@@ -2,25 +2,47 @@ syntax = "proto3";
 
 package sessionsource;
 
+import "chunksink.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
+
 option go_package = "github.com/pascalhuerst/session-recorder/protocols/go/sessionsource";
 
-service SessionSource {
-	rpc StreamOpenSessions(StreamOpenSessionsRequest) returns (stream OpenSessions);
-}
+message StreamRecordersRequest {}
 
-message StreamOpenSessionsRequest {}
-
-message OpenSessions {
-	repeated Session openSessions = 1;
-}
-
-message Session {
+message RecorderInfo {
 	string ID = 1;
-	repeated string audioFileNames = 2;
-	string waveformDataFile = 3;
-
-	int64 timeCreated = 4;
-	int64 length = 5;
-	float livetimeHours = 6;
-	bool keepSession = 7;
+	string name = 2;
+	chunksink.AudioInputStatus audioInputStatus = 3; 
 }
+
+message StreamSeesionRequst {
+	string recorderID = 1;
+}
+
+enum SessionState {
+	SESSION_STATE_UNKNOWN = 0;
+	SESSION_STATE_CREATED = 1;
+	SESSION_STATE_RECORDING = 2;
+	SESSION_STATE_FINISHED = 3;
+	SESSION_STATE_ERROR = 4;
+}
+
+message SessionInfo {
+	string ID = 1;
+	google.protobuf.Timestamp timeCreated = 2;
+	google.protobuf.Timestamp timeFinished = 3;
+
+	google.protobuf.Duration lifetime = 4;
+	string audioFileName = 5;
+	string waveformDataFile = 6;
+	bool keepSession = 7;
+
+	SessionState state = 8;
+}
+
+service SessionSource {
+	rpc StreamRecorders(StreamRecordersRequest) returns (stream RecorderInfo);
+	rpc StreamSessions(StreamSeesionRequst) returns (stream SessionInfo);
+}
+

@@ -18,7 +18,8 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type SessionSourceClient interface {
-	StreamOpenSessions(ctx context.Context, in *StreamOpenSessionsRequest, opts ...grpc.CallOption) (SessionSource_StreamOpenSessionsClient, error)
+	StreamRecorders(ctx context.Context, in *StreamRecordersRequest, opts ...grpc.CallOption) (SessionSource_StreamRecordersClient, error)
+	StreamSessions(ctx context.Context, in *StreamSeesionRequst, opts ...grpc.CallOption) (SessionSource_StreamSessionsClient, error)
 }
 
 type sessionSourceClient struct {
@@ -29,12 +30,12 @@ func NewSessionSourceClient(cc grpc.ClientConnInterface) SessionSourceClient {
 	return &sessionSourceClient{cc}
 }
 
-func (c *sessionSourceClient) StreamOpenSessions(ctx context.Context, in *StreamOpenSessionsRequest, opts ...grpc.CallOption) (SessionSource_StreamOpenSessionsClient, error) {
-	stream, err := c.cc.NewStream(ctx, &SessionSource_ServiceDesc.Streams[0], "/sessionsource.SessionSource/StreamOpenSessions", opts...)
+func (c *sessionSourceClient) StreamRecorders(ctx context.Context, in *StreamRecordersRequest, opts ...grpc.CallOption) (SessionSource_StreamRecordersClient, error) {
+	stream, err := c.cc.NewStream(ctx, &SessionSource_ServiceDesc.Streams[0], "/sessionsource.SessionSource/StreamRecorders", opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &sessionSourceStreamOpenSessionsClient{stream}
+	x := &sessionSourceStreamRecordersClient{stream}
 	if err := x.ClientStream.SendMsg(in); err != nil {
 		return nil, err
 	}
@@ -44,17 +45,49 @@ func (c *sessionSourceClient) StreamOpenSessions(ctx context.Context, in *Stream
 	return x, nil
 }
 
-type SessionSource_StreamOpenSessionsClient interface {
-	Recv() (*OpenSessions, error)
+type SessionSource_StreamRecordersClient interface {
+	Recv() (*RecorderInfo, error)
 	grpc.ClientStream
 }
 
-type sessionSourceStreamOpenSessionsClient struct {
+type sessionSourceStreamRecordersClient struct {
 	grpc.ClientStream
 }
 
-func (x *sessionSourceStreamOpenSessionsClient) Recv() (*OpenSessions, error) {
-	m := new(OpenSessions)
+func (x *sessionSourceStreamRecordersClient) Recv() (*RecorderInfo, error) {
+	m := new(RecorderInfo)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+func (c *sessionSourceClient) StreamSessions(ctx context.Context, in *StreamSeesionRequst, opts ...grpc.CallOption) (SessionSource_StreamSessionsClient, error) {
+	stream, err := c.cc.NewStream(ctx, &SessionSource_ServiceDesc.Streams[1], "/sessionsource.SessionSource/StreamSessions", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &sessionSourceStreamSessionsClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type SessionSource_StreamSessionsClient interface {
+	Recv() (*SessionInfo, error)
+	grpc.ClientStream
+}
+
+type sessionSourceStreamSessionsClient struct {
+	grpc.ClientStream
+}
+
+func (x *sessionSourceStreamSessionsClient) Recv() (*SessionInfo, error) {
+	m := new(SessionInfo)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -65,15 +98,19 @@ func (x *sessionSourceStreamOpenSessionsClient) Recv() (*OpenSessions, error) {
 // All implementations should embed UnimplementedSessionSourceServer
 // for forward compatibility
 type SessionSourceServer interface {
-	StreamOpenSessions(*StreamOpenSessionsRequest, SessionSource_StreamOpenSessionsServer) error
+	StreamRecorders(*StreamRecordersRequest, SessionSource_StreamRecordersServer) error
+	StreamSessions(*StreamSeesionRequst, SessionSource_StreamSessionsServer) error
 }
 
 // UnimplementedSessionSourceServer should be embedded to have forward compatible implementations.
 type UnimplementedSessionSourceServer struct {
 }
 
-func (UnimplementedSessionSourceServer) StreamOpenSessions(*StreamOpenSessionsRequest, SessionSource_StreamOpenSessionsServer) error {
-	return status.Errorf(codes.Unimplemented, "method StreamOpenSessions not implemented")
+func (UnimplementedSessionSourceServer) StreamRecorders(*StreamRecordersRequest, SessionSource_StreamRecordersServer) error {
+	return status.Errorf(codes.Unimplemented, "method StreamRecorders not implemented")
+}
+func (UnimplementedSessionSourceServer) StreamSessions(*StreamSeesionRequst, SessionSource_StreamSessionsServer) error {
+	return status.Errorf(codes.Unimplemented, "method StreamSessions not implemented")
 }
 
 // UnsafeSessionSourceServer may be embedded to opt out of forward compatibility for this service.
@@ -87,24 +124,45 @@ func RegisterSessionSourceServer(s grpc.ServiceRegistrar, srv SessionSourceServe
 	s.RegisterService(&SessionSource_ServiceDesc, srv)
 }
 
-func _SessionSource_StreamOpenSessions_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(StreamOpenSessionsRequest)
+func _SessionSource_StreamRecorders_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(StreamRecordersRequest)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}
-	return srv.(SessionSourceServer).StreamOpenSessions(m, &sessionSourceStreamOpenSessionsServer{stream})
+	return srv.(SessionSourceServer).StreamRecorders(m, &sessionSourceStreamRecordersServer{stream})
 }
 
-type SessionSource_StreamOpenSessionsServer interface {
-	Send(*OpenSessions) error
+type SessionSource_StreamRecordersServer interface {
+	Send(*RecorderInfo) error
 	grpc.ServerStream
 }
 
-type sessionSourceStreamOpenSessionsServer struct {
+type sessionSourceStreamRecordersServer struct {
 	grpc.ServerStream
 }
 
-func (x *sessionSourceStreamOpenSessionsServer) Send(m *OpenSessions) error {
+func (x *sessionSourceStreamRecordersServer) Send(m *RecorderInfo) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func _SessionSource_StreamSessions_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(StreamSeesionRequst)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(SessionSourceServer).StreamSessions(m, &sessionSourceStreamSessionsServer{stream})
+}
+
+type SessionSource_StreamSessionsServer interface {
+	Send(*SessionInfo) error
+	grpc.ServerStream
+}
+
+type sessionSourceStreamSessionsServer struct {
+	grpc.ServerStream
+}
+
+func (x *sessionSourceStreamSessionsServer) Send(m *SessionInfo) error {
 	return x.ServerStream.SendMsg(m)
 }
 
@@ -117,8 +175,13 @@ var SessionSource_ServiceDesc = grpc.ServiceDesc{
 	Methods:     []grpc.MethodDesc{},
 	Streams: []grpc.StreamDesc{
 		{
-			StreamName:    "StreamOpenSessions",
-			Handler:       _SessionSource_StreamOpenSessions_Handler,
+			StreamName:    "StreamRecorders",
+			Handler:       _SessionSource_StreamRecorders_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "StreamSessions",
+			Handler:       _SessionSource_StreamSessions_Handler,
 			ServerStreams: true,
 		},
 	},

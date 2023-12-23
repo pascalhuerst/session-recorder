@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package audiosource;
+
+option go_package = "github.com/pascalhuerst/alsa2fifo_indexer/audiosource";
+
+service AudioSource {
+    rpc SetAudioSourceInfo(SetAudioSourceInfoRequest) returns (Reply);
+}
+
+message Reply {}
+
+message SetAudioSourceInfoRequest{
+    AudioSourceInfo info = 1;
+}
+
+message AudioSourceInfo {
+    string name = 1;
+    AudioSourceStatus status = 2;
+}
+
+message AudioSourceStatus {
+    enum Code {
+        UNKNOWN = 0;
+        MONITORING = 1;
+        LEVEL_DETECTED = 2;
+        ERROR = 3;    
+    }
+
+    Code code = 1;
+}

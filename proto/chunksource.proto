@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package chunksource;
+
+option go_package = "github.com/pascalhuerst/alsa2fifo_indexer/proto/go/chunksource";
+
+service ChunkSource {
+    rpc StreamChunkSourceStatus(StreamChunkSourceStatusRequest) returns (stream ChunkSourceInfo);
+}
+
+message StreamChunkSourceStatusRequest{}
+
+message ChunkSourceInfo {
+    string name = 1;
+    string uuid = 2;
+    
+    ChunkSourceMetrics  metrics = 3;
+}
+
+message ChunkSourceMetrics {
+    string sessionID = 1;
+    uint32 chunkCount = 3;
+    uint64 startTime = 4;
+    uint64 sessionSize = 5;
+}

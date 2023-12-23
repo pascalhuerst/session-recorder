@@ -2,19 +2,25 @@ PROTOC ?= protoc
 GRPC_CPP_PLUGIN ?= $(shell which grpc_cpp_plugin)
 GRPC_TS_PLUGIN ?= ./node_modules/.bin/protoc-gen-ts_proto
 MD ?= mkdir
+CP ?= cp
 
 PROTOS = \
-	chunksource \
+	chunksink \
 	sessionsource
 
-all: create_dirs ${PROTOS}
+
+
+all: create_dirs ${PROTOS} gomod
+
+gomod:
+	cp go.mod ./go
 
 create_dirs:
 	$(MD) -p cpp
 	$(MD) -p ts
 	$(MD) -p go
 
-chunksource:
+chunksink:
 	${PROTOC} \
 		--grpc_out=generate_mock_code=false:./cpp \
 		--cpp_out=./cpp \

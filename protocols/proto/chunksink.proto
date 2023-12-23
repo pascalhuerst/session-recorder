@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package chunksink;
+
+option go_package = "github.com/pascalhuerst/session-recorder/protocols/go/chunksink";
+
+enum AudioInputStatus {
+    UNKNOWN = 0;
+    NO_SIGNAL = 1;
+    SIGNAL = 2;
+}
+
+message RecorderStatusRequest {
+    string name = 1;
+    string uuid = 2;
+    
+    AudioInputStatus status = 3;
+}
+
+message RecorderStatusReply {
+    bool sendChunks = 1;
+}
+
+message StreamChunkDataRequest{}
+
+message ChunkSourceMetrics {
+    string sessionID = 1;
+    uint32 chunkCount = 2;
+    uint64 startTime = 3;
+}
+
+message ChunkData {
+    string name = 1;
+    string uuid = 2;
+    
+    ChunkSourceMetrics metrics = 3;
+    repeated uint32 samples = 4;
+}
+
+service ChunkSink {
+    rpc StreamChunkData(StreamChunkDataRequest) returns (stream ChunkData);
+    rpc SetRecorderStatus(RecorderStatusRequest) returns (RecorderStatusReply);
+}

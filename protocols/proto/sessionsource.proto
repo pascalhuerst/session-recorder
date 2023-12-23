@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package sessionsource;
 
-option go_package = "github.com/pascalhuerst/alsa2fifo_indexer/sessionsource";
+option go_package = "github.com/pascalhuerst/session-recorder/protocols/go/sessionsource";
 
 service SessionSource {
 	rpc StreamOpenSessions(StreamOpenSessionsRequest) returns (stream OpenSessions);

@@ -22,11 +22,12 @@ chunksource:
 		--proto_path=proto \
 		$@.proto
 
+	$(MD) -p go/$@
 	$(PROTOC) \
-		--go_out=paths=source_relative:./go $@.proto \
+		--go_out=paths=source_relative:./go/$@ $@.proto \
 		--go-grpc_opt=require_unimplemented_servers=false,paths=source_relative \
 		--proto_path=proto \
-		--go-grpc_out=./go $@.proto
+		--go-grpc_out=./go/$@ $@.proto
 
 
 sessionsource:
@@ -37,11 +38,12 @@ sessionsource:
 		--proto_path=proto \
 		$@.proto
 
+	$(MD) -p go/$@
 	$(PROTOC) \
-		--go_out=paths=source_relative:./go $@.proto \
+		--go_out=paths=source_relative:./go/$@ $@.proto \
 		--go-grpc_opt=require_unimplemented_servers=false,paths=source_relative \
 		--proto_path=proto \
-		--go-grpc_out=./go $@.proto
+		--go-grpc_out=./go/$@ $@.proto
 	
 clean:
 	rm -rf cpp

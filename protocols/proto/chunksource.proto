@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package chunksource;
 
-option go_package = "github.com/pascalhuerst/alsa2fifo_indexer/proto/go/chunksource";
+option go_package = "github.com/pascalhuerst/session-recorder/protocols/go/chunksource";
 
 service ChunkSource {
     rpc StreamChunkSourceStatus(StreamChunkSourceStatusRequest) returns (stream ChunkSourceInfo);

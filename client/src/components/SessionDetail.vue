@@ -1,10 +1,15 @@
 <template>
   <div class="sessions">
-    <b-loading :is-full-page="true" :active="loading" :can-cancel="false" id="connectionSpinner"></b-loading>
+    <b-loading
+      :is-full-page="true"
+      :active="loading"
+      :can-cancel="false"
+      id="connectionSpinner"
+    ></b-loading>
     <h1 class="title">Detail</h1>
     <div class="tags has-addons">
-          <span class="tag">Session ID</span>
-          <span class="tag is-primary">{{ sessionID }}</span>
+      <span class="tag">Session ID</span>
+      <span class="tag is-primary">{{ sessionID }}</span>
     </div>
     <!--
     <div class="buttons">
@@ -19,42 +24,52 @@
       <div id="overview-waveform"></div>
       <div class="vspace"></div>
       <h2 class="subtitle">Zoom View</h2>
-              
-       <nav class="level">
-        <!-- Left side -->
-          <div class="level-left">
-            <div class="level-item">
-              <b-button size="is-small" type="is-primary" v-on:click="play">
-                <i class="fas fa-play"></i>
-              </b-button>
-            </div>
-            <div class="level-item">
-              <b-button size="is-small" type="is-primary" v-on:click="zoomIn">
-                <i class="fas fa-search-plus"></i>
-              </b-button>
-            </div>
-            <div class="level-item">
-              <b-button size="is-small" type="is-primary" v-on:click="zoomOut">
-                <i class="fas fa-search-minus"></i>
-              </b-button>
-            </div>
-          </div>
 
-          <!-- Right side -->
-          <div class="level-right">
-            <div class="level-item">
-              <span class="is-small">Create Segment</span>
-            </div>
-            <div class="level-item">
-              <input v-model="segmentName" class="input is-small" type="text" placeholder="Name">
-            </div>
-            <div class="level-item">
-              <b-button  :disabled="segmentName === ''" size="is-small" type="is-primary" v-on:click="addSegment">
-                <i class="fas fa-plus"></i>
-              </b-button>
-            </div>
+      <nav class="level">
+        <!-- Left side -->
+        <div class="level-left">
+          <div class="level-item">
+            <b-button size="is-small" type="is-primary" v-on:click="play">
+              <i class="fas fa-play"></i>
+            </b-button>
           </div>
-        </nav>
+          <div class="level-item">
+            <b-button size="is-small" type="is-primary" v-on:click="zoomIn">
+              <i class="fas fa-search-plus"></i>
+            </b-button>
+          </div>
+          <div class="level-item">
+            <b-button size="is-small" type="is-primary" v-on:click="zoomOut">
+              <i class="fas fa-search-minus"></i>
+            </b-button>
+          </div>
+        </div>
+
+        <!-- Right side -->
+        <div class="level-right">
+          <div class="level-item">
+            <span class="is-small">Create Segment</span>
+          </div>
+          <div class="level-item">
+            <input
+              v-model="segmentName"
+              class="input is-small"
+              type="text"
+              placeholder="Name"
+            />
+          </div>
+          <div class="level-item">
+            <b-button
+              :disabled="segmentName === ''"
+              size="is-small"
+              type="is-primary"
+              v-on:click="addSegment"
+            >
+              <i class="fas fa-plus"></i>
+            </b-button>
+          </div>
+        </div>
+      </nav>
       <div id="zoomview-waveform"></div>
     </div>
 
@@ -67,32 +82,53 @@
           <span class="is-small">Name</span>
         </div>
         <div class="level-item">
-          <input v-model="segment.labelText" class="input is-small" type="text" placeholder="Name">
+          <input
+            v-model="segment.labelText"
+            class="input is-small"
+            type="text"
+            placeholder="Name"
+          />
         </div>
         <div class="level-item">
           <span class="is-small">Start Time</span>
         </div>
         <div class="level-item">
-          <input v-model="segment.startTime" class="input is-small" type="text" placeholder="Start Time">
+          <input
+            v-model="segment.startTime"
+            class="input is-small"
+            type="text"
+            placeholder="Start Time"
+          />
         </div>
         <div class="level-item">
           <span class="is-small">End Time</span>
         </div>
-         <div class="level-item">
-          <input v-model="segment.endTime" class="input is-small" type="text" placeholder="End Time">
+        <div class="level-item">
+          <input
+            v-model="segment.endTime"
+            class="input is-small"
+            type="text"
+            placeholder="End Time"
+          />
         </div>
-         <div class="level-item">
-          <input v-model="segment.ID" class="input is-small" type="text" placeholder="End Time">
+        <div class="level-item">
+          <input
+            v-model="segment.ID"
+            class="input is-small"
+            type="text"
+            placeholder="End Time"
+          />
         </div>
-         <div class="level-item">
-          <button class="delete" @click="removeSegment(segment.id)">{{ segment.id }}</button>
+        <div class="level-item">
+          <button class="delete" @click="removeSegment(segment.id)">
+            {{ segment.id }}
+          </button>
         </div>
       </div>
 
       <!-- Right side -->
       <div class="level-right">
-        <div class="level-item">
-        </div>
+        <div class="level-item"></div>
       </div>
     </nav>
 
@@ -101,13 +137,21 @@
     <div class="vspace">
       <div class="buttons">
         <section>
-          <button class="button is-danger is-outlined" is-pulled-left @click="$router.push('/')">
+          <button
+            class="button is-danger is-outlined"
+            is-pulled-left
+            @click="$router.push('/')"
+          >
             <span>Abort</span>
             <span class="icon is-small">
               <i class="fas fa-times"></i>
             </span>
           </button>
-          <button class="button is-success" is-pulled-right @click="renderSegments()">
+          <button
+            class="button is-success"
+            is-pulled-right
+            @click="renderSegments()"
+          >
             <span class="icon is-small">
               <i class="fas fa-check"></i>
             </span>
@@ -116,7 +160,6 @@
         </section>
       </div>
     </div>
-
 
     <audio>
       <source :src="this.mediaURL" type="audio/ogg" />
@@ -135,8 +178,7 @@ const foregroundColor = "#eeeeee55";
 
 export default {
   name: "SessionDetail",
-  components: {
-  },
+  components: {},
   data() {
     return {
       backendServerURL: "http://server.lan:8234/",
@@ -144,9 +186,9 @@ export default {
       arrayBufferURL: "",
       mediaURL: "",
       isSegmentEditorActive: false,
-      segments: new Object(),
+      segments: {},
       segmentName: "",
-      playState: 'Play',
+      playState: "Play",
       instance: undefined,
       loading: true,
     };
@@ -217,7 +259,9 @@ export default {
         axisLabelColor: foregroundColor,
 
         // Array of zoom levels in samples per pixel (big >> small)
-        zoomLevels: [512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144],
+        zoomLevels: [
+          512, 1024, 2048, 4096, 8192, 16384, 32768, 65536, 131072, 262144,
+        ],
         /*
         segments: [{
           startTime: 1,
@@ -236,9 +280,8 @@ export default {
         }
         this.loading = false;
 
-        inst.on('segments.add', this.segmentAdded);
-        inst.on('segments.remove', this.segmentRemoved);
-
+        inst.on("segments.add", this.segmentAdded);
+        inst.on("segments.remove", this.segmentRemoved);
       });
     },
     segmentAdded(segments) {
@@ -255,32 +298,32 @@ export default {
     },
     play() {
       if (this.instance !== undefined) {
-        if (this.playState == 'Play') {
+        if (this.playState == "Play") {
           this.instance.player.play();
-          this.playState = 'Pause';
+          this.playState = "Pause";
         } else {
           this.instance.player.pause();
-          this.playState = 'Play';
+          this.playState = "Play";
         }
       }
     },
     removeSegment(id) {
-      console.log('Removing Segment: ' + id);
+      console.log("Removing Segment: " + id);
       this.instance.segments.removeById(id);
     },
-    addSegment() {     
+    addSegment() {
       this.instance.segments.add({
         startTime: this.instance.player.getCurrentTime(),
         endTime: this.instance.player.getCurrentTime() + 10,
         labelText: this.segmentName,
         editable: true,
-        color: '#ffffff99',
+        color: "#ffffff99",
       });
       this.segmentName = "";
     },
     syncSegments() {
       var segments = this.instance.segments.getSegments();
-      
+
       for (var i = 0; i < segments.length; i++) {
         var segment = segments[i];
 
@@ -289,7 +332,7 @@ export default {
           startTime: segment.startTime,
           endTime: segment.endTime,
           id: segment.id,
-          filetypes: ['mp3', 'ogg', 'wav', 'flac']
+          filetypes: ["mp3", "ogg", "wav", "flac"],
         });
       }
     },
@@ -330,8 +373,8 @@ export default {
       this.instance.zoom.zoomOut();
     },
     renderSegments() {
-      this.syncSegments()
-      
+      this.syncSegments();
+
       const requestOptions = {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -339,28 +382,25 @@ export default {
           sessionID: this.sessionID,
           recorderID: this.recorderID,
           segments: this.segments,
-        })
+        }),
       };
 
-      fetch(this.backendServerURL + 'render', requestOptions)
-        .then(response => {
-          console.log(JSON.stringify(response))
-        });
-      
+      fetch(this.backendServerURL + "render", requestOptions).then(
+        (response) => {
+          console.log(JSON.stringify(response));
+        },
+      );
 
-      console.log(JSON.stringify(this.segments))
+      console.log(JSON.stringify(this.segments));
 
       //this.$router.push('/');
-    }
+    },
   },
 };
 </script>
-
 
 <style scoped>
 .vspace {
   padding-top: 50px;
 }
 </style>
-
-

@@ -1,5 +1,5 @@
 // Import Bulma's core
-@import "~bulma/sass/utilities/_all";
+@import "../../../node_modules/bulma/sass/utilities/_all.sass";
 
 // Set your colors
 $primary: #0c86ed;
@@ -90,5 +90,5 @@ $link-focus-border: $primary;
 
 
 // Import Bulma and Buefy styles
-@import "~bulma";
-@import "~buefy/src/scss/buefy";
+@import "../../../node_modules/bulma/bulma.sass";
+@import "../../../node_modules/buefy/src/scss/buefy.scss";

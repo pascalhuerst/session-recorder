@@ -1,17 +1,14 @@
 <template>
   <section class="section">
     <div class="sessions">
-      
-      
-      
       <div class="tabs  is-boxed">
         <ul v-for="(recorder, key) in sessionsList"
-        :key="key">
-          <li :class="selectedRecorderID === key ? 'is-active' : ''" ><a @click="selectedRecorderID=key"> {{ key }} </a></li>
+            :key="key">
+          <li :class="selectedRecorderID === key ? 'is-active' : ''"><a @click="selectedRecorderID=key"> {{ key }} </a>
+          </li>
         </ul>
-      </div>        
-      
-      
+      </div>
+
 
       <div v-if="selectedRecorderID !== undefined">
         <section class="hero" v-for="(session, index) in sessionsList[selectedRecorderID].open_sessions" :key="index">
@@ -21,18 +18,18 @@
             <nav class="level">
               <!-- Left side -->
               <div class="level-left">
-              
+
                 <div class="level-item">
                   <div class="tags has-addons">
                     <span class="tag">Lifetime</span>
-                    <span class="tag is-primary">{{ formatHourToLive(session.hours_to_live)}} Hours</span>
-                  </div>              
+                    <span class="tag is-primary">{{ formatHourToLive(session.hours_to_live) }} Hours</span>
+                  </div>
                 </div>
                 <div class="level-item">
                   <div class="tags has-addons">
                     <span class="tag">Created</span>
                     <span class="tag is-primary">{{ new Date(session.timestamp).toLocaleString() }}</span>
-                  </div>    
+                  </div>
                 </div>
               </div>
 
@@ -45,15 +42,16 @@
                   </span>
                 </div>
                 <div class="level-item">
-                <a :href="backendServerURL +  selectedRecorderID + '/' + session.id + '/' + 'data.wav'">
-                    <span class="tag is-primary" >
+                  <a :href="backendServerURL +  selectedRecorderID + '/' + session.id + '/' + 'data.wav'">
+                    <span class="tag is-primary">
                       <i class="fas fa-download"></i>
                     </span>
                   </a>
                 </div>
 
                 <!-- Flagged Sessions don't get autodeleted -->
-                <b-switch v-model="session.flagged" @input="flagSession(selectedRecorderID, session.id, session.flagged)">
+                <b-switch v-model="session.flagged"
+                          @input="flagSession(selectedRecorderID, session.id, session.flagged)">
                   {{ session.flagged == true ? 'Keep Session' : 'Audo Delete' }}
                 </b-switch>
 
@@ -74,8 +72,8 @@
 
             <a v-bind:href="serverURL + 'detail/' + selectedRecorderID + '/' + session.id">
               <img
-                class="waveform"
-                :src="backendServerURL +  selectedRecorderID + '/' + session.id + '/' + 'overview.png'"
+                  class="waveform"
+                  :src="backendServerURL +  selectedRecorderID + '/' + session.id + '/' + 'overview.png'"
               />
             </a>
           </div>
@@ -89,8 +87,7 @@
 
 export default {
   name: "OpenSessions",
-  components: {
-  },
+  components: {},
   data() {
     return {
       serverURL: "http://server.lan/",
@@ -109,24 +106,24 @@ export default {
   methods: {
     getSessionsList() {
       fetch(this.backendServerURL + 'introspect')
-        .then((response) => response.json())
-        .then((data) => {
-          this.sessionsList = data;
+          .then((response) => response.json())
+          .then((data) => {
+            this.sessionsList = data;
 
-          this.availableRecorderIDs = []
-          for (let key in this.sessionsList) {
-            this.availableRecorderIDs.push(key)
-          }
+            this.availableRecorderIDs = []
+            for (let key in this.sessionsList) {
+              this.availableRecorderIDs.push(key)
+            }
 
-          console.log(JSON.stringify(this.sessionsList))
+            console.log(JSON.stringify(this.sessionsList))
 
-/*
-          for (let key in this.sessionsList) {
-            this.selectedRecorderID = key
-            break;
-          }
-*/
-        });
+            /*
+                      for (let key in this.sessionsList) {
+                        this.selectedRecorderID = key
+                        break;
+                      }
+            */
+          });
     },
     formatHourToLive(hours) {
       return Math.floor(hours)
@@ -134,7 +131,7 @@ export default {
     deleteSession(recorderID, sessionID) {
       const requestOptions = {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {"Content-Type": "application/json"},
         body: JSON.stringify({
           recorderID: recorderID,
           sessionID: sessionID,
@@ -142,18 +139,18 @@ export default {
       };
 
       fetch(this.backendServerURL + 'delete', requestOptions)
-        .then(response => {
-          console.log(JSON.stringify(response));
-          this.getSessionsList();
-      });
+          .then(response => {
+            console.log(JSON.stringify(response));
+            this.getSessionsList();
+          });
     },
     flagSession(recorderID, sessionID, isFlagged) {
-      
+
       console.log('isFlagged: ' + isFlagged)
-      
+
       const requestOptions = {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {"Content-Type": "application/json"},
         body: JSON.stringify({
           recorderID: recorderID,
           sessionID: sessionID,
@@ -162,18 +159,18 @@ export default {
       };
 
       fetch(this.backendServerURL + 'flag', requestOptions)
-        .then(response => {
-          console.log(JSON.stringify(response));
-          //this.getSessionsList();
-      });
+          .then(response => {
+            console.log(JSON.stringify(response));
+            //this.getSessionsList();
+          });
     },
     playSession(recorderID, sessionID) {
-      
+
       console.log("playSession")
-      
+
       const requestOptions = {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {"Content-Type": "application/json"},
         body: JSON.stringify({
           recorderID: recorderID,
           sessionID: sessionID,
@@ -182,10 +179,10 @@ export default {
       };
 
       fetch(this.backendServerURL + 'play', requestOptions)
-        .then(response => {
-          console.log(JSON.stringify(response));
-        });
-      }
+          .then(response => {
+            console.log(JSON.stringify(response));
+          });
+    }
   },
 };
 </script>

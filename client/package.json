@@ -1,64 +1,40 @@
 {
-  "name": "domestic-recorder-frontend",
-  "version": "0.1.0",
+  "name": "@session-recorder/client",
   "private": true,
+  "version": "0.0.0",
+  "type": "module",
   "scripts": {
-    "serve": "vue-cli-service serve",
-    "build": "vue-cli-service build",
-    "lint": "vue-cli-service lint"
+    "dev": "vite",
+    "build": "vue-tsc && vite build",
+    "preview": "vite preview"
   },
   "dependencies": {
-    "@improbable-eng/grpc-web": "^0.13.0",
-    "@types/google-protobuf": "^3.15.5",
+    "@improbable-eng/grpc-web": "^0.15.0",
+    "@types/google-protobuf": "^3.15.12",
     "alsa2fifo_indexer": "github:pascalhuerst/alsa2fifo_indexer",
-    "buefy": "^0.9.4",
-    "core-js": "^3.6.5",
-    "google-protobuf": "^3.18.0",
+    "buefy": "^0.9.25",
+    "core-js": "^3.34.0",
+    "google-protobuf": "^3.21.2",
     "grpc-web-client": "^0.7.0",
-    "peaks.js": "^0.22.0",
-    "vue": "^2.6.11",
-    "vue-class-component": "^7.2.3",
+    "peaks.js": "^3.2.1",
+    "vue": "^2.7.15",
+    "vue-class-component": "^7.2.6",
     "vue-property-decorator": "^9.1.2",
-    "vue-router": "^3.4.9",
-    "vuex": "^3.6.2",
+    "vue-router": "3.6.5",
+    "vuex": "3.6.2",
     "vuex-class": "^0.3.2",
-    "waveform-data": "^3.3.4"
+    "waveform-data": "^4.4.0"
   },
   "devDependencies": {
-    "@typescript-eslint/eslint-plugin": "^4.32.0",
-    "@typescript-eslint/parser": "^4.32.0",
-    "@vue/cli-plugin-babel": "~4.5.0",
-    "@vue/cli-plugin-eslint": "^3.1.1",
-    "@vue/cli-plugin-typescript": "^4.5.13",
-    "@vue/cli-service": "^3.12.1",
-    "@vue/eslint-config-typescript": "^4.0.0",
-    "babel-eslint": "^10.1.0",
-    "eslint": "^6.7.2",
-    "eslint-plugin-vue": "^7.18.0",
-    "node-sass": "^6.0.1",
-    "sass-loader": "^10.1.0",
-    "style-loader": "^2.0.0",
-    "typescript": "~4.1.5",
-    "vue-template-compiler": "^2.6.11"
-  },
-  "eslintConfig": {
-    "root": true,
-    "env": {
-      "node": true
-    },
-    "extends": [
-      "plugin:vue/essential",
-      "eslint:recommended",
-      "@vue/typescript"
-    ],
-    "parserOptions": {
-      "parser": "@typescript-eslint/parser"
-    },
-    "rules": {}
-  },
-  "browserslist": [
-    "> 1%",
-    "last 2 versions",
-    "not dead"
-  ]
+    "@typescript-eslint/eslint-plugin": "^6.15.0",
+    "@typescript-eslint/parser": "^6.15.0",
+    "@vitejs/plugin-vue2": "^2.3.1",
+    "@vue/eslint-config-typescript": "^12.0.0",
+    "eslint": "^8.56.0",
+    "eslint-plugin-vue": "^9.19.2",
+    "sass": "^1.69.5",
+    "typescript": "^5.3.3",
+    "vite": "4.5.1",
+    "vue-tsc": "^1.8.26"
+  }
 }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { OpenSession } from "../../../client/getOpenSessions.ts";
+import { OpenSession } from "../../../grpc/procedures/streamSessions.ts";
 import WaveformCanvas from "../../../lib/waveform/WaveformCanvas.vue";
 import { computed } from "vue";
 import { env } from "../../../env.ts";

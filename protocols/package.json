@@ -1,4 +1,6 @@
 {
+  "name": "@session-recorder/protocols",
+  "private": true,
   "dependencies": {
     "long": "^5.2.3",
     "nice-grpc": "^2.1.7",

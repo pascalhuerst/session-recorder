@@ -1,15 +1,19 @@
 <script setup lang="ts">
-import { useAsyncState } from "@vueuse/core";
-import { getRecordingDevices } from "../../../client/getRecordingDevices.ts";
 import { useRoute, useRouter } from "vue-router";
-import { computed } from "vue";
+import { computed, ref } from "vue";
+import { streamRecorders } from "../../../grpc/procedures/streamRecorders.ts";
+import { RecorderInfo } from "@session-recorder/protocols/ts/sessionsource.ts";
 
 const router = useRouter();
 const route = useRoute();
 
-const { state } = useAsyncState(async () => {
-  return { recorderIds: await getRecordingDevices() };
-}, { recorderIds: [] });
+const recorders = ref<Set<RecorderInfo>>(new Set);
+
+streamRecorders({
+  onMessage: (recorderInfo) => {
+    recorders.value.add(recorderInfo);
+  }
+});
 
 const selectedRecorderId = computed(() => route.params.recorderId);
 
@@ -21,9 +25,9 @@ const setSelected = (item: string) => {
 <template>
   <nav>
     <ul>
-      <li v-for="recorderId in state.recorderIds" :key="recorderId">
-        <button :class="['link', { 'is-active': selectedRecorderId === recorderId }]" @click="setSelected(recorderId)">
-          {{ recorderId }}
+      <li v-for="recorder in recorders" :key="recorder.ID">
+        <button :class="['link', { 'is-active': selectedRecorderId === recorder.ID }]" @click="setSelected(recorder.ID)">
+          {{ recorder.name }}
         </button>
       </li>
     </ul>

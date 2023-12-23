@@ -40,7 +40,7 @@ sessionsource:
 	$(PROTOC) \
 		--plugin=protoc-gen-ts_proto=$(GRPC_TS_PLUGIN) \
 		--ts_proto_out=./ts \
-		--ts_proto_opt=outputServices=nice-grpc,outputServices=generic-definitions,useExactTypes=false \
+		--ts_proto_opt=outputServices=nice-grpc,outputServices=generic-definitions,useExactTypes=false,esModuleInterop=true \
 		--proto_path=proto \
 		$@.proto
 

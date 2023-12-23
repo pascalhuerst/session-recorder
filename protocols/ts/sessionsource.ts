@@ -1,6 +1,6 @@
 /* eslint-disable */
 import type { CallContext, CallOptions } from "nice-grpc-common";
-import * as _m0 from "protobufjs/minimal";
+import _m0 from "protobufjs/minimal";
 import { AudioInputStatus, audioInputStatusFromJSON, audioInputStatusToJSON } from "./chunksink";
 import { Duration } from "./google/protobuf/duration";
 import { Timestamp } from "./google/protobuf/timestamp";

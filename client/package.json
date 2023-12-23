@@ -6,16 +6,15 @@
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "preinstall": "npm install ../protocols"
   },
   "dependencies": {
-    "@improbable-eng/grpc-web": "^0.15.0",
-    "@types/google-protobuf": "^3.15.12",
+    "@session-recorder/protocols": "file:../protocols",
     "@vueuse/core": "^10.7.0",
-    "alsa2fifo_indexer": "github:pascalhuerst/alsa2fifo_indexer",
     "core-js": "^3.34.0",
     "google-protobuf": "^3.21.2",
-    "grpc-web-client": "^0.7.0",
+    "nice-grpc-web": "^3.3.2",
     "peaks.js": "^3.2.1",
     "pinia": "^2.1.7",
     "pollen-css": "^4.6.2",
@@ -25,6 +24,7 @@
     "zod": "^3.22.4"
   },
   "devDependencies": {
+    "@types/google-protobuf": "^3.15.12",
     "@typescript-eslint/eslint-plugin": "^6.15.0",
     "@typescript-eslint/parser": "^6.15.0",
     "@vitejs/plugin-vue": "^4.5.2",

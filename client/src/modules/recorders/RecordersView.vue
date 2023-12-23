@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { useRouter } from "vue-router";
 import { onBeforeMount } from "vue";
-import { getRecordingDevices } from "../../client/getRecordingDevices.ts";
+import { streamRecorders } from "../../grpc/procedures/streamRecorders.ts";
 
 const router = useRouter();
 
 onBeforeMount(() => {
-  getRecordingDevices().then((devices) => {
-    router.replace(`/recorders/${devices.at(0)}/sessions`);
+  streamRecorders({
+    onMessage: (recorderInfo) => {
+      router.replace(`/recorders/${recorderInfo.ID}/sessions`);
+    }
   });
 });
 

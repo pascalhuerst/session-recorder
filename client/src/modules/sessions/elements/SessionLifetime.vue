@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { OpenSession } from "../../../client/getOpenSessions.ts";
+import { OpenSession } from "../../../grpc/procedures/streamSessions.ts";
 import Switch from "../../../lib/forms/Switch.vue";
 import { computed, ref } from "vue";
 

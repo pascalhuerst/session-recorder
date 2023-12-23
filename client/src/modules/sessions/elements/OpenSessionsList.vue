@@ -1,27 +1,35 @@
 <script setup lang="ts">
 import { useRoute } from "vue-router";
-import { useAsyncState } from "@vueuse/core";
-import { computed, watch } from "vue";
-import { getOpenSessions } from "../../../client/getOpenSessions.ts";
+import { computed, ref, watch } from "vue";
+import { streamSessions } from "../../../grpc/procedures/streamSessions.ts";
 import SessionCard from "./SessionCard.vue";
+import { SessionInfo} from '@session-recorder/protocols/ts/sessionsource.ts';
 
 const route = useRoute();
 
+const sessions = ref<Set<SessionInfo>>(new Set);
 const selectedRecorderId = computed(() => route.params.recorderId as string);
 
-const { state, execute } = useAsyncState(async () => {
-  return { sessions: await getOpenSessions(selectedRecorderId.value) };
-}, { sessions: [] });
-
 watch(selectedRecorderId, () => {
-  execute();
+  sessions.value.clear();
+
+  streamSessions({
+    request: {
+      recorderID: selectedRecorderId.value
+    },
+    onMessage: (session) => {
+      sessions.value.add(session);
+    }
+  });
+}, {
+  immediate: true
 });
 </script>
 
 <template>
   <div class="list">
-    <template v-for="(session, index) in state.sessions" :key="session.id">
-      <SessionCard :session="session" :recorder-id="selectedRecorderId" :index="state.sessions.length - index" />
+    <template v-for="(session, index) in sessions" :key="session.id">
+      <SessionCard :session="session" :recorder-id="selectedRecorderId" :index="sessions.size - index" />
     </template>
   </div>
 </template>

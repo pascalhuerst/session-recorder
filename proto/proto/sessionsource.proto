@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package sessionsource;
+
+option go_package = "github.com/pascalhuerst/alsa2fifo_indexer/sessionsource";
+
+service SessionSource {
+	rpc StreamOpenSessions(StreamOpenSessionsRequest) returns (stream OpenSessions);
+}
+
+message StreamOpenSessionsRequest {}
+
+message OpenSessions {
+	repeated Session openSessions = 1;
+}
+
+message Session {
+	string ID = 1;
+	repeated string audioFileNames = 2;
+	string waveformDataFile = 3;
+
+	int64 timeCreated = 4;
+	int64 length = 5;
+	float livetimeHours = 6;
+	bool keepSession = 7;
+}

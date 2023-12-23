@@ -1,47 +1,49 @@
 PROTOC ?= protoc
 GRPC_CPP_PLUGIN ?= $(shell which grpc_cpp_plugin)
-GRPC_TS_PLUGIN ?= $(shell which protoc-gen-ts)
+GRPC_TS_PLUGIN ?= ./node_modules/.bin/protoc-gen-ts_proto
 MD ?= mkdir
 
 PROTOS = \
-	audiosource
+	chunksource \
+	sessionsource
 
-all: ${PROTOS}
+all: create_dirs ${PROTOS}
+
+create_dirs:
+	$(MD) -p cpp
+	$(MD) -p ts
+	$(MD) -p go
 
 chunksource:
-	${PROTOC} --go-grpc_out=paths=source_relative:./go $@.proto
-	${PROTOC} --grpc_out=generate_mock_code=false:./cpp \
-			  --cpp_out=./cpp \
-			  --plugin=protoc-gen-grpc=${GRPC_CPP_PLUGIN} \
-			  --proto_path=. \
-			  $@.proto
-	$(PROTOC) --plugin=protoc-gen-ts=${GRPC_TS_PLUGIN} \
-			  --proto_path=. \
-			  --ts_out="service=grpc-web:./ts" \
-  			  --js_out="import_style=commonjs,binary:./ts" \
-			  $@.proto
+	${PROTOC} \
+		--grpc_out=generate_mock_code=false:./cpp \
+		--cpp_out=./cpp \
+		--plugin=protoc-gen-grpc=${GRPC_CPP_PLUGIN} \
+		--proto_path=proto \
+		$@.proto
 
-audiosource:
-	${PROTOC} --go_out=paths=source_relative:../$@ $@.proto \
-			  --go-grpc_opt=require_unimplemented_servers=false,paths=source_relative \
-			  --go-grpc_out=../$@ $@.proto
-	${MD} -p ./cpp/$@
-	${PROTOC} --grpc_out=generate_mock_code=false:./cpp/$@ \
-			  --cpp_out=./cpp/$@ \
-			  --plugin=protoc-gen-grpc=${GRPC_CPP_PLUGIN} \
-			  --proto_path=. \
-			  $@.proto	
+	$(PROTOC) \
+		--go_out=paths=source_relative:./go $@.proto \
+		--go-grpc_opt=require_unimplemented_servers=false,paths=source_relative \
+		--proto_path=proto \
+		--go-grpc_out=./go $@.proto
+
 
 sessionsource:
-	${PROTOC} --go_out=paths=source_relative:../$@ $@.proto \
-			  --go-grpc_opt=require_unimplemented_servers=false,paths=source_relative \
-			  --go-grpc_out=../$@ $@.proto
-	$(PROTOC) --plugin=protoc-gen-ts=${GRPC_TS_PLUGIN} \
-			  --proto_path=. \
-			  --ts_out="service=grpc-web:./ts" \
-			  --js_out="import_style=commonjs,binary:./ts" \
-			  $@.proto
+	$(PROTOC) \
+		--plugin=protoc-gen-ts_proto=$(GRPC_TS_PLUGIN) \
+		--ts_proto_out=./ts \
+		--ts_proto_opt=outputServices=nice-grpc,outputServices=generic-definitions,useExactTypes=false \
+		--proto_path=proto \
+		$@.proto
 
+	$(PROTOC) \
+		--go_out=paths=source_relative:./go $@.proto \
+		--go-grpc_opt=require_unimplemented_servers=false,paths=source_relative \
+		--proto_path=proto \
+		--go-grpc_out=./go $@.proto
+	
 clean:
-	rm -f cpp/*
-	rm -f ts/*
+	rm -rf cpp
+	rm -rf ts
+	rm -rf go

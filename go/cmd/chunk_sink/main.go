@@ -3,7 +3,8 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
+
 	"net/http"
 	"os"
 	"os/exec"
@@ -12,13 +13,20 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/mattn/go-colorable"
+	"github.com/pascalhuerst/session-recorder/grpc"
 	"github.com/pascalhuerst/session-recorder/mdns"
 
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 )
 
-const chunkSinkPort = 8080
-const chunkSinkService = "_observer-chunksink._tcp"
+const (
+	chunkSinkPort        = 8779
+	chunkSinkService     = "_session-recorder-chunksink._tcp"
+	sessionSourcePort    = 8780
+	sessionSourceService = "_session-recorder-sessionsource._tcp"
+)
 
 var (
 	version string
@@ -57,8 +65,7 @@ func parseFileName(fileName string) (chunk, error) {
 }
 
 func (i indexer) cleanupChunks() {
-
-	recorders, err := ioutil.ReadDir(i.chunkDir)
+	recorders, err := os.ReadDir(i.chunkDir)
 	if err != nil {
 		fmt.Printf("Cannot read recorders in: %v\n", i.chunkDir)
 		return
@@ -68,7 +75,7 @@ func (i indexer) cleanupChunks() {
 		fmt.Printf("Cleaning up %s\n", recorder.Name())
 
 		sessionsPath := filepath.Join(i.chunkDir, recorder.Name())
-		sessions, err := ioutil.ReadDir(sessionsPath)
+		sessions, err := os.ReadDir(sessionsPath)
 		if err != nil {
 			fmt.Printf("Cannot read sessions in: %v\n", sessionsPath)
 			return
@@ -87,7 +94,7 @@ func (i indexer) closeSession(recorderID, sessionID string) {
 	os.MkdirAll(targetPath, os.ModePerm)
 
 	sourcePath := filepath.Join(i.chunkDir, recorderID, sessionID)
-	chunks, err := ioutil.ReadDir(sourcePath)
+	chunks, err := os.ReadDir(sourcePath)
 	if err != nil {
 		fmt.Printf("Cannot read chunks in: %v\n", sourcePath)
 		return
@@ -105,7 +112,7 @@ func (i indexer) closeSession(recorderID, sessionID string) {
 
 	for _, chunk := range chunks {
 		chunkFilePath := filepath.Join(sourcePath, chunk.Name())
-		d, err := ioutil.ReadFile(chunkFilePath)
+		d, err := os.ReadFile(chunkFilePath)
 		if err != nil {
 			fmt.Printf("Cannot read file: %v\n", chunkFilePath)
 			return
@@ -193,7 +200,7 @@ func (i indexer) closeSession(recorderID, sessionID string) {
 		}
 		err = cmd.Start()
 		if err != nil {
-			errorBuffer, _ := ioutil.ReadAll(stderr)
+			errorBuffer, _ := io.ReadAll(stderr)
 			return fmt.Errorf("%s", string(errorBuffer))
 		}
 
@@ -256,7 +263,7 @@ func (i indexer) uploadFile(w http.ResponseWriter, r *http.Request) {
 	}
 	defer file.Close()
 
-	fileBytes, err := ioutil.ReadAll(file)
+	fileBytes, err := io.ReadAll(file)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Println(err)
@@ -283,7 +290,7 @@ func (i indexer) uploadFile(w http.ResponseWriter, r *http.Request) {
 	os.MkdirAll(targetPath, os.ModePerm)
 	targetFilePath := filepath.Join(targetPath, fmt.Sprintf("%s_%s.raw", chk.chunkID, chk.timestamp))
 
-	err = ioutil.WriteFile(targetFilePath, fileBytes, 0664)
+	err = os.WriteFile(targetFilePath, fileBytes, 0664)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		fmt.Println(err)
@@ -295,27 +302,20 @@ func (i indexer) uploadFile(w http.ResponseWriter, r *http.Request) {
 }
 
 func (i indexer) setup() {
-
-	txt := [][]byte{
-		[]byte(fmt.Sprintf("Chunk Source: %s", i.name)),
-		[]byte(fmt.Sprintf("Software Version: %s", version)),
-	}
-
-	_, err := i.mdns.PublishRecord(i.mdns.Hostname(), chunkSinkService, "", chunkSinkPort, txt)
-	if err != nil {
-		log.Err(err).Msg("Cannot announce service")
-	}
-	log.Printf("chunk sink server succesfully announced")
-
 	http.HandleFunc("/upload", i.uploadFile)
 	http.ListenAndServe(fmt.Sprintf(":%d", chunkSinkPort), nil)
 }
 
 func main() {
-
 	chunkDir := flag.String("chunk", "chunks", "Directory to store chunks")
 	sessionDir := flag.String("session", "sessions", "Directory to store sessions")
 	flag.Parse()
+
+	consoleWriter := zerolog.ConsoleWriter{
+		TimeFormat: time.StampMicro,
+		Out:        colorable.NewColorableStdout(),
+	}
+	log.Logger = log.Output(consoleWriter)
 
 	hostname, err := os.Hostname()
 	if err != nil {
@@ -324,7 +324,7 @@ func main() {
 
 	i := indexer{
 		sessionForRecorder: make(map[string]string),
-		name:               "superRecorder_" + hostname,
+		name:               "session-recorder-" + hostname,
 		uuid:               uuid.NewString(),
 	}
 
@@ -352,15 +352,31 @@ func main() {
 	fmt.Printf("Cleaning up old chunks...\n")
 	i.cleanupChunks()
 
-	/*
-		ctx := grpc.MakeProtocolServerContext()
-		audioSourceServer := grpc.NewAudioSourceServer(ctx)
+	chunkSinkServer := grpc.NewChunkSinkServer(hostname, version)
 
-		_, err = grpc.StartProtocolServer(audioSourceServer, i.mdns, "_observer-audiosource._tcp", 8844, [][]byte{})
-		if err != nil {
-			log.Fatalf("Cannot start audio source server: %v", err)
-		}
-	*/
+	port, err := grpc.StartProtocolServer(chunkSinkServer, i.mdns, chunkSinkService, chunkSinkPort)
+	if err != nil {
+		log.Err(err).Msg("Cannot start chunk sink server")
+
+		return
+	}
+	log.Info().Msgf("Chunk sink server is now being served on port %d", port)
+
+	sessionSourceServer := grpc.NewSessionSourceServer(hostname, version)
+	if err != nil {
+		log.Err(err).Msg("Cannot create session source server")
+
+		return
+	}
+
+	port, err = grpc.StartProtocolServer(sessionSourceServer, i.mdns, sessionSourceService, sessionSourcePort)
+	if err != nil {
+		log.Err(err).Msg("Cannot start session source server")
+
+		return
+	}
+
+	log.Info().Msgf("Session source server is now being served on port %d", port)
 
 	i.setup()
 

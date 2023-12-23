@@ -6,6 +6,7 @@ BINARIES = \
   chunk_sink		\
   chunk_source		\
   observer			\
+  chunk_sink_client
 
 PACKAGES = \
   mdns
@@ -21,5 +22,9 @@ chunk_source:
 observer:
 	${GO} build -o bin/$@ $(GOBUILDFLAGS) -ldflags "-X main.version=$(VERSION)" ./cmd/$@
 
+chunk_sink_client:
+	${GO} build -o bin/$@ $(GOBUILDFLAGS) -ldflags "-X main.version=$(VERSION)" ./cmd/$@
+
 clean:
 	cd bin && rm -f ${BINARIES}
+

@@ -10,35 +10,25 @@ import (
 	"google.golang.org/grpc"
 )
 
-type ProtocolServerContext struct {
-}
-
-func MakeProtocolServerContext() *ProtocolServerContext {
-	return &ProtocolServerContext{}
-}
-
-type AudioSourceServer struct {
-	protocolServerCtx *ProtocolServerContext
-}
-
 // ProtocolServer is an interface that all the grpc servers must implement
 type ProtocolServer interface {
 	registerGrpcServer(*grpc.Server)
 	serverOptions() []grpc.ServerOption
+	announcement() [][]byte
 }
 
-// StartProtocolServer asynchronously starts listening for grpc connections from clients
-func StartProtocolServer(server ProtocolServer, mdnsServer *mdns.Server, mdnsName string, port uint16, announcement [][]byte) (uint16, error) {
-
-	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+func StartProtocolServer(server ProtocolServer, mdnsServer *mdns.Server, mdnsName string, port uint16) (uint16, error) {
+	host := fmt.Sprintf(":%d", port)
+	listener, err := net.Listen("tcp", host)
 	if err != nil {
-		return 0, fmt.Errorf("cannot listen on port: %v", err)
+		return 0, fmt.Errorf("cannot listen on %s: %v", host, err)
 	}
 
 	port = uint16(listener.Addr().(*net.TCPAddr).Port)
 
-	const MAX_MSG_SIZE = 1024 * 1024
-	grpcServer := grpc.NewServer(grpc.MaxRecvMsgSize(MAX_MSG_SIZE), grpc.MaxSendMsgSize(MAX_MSG_SIZE))
+	grpcServer := grpc.NewServer(server.serverOptions()...)
+
+	server.registerGrpcServer(grpcServer)
 
 	go func() {
 		err := grpcServer.Serve(listener)
@@ -48,7 +38,7 @@ func StartProtocolServer(server ProtocolServer, mdnsServer *mdns.Server, mdnsNam
 	}()
 
 	if mdnsServer != nil {
-		_, err = mdnsServer.PublishRecord(mdnsServer.Hostname(), mdnsName, "", port, announcement)
+		_, err = mdnsServer.PublishRecord(mdnsServer.Hostname(), mdnsName, "", port, server.announcement())
 		if err != nil {
 			return 0, fmt.Errorf("unable to publish mDNS record %s: %v", mdnsName, err)
 		}

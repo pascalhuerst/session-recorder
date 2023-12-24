@@ -58,19 +58,17 @@ const createdAt = computed(() => {
   display: flex;
   flex-direction: column;
   gap: var(--scale-00);
-  border-radius: var(--radius-sm);
-  box-shadow: rgba(0, 0, 0, 0.05) 0px 6px 24px 0px, rgba(0, 0, 0, 0.08) 0px 0px 0px 1px;
 }
 
 .heading {
-  position: absolute;
   top: 0;
   left: 0;
   width: calc(100% - calc(2 * var(--size-3)));
   margin-left: var(--size-3);
-  margin-top: calc(-1 * var(--size-8));
   display: flex;
+  align-items: center;
   gap: var(--size-2);
+  font-size: var(--scale-1);
 }
 
 .heading .index {
@@ -78,16 +76,11 @@ const createdAt = computed(() => {
   background-color: var(--color-grey-800);
   color: white;
   border-radius: var(--radius-sm);
-  font-size: var(--scale-2);
+  font-size: var(--scale-0);
   font-weight: var(--weight-bold);
 }
 
-.heading .timestamp {
-  margin-top: var(--size-1);
-}
-
 .heading .lifetime {
-  margin-top: var(--size-1);
   margin-left: auto;
 }
 </style>

@@ -13,6 +13,8 @@ import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 
 /* import specific icons */
 import { faTimes } from "@fortawesome/free-solid-svg-icons/faTimes";
+import { faPlay } from "@fortawesome/free-solid-svg-icons/faPlay";
+import { faPause } from "@fortawesome/free-solid-svg-icons/faPause";
 
 const router = createRouter({
   history: createWebHistory(),
@@ -30,7 +32,7 @@ const router = createRouter({
 });
 
 /* add icons to the library */
-library.add(faTimes);
+library.add(faTimes, faPlay, faPause);
 
 const app = createApp(App);
 

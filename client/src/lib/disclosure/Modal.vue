@@ -111,9 +111,10 @@ header {
   flex-direction: row;
   align-items: flex-start;
   justify-content: space-between;
-  font-weight: var(--weight-semibold);
+  font-weight: var(--weight-bold);
   text-transform: uppercase;
-  font-size: var(--scale-2);
+  font-size: var(--scale-3);
+  color: var(--color-purple-700);
 }
 
 .close {
@@ -138,6 +139,7 @@ footer {
   flex-grow: 0;
   flex-direction: row;
   justify-content: flex-end;
+  margin-top: var(--size-6);
   gap: var(--size-2);
 }
 </style>

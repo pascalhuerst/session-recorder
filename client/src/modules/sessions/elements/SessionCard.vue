@@ -1,24 +1,24 @@
 <script setup lang="ts">
-import { OpenSession } from "../../../grpc/procedures/streamSessions.ts";
 import WaveformCanvas from "../../../lib/waveform/WaveformCanvas.vue";
 import { computed } from "vue";
 import { env } from "../../../env.ts";
 import SessionLifetime from "./SessionLifetime.vue";
+import { SessionInfo } from "@session-recorder/protocols/ts/sessionsource.ts";
 
 const props = defineProps<{
-  session: OpenSession
+  session: SessionInfo,
   recorderId: string
   index: number
 }>();
 
 const waveformUrl = computed(() => {
-  return new URL(`${props.recorderId}/${props.session.id}/waveform.dat`, env.VITE_SERVER_URL).toString();
+  return new URL(`${props.recorderId}/${props.session.ID}/waveform.dat`, env.VITE_FILE_SERVER_URL).toString();
 });
 
 const audioUrls = computed(() => {
   return [
     {
-      src: new URL(`${props.recorderId}/${props.session.id}/data.ogg`, env.VITE_SERVER_URL).toString(),
+      src: new URL(`${props.recorderId}/${props.session.ID}/data.ogg`, env.VITE_FILE_SERVER_URL).toString(),
       type: "audio/ogg"
     }
   ];
@@ -34,7 +34,7 @@ const createdAt = computed(() => {
     minute: "2-digit"
   });
 
-  return dt.format(new Date(props.session.timestamp));
+  return dt.format(props.session.timeCreated);
 });
 </script>
 
@@ -42,7 +42,7 @@ const createdAt = computed(() => {
   <div class="card">
     <div class="heading">
       <span class="index">#{{ props.index }}</span>
-      <time class="timestamp" :datetime="props.session.timestamp">{{ createdAt }}</time>
+      <time class="timestamp" :datetime="String(createdAt)">{{ createdAt }}</time>
       <div class="lifetime">
         <SessionLifetime :session="session" />
       </div>
@@ -66,8 +66,8 @@ const createdAt = computed(() => {
   position: absolute;
   top: 0;
   left: 0;
-  width: calc(100% - calc(2 * var(--size-4)));
-  margin-left: var(--size-4);
+  width: calc(100% - calc(2 * var(--size-3)));
+  margin-left: var(--size-3);
   margin-top: calc(-1 * var(--size-8));
   display: flex;
   gap: var(--size-2);
@@ -83,7 +83,7 @@ const createdAt = computed(() => {
 }
 
 .heading .timestamp {
-  margin-top: var(--size-2);
+  margin-top: var(--size-1);
 }
 
 .heading .lifetime {

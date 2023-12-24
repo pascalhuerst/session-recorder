@@ -3,7 +3,7 @@ import { useRoute } from "vue-router";
 import { computed, ref, watch } from "vue";
 import { streamSessions } from "../../../grpc/procedures/streamSessions.ts";
 import SessionCard from "./SessionCard.vue";
-import { SessionInfo} from '@session-recorder/protocols/ts/sessionsource.ts';
+import { SessionInfo } from "@session-recorder/protocols/ts/sessionsource.ts";
 
 const route = useRoute();
 
@@ -24,11 +24,17 @@ watch(selectedRecorderId, () => {
 }, {
   immediate: true
 });
+
+const sortedSessions = computed(() => {
+  return Array.from(sessions.value).sort((a, b) => {
+    return Number(b.timeCreated?.getTime()) - Number(a.timeCreated?.getTime());
+  });
+});
 </script>
 
 <template>
   <div class="list">
-    <template v-for="(session, index) in sessions" :key="session.id">
+    <template v-for="(session, index) in sortedSessions" :key="session.id">
       <SessionCard :session="session" :recorder-id="selectedRecorderId" :index="sessions.size - index" />
     </template>
   </div>

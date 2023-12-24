@@ -1,41 +1,41 @@
 <script setup lang="ts">
-import { OpenSession } from "../../../grpc/procedures/streamSessions.ts";
-import Switch from "../../../lib/forms/Switch.vue";
-import { computed, ref } from "vue";
+import { type SessionInfo } from "@session-recorder/protocols/ts/sessionsource.ts";
+import { computed } from "vue";
+import { setKeepSession } from "../../../grpc/procedures/setKeepSession.ts";
+import { deleteSession } from "../../../grpc/procedures/deleteSession.ts";
 
 const props = defineProps<{
-  session: OpenSession
+  session: SessionInfo
 }>();
 
-const innerValue = ref(!!props.session.flagged);
-
-const isFlagged = computed({
-  get: () => innerValue.value,
-  set: (val: boolean) => {
-    console.log(val);
-    innerValue.value = val;
-  }
-});
-
 const ttl = computed(() => {
-  const val = Math.floor(props.session.hours_to_live);
+  if (!props.session.lifetime) {
+    return undefined;
+  }
+  const val = Math.floor(props.session.lifetime.seconds / 60);
   if (val > 0) {
     return `${val} hours`;
   }
 
-  const minutes = Math.floor(props.session.hours_to_live * 60);
+  const minutes = Math.floor(props.session.lifetime.seconds);
   return `${minutes} minutes`;
 });
+
+const onKeep = () => setKeepSession({ streamID: props.session.ID });
+const onDelete = () => deleteSession({ streamID: props.session.ID });
 </script>
 
 <template>
   <div class="lifetime">
-    <div v-if="!isFlagged" class="balance">
+    <div v-if="ttl && !session.keepSession" class="balance">
       {{ ttl }} until deleted
     </div>
-    <Switch :model-value="isFlagged">
-      <span>Keep session</span>
-    </Switch>
+    <button v-if="!session.keepSession" @click="onKeep">
+      Keep
+    </button>
+    <button @click="onDelete">
+      Delete
+    </button>
   </div>
 </template>
 
@@ -43,11 +43,18 @@ const ttl = computed(() => {
 .lifetime {
   display: flex;
   align-items: center;
-  gap: var(--size-3);
-  font-size: var(--scale-00);
+  gap: var(--size-2);
 }
 
 .balance {
-  color: var(--color-red-300);
+  font-size: var(--scale-00);
+  color: var(--color-red-500);
+}
+
+button {
+  border: 0;
+  background: none;
+  font-size: var(--scale-00);
+  color: var(--color-grey-600);
 }
 </style>

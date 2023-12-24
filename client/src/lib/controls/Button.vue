@@ -3,31 +3,36 @@
 const props = withDefaults(defineProps<{
   color?: "primary" | "neutral" | "outlined"
   variant?: "ghost" | "solid"
+  size?: "md" | "sm" | "xs"
   isLoading?: boolean
+  tagName?: string
 }>(), {
   color: "neutral",
-  variant: "solid",
-  isLoading: false
+  size: "md",
+  variant: "ghost",
+  isLoading: false,
+  tagName: "button"
 });
 
 
 </script>
 
 <template>
-  <button :class="{
+  <component :is="tagName" :class="{
     'button': true,
     'is-loading': isLoading,
     [`is-${props.variant}`]: true,
     [`is-${props.color}`]: true,
+    [`is-${props.size}`]: true,
   }">
     <slot />
-  </button>
+  </component>
 </template>
 
 <style scoped>
 .button {
-  --btn-bg-color: var(--color-grey-100);
-  --btn-bg-color-hover: var(--color-grey-200);
+  --btn-bg-color: transparent;
+  --btn-bg-color-hover: var(--color-grey-100);
   --btn-text-color: var(--color-grey-800);
   --btn-text-color-hover: var(--color-grey-900);
   --btn-border-color: transparent;
@@ -61,8 +66,23 @@ const props = withDefaults(defineProps<{
   cursor: pointer;
   transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out, border-color 0.15s ease-in-out;
 
+  &.is-sm {
+    --btn-font-size: var(--scale-0);
+    --btn-icon-size: var(--scale-0);
+    --btn-min-height: var(--size-6);
+    --btn-min-width: 0;
+  }
+
+  &.is-xs {
+    --btn-font-size: var(--scale-00);
+    --btn-icon-size: var(--scale-00);
+    --btn-min-height: var(--size-4);
+    --btn-min-width: 0;
+    text-transform: none;
+  }
+
   &.is-ghost {
-    --btn-text-color: var(--color-grey-800);
+    --btn-text-color: var(--color-grey-500);
     --btn-text-color-hover: var(--color-grey-900);
     --btn-text-color-disabled: #cccccc;
 
@@ -181,7 +201,7 @@ const props = withDefaults(defineProps<{
     }
   }
 
-  svg {
+  :slotted(svg) {
     font-size: var(--btn-icon-size);
     margin-right: 0.25rem;
   }

@@ -2,7 +2,7 @@
 import WaveformCanvas from "../../../lib/waveform/WaveformCanvas.vue";
 import { computed } from "vue";
 import { env } from "../../../env.ts";
-import SessionLifetime from "./SessionLifetime.vue";
+import SessionMenu from "./SessionMenu.vue";
 import { SessionInfo } from "@session-recorder/protocols/ts/sessionsource.ts";
 
 const props = defineProps<{
@@ -43,8 +43,8 @@ const createdAt = computed(() => {
     <div class="heading">
       <span class="index">#{{ props.index }}</span>
       <time class="timestamp" :datetime="String(createdAt)">{{ createdAt }}</time>
-      <div class="lifetime">
-        <SessionLifetime :session="session" />
+      <div class="menu">
+        <SessionMenu :session="session" :audio-urls="audioUrls"/>
       </div>
     </div>
 
@@ -80,7 +80,7 @@ const createdAt = computed(() => {
   font-weight: var(--weight-bold);
 }
 
-.heading .lifetime {
+.heading .menu {
   margin-left: auto;
 }
 </style>

@@ -6,9 +6,11 @@ import { deleteSession } from "../../../grpc/procedures/deleteSession.ts";
 import { useConfirmation } from "../../../lib/disclosure/useConfirmation.ts";
 import Modal from "../../../lib/disclosure/Modal.vue";
 import Button from "../../../lib/controls/Button.vue";
+import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 
 const props = defineProps<{
   session: SessionInfo
+  audioUrls: Array<{ src: string, type: string }>
 }>();
 
 const { awaitConfirmation, modalProps } = useConfirmation();
@@ -38,16 +40,22 @@ const onDelete = () => {
 </script>
 
 <template>
-  <div class="lifetime">
+  <div class="menu">
     <div v-if="ttl && !session.keepSession" class="balance">
       {{ ttl }} until deleted
     </div>
-    <button v-if="!session.keepSession" @click="onKeep">
+    <Button size="xs" v-if="!session.keepSession" @click="onKeep">
       Keep
-    </button>
-    <button @click="onDelete">
+    </Button>
+    <Button size="xs" @click="onDelete">
       Delete
-    </button>
+    </Button>
+    <template v-for="audioUrl in audioUrls" :key="audioUrl.src">
+      <Button size="xs" tag-name="a" :href="audioUrl.src" target="_blank" download color="primary" variant="ghost">
+        <font-awesome-icon icon="fa-solid fa-download"></font-awesome-icon>
+        {{ audioUrl.type.split("/").at(-1) }}
+      </Button>
+    </template>
   </div>
   <Modal :open="modalProps.open.value" @close="modalProps.onClose">
     <template #header>Are you sure?</template>
@@ -64,7 +72,7 @@ const onDelete = () => {
 </template>
 
 <style scoped>
-.lifetime {
+.menu {
   display: flex;
   align-items: center;
   gap: var(--size-2);

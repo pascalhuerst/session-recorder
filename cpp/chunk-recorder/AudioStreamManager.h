@@ -23,8 +23,11 @@
 #include <boost/program_options.hpp>
 namespace po = boost::program_options;
 
+#include <google/protobuf/util/time_util.h>
+
 #include "AlsaAudioInput.h"
 #include "readerwriterqueue.h"
+#include "ServiceTracker.h"
 
 using namespace moodycamel;
 
@@ -58,6 +61,8 @@ public:
         long totalBytes;
         long totalChunks;
         std::string sessionID;
+        google::protobuf::Timestamp startTime;
+
     };
 
     struct DetectorState {
@@ -78,6 +83,9 @@ public:
     void stop();
 
 private:
+    std::string m_recorderID;
+    std::string m_recorderName;
+    
     std::atomic<bool> m_terminateRequest;
     std::atomic<bool> m_writeRawPcm;
 
@@ -98,7 +106,6 @@ private:
 
     std::string m_streamFifo;
     std::string m_storageOutDir;
-    std::string m_streamPcmOutPrefix;
     unsigned long m_streamStorageChunkSize;
 
     CallbackDetector m_detectorStateChangedCB;
@@ -112,5 +119,7 @@ private:
     void createFifo(const std::string& path);
     size_t setFifoSize(int fd, size_t s);
     bool fifoHasReader(const std::string &path);
+
+    std::unique_ptr<ServiceTracker> m_serviceTracker;
 };
 

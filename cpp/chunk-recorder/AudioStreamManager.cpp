@@ -18,9 +18,14 @@
 #include "AudioStreamManager.h"
 #include "params.h"
 #include "types.h"
-#include "ServiceTracker.h"
 #include "httplib.h"
 
+#include <grpc/grpc.h>
+
+#include <grpcpp/create_channel.h>
+#include "chunksink.pb.h"
+#include "chunksink.grpc.pb.h"
+#include "common.pb.h"
 
 #include <sys/ioctl.h>
 #include <signal.h>
@@ -32,10 +37,16 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_generators.hpp>
+#include <boost/uuid/uuid_io.hpp>
+
 
 AudioStreamManager::AudioStreamManager(const po::variables_map &vmCombined,
                                        CallbackDetector onDetectorStateChangedCB,
                                        CallbackStorage onStorageChangedCB) :
+    m_recorderID(""),
+    m_recorderName(""),
     m_terminateRequest(true),
     m_writeRawPcm(false),
     m_vmCombined(vmCombined),
@@ -51,10 +62,10 @@ AudioStreamManager::AudioStreamManager(const po::variables_map &vmCombined,
     m_detectorThreshold(0.0),
     m_streamFifo(""),
     m_storageOutDir(""),
-    m_streamPcmOutPrefix(""),
     m_streamStorageChunkSize(0),
     m_detectorStateChangedCB(onDetectorStateChangedCB),
-    m_storageChangedCB(onStorageChangedCB)
+    m_storageChangedCB(onStorageChangedCB),
+    m_serviceTracker(nullptr)
 {
 }
 
@@ -62,39 +73,56 @@ AudioStreamManager::~AudioStreamManager()
 {
 }
 
+bool sendChunks(const std::string &url, chunksink::Chunks &chunks) {
+    auto channel = grpc::CreateChannel(url, grpc::InsecureChannelCredentials());
 
-bool sendBuffer(const std::string &url, const std::string &filename, SampleFrame *frames, size_t numFrames) {
+    auto stub_ = chunksink::ChunkSink::NewStub(channel);
 
-    auto buffer = reinterpret_cast<const char*>(frames);
-    size_t byteSize = (sizeof(SampleFrame) * numFrames); 
+    grpc::ClientContext context;
+    common::Respone response;
+    
+    grpc::Status status = stub_->SetChunks(&context, chunks, &response);
 
-    std::string stringBuffer;
-    for (int i=0; i<byteSize; i++) {
-        stringBuffer += buffer[i];
-    }    
-
-    httplib::MultipartFormDataItems items = {
-        {"raw_audio", stringBuffer, filename, "application/octet-stream" },
-    };
-
-    httplib::Client cli(url.c_str());
-    auto res = cli.Post("/upload", items);
-
-    if (res.error() != httplib::Error::Success || res->status != 200) {
+    if (!status.ok()) {
         return false;
     }
 
-    std::cout << "Successfully sent buffer: " <<  url << std::endl;
+    if (response.success() != true) {
+        std::cerr << "Error sending chunks to: " << url << " -- " <<  response.errormessage() << std::endl;
+        
+        return false;
+    }
+
+    return true;
+}
+
+bool sendDetectorStatus(const std::string &url, common::RecorderStatus &recorderStatus) {
+    auto channel = grpc::CreateChannel(url, grpc::InsecureChannelCredentials());
+
+    auto stub_ = chunksink::ChunkSink::NewStub(channel);
+
+    grpc::ClientContext context;
+    common::Respone response;
+    
+    grpc::Status status = stub_->SetRecorderStatus(&context, recorderStatus, &response);
+
+    if (!status.ok()) {
+        return false;
+    }
+
+    if (response.success() != true) {
+        std::cerr << "Error sending detector status to: " << url << " -- " <<  response.errormessage() << std::endl;
+        
+        return false;
+    }
 
     return true;
 }
 
 
-
 void AudioStreamManager::start()
 {
     if (m_terminateRequest) {
-
         m_terminateRequest = false;
 
         if (m_vmCombined.count(strOptStreamManagerFifo)) {
@@ -112,16 +140,22 @@ void AudioStreamManager::start()
             throw std::invalid_argument(strOptStreamManagerFifo + " must be set!");
         }
 
+        if (m_vmCombined.count(strOptRecorderID)) {
+            m_recorderID = m_vmCombined[strOptRecorderID].as<std::string>();
+        } else {
+            throw std::invalid_argument(strOptRecorderID + " must be set!");
+        }
+
+        if (m_vmCombined.count(strOptRecorderName)) {
+            m_recorderName = m_vmCombined[strOptRecorderName].as<std::string>();
+        } else {
+            throw std::invalid_argument(strOptRecorderName + " must be set!");
+        }
+
         if (m_vmCombined.count(strOptStreamManagerStorageOutputDir)) {
             m_storageOutDir = m_vmCombined[strOptStreamManagerStorageOutputDir].as<std::string>();
         } else {
             throw std::invalid_argument(strOptStreamManagerStorageOutputDir + " must be set!");
-        }
-
-        if (m_vmCombined.count(strOptStreamManagerStoragePrefix)) {
-            m_streamPcmOutPrefix = m_vmCombined[strOptStreamManagerStoragePrefix].as<std::string>();
-        } else {
-            throw std::invalid_argument(strOptStreamManagerStoragePrefix + " must be set!");
         }
 
         if (m_vmCombined.count(strOptStreamManagerPcmOutChunkSize)) {
@@ -168,10 +202,13 @@ void AudioStreamManager::start()
             throw std::invalid_argument(strOptAudioRate + "must be set!");
         }
 
+        //TODO; This crashed when destroyed
+        m_serviceTracker.reset(new ServiceTracker("_session-recorder-chunksink._tcp"));
+
+
         m_detectorBufferSize = static_cast<size_t>(static_cast<double>(rate) * detectorWindowTime);
         m_detectorSuccession = static_cast<unsigned int>(detectorTotalTime / detectorWindowTime);
         m_detectorBuffer.reset(new BlockingReaderWriterQueue<SampleFrame>(m_detectorBufferSize));
-
 
         // Instatiation and lambda callback from alsa. Just fill out ringbuffers
         m_alsaAudioInput.reset(new AlsaAudioInput(m_vmCombined, [&] (SampleFrame *frames, size_t numFrames) {
@@ -181,90 +218,7 @@ void AudioStreamManager::start()
                                        m_storageBuffer->enqueue(frames[i]);
                                    }
                                }));
-#if 0
-        // Stream lamda in a thread
-        m_streamWorker.reset(new std::thread([&] {
-            // Ignore SIGPIPE. Otherwise we terminate if reader disappears. Instead, we want start from the beginning
-            ::signal(SIGPIPE, SIG_IGN);
 
-            const size_t chunkSize = 1024;
-            SampleFrame buffer[chunkSize];
-
-            int counter = 0;
-            while (!fifoHasReader(m_streamFifo) && !m_terminateRequest) {
-                std::this_thread::sleep_for(std::chrono::milliseconds(500));
-                if ((++counter) % 10 == 0) {
-                    std::cout << "Pipe has no reader. (" << (counter>>1) << "s)" << std::endl;
-                }
-            }
-
-            if (!m_terminateRequest) {
-                // Now we had a reader. Open blocking.
-                File fifoFd(m_streamFifo, O_WRONLY);
-
-                while (!m_terminateRequest) {
-
-                    size_t i=0;
-                    while (i<chunkSize && !m_terminateRequest) {
-                        if(!m_streamBuffer->wait_dequeue_timed(buffer[i++], std::chrono::milliseconds(500)))
-                            continue;
-                    }
-
-                    if (m_terminateRequest)
-                        continue;
-
-                    size_t byteSize = chunkSize * sizeof(SampleFrame);
-                    size_t bytesWritten = 0;
-
-                    uint8_t *byteBuffer = reinterpret_cast<uint8_t*>(buffer);
-
-                    while (bytesWritten < byteSize && !m_terminateRequest) {
-                        try {
-                            struct pollfd pfd = {0, 0, 0};
-                            pfd.fd = fifoFd;
-                            pfd.events = POLLOUT;
-
-                            int ret = poll(&pfd, 1, 500);
-
-                            if (ret == 0) { //Timeout
-                                int availableBytes = fifoBytesAvailable(fifoFd);
-                                size_t size = fifoSize(fifoFd);
-
-                                std::cout << "Writing to Fifo timed out:\n";
-                                std::cout << "available:  " << availableBytes << "\n";
-                                std::cout << "size:       " << size << "\n";
-                                std::cout << "Level:      " << (static_cast<float>(availableBytes) / static_cast<float>(availableBytes)) << "\n";
-
-                                continue;
-
-                            } else if (ret < 0) {
-                                throw std::runtime_error(std::string("Error in poll(): ") + strerror(errno));
-
-                            } // ret>0 -> Some data can be written
-
-                            ssize_t written = 0;
-                            while ((written = ::write(fifoFd, &byteBuffer[bytesWritten], byteSize - bytesWritten)) < 0 && errno == EPIPE && !m_terminateRequest) {
-                                std::cout << "Fifo lost reader! write throws SIGPIPE. Waiting 500ms." << std::endl;
-                                std::this_thread::sleep_for(std::chrono::milliseconds(500));
-                            }
-
-                            if (m_terminateRequest)
-                                continue;
-
-                            if (written < 0)
-                                throw std::runtime_error(std::string("Error writing to fifo: (") + m_streamFifo + ") - " + strerror(errno));
-
-                            bytesWritten += static_cast<size_t>(written);
-                        
-                        } catch (std::exception &e) {
-                            std::cerr << e.what() << std::endl;
-                            continue;
-                        }
-                    }
-                }
-            }
-        }));
-#endif
         // Detector lambda in a thread
         m_detectorWorker.reset(new std::thread([&] {
 
@@ -284,12 +238,23 @@ void AudioStreamManager::start()
                     i++;
                 }
 
+                bool clipping = false;
+
                 double chunkSum = 0.0;
                 for (unsigned int i=0; i<m_detectorBufferSize; ++i) {
 
                     double monoSum = (buffer[i].left + buffer[i].right) / 2.0;
                     chunkSum += (monoSum * monoSum);
+
+                    if (buffer[i].left == std::numeric_limits<Sample>::max() || 
+                        buffer[i].right == std::numeric_limits<Sample>::max() ||
+                        buffer[i].left == std::numeric_limits<Sample>::min() ||
+                        buffer[i].right == std::numeric_limits<Sample>::min()) {
+                        clipping = true;
+                    }
                 }
+
+                std::cout << "clipping: " << clipping << std::endl;
 
                 double chunkSumMean = static_cast<double>(chunkSum) / static_cast<double>(m_detectorBufferSize);
                 double rms = sqrt(chunkSumMean);
@@ -313,6 +278,28 @@ void AudioStreamManager::start()
                     }
                 }
 
+                common::RecorderStatus recorderStatus;
+                recorderStatus.set_recorderid(m_recorderID);
+                recorderStatus.set_recordername(m_recorderName);
+                recorderStatus.set_signalstatus(currentState.state == STATE_SIGNAL ? common::SignalStatus::SIGNAL : common::SignalStatus::NO_SIGNAL);
+                recorderStatus.set_rmspercent(currentState.rmsPercent);
+                recorderStatus.set_clipping(clipping);
+
+                auto services = m_serviceTracker->GetServiceMap();
+                for (const auto &service : services) {
+                    for (const auto &se : service.second) {
+                        std::string url = se.second.address + ":" + std::to_string(se.second.port);
+                        std::cout << "Send detector using: " << url; 
+                        if (sendDetectorStatus(url, recorderStatus)) {
+                            std::cout << "  OK" << std::endl;
+
+                            break;
+                        }
+
+                        std::cout << "  Failed" << std::endl;
+                    }
+                }
+
                 if (m_detectorStateChangedCB)
                     m_detectorStateChangedCB(currentState);
             }
@@ -324,8 +311,6 @@ void AudioStreamManager::start()
 
             AudioStreamManager::StorageState state = {0};
             bool lastWriteRawPcmState = false;
-
-            auto st = new ServiceTracker("_observer-chunksink._tcp");
 
             while (!m_terminateRequest) {
                 size_t i=0;
@@ -339,58 +324,44 @@ void AudioStreamManager::start()
                 }
 
                 if (m_writeRawPcm) {
-
                     state.totalChunks++;
-
-                    auto timeStampEpoche = std::chrono::system_clock::now();
-                    std::stringstream ss;
-                    ss << timeStampEpoche.time_since_epoch().count();
-                    std::string strTimestamp = ss.str();
-
-                    char strChunkCount[24];
-                    sprintf(strChunkCount, "%016lu", state.totalChunks);
 
                     if (!lastWriteRawPcmState) {
                         lastWriteRawPcmState = true;
-                        state.sessionID = strTimestamp;
+
+                        boost::uuids::uuid uuid = boost::uuids::random_generator()();
+                        state.sessionID = boost::uuids::to_string(uuid);
+                        state.startTime = google::protobuf::util::TimeUtil::GetCurrentTime();
+                        state.totalChunks = 0;
                     }
           
-                    std::string fileName = m_streamPcmOutPrefix + "_" + state.sessionID + "_" + std::string(strChunkCount) + "_" + strTimestamp + ".raw";
-                    auto services = st->GetServiceMap();
-                    for (const auto service : services) {
-                        for (const auto se : service.second) {
+                    chunksink::Chunks chunks;
+                    chunks.set_recorderid(m_recorderID);
+                    chunks.set_sessionid(state.sessionID);
+                    chunks.set_chunkcount(state.totalChunks);
+                    chunks.set_allocated_timecreated(new google::protobuf::Timestamp(state.startTime));
+                    
+                    auto rawData = buffer.get();
+                    for (size_t i=0; i<m_streamStorageChunkSize; i++) {
+                        chunks.add_data(static_cast<uint32_t>(rawData[i].left));
+                        chunks.add_data(static_cast<uint32_t>(rawData[i].right));
+                    }
+
+                    auto services = m_serviceTracker->GetServiceMap();
+                    for (const auto &service : services) {
+                        for (const auto &se : service.second) {
                             std::string url = se.second.address + ":" + std::to_string(se.second.port);
-                            std::cout << "Try url: " << url << std::endl;
-                            if (sendBuffer(url, fileName, buffer.get(), m_streamStorageChunkSize))
+                            std::cout << "Send chunks using: " << url;
+                              
+                            if (sendChunks(url, chunks)) {
+                                 std::cout << "  OK" << std::endl;
+
                                 break;
+                            }
+
+                            std::cout << "  Failed" << std::endl;
                         }
                     }
-
-                    // Filesystem (rework!)
-                    // ##########
-                    # if 0
-                    try {
-                        std::string path = m_storageOutDir + "/" + fileName;
-                        File fifoFd(path, O_WRONLY | O_CREAT, 0666);
-                        ssize_t written = ::write(fifoFd, buffer.get(), m_streamStorageChunkSize * sizeof(SampleFrame));
-                        if (written < 0) {
-                            throw std::runtime_error(std::string("Error writing to file: (") + ss.str() + ") - " + strerror(errno));
-                        }
-                        state.totalBytes += written;
-
-                        if (static_cast<unsigned long>(written) < m_streamStorageChunkSize) {
-                            std::cerr << "Less written than expected: " << written << " instead of " << m_streamStorageChunkSize << std::endl;
-                        }
-
-                        if (m_storageChangedCB)
-                            m_storageChangedCB(state);
-
-                    } catch (std::exception &e) {
-                        std::cerr << e.what() << std::endl;
-                        continue;
-                    }
-                    #endif
-
                 } else {
                     if (lastWriteRawPcmState)
                       lastWriteRawPcmState = false;

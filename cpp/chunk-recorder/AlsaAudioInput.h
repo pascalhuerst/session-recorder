@@ -58,5 +58,4 @@ private:
     snd_pcm_uframes_t m_framesPerPeriod = 0;
     snd_pcm_uframes_t m_ringBufferFrames = 0;
     std::atomic<snd_pcm_uframes_t> m_framesProcessed;
-
 };

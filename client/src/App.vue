@@ -1,11 +1,7 @@
-<script setup lang="ts">
-import PageShell from "./lib/layout/PageShell.vue";
-</script>
+<script setup lang="ts"></script>
 
 <template>
-  <PageShell>
-    <router-view />
-  </PageShell>
+  <router-view />
 </template>
 
 <style>

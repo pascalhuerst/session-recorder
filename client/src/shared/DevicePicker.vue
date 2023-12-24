@@ -10,10 +10,10 @@ const props = defineProps<{
   selectedRecorderId?: string
 }>();
 
-const recorders = computed(() => Array.from(Object.values(props.recorders)));
+const recorders = computed(() => Array.from(props.recorders.values()));
 
 const setSelected = (item: string) => {
-  router.push(`/recorders/${item}`);
+  router.push(`/recorders/${item}/sessions`);
 };
 </script>
 

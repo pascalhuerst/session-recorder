@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import WaveformCanvas from "../../lib/waveform/WaveformCanvas.vue";
+import WaveformCanvas from "../lib/waveform/WaveformCanvas.vue";
 import { computed } from "vue";
-import { env } from "../../env.ts";
+import { env } from "../env.ts";
 import SessionMenu from "./SessionMenu.vue";
 import { SessionInfo } from "protocols/ts/sessionsource.ts";
 
@@ -24,7 +24,7 @@ const audioUrls = computed(() => {
     {
       src: new URL(`${props.recorderId}/${props.session.ID}/data.flac`, env.VITE_FILE_SERVER_URL).toString(),
       type: "audio/flac"
-    },
+    }
   ];
 });
 
@@ -48,7 +48,7 @@ const createdAt = computed(() => {
       <span class="index">#{{ props.index }}</span>
       <time class="timestamp" :datetime="String(createdAt)">{{ createdAt }}</time>
       <div class="menu">
-        <SessionMenu :session="session" :audio-urls="audioUrls"/>
+        <SessionMenu :session="session" :audio-urls="audioUrls" />
       </div>
     </div>
 

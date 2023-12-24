@@ -1,20 +1,7 @@
-<script setup lang="ts">
-import DevicePicker from "./elements/DevicePicker.vue";
-import OpenSessionList from "./elements/OpenSessionsList.vue";
-import Container from "../../../../../lib/layout/Container.vue";
-</script>
+<script setup lang="ts"></script>
 
 <template>
-  <div class="navbar">
-    <Container>
-      <DevicePicker />
-    </Container>
-  </div>
-  <div class="sessions">
-    <Container>
-      <OpenSessionList />
-    </Container>
-  </div>
+  Hello
 </template>
 
 <style scoped>

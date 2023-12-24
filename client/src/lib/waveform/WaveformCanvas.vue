@@ -3,6 +3,7 @@ import { ref, shallowRef, watch } from "vue";
 import VirtualizedItem from "../disclosure/VirtualizedItem.vue";
 import Peaks, { type PeaksInstance, type PeaksOptions } from "peaks.js";
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
+import { onClickOutside } from "@vueuse/core";
 
 const props = withDefaults(defineProps<{
   waveformUrl: string
@@ -12,6 +13,7 @@ const props = withDefaults(defineProps<{
   height: 200
 });
 
+const canvasEl = ref<HTMLElement>();
 const containerEl = ref<HTMLElement>();
 const mediaEl = ref<HTMLAudioElement>();
 const peaksInstanceRef = shallowRef<PeaksInstance>();
@@ -27,7 +29,7 @@ watch([containerEl, mediaEl, props], () => {
         playheadColor: "#6b46c1",
         playedWaveformColor: "#bdafe3",
         showPlayheadTime: true,
-        playheadTextColor: "#6b46c1",
+        playheadTextColor: "#6b46c1"
       },
       mediaElement: mediaEl.value,
       dataUri: {
@@ -53,7 +55,7 @@ watch([containerEl, mediaEl, props], () => {
 
 const isPlaying = ref(false);
 
-const play = () => {
+const onClick = () => {
   const player = peaksInstanceRef.value?.player as PeaksOptions["player"];
   if (!player) {
     return;
@@ -66,16 +68,23 @@ const play = () => {
     player.play();
     isPlaying.value = true;
   }
+
+  onClickOutside(canvasEl.value, () => {
+    if (isPlaying.value) {
+      player.pause();
+      isPlaying.value = false;
+    }
+  });
 };
 </script>
 
 <template>
-  <VirtualizedItem :min-height="props.height" :preload-margin="400" class="canvas">
+  <VirtualizedItem :min-height="props.height" :preload-margin="400" class="canvas" ref="canvasEl">
     <div ref="containerEl" :style="{ height: `${props.height}px` }" class="overview"></div>
     <audio ref="mediaEl">
       <source v-for="url in audioUrls" :key="url.type" v-bind="url">
     </audio>
-    <button v-if="peaksInstanceRef" class="play" @click="play">
+    <button v-if="peaksInstanceRef" class="play" @click="onClick">
       <font-awesome-icon v-if="isPlaying" icon="fa-solid fa-pause" />
       <font-awesome-icon v-else icon="fa-solid fa-play" />
     </button>
@@ -98,7 +107,7 @@ const play = () => {
   position: absolute;
   bottom: 0;
   left: 0;
-  transform: translateX(-50%) translateY(-20%);
+  margin: var(--size-3);
   width: var(--size-12);
   height: var(--size-12);
   border-radius: var(--radius-full);
@@ -106,9 +115,9 @@ const play = () => {
   align-items: center;
   justify-content: center;
   font-size: var(--size-6);
-  border: 0;
+  border: 1px solid var(--color-grey-200);
   background: var(--color-grey-100);
   color: var(--color-purple-700);
-  box-shadow: rgba(0, 0, 0, 0.1) 0px 20px 25px -5px, rgba(0, 0, 0, 0.04) 0px 10px 10px -5px;
+  box-shadow: rgba(17, 17, 26, 0.1) 0px 4px 16px, rgba(17, 17, 26, 0.05) 0px 8px 32px;
 }
 </style>

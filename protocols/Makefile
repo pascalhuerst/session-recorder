@@ -65,6 +65,13 @@ common:
 		--proto_path=proto \
 		--go-grpc_out=./go/$@ $@.proto
 
+	${PROTOC} \
+		--grpc_out=generate_mock_code=false:./cpp \
+		--cpp_out=./cpp \
+		--plugin=protoc-gen-grpc=${GRPC_CPP_PLUGIN} \
+		--proto_path=proto \
+		$@.proto
+
 clean:
 	rm -rf cpp
 	rm -rf ts

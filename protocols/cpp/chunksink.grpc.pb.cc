@@ -22,8 +22,8 @@
 namespace chunksink {
 
 static const char* ChunkSink_method_names[] = {
-  "/chunksink.ChunkSink/StreamChunkData",
   "/chunksink.ChunkSink/SetRecorderStatus",
+  "/chunksink.ChunkSink/SetChunks",
 };
 
 std::unique_ptr< ChunkSink::Stub> ChunkSink::NewStub(const std::shared_ptr< ::grpc::ChannelInterface>& channel, const ::grpc::StubOptions& options) {
@@ -33,45 +33,52 @@ std::unique_ptr< ChunkSink::Stub> ChunkSink::NewStub(const std::shared_ptr< ::gr
 }
 
 ChunkSink::Stub::Stub(const std::shared_ptr< ::grpc::ChannelInterface>& channel, const ::grpc::StubOptions& options)
-  : channel_(channel), rpcmethod_StreamChunkData_(ChunkSink_method_names[0], options.suffix_for_stats(),::grpc::internal::RpcMethod::CLIENT_STREAMING, channel)
-  , rpcmethod_SetRecorderStatus_(ChunkSink_method_names[1], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
+  : channel_(channel), rpcmethod_SetRecorderStatus_(ChunkSink_method_names[0], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
+  , rpcmethod_SetChunks_(ChunkSink_method_names[1], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
   {}
 
-::grpc::ClientWriter< ::chunksink::ChunkData>* ChunkSink::Stub::StreamChunkDataRaw(::grpc::ClientContext* context, ::chunksink::StreamChunkDataReply* response) {
-  return ::grpc::internal::ClientWriterFactory< ::chunksink::ChunkData>::Create(channel_.get(), rpcmethod_StreamChunkData_, context, response);
+::grpc::Status ChunkSink::Stub::SetRecorderStatus(::grpc::ClientContext* context, const ::common::RecorderStatus& request, ::common::Respone* response) {
+  return ::grpc::internal::BlockingUnaryCall< ::common::RecorderStatus, ::common::Respone, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), rpcmethod_SetRecorderStatus_, context, request, response);
 }
 
-void ChunkSink::Stub::async::StreamChunkData(::grpc::ClientContext* context, ::chunksink::StreamChunkDataReply* response, ::grpc::ClientWriteReactor< ::chunksink::ChunkData>* reactor) {
-  ::grpc::internal::ClientCallbackWriterFactory< ::chunksink::ChunkData>::Create(stub_->channel_.get(), stub_->rpcmethod_StreamChunkData_, context, response, reactor);
+void ChunkSink::Stub::async::SetRecorderStatus(::grpc::ClientContext* context, const ::common::RecorderStatus* request, ::common::Respone* response, std::function<void(::grpc::Status)> f) {
+  ::grpc::internal::CallbackUnaryCall< ::common::RecorderStatus, ::common::Respone, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(stub_->channel_.get(), stub_->rpcmethod_SetRecorderStatus_, context, request, response, std::move(f));
 }
 
-::grpc::ClientAsyncWriter< ::chunksink::ChunkData>* ChunkSink::Stub::AsyncStreamChunkDataRaw(::grpc::ClientContext* context, ::chunksink::StreamChunkDataReply* response, ::grpc::CompletionQueue* cq, void* tag) {
-  return ::grpc::internal::ClientAsyncWriterFactory< ::chunksink::ChunkData>::Create(channel_.get(), cq, rpcmethod_StreamChunkData_, context, response, true, tag);
-}
-
-::grpc::ClientAsyncWriter< ::chunksink::ChunkData>* ChunkSink::Stub::PrepareAsyncStreamChunkDataRaw(::grpc::ClientContext* context, ::chunksink::StreamChunkDataReply* response, ::grpc::CompletionQueue* cq) {
-  return ::grpc::internal::ClientAsyncWriterFactory< ::chunksink::ChunkData>::Create(channel_.get(), cq, rpcmethod_StreamChunkData_, context, response, false, nullptr);
-}
-
-::grpc::Status ChunkSink::Stub::SetRecorderStatus(::grpc::ClientContext* context, const ::chunksink::RecorderStatusRequest& request, ::chunksink::RecorderStatusReply* response) {
-  return ::grpc::internal::BlockingUnaryCall< ::chunksink::RecorderStatusRequest, ::chunksink::RecorderStatusReply, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), rpcmethod_SetRecorderStatus_, context, request, response);
-}
-
-void ChunkSink::Stub::async::SetRecorderStatus(::grpc::ClientContext* context, const ::chunksink::RecorderStatusRequest* request, ::chunksink::RecorderStatusReply* response, std::function<void(::grpc::Status)> f) {
-  ::grpc::internal::CallbackUnaryCall< ::chunksink::RecorderStatusRequest, ::chunksink::RecorderStatusReply, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(stub_->channel_.get(), stub_->rpcmethod_SetRecorderStatus_, context, request, response, std::move(f));
-}
-
-void ChunkSink::Stub::async::SetRecorderStatus(::grpc::ClientContext* context, const ::chunksink::RecorderStatusRequest* request, ::chunksink::RecorderStatusReply* response, ::grpc::ClientUnaryReactor* reactor) {
+void ChunkSink::Stub::async::SetRecorderStatus(::grpc::ClientContext* context, const ::common::RecorderStatus* request, ::common::Respone* response, ::grpc::ClientUnaryReactor* reactor) {
   ::grpc::internal::ClientCallbackUnaryFactory::Create< ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(stub_->channel_.get(), stub_->rpcmethod_SetRecorderStatus_, context, request, response, reactor);
 }
 
-::grpc::ClientAsyncResponseReader< ::chunksink::RecorderStatusReply>* ChunkSink::Stub::PrepareAsyncSetRecorderStatusRaw(::grpc::ClientContext* context, const ::chunksink::RecorderStatusRequest& request, ::grpc::CompletionQueue* cq) {
-  return ::grpc::internal::ClientAsyncResponseReaderHelper::Create< ::chunksink::RecorderStatusReply, ::chunksink::RecorderStatusRequest, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), cq, rpcmethod_SetRecorderStatus_, context, request);
+::grpc::ClientAsyncResponseReader< ::common::Respone>* ChunkSink::Stub::PrepareAsyncSetRecorderStatusRaw(::grpc::ClientContext* context, const ::common::RecorderStatus& request, ::grpc::CompletionQueue* cq) {
+  return ::grpc::internal::ClientAsyncResponseReaderHelper::Create< ::common::Respone, ::common::RecorderStatus, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), cq, rpcmethod_SetRecorderStatus_, context, request);
 }
 
-::grpc::ClientAsyncResponseReader< ::chunksink::RecorderStatusReply>* ChunkSink::Stub::AsyncSetRecorderStatusRaw(::grpc::ClientContext* context, const ::chunksink::RecorderStatusRequest& request, ::grpc::CompletionQueue* cq) {
+::grpc::ClientAsyncResponseReader< ::common::Respone>* ChunkSink::Stub::AsyncSetRecorderStatusRaw(::grpc::ClientContext* context, const ::common::RecorderStatus& request, ::grpc::CompletionQueue* cq) {
   auto* result =
     this->PrepareAsyncSetRecorderStatusRaw(context, request, cq);
+  result->StartCall();
+  return result;
+}
+
+::grpc::Status ChunkSink::Stub::SetChunks(::grpc::ClientContext* context, const ::chunksink::Chunks& request, ::common::Respone* response) {
+  return ::grpc::internal::BlockingUnaryCall< ::chunksink::Chunks, ::common::Respone, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), rpcmethod_SetChunks_, context, request, response);
+}
+
+void ChunkSink::Stub::async::SetChunks(::grpc::ClientContext* context, const ::chunksink::Chunks* request, ::common::Respone* response, std::function<void(::grpc::Status)> f) {
+  ::grpc::internal::CallbackUnaryCall< ::chunksink::Chunks, ::common::Respone, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(stub_->channel_.get(), stub_->rpcmethod_SetChunks_, context, request, response, std::move(f));
+}
+
+void ChunkSink::Stub::async::SetChunks(::grpc::ClientContext* context, const ::chunksink::Chunks* request, ::common::Respone* response, ::grpc::ClientUnaryReactor* reactor) {
+  ::grpc::internal::ClientCallbackUnaryFactory::Create< ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(stub_->channel_.get(), stub_->rpcmethod_SetChunks_, context, request, response, reactor);
+}
+
+::grpc::ClientAsyncResponseReader< ::common::Respone>* ChunkSink::Stub::PrepareAsyncSetChunksRaw(::grpc::ClientContext* context, const ::chunksink::Chunks& request, ::grpc::CompletionQueue* cq) {
+  return ::grpc::internal::ClientAsyncResponseReaderHelper::Create< ::common::Respone, ::chunksink::Chunks, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), cq, rpcmethod_SetChunks_, context, request);
+}
+
+::grpc::ClientAsyncResponseReader< ::common::Respone>* ChunkSink::Stub::AsyncSetChunksRaw(::grpc::ClientContext* context, const ::chunksink::Chunks& request, ::grpc::CompletionQueue* cq) {
+  auto* result =
+    this->PrepareAsyncSetChunksRaw(context, request, cq);
   result->StartCall();
   return result;
 }
@@ -79,37 +86,37 @@ void ChunkSink::Stub::async::SetRecorderStatus(::grpc::ClientContext* context, c
 ChunkSink::Service::Service() {
   AddMethod(new ::grpc::internal::RpcServiceMethod(
       ChunkSink_method_names[0],
-      ::grpc::internal::RpcMethod::CLIENT_STREAMING,
-      new ::grpc::internal::ClientStreamingHandler< ChunkSink::Service, ::chunksink::ChunkData, ::chunksink::StreamChunkDataReply>(
+      ::grpc::internal::RpcMethod::NORMAL_RPC,
+      new ::grpc::internal::RpcMethodHandler< ChunkSink::Service, ::common::RecorderStatus, ::common::Respone, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(
           [](ChunkSink::Service* service,
              ::grpc::ServerContext* ctx,
-             ::grpc::ServerReader<::chunksink::ChunkData>* reader,
-             ::chunksink::StreamChunkDataReply* resp) {
-               return service->StreamChunkData(ctx, reader, resp);
+             const ::common::RecorderStatus* req,
+             ::common::Respone* resp) {
+               return service->SetRecorderStatus(ctx, req, resp);
              }, this)));
   AddMethod(new ::grpc::internal::RpcServiceMethod(
       ChunkSink_method_names[1],
       ::grpc::internal::RpcMethod::NORMAL_RPC,
-      new ::grpc::internal::RpcMethodHandler< ChunkSink::Service, ::chunksink::RecorderStatusRequest, ::chunksink::RecorderStatusReply, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(
+      new ::grpc::internal::RpcMethodHandler< ChunkSink::Service, ::chunksink::Chunks, ::common::Respone, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(
           [](ChunkSink::Service* service,
              ::grpc::ServerContext* ctx,
-             const ::chunksink::RecorderStatusRequest* req,
-             ::chunksink::RecorderStatusReply* resp) {
-               return service->SetRecorderStatus(ctx, req, resp);
+             const ::chunksink::Chunks* req,
+             ::common::Respone* resp) {
+               return service->SetChunks(ctx, req, resp);
              }, this)));
 }
 
 ChunkSink::Service::~Service() {
 }
 
-::grpc::Status ChunkSink::Service::StreamChunkData(::grpc::ServerContext* context, ::grpc::ServerReader< ::chunksink::ChunkData>* reader, ::chunksink::StreamChunkDataReply* response) {
+::grpc::Status ChunkSink::Service::SetRecorderStatus(::grpc::ServerContext* context, const ::common::RecorderStatus* request, ::common::Respone* response) {
   (void) context;
-  (void) reader;
+  (void) request;
   (void) response;
   return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
 }
 
-::grpc::Status ChunkSink::Service::SetRecorderStatus(::grpc::ServerContext* context, const ::chunksink::RecorderStatusRequest* request, ::chunksink::RecorderStatusReply* response) {
+::grpc::Status ChunkSink::Service::SetChunks(::grpc::ServerContext* context, const ::chunksink::Chunks* request, ::common::Respone* response) {
   (void) context;
   (void) request;
   (void) response;

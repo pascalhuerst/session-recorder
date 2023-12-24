@@ -10,23 +10,19 @@ option go_package = "github.com/pascalhuerst/session-recorder/protocols/go/sessi
 
 message StreamRecordersRequest {}
 
-message RecorderInfo {
-	string name = 2;
-	common.AudioInputStatus audioInputStatus = 3; 
-}
-
 message RecordereRemoved {}
 
 message Recorder {
-	string ID = 1;
+	string recorderID = 1;
+	string recorderName = 2;
 	
 	oneof info {
-		RecorderInfo updated = 2;
-		RecordereRemoved removed = 3;
+		common.RecorderStatus status = 3;
+		RecordereRemoved removed = 4;
 	}
 }
 
-message StreamSeesionRequst {
+message StreamSessionRequest {
 	string recorderID = 1;
 }
 
@@ -79,7 +75,7 @@ service SessionSource {
 	rpc StreamRecorders(StreamRecordersRequest) returns (stream Recorder);
 	
 	// Session RPC
-	rpc StreamSessions(StreamSeesionRequst) returns (stream Session);
+	rpc StreamSessions(StreamSessionRequest) returns (stream Session);
 	rpc SetKeepSession(SetKeepSessionRequest) returns (common.Respone);
 	rpc DeleteSession(DeleteSessionRequest) returns (common.Respone);
 	rpc SetName(SetNameRequest) returns (common.Respone);

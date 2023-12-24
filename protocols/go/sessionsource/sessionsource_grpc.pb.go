@@ -22,7 +22,7 @@ type SessionSourceClient interface {
 	// Recorder RPC
 	StreamRecorders(ctx context.Context, in *StreamRecordersRequest, opts ...grpc.CallOption) (SessionSource_StreamRecordersClient, error)
 	// Session RPC
-	StreamSessions(ctx context.Context, in *StreamSeesionRequst, opts ...grpc.CallOption) (SessionSource_StreamSessionsClient, error)
+	StreamSessions(ctx context.Context, in *StreamSessionRequest, opts ...grpc.CallOption) (SessionSource_StreamSessionsClient, error)
 	SetKeepSession(ctx context.Context, in *SetKeepSessionRequest, opts ...grpc.CallOption) (*common.Respone, error)
 	DeleteSession(ctx context.Context, in *DeleteSessionRequest, opts ...grpc.CallOption) (*common.Respone, error)
 	SetName(ctx context.Context, in *SetNameRequest, opts ...grpc.CallOption) (*common.Respone, error)
@@ -68,7 +68,7 @@ func (x *sessionSourceStreamRecordersClient) Recv() (*Recorder, error) {
 	return m, nil
 }
 
-func (c *sessionSourceClient) StreamSessions(ctx context.Context, in *StreamSeesionRequst, opts ...grpc.CallOption) (SessionSource_StreamSessionsClient, error) {
+func (c *sessionSourceClient) StreamSessions(ctx context.Context, in *StreamSessionRequest, opts ...grpc.CallOption) (SessionSource_StreamSessionsClient, error) {
 	stream, err := c.cc.NewStream(ctx, &SessionSource_ServiceDesc.Streams[1], "/sessionsource.SessionSource/StreamSessions", opts...)
 	if err != nil {
 		return nil, err
@@ -134,7 +134,7 @@ type SessionSourceServer interface {
 	// Recorder RPC
 	StreamRecorders(*StreamRecordersRequest, SessionSource_StreamRecordersServer) error
 	// Session RPC
-	StreamSessions(*StreamSeesionRequst, SessionSource_StreamSessionsServer) error
+	StreamSessions(*StreamSessionRequest, SessionSource_StreamSessionsServer) error
 	SetKeepSession(context.Context, *SetKeepSessionRequest) (*common.Respone, error)
 	DeleteSession(context.Context, *DeleteSessionRequest) (*common.Respone, error)
 	SetName(context.Context, *SetNameRequest) (*common.Respone, error)
@@ -147,7 +147,7 @@ type UnimplementedSessionSourceServer struct {
 func (UnimplementedSessionSourceServer) StreamRecorders(*StreamRecordersRequest, SessionSource_StreamRecordersServer) error {
 	return status.Errorf(codes.Unimplemented, "method StreamRecorders not implemented")
 }
-func (UnimplementedSessionSourceServer) StreamSessions(*StreamSeesionRequst, SessionSource_StreamSessionsServer) error {
+func (UnimplementedSessionSourceServer) StreamSessions(*StreamSessionRequest, SessionSource_StreamSessionsServer) error {
 	return status.Errorf(codes.Unimplemented, "method StreamSessions not implemented")
 }
 func (UnimplementedSessionSourceServer) SetKeepSession(context.Context, *SetKeepSessionRequest) (*common.Respone, error) {
@@ -193,7 +193,7 @@ func (x *sessionSourceStreamRecordersServer) Send(m *Recorder) error {
 }
 
 func _SessionSource_StreamSessions_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(StreamSeesionRequst)
+	m := new(StreamSessionRequest)
 	if err := stream.RecvMsg(m); err != nil {
 		return err
 	}

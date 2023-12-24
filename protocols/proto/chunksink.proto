@@ -3,37 +3,21 @@ syntax = "proto3";
 package chunksink;
 
 import "common.proto";
+import "google/protobuf/timestamp.proto";
 
 option go_package = "github.com/pascalhuerst/session-recorder/protocols/go/chunksink";
 
-message RecorderStatusRequest {
-    string name = 1;
-    string uuid = 2;
-    
-    common.AudioInputStatus status = 3;
+message Chunks {
+    string recorderID = 1;
+    string sessionID = 2;
+    uint32 chunkCount = 3;
+    google.protobuf.Timestamp timeCreated = 4;
+
+    repeated uint32 data = 5;
 }
 
-message RecorderStatusReply {
-    bool sendChunks = 1;
-}
-
-message StreamChunkDataReply{}
-
-message ChunkSourceMetrics {
-    string sessionID = 1;
-    uint32 chunkCount = 2;
-    uint64 startTime = 3;
-}
-
-message ChunkData {
-    string name = 1;
-    string uuid = 2;
-    
-    ChunkSourceMetrics metrics = 3;
-    repeated uint32 samples = 4;
-}
 
 service ChunkSink {
-    rpc StreamChunkData(stream ChunkData) returns (StreamChunkDataReply);
-    rpc SetRecorderStatus(RecorderStatusRequest) returns (RecorderStatusReply);
+    rpc SetRecorderStatus(common.RecorderStatus) returns (common.Respone);
+    rpc SetChunks(Chunks) returns (common.Respone);
 }

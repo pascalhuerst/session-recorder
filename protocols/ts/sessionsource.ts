@@ -1,7 +1,7 @@
 /* eslint-disable */
 import type { CallContext, CallOptions } from "nice-grpc-common";
 import _m0 from "protobufjs/minimal";
-import { AudioInputStatus, audioInputStatusFromJSON, audioInputStatusToJSON, Respone } from "./common";
+import { RecorderStatus, Respone } from "./common";
 import { Duration } from "./google/protobuf/duration";
 import { Timestamp } from "./google/protobuf/timestamp";
 
@@ -49,21 +49,17 @@ export function sessionStateToJSON(object: SessionState): string {
 export interface StreamRecordersRequest {
 }
 
-export interface RecorderInfo {
-  name: string;
-  audioInputStatus: AudioInputStatus;
-}
-
 export interface RecordereRemoved {
 }
 
 export interface Recorder {
-  ID: string;
-  updated?: RecorderInfo | undefined;
+  recorderID: string;
+  recorderName: string;
+  status?: RecorderStatus | undefined;
   removed?: RecordereRemoved | undefined;
 }
 
-export interface StreamSeesionRequst {
+export interface StreamSessionRequest {
   recorderID: string;
 }
 
@@ -144,80 +140,6 @@ export const StreamRecordersRequest = {
   },
 };
 
-function createBaseRecorderInfo(): RecorderInfo {
-  return { name: "", audioInputStatus: 0 };
-}
-
-export const RecorderInfo = {
-  encode(message: RecorderInfo, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
-    if (message.name !== "") {
-      writer.uint32(18).string(message.name);
-    }
-    if (message.audioInputStatus !== 0) {
-      writer.uint32(24).int32(message.audioInputStatus);
-    }
-    return writer;
-  },
-
-  decode(input: _m0.Reader | Uint8Array, length?: number): RecorderInfo {
-    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseRecorderInfo();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 2:
-          if (tag !== 18) {
-            break;
-          }
-
-          message.name = reader.string();
-          continue;
-        case 3:
-          if (tag !== 24) {
-            break;
-          }
-
-          message.audioInputStatus = reader.int32() as any;
-          continue;
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skipType(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): RecorderInfo {
-    return {
-      name: isSet(object.name) ? globalThis.String(object.name) : "",
-      audioInputStatus: isSet(object.audioInputStatus) ? audioInputStatusFromJSON(object.audioInputStatus) : 0,
-    };
-  },
-
-  toJSON(message: RecorderInfo): unknown {
-    const obj: any = {};
-    if (message.name !== "") {
-      obj.name = message.name;
-    }
-    if (message.audioInputStatus !== 0) {
-      obj.audioInputStatus = audioInputStatusToJSON(message.audioInputStatus);
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<RecorderInfo>): RecorderInfo {
-    return RecorderInfo.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<RecorderInfo>): RecorderInfo {
-    const message = createBaseRecorderInfo();
-    message.name = object.name ?? "";
-    message.audioInputStatus = object.audioInputStatus ?? 0;
-    return message;
-  },
-};
-
 function createBaseRecordereRemoved(): RecordereRemoved {
   return {};
 }
@@ -262,19 +184,22 @@ export const RecordereRemoved = {
 };
 
 function createBaseRecorder(): Recorder {
-  return { ID: "", updated: undefined, removed: undefined };
+  return { recorderID: "", recorderName: "", status: undefined, removed: undefined };
 }
 
 export const Recorder = {
   encode(message: Recorder, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
-    if (message.ID !== "") {
-      writer.uint32(10).string(message.ID);
+    if (message.recorderID !== "") {
+      writer.uint32(10).string(message.recorderID);
     }
-    if (message.updated !== undefined) {
-      RecorderInfo.encode(message.updated, writer.uint32(18).fork()).ldelim();
+    if (message.recorderName !== "") {
+      writer.uint32(18).string(message.recorderName);
+    }
+    if (message.status !== undefined) {
+      RecorderStatus.encode(message.status, writer.uint32(26).fork()).ldelim();
     }
     if (message.removed !== undefined) {
-      RecordereRemoved.encode(message.removed, writer.uint32(26).fork()).ldelim();
+      RecordereRemoved.encode(message.removed, writer.uint32(34).fork()).ldelim();
     }
     return writer;
   },
@@ -291,17 +216,24 @@ export const Recorder = {
             break;
           }
 
-          message.ID = reader.string();
+          message.recorderID = reader.string();
           continue;
         case 2:
           if (tag !== 18) {
             break;
           }
 
-          message.updated = RecorderInfo.decode(reader, reader.uint32());
+          message.recorderName = reader.string();
           continue;
         case 3:
           if (tag !== 26) {
+            break;
+          }
+
+          message.status = RecorderStatus.decode(reader, reader.uint32());
+          continue;
+        case 4:
+          if (tag !== 34) {
             break;
           }
 
@@ -318,19 +250,23 @@ export const Recorder = {
 
   fromJSON(object: any): Recorder {
     return {
-      ID: isSet(object.ID) ? globalThis.String(object.ID) : "",
-      updated: isSet(object.updated) ? RecorderInfo.fromJSON(object.updated) : undefined,
+      recorderID: isSet(object.recorderID) ? globalThis.String(object.recorderID) : "",
+      recorderName: isSet(object.recorderName) ? globalThis.String(object.recorderName) : "",
+      status: isSet(object.status) ? RecorderStatus.fromJSON(object.status) : undefined,
       removed: isSet(object.removed) ? RecordereRemoved.fromJSON(object.removed) : undefined,
     };
   },
 
   toJSON(message: Recorder): unknown {
     const obj: any = {};
-    if (message.ID !== "") {
-      obj.ID = message.ID;
+    if (message.recorderID !== "") {
+      obj.recorderID = message.recorderID;
     }
-    if (message.updated !== undefined) {
-      obj.updated = RecorderInfo.toJSON(message.updated);
+    if (message.recorderName !== "") {
+      obj.recorderName = message.recorderName;
+    }
+    if (message.status !== undefined) {
+      obj.status = RecorderStatus.toJSON(message.status);
     }
     if (message.removed !== undefined) {
       obj.removed = RecordereRemoved.toJSON(message.removed);
@@ -343,9 +279,10 @@ export const Recorder = {
   },
   fromPartial(object: DeepPartial<Recorder>): Recorder {
     const message = createBaseRecorder();
-    message.ID = object.ID ?? "";
-    message.updated = (object.updated !== undefined && object.updated !== null)
-      ? RecorderInfo.fromPartial(object.updated)
+    message.recorderID = object.recorderID ?? "";
+    message.recorderName = object.recorderName ?? "";
+    message.status = (object.status !== undefined && object.status !== null)
+      ? RecorderStatus.fromPartial(object.status)
       : undefined;
     message.removed = (object.removed !== undefined && object.removed !== null)
       ? RecordereRemoved.fromPartial(object.removed)
@@ -354,22 +291,22 @@ export const Recorder = {
   },
 };
 
-function createBaseStreamSeesionRequst(): StreamSeesionRequst {
+function createBaseStreamSessionRequest(): StreamSessionRequest {
   return { recorderID: "" };
 }
 
-export const StreamSeesionRequst = {
-  encode(message: StreamSeesionRequst, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+export const StreamSessionRequest = {
+  encode(message: StreamSessionRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
     if (message.recorderID !== "") {
       writer.uint32(10).string(message.recorderID);
     }
     return writer;
   },
 
-  decode(input: _m0.Reader | Uint8Array, length?: number): StreamSeesionRequst {
+  decode(input: _m0.Reader | Uint8Array, length?: number): StreamSessionRequest {
     const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
     let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseStreamSeesionRequst();
+    const message = createBaseStreamSessionRequest();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -389,11 +326,11 @@ export const StreamSeesionRequst = {
     return message;
   },
 
-  fromJSON(object: any): StreamSeesionRequst {
+  fromJSON(object: any): StreamSessionRequest {
     return { recorderID: isSet(object.recorderID) ? globalThis.String(object.recorderID) : "" };
   },
 
-  toJSON(message: StreamSeesionRequst): unknown {
+  toJSON(message: StreamSessionRequest): unknown {
     const obj: any = {};
     if (message.recorderID !== "") {
       obj.recorderID = message.recorderID;
@@ -401,11 +338,11 @@ export const StreamSeesionRequst = {
     return obj;
   },
 
-  create(base?: DeepPartial<StreamSeesionRequst>): StreamSeesionRequst {
-    return StreamSeesionRequst.fromPartial(base ?? {});
+  create(base?: DeepPartial<StreamSessionRequest>): StreamSessionRequest {
+    return StreamSessionRequest.fromPartial(base ?? {});
   },
-  fromPartial(object: DeepPartial<StreamSeesionRequst>): StreamSeesionRequst {
-    const message = createBaseStreamSeesionRequst();
+  fromPartial(object: DeepPartial<StreamSessionRequest>): StreamSessionRequest {
+    const message = createBaseStreamSessionRequest();
     message.recorderID = object.recorderID ?? "";
     return message;
   },
@@ -944,7 +881,7 @@ export const SessionSourceDefinition = {
     /** Session RPC */
     streamSessions: {
       name: "StreamSessions",
-      requestType: StreamSeesionRequst,
+      requestType: StreamSessionRequest,
       requestStream: false,
       responseType: Session,
       responseStream: true,
@@ -985,7 +922,7 @@ export interface SessionSourceServiceImplementation<CallContextExt = {}> {
   ): ServerStreamingMethodResult<DeepPartial<Recorder>>;
   /** Session RPC */
   streamSessions(
-    request: StreamSeesionRequst,
+    request: StreamSessionRequest,
     context: CallContext & CallContextExt,
   ): ServerStreamingMethodResult<DeepPartial<Session>>;
   setKeepSession(request: SetKeepSessionRequest, context: CallContext & CallContextExt): Promise<DeepPartial<Respone>>;
@@ -1001,7 +938,7 @@ export interface SessionSourceClient<CallOptionsExt = {}> {
   ): AsyncIterable<Recorder>;
   /** Session RPC */
   streamSessions(
-    request: DeepPartial<StreamSeesionRequst>,
+    request: DeepPartial<StreamSessionRequest>,
     options?: CallOptions & CallOptionsExt,
   ): AsyncIterable<Session>;
   setKeepSession(request: DeepPartial<SetKeepSessionRequest>, options?: CallOptions & CallOptionsExt): Promise<Respone>;

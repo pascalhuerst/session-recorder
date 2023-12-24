@@ -23,7 +23,6 @@
 #include <google/protobuf/io/coded_stream.h>
 #include <google/protobuf/arena.h>
 #include <google/protobuf/arenastring.h>
-#include <google/protobuf/generated_message_bases.h>
 #include <google/protobuf/generated_message_table_driven.h>
 #include <google/protobuf/generated_message_util.h>
 #include <google/protobuf/metadata_lite.h>
@@ -33,6 +32,7 @@
 #include <google/protobuf/extension_set.h>  // IWYU pragma: export
 #include <google/protobuf/unknown_field_set.h>
 #include "common.pb.h"
+#include <google/protobuf/timestamp.pb.h>
 // @@protoc_insertion_point(includes)
 #include <google/protobuf/port_def.inc>
 #define PROTOBUF_INTERNAL_EXPORT_chunksink_2eproto
@@ -48,7 +48,7 @@ struct TableStruct_chunksink_2eproto {
     PROTOBUF_SECTION_VARIABLE(protodesc_cold);
   static const ::PROTOBUF_NAMESPACE_ID::internal::AuxiliaryParseTableField aux[]
     PROTOBUF_SECTION_VARIABLE(protodesc_cold);
-  static const ::PROTOBUF_NAMESPACE_ID::internal::ParseTable schema[5]
+  static const ::PROTOBUF_NAMESPACE_ID::internal::ParseTable schema[1]
     PROTOBUF_SECTION_VARIABLE(protodesc_cold);
   static const ::PROTOBUF_NAMESPACE_ID::internal::FieldMetadata field_metadata[];
   static const ::PROTOBUF_NAMESPACE_ID::internal::SerializationTable serialization_table[];
@@ -56,51 +56,35 @@ struct TableStruct_chunksink_2eproto {
 };
 extern const ::PROTOBUF_NAMESPACE_ID::internal::DescriptorTable descriptor_table_chunksink_2eproto;
 namespace chunksink {
-class ChunkData;
-struct ChunkDataDefaultTypeInternal;
-extern ChunkDataDefaultTypeInternal _ChunkData_default_instance_;
-class ChunkSourceMetrics;
-struct ChunkSourceMetricsDefaultTypeInternal;
-extern ChunkSourceMetricsDefaultTypeInternal _ChunkSourceMetrics_default_instance_;
-class RecorderStatusReply;
-struct RecorderStatusReplyDefaultTypeInternal;
-extern RecorderStatusReplyDefaultTypeInternal _RecorderStatusReply_default_instance_;
-class RecorderStatusRequest;
-struct RecorderStatusRequestDefaultTypeInternal;
-extern RecorderStatusRequestDefaultTypeInternal _RecorderStatusRequest_default_instance_;
-class StreamChunkDataReply;
-struct StreamChunkDataReplyDefaultTypeInternal;
-extern StreamChunkDataReplyDefaultTypeInternal _StreamChunkDataReply_default_instance_;
+class Chunks;
+struct ChunksDefaultTypeInternal;
+extern ChunksDefaultTypeInternal _Chunks_default_instance_;
 }  // namespace chunksink
 PROTOBUF_NAMESPACE_OPEN
-template<> ::chunksink::ChunkData* Arena::CreateMaybeMessage<::chunksink::ChunkData>(Arena*);
-template<> ::chunksink::ChunkSourceMetrics* Arena::CreateMaybeMessage<::chunksink::ChunkSourceMetrics>(Arena*);
-template<> ::chunksink::RecorderStatusReply* Arena::CreateMaybeMessage<::chunksink::RecorderStatusReply>(Arena*);
-template<> ::chunksink::RecorderStatusRequest* Arena::CreateMaybeMessage<::chunksink::RecorderStatusRequest>(Arena*);
-template<> ::chunksink::StreamChunkDataReply* Arena::CreateMaybeMessage<::chunksink::StreamChunkDataReply>(Arena*);
+template<> ::chunksink::Chunks* Arena::CreateMaybeMessage<::chunksink::Chunks>(Arena*);
 PROTOBUF_NAMESPACE_CLOSE
 namespace chunksink {
 
 // ===================================================================
 
-class RecorderStatusRequest final :
-    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:chunksink.RecorderStatusRequest) */ {
+class Chunks final :
+    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:chunksink.Chunks) */ {
  public:
-  inline RecorderStatusRequest() : RecorderStatusRequest(nullptr) {}
-  ~RecorderStatusRequest() override;
-  explicit constexpr RecorderStatusRequest(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
+  inline Chunks() : Chunks(nullptr) {}
+  ~Chunks() override;
+  explicit constexpr Chunks(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
 
-  RecorderStatusRequest(const RecorderStatusRequest& from);
-  RecorderStatusRequest(RecorderStatusRequest&& from) noexcept
-    : RecorderStatusRequest() {
+  Chunks(const Chunks& from);
+  Chunks(Chunks&& from) noexcept
+    : Chunks() {
     *this = ::std::move(from);
   }
 
-  inline RecorderStatusRequest& operator=(const RecorderStatusRequest& from) {
+  inline Chunks& operator=(const Chunks& from) {
     CopyFrom(from);
     return *this;
   }
-  inline RecorderStatusRequest& operator=(RecorderStatusRequest&& from) noexcept {
+  inline Chunks& operator=(Chunks&& from) noexcept {
     if (this == &from) return *this;
     if (GetOwningArena() == from.GetOwningArena()
   #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
@@ -123,20 +107,20 @@ class RecorderStatusRequest final :
   static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
     return default_instance().GetMetadata().reflection;
   }
-  static const RecorderStatusRequest& default_instance() {
+  static const Chunks& default_instance() {
     return *internal_default_instance();
   }
-  static inline const RecorderStatusRequest* internal_default_instance() {
-    return reinterpret_cast<const RecorderStatusRequest*>(
-               &_RecorderStatusRequest_default_instance_);
+  static inline const Chunks* internal_default_instance() {
+    return reinterpret_cast<const Chunks*>(
+               &_Chunks_default_instance_);
   }
   static constexpr int kIndexInFileMessages =
     0;
 
-  friend void swap(RecorderStatusRequest& a, RecorderStatusRequest& b) {
+  friend void swap(Chunks& a, Chunks& b) {
     a.Swap(&b);
   }
-  inline void Swap(RecorderStatusRequest* other) {
+  inline void Swap(Chunks* other) {
     if (other == this) return;
   #ifdef PROTOBUF_FORCE_COPY_IN_SWAP
     if (GetOwningArena() != nullptr &&
@@ -149,7 +133,7 @@ class RecorderStatusRequest final :
       ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
     }
   }
-  void UnsafeArenaSwap(RecorderStatusRequest* other) {
+  void UnsafeArenaSwap(Chunks* other) {
     if (other == this) return;
     GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
     InternalSwap(other);
@@ -157,13 +141,13 @@ class RecorderStatusRequest final :
 
   // implements Message ----------------------------------------------
 
-  RecorderStatusRequest* New(::PROTOBUF_NAMESPACE_ID::Arena* arena = nullptr) const final {
-    return CreateMaybeMessage<RecorderStatusRequest>(arena);
+  Chunks* New(::PROTOBUF_NAMESPACE_ID::Arena* arena = nullptr) const final {
+    return CreateMaybeMessage<Chunks>(arena);
   }
   using ::PROTOBUF_NAMESPACE_ID::Message::CopyFrom;
-  void CopyFrom(const RecorderStatusRequest& from);
+  void CopyFrom(const Chunks& from);
   using ::PROTOBUF_NAMESPACE_ID::Message::MergeFrom;
-  void MergeFrom(const RecorderStatusRequest& from);
+  void MergeFrom(const Chunks& from);
   private:
   static void MergeImpl(::PROTOBUF_NAMESPACE_ID::Message* to, const ::PROTOBUF_NAMESPACE_ID::Message& from);
   public:
@@ -180,15 +164,15 @@ class RecorderStatusRequest final :
   void SharedCtor();
   void SharedDtor();
   void SetCachedSize(int size) const final;
-  void InternalSwap(RecorderStatusRequest* other);
+  void InternalSwap(Chunks* other);
 
   private:
   friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
   static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
-    return "chunksink.RecorderStatusRequest";
+    return "chunksink.Chunks";
   }
   protected:
-  explicit RecorderStatusRequest(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+  explicit Chunks(::PROTOBUF_NAMESPACE_ID::Arena* arena,
                        bool is_message_owned = false);
   private:
   static void ArenaDtor(void* object);
@@ -205,453 +189,49 @@ class RecorderStatusRequest final :
   // accessors -------------------------------------------------------
 
   enum : int {
-    kNameFieldNumber = 1,
-    kUuidFieldNumber = 2,
-    kStatusFieldNumber = 3,
+    kDataFieldNumber = 5,
+    kRecorderIDFieldNumber = 1,
+    kSessionIDFieldNumber = 2,
+    kTimeCreatedFieldNumber = 4,
+    kChunkCountFieldNumber = 3,
   };
-  // string name = 1;
-  void clear_name();
-  const std::string& name() const;
+  // repeated uint32 data = 5;
+  int data_size() const;
+  private:
+  int _internal_data_size() const;
+  public:
+  void clear_data();
+  private:
+  uint32_t _internal_data(int index) const;
+  const ::PROTOBUF_NAMESPACE_ID::RepeatedField< uint32_t >&
+      _internal_data() const;
+  void _internal_add_data(uint32_t value);
+  ::PROTOBUF_NAMESPACE_ID::RepeatedField< uint32_t >*
+      _internal_mutable_data();
+  public:
+  uint32_t data(int index) const;
+  void set_data(int index, uint32_t value);
+  void add_data(uint32_t value);
+  const ::PROTOBUF_NAMESPACE_ID::RepeatedField< uint32_t >&
+      data() const;
+  ::PROTOBUF_NAMESPACE_ID::RepeatedField< uint32_t >*
+      mutable_data();
+
+  // string recorderID = 1;
+  void clear_recorderid();
+  const std::string& recorderid() const;
   template <typename ArgT0 = const std::string&, typename... ArgT>
-  void set_name(ArgT0&& arg0, ArgT... args);
-  std::string* mutable_name();
-  PROTOBUF_NODISCARD std::string* release_name();
-  void set_allocated_name(std::string* name);
+  void set_recorderid(ArgT0&& arg0, ArgT... args);
+  std::string* mutable_recorderid();
+  PROTOBUF_NODISCARD std::string* release_recorderid();
+  void set_allocated_recorderid(std::string* recorderid);
   private:
-  const std::string& _internal_name() const;
-  inline PROTOBUF_ALWAYS_INLINE void _internal_set_name(const std::string& value);
-  std::string* _internal_mutable_name();
+  const std::string& _internal_recorderid() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_recorderid(const std::string& value);
+  std::string* _internal_mutable_recorderid();
   public:
 
-  // string uuid = 2;
-  void clear_uuid();
-  const std::string& uuid() const;
-  template <typename ArgT0 = const std::string&, typename... ArgT>
-  void set_uuid(ArgT0&& arg0, ArgT... args);
-  std::string* mutable_uuid();
-  PROTOBUF_NODISCARD std::string* release_uuid();
-  void set_allocated_uuid(std::string* uuid);
-  private:
-  const std::string& _internal_uuid() const;
-  inline PROTOBUF_ALWAYS_INLINE void _internal_set_uuid(const std::string& value);
-  std::string* _internal_mutable_uuid();
-  public:
-
-  // .common.AudioInputStatus status = 3;
-  void clear_status();
-  ::common::AudioInputStatus status() const;
-  void set_status(::common::AudioInputStatus value);
-  private:
-  ::common::AudioInputStatus _internal_status() const;
-  void _internal_set_status(::common::AudioInputStatus value);
-  public:
-
-  // @@protoc_insertion_point(class_scope:chunksink.RecorderStatusRequest)
- private:
-  class _Internal;
-
-  template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
-  typedef void InternalArenaConstructable_;
-  typedef void DestructorSkippable_;
-  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr name_;
-  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr uuid_;
-  int status_;
-  mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
-  friend struct ::TableStruct_chunksink_2eproto;
-};
-// -------------------------------------------------------------------
-
-class RecorderStatusReply final :
-    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:chunksink.RecorderStatusReply) */ {
- public:
-  inline RecorderStatusReply() : RecorderStatusReply(nullptr) {}
-  ~RecorderStatusReply() override;
-  explicit constexpr RecorderStatusReply(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
-
-  RecorderStatusReply(const RecorderStatusReply& from);
-  RecorderStatusReply(RecorderStatusReply&& from) noexcept
-    : RecorderStatusReply() {
-    *this = ::std::move(from);
-  }
-
-  inline RecorderStatusReply& operator=(const RecorderStatusReply& from) {
-    CopyFrom(from);
-    return *this;
-  }
-  inline RecorderStatusReply& operator=(RecorderStatusReply&& from) noexcept {
-    if (this == &from) return *this;
-    if (GetOwningArena() == from.GetOwningArena()
-  #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
-        && GetOwningArena() != nullptr
-  #endif  // !PROTOBUF_FORCE_COPY_IN_MOVE
-    ) {
-      InternalSwap(&from);
-    } else {
-      CopyFrom(from);
-    }
-    return *this;
-  }
-
-  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* descriptor() {
-    return GetDescriptor();
-  }
-  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* GetDescriptor() {
-    return default_instance().GetMetadata().descriptor;
-  }
-  static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
-    return default_instance().GetMetadata().reflection;
-  }
-  static const RecorderStatusReply& default_instance() {
-    return *internal_default_instance();
-  }
-  static inline const RecorderStatusReply* internal_default_instance() {
-    return reinterpret_cast<const RecorderStatusReply*>(
-               &_RecorderStatusReply_default_instance_);
-  }
-  static constexpr int kIndexInFileMessages =
-    1;
-
-  friend void swap(RecorderStatusReply& a, RecorderStatusReply& b) {
-    a.Swap(&b);
-  }
-  inline void Swap(RecorderStatusReply* other) {
-    if (other == this) return;
-  #ifdef PROTOBUF_FORCE_COPY_IN_SWAP
-    if (GetOwningArena() != nullptr &&
-        GetOwningArena() == other->GetOwningArena()) {
-   #else  // PROTOBUF_FORCE_COPY_IN_SWAP
-    if (GetOwningArena() == other->GetOwningArena()) {
-  #endif  // !PROTOBUF_FORCE_COPY_IN_SWAP
-      InternalSwap(other);
-    } else {
-      ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
-    }
-  }
-  void UnsafeArenaSwap(RecorderStatusReply* other) {
-    if (other == this) return;
-    GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
-    InternalSwap(other);
-  }
-
-  // implements Message ----------------------------------------------
-
-  RecorderStatusReply* New(::PROTOBUF_NAMESPACE_ID::Arena* arena = nullptr) const final {
-    return CreateMaybeMessage<RecorderStatusReply>(arena);
-  }
-  using ::PROTOBUF_NAMESPACE_ID::Message::CopyFrom;
-  void CopyFrom(const RecorderStatusReply& from);
-  using ::PROTOBUF_NAMESPACE_ID::Message::MergeFrom;
-  void MergeFrom(const RecorderStatusReply& from);
-  private:
-  static void MergeImpl(::PROTOBUF_NAMESPACE_ID::Message* to, const ::PROTOBUF_NAMESPACE_ID::Message& from);
-  public:
-  PROTOBUF_ATTRIBUTE_REINITIALIZES void Clear() final;
-  bool IsInitialized() const final;
-
-  size_t ByteSizeLong() const final;
-  const char* _InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID::internal::ParseContext* ctx) final;
-  uint8_t* _InternalSerialize(
-      uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const final;
-  int GetCachedSize() const final { return _cached_size_.Get(); }
-
-  private:
-  void SharedCtor();
-  void SharedDtor();
-  void SetCachedSize(int size) const final;
-  void InternalSwap(RecorderStatusReply* other);
-
-  private:
-  friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
-  static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
-    return "chunksink.RecorderStatusReply";
-  }
-  protected:
-  explicit RecorderStatusReply(::PROTOBUF_NAMESPACE_ID::Arena* arena,
-                       bool is_message_owned = false);
-  private:
-  static void ArenaDtor(void* object);
-  inline void RegisterArenaDtor(::PROTOBUF_NAMESPACE_ID::Arena* arena);
-  public:
-
-  static const ClassData _class_data_;
-  const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*GetClassData() const final;
-
-  ::PROTOBUF_NAMESPACE_ID::Metadata GetMetadata() const final;
-
-  // nested types ----------------------------------------------------
-
-  // accessors -------------------------------------------------------
-
-  enum : int {
-    kSendChunksFieldNumber = 1,
-  };
-  // bool sendChunks = 1;
-  void clear_sendchunks();
-  bool sendchunks() const;
-  void set_sendchunks(bool value);
-  private:
-  bool _internal_sendchunks() const;
-  void _internal_set_sendchunks(bool value);
-  public:
-
-  // @@protoc_insertion_point(class_scope:chunksink.RecorderStatusReply)
- private:
-  class _Internal;
-
-  template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
-  typedef void InternalArenaConstructable_;
-  typedef void DestructorSkippable_;
-  bool sendchunks_;
-  mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
-  friend struct ::TableStruct_chunksink_2eproto;
-};
-// -------------------------------------------------------------------
-
-class StreamChunkDataReply final :
-    public ::PROTOBUF_NAMESPACE_ID::internal::ZeroFieldsBase /* @@protoc_insertion_point(class_definition:chunksink.StreamChunkDataReply) */ {
- public:
-  inline StreamChunkDataReply() : StreamChunkDataReply(nullptr) {}
-  explicit constexpr StreamChunkDataReply(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
-
-  StreamChunkDataReply(const StreamChunkDataReply& from);
-  StreamChunkDataReply(StreamChunkDataReply&& from) noexcept
-    : StreamChunkDataReply() {
-    *this = ::std::move(from);
-  }
-
-  inline StreamChunkDataReply& operator=(const StreamChunkDataReply& from) {
-    CopyFrom(from);
-    return *this;
-  }
-  inline StreamChunkDataReply& operator=(StreamChunkDataReply&& from) noexcept {
-    if (this == &from) return *this;
-    if (GetOwningArena() == from.GetOwningArena()
-  #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
-        && GetOwningArena() != nullptr
-  #endif  // !PROTOBUF_FORCE_COPY_IN_MOVE
-    ) {
-      InternalSwap(&from);
-    } else {
-      CopyFrom(from);
-    }
-    return *this;
-  }
-
-  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* descriptor() {
-    return GetDescriptor();
-  }
-  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* GetDescriptor() {
-    return default_instance().GetMetadata().descriptor;
-  }
-  static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
-    return default_instance().GetMetadata().reflection;
-  }
-  static const StreamChunkDataReply& default_instance() {
-    return *internal_default_instance();
-  }
-  static inline const StreamChunkDataReply* internal_default_instance() {
-    return reinterpret_cast<const StreamChunkDataReply*>(
-               &_StreamChunkDataReply_default_instance_);
-  }
-  static constexpr int kIndexInFileMessages =
-    2;
-
-  friend void swap(StreamChunkDataReply& a, StreamChunkDataReply& b) {
-    a.Swap(&b);
-  }
-  inline void Swap(StreamChunkDataReply* other) {
-    if (other == this) return;
-  #ifdef PROTOBUF_FORCE_COPY_IN_SWAP
-    if (GetOwningArena() != nullptr &&
-        GetOwningArena() == other->GetOwningArena()) {
-   #else  // PROTOBUF_FORCE_COPY_IN_SWAP
-    if (GetOwningArena() == other->GetOwningArena()) {
-  #endif  // !PROTOBUF_FORCE_COPY_IN_SWAP
-      InternalSwap(other);
-    } else {
-      ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
-    }
-  }
-  void UnsafeArenaSwap(StreamChunkDataReply* other) {
-    if (other == this) return;
-    GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
-    InternalSwap(other);
-  }
-
-  // implements Message ----------------------------------------------
-
-  StreamChunkDataReply* New(::PROTOBUF_NAMESPACE_ID::Arena* arena = nullptr) const final {
-    return CreateMaybeMessage<StreamChunkDataReply>(arena);
-  }
-  using ::PROTOBUF_NAMESPACE_ID::internal::ZeroFieldsBase::CopyFrom;
-  inline void CopyFrom(const StreamChunkDataReply& from) {
-    ::PROTOBUF_NAMESPACE_ID::internal::ZeroFieldsBase::CopyImpl(this, from);
-  }
-  using ::PROTOBUF_NAMESPACE_ID::internal::ZeroFieldsBase::MergeFrom;
-  void MergeFrom(const StreamChunkDataReply& from) {
-    ::PROTOBUF_NAMESPACE_ID::internal::ZeroFieldsBase::MergeImpl(this, from);
-  }
-  public:
-
-  private:
-  friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
-  static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
-    return "chunksink.StreamChunkDataReply";
-  }
-  protected:
-  explicit StreamChunkDataReply(::PROTOBUF_NAMESPACE_ID::Arena* arena,
-                       bool is_message_owned = false);
-  private:
-  public:
-
-  static const ClassData _class_data_;
-  const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*GetClassData() const final;
-
-  ::PROTOBUF_NAMESPACE_ID::Metadata GetMetadata() const final;
-
-  // nested types ----------------------------------------------------
-
-  // accessors -------------------------------------------------------
-
-  // @@protoc_insertion_point(class_scope:chunksink.StreamChunkDataReply)
- private:
-  class _Internal;
-
-  template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
-  typedef void InternalArenaConstructable_;
-  typedef void DestructorSkippable_;
-  mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
-  friend struct ::TableStruct_chunksink_2eproto;
-};
-// -------------------------------------------------------------------
-
-class ChunkSourceMetrics final :
-    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:chunksink.ChunkSourceMetrics) */ {
- public:
-  inline ChunkSourceMetrics() : ChunkSourceMetrics(nullptr) {}
-  ~ChunkSourceMetrics() override;
-  explicit constexpr ChunkSourceMetrics(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
-
-  ChunkSourceMetrics(const ChunkSourceMetrics& from);
-  ChunkSourceMetrics(ChunkSourceMetrics&& from) noexcept
-    : ChunkSourceMetrics() {
-    *this = ::std::move(from);
-  }
-
-  inline ChunkSourceMetrics& operator=(const ChunkSourceMetrics& from) {
-    CopyFrom(from);
-    return *this;
-  }
-  inline ChunkSourceMetrics& operator=(ChunkSourceMetrics&& from) noexcept {
-    if (this == &from) return *this;
-    if (GetOwningArena() == from.GetOwningArena()
-  #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
-        && GetOwningArena() != nullptr
-  #endif  // !PROTOBUF_FORCE_COPY_IN_MOVE
-    ) {
-      InternalSwap(&from);
-    } else {
-      CopyFrom(from);
-    }
-    return *this;
-  }
-
-  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* descriptor() {
-    return GetDescriptor();
-  }
-  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* GetDescriptor() {
-    return default_instance().GetMetadata().descriptor;
-  }
-  static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
-    return default_instance().GetMetadata().reflection;
-  }
-  static const ChunkSourceMetrics& default_instance() {
-    return *internal_default_instance();
-  }
-  static inline const ChunkSourceMetrics* internal_default_instance() {
-    return reinterpret_cast<const ChunkSourceMetrics*>(
-               &_ChunkSourceMetrics_default_instance_);
-  }
-  static constexpr int kIndexInFileMessages =
-    3;
-
-  friend void swap(ChunkSourceMetrics& a, ChunkSourceMetrics& b) {
-    a.Swap(&b);
-  }
-  inline void Swap(ChunkSourceMetrics* other) {
-    if (other == this) return;
-  #ifdef PROTOBUF_FORCE_COPY_IN_SWAP
-    if (GetOwningArena() != nullptr &&
-        GetOwningArena() == other->GetOwningArena()) {
-   #else  // PROTOBUF_FORCE_COPY_IN_SWAP
-    if (GetOwningArena() == other->GetOwningArena()) {
-  #endif  // !PROTOBUF_FORCE_COPY_IN_SWAP
-      InternalSwap(other);
-    } else {
-      ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
-    }
-  }
-  void UnsafeArenaSwap(ChunkSourceMetrics* other) {
-    if (other == this) return;
-    GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
-    InternalSwap(other);
-  }
-
-  // implements Message ----------------------------------------------
-
-  ChunkSourceMetrics* New(::PROTOBUF_NAMESPACE_ID::Arena* arena = nullptr) const final {
-    return CreateMaybeMessage<ChunkSourceMetrics>(arena);
-  }
-  using ::PROTOBUF_NAMESPACE_ID::Message::CopyFrom;
-  void CopyFrom(const ChunkSourceMetrics& from);
-  using ::PROTOBUF_NAMESPACE_ID::Message::MergeFrom;
-  void MergeFrom(const ChunkSourceMetrics& from);
-  private:
-  static void MergeImpl(::PROTOBUF_NAMESPACE_ID::Message* to, const ::PROTOBUF_NAMESPACE_ID::Message& from);
-  public:
-  PROTOBUF_ATTRIBUTE_REINITIALIZES void Clear() final;
-  bool IsInitialized() const final;
-
-  size_t ByteSizeLong() const final;
-  const char* _InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID::internal::ParseContext* ctx) final;
-  uint8_t* _InternalSerialize(
-      uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const final;
-  int GetCachedSize() const final { return _cached_size_.Get(); }
-
-  private:
-  void SharedCtor();
-  void SharedDtor();
-  void SetCachedSize(int size) const final;
-  void InternalSwap(ChunkSourceMetrics* other);
-
-  private:
-  friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
-  static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
-    return "chunksink.ChunkSourceMetrics";
-  }
-  protected:
-  explicit ChunkSourceMetrics(::PROTOBUF_NAMESPACE_ID::Arena* arena,
-                       bool is_message_owned = false);
-  private:
-  static void ArenaDtor(void* object);
-  inline void RegisterArenaDtor(::PROTOBUF_NAMESPACE_ID::Arena* arena);
-  public:
-
-  static const ClassData _class_data_;
-  const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*GetClassData() const final;
-
-  ::PROTOBUF_NAMESPACE_ID::Metadata GetMetadata() const final;
-
-  // nested types ----------------------------------------------------
-
-  // accessors -------------------------------------------------------
-
-  enum : int {
-    kSessionIDFieldNumber = 1,
-    kStartTimeFieldNumber = 3,
-    kChunkCountFieldNumber = 2,
-  };
-  // string sessionID = 1;
+  // string sessionID = 2;
   void clear_sessionid();
   const std::string& sessionid() const;
   template <typename ArgT0 = const std::string&, typename... ArgT>
@@ -665,16 +245,25 @@ class ChunkSourceMetrics final :
   std::string* _internal_mutable_sessionid();
   public:
 
-  // uint64 startTime = 3;
-  void clear_starttime();
-  uint64_t starttime() const;
-  void set_starttime(uint64_t value);
+  // .google.protobuf.Timestamp timeCreated = 4;
+  bool has_timecreated() const;
   private:
-  uint64_t _internal_starttime() const;
-  void _internal_set_starttime(uint64_t value);
+  bool _internal_has_timecreated() const;
   public:
+  void clear_timecreated();
+  const ::PROTOBUF_NAMESPACE_ID::Timestamp& timecreated() const;
+  PROTOBUF_NODISCARD ::PROTOBUF_NAMESPACE_ID::Timestamp* release_timecreated();
+  ::PROTOBUF_NAMESPACE_ID::Timestamp* mutable_timecreated();
+  void set_allocated_timecreated(::PROTOBUF_NAMESPACE_ID::Timestamp* timecreated);
+  private:
+  const ::PROTOBUF_NAMESPACE_ID::Timestamp& _internal_timecreated() const;
+  ::PROTOBUF_NAMESPACE_ID::Timestamp* _internal_mutable_timecreated();
+  public:
+  void unsafe_arena_set_allocated_timecreated(
+      ::PROTOBUF_NAMESPACE_ID::Timestamp* timecreated);
+  ::PROTOBUF_NAMESPACE_ID::Timestamp* unsafe_arena_release_timecreated();
 
-  // uint32 chunkCount = 2;
+  // uint32 chunkCount = 3;
   void clear_chunkcount();
   uint32_t chunkcount() const;
   void set_chunkcount(uint32_t value);
@@ -683,228 +272,19 @@ class ChunkSourceMetrics final :
   void _internal_set_chunkcount(uint32_t value);
   public:
 
-  // @@protoc_insertion_point(class_scope:chunksink.ChunkSourceMetrics)
+  // @@protoc_insertion_point(class_scope:chunksink.Chunks)
  private:
   class _Internal;
 
   template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
   typedef void InternalArenaConstructable_;
   typedef void DestructorSkippable_;
+  ::PROTOBUF_NAMESPACE_ID::RepeatedField< uint32_t > data_;
+  mutable std::atomic<int> _data_cached_byte_size_;
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr recorderid_;
   ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr sessionid_;
-  uint64_t starttime_;
+  ::PROTOBUF_NAMESPACE_ID::Timestamp* timecreated_;
   uint32_t chunkcount_;
-  mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
-  friend struct ::TableStruct_chunksink_2eproto;
-};
-// -------------------------------------------------------------------
-
-class ChunkData final :
-    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:chunksink.ChunkData) */ {
- public:
-  inline ChunkData() : ChunkData(nullptr) {}
-  ~ChunkData() override;
-  explicit constexpr ChunkData(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
-
-  ChunkData(const ChunkData& from);
-  ChunkData(ChunkData&& from) noexcept
-    : ChunkData() {
-    *this = ::std::move(from);
-  }
-
-  inline ChunkData& operator=(const ChunkData& from) {
-    CopyFrom(from);
-    return *this;
-  }
-  inline ChunkData& operator=(ChunkData&& from) noexcept {
-    if (this == &from) return *this;
-    if (GetOwningArena() == from.GetOwningArena()
-  #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
-        && GetOwningArena() != nullptr
-  #endif  // !PROTOBUF_FORCE_COPY_IN_MOVE
-    ) {
-      InternalSwap(&from);
-    } else {
-      CopyFrom(from);
-    }
-    return *this;
-  }
-
-  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* descriptor() {
-    return GetDescriptor();
-  }
-  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* GetDescriptor() {
-    return default_instance().GetMetadata().descriptor;
-  }
-  static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
-    return default_instance().GetMetadata().reflection;
-  }
-  static const ChunkData& default_instance() {
-    return *internal_default_instance();
-  }
-  static inline const ChunkData* internal_default_instance() {
-    return reinterpret_cast<const ChunkData*>(
-               &_ChunkData_default_instance_);
-  }
-  static constexpr int kIndexInFileMessages =
-    4;
-
-  friend void swap(ChunkData& a, ChunkData& b) {
-    a.Swap(&b);
-  }
-  inline void Swap(ChunkData* other) {
-    if (other == this) return;
-  #ifdef PROTOBUF_FORCE_COPY_IN_SWAP
-    if (GetOwningArena() != nullptr &&
-        GetOwningArena() == other->GetOwningArena()) {
-   #else  // PROTOBUF_FORCE_COPY_IN_SWAP
-    if (GetOwningArena() == other->GetOwningArena()) {
-  #endif  // !PROTOBUF_FORCE_COPY_IN_SWAP
-      InternalSwap(other);
-    } else {
-      ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
-    }
-  }
-  void UnsafeArenaSwap(ChunkData* other) {
-    if (other == this) return;
-    GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
-    InternalSwap(other);
-  }
-
-  // implements Message ----------------------------------------------
-
-  ChunkData* New(::PROTOBUF_NAMESPACE_ID::Arena* arena = nullptr) const final {
-    return CreateMaybeMessage<ChunkData>(arena);
-  }
-  using ::PROTOBUF_NAMESPACE_ID::Message::CopyFrom;
-  void CopyFrom(const ChunkData& from);
-  using ::PROTOBUF_NAMESPACE_ID::Message::MergeFrom;
-  void MergeFrom(const ChunkData& from);
-  private:
-  static void MergeImpl(::PROTOBUF_NAMESPACE_ID::Message* to, const ::PROTOBUF_NAMESPACE_ID::Message& from);
-  public:
-  PROTOBUF_ATTRIBUTE_REINITIALIZES void Clear() final;
-  bool IsInitialized() const final;
-
-  size_t ByteSizeLong() const final;
-  const char* _InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID::internal::ParseContext* ctx) final;
-  uint8_t* _InternalSerialize(
-      uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const final;
-  int GetCachedSize() const final { return _cached_size_.Get(); }
-
-  private:
-  void SharedCtor();
-  void SharedDtor();
-  void SetCachedSize(int size) const final;
-  void InternalSwap(ChunkData* other);
-
-  private:
-  friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
-  static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
-    return "chunksink.ChunkData";
-  }
-  protected:
-  explicit ChunkData(::PROTOBUF_NAMESPACE_ID::Arena* arena,
-                       bool is_message_owned = false);
-  private:
-  static void ArenaDtor(void* object);
-  inline void RegisterArenaDtor(::PROTOBUF_NAMESPACE_ID::Arena* arena);
-  public:
-
-  static const ClassData _class_data_;
-  const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*GetClassData() const final;
-
-  ::PROTOBUF_NAMESPACE_ID::Metadata GetMetadata() const final;
-
-  // nested types ----------------------------------------------------
-
-  // accessors -------------------------------------------------------
-
-  enum : int {
-    kSamplesFieldNumber = 4,
-    kNameFieldNumber = 1,
-    kUuidFieldNumber = 2,
-    kMetricsFieldNumber = 3,
-  };
-  // repeated uint32 samples = 4;
-  int samples_size() const;
-  private:
-  int _internal_samples_size() const;
-  public:
-  void clear_samples();
-  private:
-  uint32_t _internal_samples(int index) const;
-  const ::PROTOBUF_NAMESPACE_ID::RepeatedField< uint32_t >&
-      _internal_samples() const;
-  void _internal_add_samples(uint32_t value);
-  ::PROTOBUF_NAMESPACE_ID::RepeatedField< uint32_t >*
-      _internal_mutable_samples();
-  public:
-  uint32_t samples(int index) const;
-  void set_samples(int index, uint32_t value);
-  void add_samples(uint32_t value);
-  const ::PROTOBUF_NAMESPACE_ID::RepeatedField< uint32_t >&
-      samples() const;
-  ::PROTOBUF_NAMESPACE_ID::RepeatedField< uint32_t >*
-      mutable_samples();
-
-  // string name = 1;
-  void clear_name();
-  const std::string& name() const;
-  template <typename ArgT0 = const std::string&, typename... ArgT>
-  void set_name(ArgT0&& arg0, ArgT... args);
-  std::string* mutable_name();
-  PROTOBUF_NODISCARD std::string* release_name();
-  void set_allocated_name(std::string* name);
-  private:
-  const std::string& _internal_name() const;
-  inline PROTOBUF_ALWAYS_INLINE void _internal_set_name(const std::string& value);
-  std::string* _internal_mutable_name();
-  public:
-
-  // string uuid = 2;
-  void clear_uuid();
-  const std::string& uuid() const;
-  template <typename ArgT0 = const std::string&, typename... ArgT>
-  void set_uuid(ArgT0&& arg0, ArgT... args);
-  std::string* mutable_uuid();
-  PROTOBUF_NODISCARD std::string* release_uuid();
-  void set_allocated_uuid(std::string* uuid);
-  private:
-  const std::string& _internal_uuid() const;
-  inline PROTOBUF_ALWAYS_INLINE void _internal_set_uuid(const std::string& value);
-  std::string* _internal_mutable_uuid();
-  public:
-
-  // .chunksink.ChunkSourceMetrics metrics = 3;
-  bool has_metrics() const;
-  private:
-  bool _internal_has_metrics() const;
-  public:
-  void clear_metrics();
-  const ::chunksink::ChunkSourceMetrics& metrics() const;
-  PROTOBUF_NODISCARD ::chunksink::ChunkSourceMetrics* release_metrics();
-  ::chunksink::ChunkSourceMetrics* mutable_metrics();
-  void set_allocated_metrics(::chunksink::ChunkSourceMetrics* metrics);
-  private:
-  const ::chunksink::ChunkSourceMetrics& _internal_metrics() const;
-  ::chunksink::ChunkSourceMetrics* _internal_mutable_metrics();
-  public:
-  void unsafe_arena_set_allocated_metrics(
-      ::chunksink::ChunkSourceMetrics* metrics);
-  ::chunksink::ChunkSourceMetrics* unsafe_arena_release_metrics();
-
-  // @@protoc_insertion_point(class_scope:chunksink.ChunkData)
- private:
-  class _Internal;
-
-  template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
-  typedef void InternalArenaConstructable_;
-  typedef void DestructorSkippable_;
-  ::PROTOBUF_NAMESPACE_ID::RepeatedField< uint32_t > samples_;
-  mutable std::atomic<int> _samples_cached_byte_size_;
-  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr name_;
-  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr uuid_;
-  ::chunksink::ChunkSourceMetrics* metrics_;
   mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   friend struct ::TableStruct_chunksink_2eproto;
 };
@@ -917,198 +297,95 @@ class ChunkData final :
   #pragma GCC diagnostic push
   #pragma GCC diagnostic ignored "-Wstrict-aliasing"
 #endif  // __GNUC__
-// RecorderStatusRequest
+// Chunks
 
-// string name = 1;
-inline void RecorderStatusRequest::clear_name() {
-  name_.ClearToEmpty();
+// string recorderID = 1;
+inline void Chunks::clear_recorderid() {
+  recorderid_.ClearToEmpty();
 }
-inline const std::string& RecorderStatusRequest::name() const {
-  // @@protoc_insertion_point(field_get:chunksink.RecorderStatusRequest.name)
-  return _internal_name();
+inline const std::string& Chunks::recorderid() const {
+  // @@protoc_insertion_point(field_get:chunksink.Chunks.recorderID)
+  return _internal_recorderid();
 }
 template <typename ArgT0, typename... ArgT>
 inline PROTOBUF_ALWAYS_INLINE
-void RecorderStatusRequest::set_name(ArgT0&& arg0, ArgT... args) {
+void Chunks::set_recorderid(ArgT0&& arg0, ArgT... args) {
  
- name_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
-  // @@protoc_insertion_point(field_set:chunksink.RecorderStatusRequest.name)
+ recorderid_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set:chunksink.Chunks.recorderID)
 }
-inline std::string* RecorderStatusRequest::mutable_name() {
-  std::string* _s = _internal_mutable_name();
-  // @@protoc_insertion_point(field_mutable:chunksink.RecorderStatusRequest.name)
+inline std::string* Chunks::mutable_recorderid() {
+  std::string* _s = _internal_mutable_recorderid();
+  // @@protoc_insertion_point(field_mutable:chunksink.Chunks.recorderID)
   return _s;
 }
-inline const std::string& RecorderStatusRequest::_internal_name() const {
-  return name_.Get();
+inline const std::string& Chunks::_internal_recorderid() const {
+  return recorderid_.Get();
 }
-inline void RecorderStatusRequest::_internal_set_name(const std::string& value) {
+inline void Chunks::_internal_set_recorderid(const std::string& value) {
   
-  name_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, value, GetArenaForAllocation());
+  recorderid_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, value, GetArenaForAllocation());
 }
-inline std::string* RecorderStatusRequest::_internal_mutable_name() {
+inline std::string* Chunks::_internal_mutable_recorderid() {
   
-  return name_.Mutable(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, GetArenaForAllocation());
+  return recorderid_.Mutable(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, GetArenaForAllocation());
 }
-inline std::string* RecorderStatusRequest::release_name() {
-  // @@protoc_insertion_point(field_release:chunksink.RecorderStatusRequest.name)
-  return name_.Release(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), GetArenaForAllocation());
+inline std::string* Chunks::release_recorderid() {
+  // @@protoc_insertion_point(field_release:chunksink.Chunks.recorderID)
+  return recorderid_.Release(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), GetArenaForAllocation());
 }
-inline void RecorderStatusRequest::set_allocated_name(std::string* name) {
-  if (name != nullptr) {
+inline void Chunks::set_allocated_recorderid(std::string* recorderid) {
+  if (recorderid != nullptr) {
     
   } else {
     
   }
-  name_.SetAllocated(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), name,
+  recorderid_.SetAllocated(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), recorderid,
       GetArenaForAllocation());
 #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
-  if (name_.IsDefault(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited())) {
-    name_.Set(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), "", GetArenaForAllocation());
+  if (recorderid_.IsDefault(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited())) {
+    recorderid_.Set(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), "", GetArenaForAllocation());
   }
 #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
-  // @@protoc_insertion_point(field_set_allocated:chunksink.RecorderStatusRequest.name)
+  // @@protoc_insertion_point(field_set_allocated:chunksink.Chunks.recorderID)
 }
 
-// string uuid = 2;
-inline void RecorderStatusRequest::clear_uuid() {
-  uuid_.ClearToEmpty();
-}
-inline const std::string& RecorderStatusRequest::uuid() const {
-  // @@protoc_insertion_point(field_get:chunksink.RecorderStatusRequest.uuid)
-  return _internal_uuid();
-}
-template <typename ArgT0, typename... ArgT>
-inline PROTOBUF_ALWAYS_INLINE
-void RecorderStatusRequest::set_uuid(ArgT0&& arg0, ArgT... args) {
- 
- uuid_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
-  // @@protoc_insertion_point(field_set:chunksink.RecorderStatusRequest.uuid)
-}
-inline std::string* RecorderStatusRequest::mutable_uuid() {
-  std::string* _s = _internal_mutable_uuid();
-  // @@protoc_insertion_point(field_mutable:chunksink.RecorderStatusRequest.uuid)
-  return _s;
-}
-inline const std::string& RecorderStatusRequest::_internal_uuid() const {
-  return uuid_.Get();
-}
-inline void RecorderStatusRequest::_internal_set_uuid(const std::string& value) {
-  
-  uuid_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, value, GetArenaForAllocation());
-}
-inline std::string* RecorderStatusRequest::_internal_mutable_uuid() {
-  
-  return uuid_.Mutable(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, GetArenaForAllocation());
-}
-inline std::string* RecorderStatusRequest::release_uuid() {
-  // @@protoc_insertion_point(field_release:chunksink.RecorderStatusRequest.uuid)
-  return uuid_.Release(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), GetArenaForAllocation());
-}
-inline void RecorderStatusRequest::set_allocated_uuid(std::string* uuid) {
-  if (uuid != nullptr) {
-    
-  } else {
-    
-  }
-  uuid_.SetAllocated(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), uuid,
-      GetArenaForAllocation());
-#ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
-  if (uuid_.IsDefault(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited())) {
-    uuid_.Set(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), "", GetArenaForAllocation());
-  }
-#endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
-  // @@protoc_insertion_point(field_set_allocated:chunksink.RecorderStatusRequest.uuid)
-}
-
-// .common.AudioInputStatus status = 3;
-inline void RecorderStatusRequest::clear_status() {
-  status_ = 0;
-}
-inline ::common::AudioInputStatus RecorderStatusRequest::_internal_status() const {
-  return static_cast< ::common::AudioInputStatus >(status_);
-}
-inline ::common::AudioInputStatus RecorderStatusRequest::status() const {
-  // @@protoc_insertion_point(field_get:chunksink.RecorderStatusRequest.status)
-  return _internal_status();
-}
-inline void RecorderStatusRequest::_internal_set_status(::common::AudioInputStatus value) {
-  
-  status_ = value;
-}
-inline void RecorderStatusRequest::set_status(::common::AudioInputStatus value) {
-  _internal_set_status(value);
-  // @@protoc_insertion_point(field_set:chunksink.RecorderStatusRequest.status)
-}
-
-// -------------------------------------------------------------------
-
-// RecorderStatusReply
-
-// bool sendChunks = 1;
-inline void RecorderStatusReply::clear_sendchunks() {
-  sendchunks_ = false;
-}
-inline bool RecorderStatusReply::_internal_sendchunks() const {
-  return sendchunks_;
-}
-inline bool RecorderStatusReply::sendchunks() const {
-  // @@protoc_insertion_point(field_get:chunksink.RecorderStatusReply.sendChunks)
-  return _internal_sendchunks();
-}
-inline void RecorderStatusReply::_internal_set_sendchunks(bool value) {
-  
-  sendchunks_ = value;
-}
-inline void RecorderStatusReply::set_sendchunks(bool value) {
-  _internal_set_sendchunks(value);
-  // @@protoc_insertion_point(field_set:chunksink.RecorderStatusReply.sendChunks)
-}
-
-// -------------------------------------------------------------------
-
-// StreamChunkDataReply
-
-// -------------------------------------------------------------------
-
-// ChunkSourceMetrics
-
-// string sessionID = 1;
-inline void ChunkSourceMetrics::clear_sessionid() {
+// string sessionID = 2;
+inline void Chunks::clear_sessionid() {
   sessionid_.ClearToEmpty();
 }
-inline const std::string& ChunkSourceMetrics::sessionid() const {
-  // @@protoc_insertion_point(field_get:chunksink.ChunkSourceMetrics.sessionID)
+inline const std::string& Chunks::sessionid() const {
+  // @@protoc_insertion_point(field_get:chunksink.Chunks.sessionID)
   return _internal_sessionid();
 }
 template <typename ArgT0, typename... ArgT>
 inline PROTOBUF_ALWAYS_INLINE
-void ChunkSourceMetrics::set_sessionid(ArgT0&& arg0, ArgT... args) {
+void Chunks::set_sessionid(ArgT0&& arg0, ArgT... args) {
  
  sessionid_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
-  // @@protoc_insertion_point(field_set:chunksink.ChunkSourceMetrics.sessionID)
+  // @@protoc_insertion_point(field_set:chunksink.Chunks.sessionID)
 }
-inline std::string* ChunkSourceMetrics::mutable_sessionid() {
+inline std::string* Chunks::mutable_sessionid() {
   std::string* _s = _internal_mutable_sessionid();
-  // @@protoc_insertion_point(field_mutable:chunksink.ChunkSourceMetrics.sessionID)
+  // @@protoc_insertion_point(field_mutable:chunksink.Chunks.sessionID)
   return _s;
 }
-inline const std::string& ChunkSourceMetrics::_internal_sessionid() const {
+inline const std::string& Chunks::_internal_sessionid() const {
   return sessionid_.Get();
 }
-inline void ChunkSourceMetrics::_internal_set_sessionid(const std::string& value) {
+inline void Chunks::_internal_set_sessionid(const std::string& value) {
   
   sessionid_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, value, GetArenaForAllocation());
 }
-inline std::string* ChunkSourceMetrics::_internal_mutable_sessionid() {
+inline std::string* Chunks::_internal_mutable_sessionid() {
   
   return sessionid_.Mutable(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, GetArenaForAllocation());
 }
-inline std::string* ChunkSourceMetrics::release_sessionid() {
-  // @@protoc_insertion_point(field_release:chunksink.ChunkSourceMetrics.sessionID)
+inline std::string* Chunks::release_sessionid() {
+  // @@protoc_insertion_point(field_release:chunksink.Chunks.sessionID)
   return sessionid_.Release(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), GetArenaForAllocation());
 }
-inline void ChunkSourceMetrics::set_allocated_sessionid(std::string* sessionid) {
+inline void Chunks::set_allocated_sessionid(std::string* sessionid) {
   if (sessionid != nullptr) {
     
   } else {
@@ -1121,194 +398,62 @@ inline void ChunkSourceMetrics::set_allocated_sessionid(std::string* sessionid) 
     sessionid_.Set(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), "", GetArenaForAllocation());
   }
 #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
-  // @@protoc_insertion_point(field_set_allocated:chunksink.ChunkSourceMetrics.sessionID)
+  // @@protoc_insertion_point(field_set_allocated:chunksink.Chunks.sessionID)
 }
 
-// uint32 chunkCount = 2;
-inline void ChunkSourceMetrics::clear_chunkcount() {
+// uint32 chunkCount = 3;
+inline void Chunks::clear_chunkcount() {
   chunkcount_ = 0u;
 }
-inline uint32_t ChunkSourceMetrics::_internal_chunkcount() const {
+inline uint32_t Chunks::_internal_chunkcount() const {
   return chunkcount_;
 }
-inline uint32_t ChunkSourceMetrics::chunkcount() const {
-  // @@protoc_insertion_point(field_get:chunksink.ChunkSourceMetrics.chunkCount)
+inline uint32_t Chunks::chunkcount() const {
+  // @@protoc_insertion_point(field_get:chunksink.Chunks.chunkCount)
   return _internal_chunkcount();
 }
-inline void ChunkSourceMetrics::_internal_set_chunkcount(uint32_t value) {
+inline void Chunks::_internal_set_chunkcount(uint32_t value) {
   
   chunkcount_ = value;
 }
-inline void ChunkSourceMetrics::set_chunkcount(uint32_t value) {
+inline void Chunks::set_chunkcount(uint32_t value) {
   _internal_set_chunkcount(value);
-  // @@protoc_insertion_point(field_set:chunksink.ChunkSourceMetrics.chunkCount)
+  // @@protoc_insertion_point(field_set:chunksink.Chunks.chunkCount)
 }
 
-// uint64 startTime = 3;
-inline void ChunkSourceMetrics::clear_starttime() {
-  starttime_ = uint64_t{0u};
+// .google.protobuf.Timestamp timeCreated = 4;
+inline bool Chunks::_internal_has_timecreated() const {
+  return this != internal_default_instance() && timecreated_ != nullptr;
 }
-inline uint64_t ChunkSourceMetrics::_internal_starttime() const {
-  return starttime_;
+inline bool Chunks::has_timecreated() const {
+  return _internal_has_timecreated();
 }
-inline uint64_t ChunkSourceMetrics::starttime() const {
-  // @@protoc_insertion_point(field_get:chunksink.ChunkSourceMetrics.startTime)
-  return _internal_starttime();
+inline const ::PROTOBUF_NAMESPACE_ID::Timestamp& Chunks::_internal_timecreated() const {
+  const ::PROTOBUF_NAMESPACE_ID::Timestamp* p = timecreated_;
+  return p != nullptr ? *p : reinterpret_cast<const ::PROTOBUF_NAMESPACE_ID::Timestamp&>(
+      ::PROTOBUF_NAMESPACE_ID::_Timestamp_default_instance_);
 }
-inline void ChunkSourceMetrics::_internal_set_starttime(uint64_t value) {
-  
-  starttime_ = value;
+inline const ::PROTOBUF_NAMESPACE_ID::Timestamp& Chunks::timecreated() const {
+  // @@protoc_insertion_point(field_get:chunksink.Chunks.timeCreated)
+  return _internal_timecreated();
 }
-inline void ChunkSourceMetrics::set_starttime(uint64_t value) {
-  _internal_set_starttime(value);
-  // @@protoc_insertion_point(field_set:chunksink.ChunkSourceMetrics.startTime)
-}
-
-// -------------------------------------------------------------------
-
-// ChunkData
-
-// string name = 1;
-inline void ChunkData::clear_name() {
-  name_.ClearToEmpty();
-}
-inline const std::string& ChunkData::name() const {
-  // @@protoc_insertion_point(field_get:chunksink.ChunkData.name)
-  return _internal_name();
-}
-template <typename ArgT0, typename... ArgT>
-inline PROTOBUF_ALWAYS_INLINE
-void ChunkData::set_name(ArgT0&& arg0, ArgT... args) {
- 
- name_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
-  // @@protoc_insertion_point(field_set:chunksink.ChunkData.name)
-}
-inline std::string* ChunkData::mutable_name() {
-  std::string* _s = _internal_mutable_name();
-  // @@protoc_insertion_point(field_mutable:chunksink.ChunkData.name)
-  return _s;
-}
-inline const std::string& ChunkData::_internal_name() const {
-  return name_.Get();
-}
-inline void ChunkData::_internal_set_name(const std::string& value) {
-  
-  name_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, value, GetArenaForAllocation());
-}
-inline std::string* ChunkData::_internal_mutable_name() {
-  
-  return name_.Mutable(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, GetArenaForAllocation());
-}
-inline std::string* ChunkData::release_name() {
-  // @@protoc_insertion_point(field_release:chunksink.ChunkData.name)
-  return name_.Release(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), GetArenaForAllocation());
-}
-inline void ChunkData::set_allocated_name(std::string* name) {
-  if (name != nullptr) {
-    
-  } else {
-    
-  }
-  name_.SetAllocated(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), name,
-      GetArenaForAllocation());
-#ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
-  if (name_.IsDefault(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited())) {
-    name_.Set(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), "", GetArenaForAllocation());
-  }
-#endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
-  // @@protoc_insertion_point(field_set_allocated:chunksink.ChunkData.name)
-}
-
-// string uuid = 2;
-inline void ChunkData::clear_uuid() {
-  uuid_.ClearToEmpty();
-}
-inline const std::string& ChunkData::uuid() const {
-  // @@protoc_insertion_point(field_get:chunksink.ChunkData.uuid)
-  return _internal_uuid();
-}
-template <typename ArgT0, typename... ArgT>
-inline PROTOBUF_ALWAYS_INLINE
-void ChunkData::set_uuid(ArgT0&& arg0, ArgT... args) {
- 
- uuid_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
-  // @@protoc_insertion_point(field_set:chunksink.ChunkData.uuid)
-}
-inline std::string* ChunkData::mutable_uuid() {
-  std::string* _s = _internal_mutable_uuid();
-  // @@protoc_insertion_point(field_mutable:chunksink.ChunkData.uuid)
-  return _s;
-}
-inline const std::string& ChunkData::_internal_uuid() const {
-  return uuid_.Get();
-}
-inline void ChunkData::_internal_set_uuid(const std::string& value) {
-  
-  uuid_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, value, GetArenaForAllocation());
-}
-inline std::string* ChunkData::_internal_mutable_uuid() {
-  
-  return uuid_.Mutable(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, GetArenaForAllocation());
-}
-inline std::string* ChunkData::release_uuid() {
-  // @@protoc_insertion_point(field_release:chunksink.ChunkData.uuid)
-  return uuid_.Release(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), GetArenaForAllocation());
-}
-inline void ChunkData::set_allocated_uuid(std::string* uuid) {
-  if (uuid != nullptr) {
-    
-  } else {
-    
-  }
-  uuid_.SetAllocated(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), uuid,
-      GetArenaForAllocation());
-#ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
-  if (uuid_.IsDefault(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited())) {
-    uuid_.Set(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), "", GetArenaForAllocation());
-  }
-#endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
-  // @@protoc_insertion_point(field_set_allocated:chunksink.ChunkData.uuid)
-}
-
-// .chunksink.ChunkSourceMetrics metrics = 3;
-inline bool ChunkData::_internal_has_metrics() const {
-  return this != internal_default_instance() && metrics_ != nullptr;
-}
-inline bool ChunkData::has_metrics() const {
-  return _internal_has_metrics();
-}
-inline void ChunkData::clear_metrics() {
-  if (GetArenaForAllocation() == nullptr && metrics_ != nullptr) {
-    delete metrics_;
-  }
-  metrics_ = nullptr;
-}
-inline const ::chunksink::ChunkSourceMetrics& ChunkData::_internal_metrics() const {
-  const ::chunksink::ChunkSourceMetrics* p = metrics_;
-  return p != nullptr ? *p : reinterpret_cast<const ::chunksink::ChunkSourceMetrics&>(
-      ::chunksink::_ChunkSourceMetrics_default_instance_);
-}
-inline const ::chunksink::ChunkSourceMetrics& ChunkData::metrics() const {
-  // @@protoc_insertion_point(field_get:chunksink.ChunkData.metrics)
-  return _internal_metrics();
-}
-inline void ChunkData::unsafe_arena_set_allocated_metrics(
-    ::chunksink::ChunkSourceMetrics* metrics) {
+inline void Chunks::unsafe_arena_set_allocated_timecreated(
+    ::PROTOBUF_NAMESPACE_ID::Timestamp* timecreated) {
   if (GetArenaForAllocation() == nullptr) {
-    delete reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(metrics_);
+    delete reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(timecreated_);
   }
-  metrics_ = metrics;
-  if (metrics) {
+  timecreated_ = timecreated;
+  if (timecreated) {
     
   } else {
     
   }
-  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:chunksink.ChunkData.metrics)
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:chunksink.Chunks.timeCreated)
 }
-inline ::chunksink::ChunkSourceMetrics* ChunkData::release_metrics() {
+inline ::PROTOBUF_NAMESPACE_ID::Timestamp* Chunks::release_timecreated() {
   
-  ::chunksink::ChunkSourceMetrics* temp = metrics_;
-  metrics_ = nullptr;
+  ::PROTOBUF_NAMESPACE_ID::Timestamp* temp = timecreated_;
+  timecreated_ = nullptr;
 #ifdef PROTOBUF_FORCE_COPY_IN_RELEASE
   auto* old =  reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(temp);
   temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
@@ -1320,104 +465,98 @@ inline ::chunksink::ChunkSourceMetrics* ChunkData::release_metrics() {
 #endif  // !PROTOBUF_FORCE_COPY_IN_RELEASE
   return temp;
 }
-inline ::chunksink::ChunkSourceMetrics* ChunkData::unsafe_arena_release_metrics() {
-  // @@protoc_insertion_point(field_release:chunksink.ChunkData.metrics)
+inline ::PROTOBUF_NAMESPACE_ID::Timestamp* Chunks::unsafe_arena_release_timecreated() {
+  // @@protoc_insertion_point(field_release:chunksink.Chunks.timeCreated)
   
-  ::chunksink::ChunkSourceMetrics* temp = metrics_;
-  metrics_ = nullptr;
+  ::PROTOBUF_NAMESPACE_ID::Timestamp* temp = timecreated_;
+  timecreated_ = nullptr;
   return temp;
 }
-inline ::chunksink::ChunkSourceMetrics* ChunkData::_internal_mutable_metrics() {
+inline ::PROTOBUF_NAMESPACE_ID::Timestamp* Chunks::_internal_mutable_timecreated() {
   
-  if (metrics_ == nullptr) {
-    auto* p = CreateMaybeMessage<::chunksink::ChunkSourceMetrics>(GetArenaForAllocation());
-    metrics_ = p;
+  if (timecreated_ == nullptr) {
+    auto* p = CreateMaybeMessage<::PROTOBUF_NAMESPACE_ID::Timestamp>(GetArenaForAllocation());
+    timecreated_ = p;
   }
-  return metrics_;
+  return timecreated_;
 }
-inline ::chunksink::ChunkSourceMetrics* ChunkData::mutable_metrics() {
-  ::chunksink::ChunkSourceMetrics* _msg = _internal_mutable_metrics();
-  // @@protoc_insertion_point(field_mutable:chunksink.ChunkData.metrics)
+inline ::PROTOBUF_NAMESPACE_ID::Timestamp* Chunks::mutable_timecreated() {
+  ::PROTOBUF_NAMESPACE_ID::Timestamp* _msg = _internal_mutable_timecreated();
+  // @@protoc_insertion_point(field_mutable:chunksink.Chunks.timeCreated)
   return _msg;
 }
-inline void ChunkData::set_allocated_metrics(::chunksink::ChunkSourceMetrics* metrics) {
+inline void Chunks::set_allocated_timecreated(::PROTOBUF_NAMESPACE_ID::Timestamp* timecreated) {
   ::PROTOBUF_NAMESPACE_ID::Arena* message_arena = GetArenaForAllocation();
   if (message_arena == nullptr) {
-    delete metrics_;
+    delete reinterpret_cast< ::PROTOBUF_NAMESPACE_ID::MessageLite*>(timecreated_);
   }
-  if (metrics) {
+  if (timecreated) {
     ::PROTOBUF_NAMESPACE_ID::Arena* submessage_arena =
-        ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper<::chunksink::ChunkSourceMetrics>::GetOwningArena(metrics);
+        ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper<
+            ::PROTOBUF_NAMESPACE_ID::MessageLite>::GetOwningArena(
+                reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(timecreated));
     if (message_arena != submessage_arena) {
-      metrics = ::PROTOBUF_NAMESPACE_ID::internal::GetOwnedMessage(
-          message_arena, metrics, submessage_arena);
+      timecreated = ::PROTOBUF_NAMESPACE_ID::internal::GetOwnedMessage(
+          message_arena, timecreated, submessage_arena);
     }
     
   } else {
     
   }
-  metrics_ = metrics;
-  // @@protoc_insertion_point(field_set_allocated:chunksink.ChunkData.metrics)
+  timecreated_ = timecreated;
+  // @@protoc_insertion_point(field_set_allocated:chunksink.Chunks.timeCreated)
 }
 
-// repeated uint32 samples = 4;
-inline int ChunkData::_internal_samples_size() const {
-  return samples_.size();
+// repeated uint32 data = 5;
+inline int Chunks::_internal_data_size() const {
+  return data_.size();
 }
-inline int ChunkData::samples_size() const {
-  return _internal_samples_size();
+inline int Chunks::data_size() const {
+  return _internal_data_size();
 }
-inline void ChunkData::clear_samples() {
-  samples_.Clear();
+inline void Chunks::clear_data() {
+  data_.Clear();
 }
-inline uint32_t ChunkData::_internal_samples(int index) const {
-  return samples_.Get(index);
+inline uint32_t Chunks::_internal_data(int index) const {
+  return data_.Get(index);
 }
-inline uint32_t ChunkData::samples(int index) const {
-  // @@protoc_insertion_point(field_get:chunksink.ChunkData.samples)
-  return _internal_samples(index);
+inline uint32_t Chunks::data(int index) const {
+  // @@protoc_insertion_point(field_get:chunksink.Chunks.data)
+  return _internal_data(index);
 }
-inline void ChunkData::set_samples(int index, uint32_t value) {
-  samples_.Set(index, value);
-  // @@protoc_insertion_point(field_set:chunksink.ChunkData.samples)
+inline void Chunks::set_data(int index, uint32_t value) {
+  data_.Set(index, value);
+  // @@protoc_insertion_point(field_set:chunksink.Chunks.data)
 }
-inline void ChunkData::_internal_add_samples(uint32_t value) {
-  samples_.Add(value);
+inline void Chunks::_internal_add_data(uint32_t value) {
+  data_.Add(value);
 }
-inline void ChunkData::add_samples(uint32_t value) {
-  _internal_add_samples(value);
-  // @@protoc_insertion_point(field_add:chunksink.ChunkData.samples)
-}
-inline const ::PROTOBUF_NAMESPACE_ID::RepeatedField< uint32_t >&
-ChunkData::_internal_samples() const {
-  return samples_;
+inline void Chunks::add_data(uint32_t value) {
+  _internal_add_data(value);
+  // @@protoc_insertion_point(field_add:chunksink.Chunks.data)
 }
 inline const ::PROTOBUF_NAMESPACE_ID::RepeatedField< uint32_t >&
-ChunkData::samples() const {
-  // @@protoc_insertion_point(field_list:chunksink.ChunkData.samples)
-  return _internal_samples();
+Chunks::_internal_data() const {
+  return data_;
+}
+inline const ::PROTOBUF_NAMESPACE_ID::RepeatedField< uint32_t >&
+Chunks::data() const {
+  // @@protoc_insertion_point(field_list:chunksink.Chunks.data)
+  return _internal_data();
 }
 inline ::PROTOBUF_NAMESPACE_ID::RepeatedField< uint32_t >*
-ChunkData::_internal_mutable_samples() {
-  return &samples_;
+Chunks::_internal_mutable_data() {
+  return &data_;
 }
 inline ::PROTOBUF_NAMESPACE_ID::RepeatedField< uint32_t >*
-ChunkData::mutable_samples() {
-  // @@protoc_insertion_point(field_mutable_list:chunksink.ChunkData.samples)
-  return _internal_mutable_samples();
+Chunks::mutable_data() {
+  // @@protoc_insertion_point(field_mutable_list:chunksink.Chunks.data)
+  return _internal_mutable_data();
 }
 
 #ifdef __GNUC__
   #pragma GCC diagnostic pop
 #endif  // __GNUC__
-// -------------------------------------------------------------------
-
-// -------------------------------------------------------------------
-
-// -------------------------------------------------------------------
-
-// -------------------------------------------------------------------
-
 
 // @@protoc_insertion_point(namespace_scope)
 

@@ -35,64 +35,61 @@ class ChunkSink final {
   class StubInterface {
    public:
     virtual ~StubInterface() {}
-    std::unique_ptr< ::grpc::ClientWriterInterface< ::chunksink::ChunkData>> StreamChunkData(::grpc::ClientContext* context, ::chunksink::StreamChunkDataReply* response) {
-      return std::unique_ptr< ::grpc::ClientWriterInterface< ::chunksink::ChunkData>>(StreamChunkDataRaw(context, response));
+    virtual ::grpc::Status SetRecorderStatus(::grpc::ClientContext* context, const ::common::RecorderStatus& request, ::common::Respone* response) = 0;
+    std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>> AsyncSetRecorderStatus(::grpc::ClientContext* context, const ::common::RecorderStatus& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>>(AsyncSetRecorderStatusRaw(context, request, cq));
     }
-    std::unique_ptr< ::grpc::ClientAsyncWriterInterface< ::chunksink::ChunkData>> AsyncStreamChunkData(::grpc::ClientContext* context, ::chunksink::StreamChunkDataReply* response, ::grpc::CompletionQueue* cq, void* tag) {
-      return std::unique_ptr< ::grpc::ClientAsyncWriterInterface< ::chunksink::ChunkData>>(AsyncStreamChunkDataRaw(context, response, cq, tag));
+    std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>> PrepareAsyncSetRecorderStatus(::grpc::ClientContext* context, const ::common::RecorderStatus& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>>(PrepareAsyncSetRecorderStatusRaw(context, request, cq));
     }
-    std::unique_ptr< ::grpc::ClientAsyncWriterInterface< ::chunksink::ChunkData>> PrepareAsyncStreamChunkData(::grpc::ClientContext* context, ::chunksink::StreamChunkDataReply* response, ::grpc::CompletionQueue* cq) {
-      return std::unique_ptr< ::grpc::ClientAsyncWriterInterface< ::chunksink::ChunkData>>(PrepareAsyncStreamChunkDataRaw(context, response, cq));
+    virtual ::grpc::Status SetChunks(::grpc::ClientContext* context, const ::chunksink::Chunks& request, ::common::Respone* response) = 0;
+    std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>> AsyncSetChunks(::grpc::ClientContext* context, const ::chunksink::Chunks& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>>(AsyncSetChunksRaw(context, request, cq));
     }
-    virtual ::grpc::Status SetRecorderStatus(::grpc::ClientContext* context, const ::chunksink::RecorderStatusRequest& request, ::chunksink::RecorderStatusReply* response) = 0;
-    std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::chunksink::RecorderStatusReply>> AsyncSetRecorderStatus(::grpc::ClientContext* context, const ::chunksink::RecorderStatusRequest& request, ::grpc::CompletionQueue* cq) {
-      return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::chunksink::RecorderStatusReply>>(AsyncSetRecorderStatusRaw(context, request, cq));
-    }
-    std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::chunksink::RecorderStatusReply>> PrepareAsyncSetRecorderStatus(::grpc::ClientContext* context, const ::chunksink::RecorderStatusRequest& request, ::grpc::CompletionQueue* cq) {
-      return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::chunksink::RecorderStatusReply>>(PrepareAsyncSetRecorderStatusRaw(context, request, cq));
+    std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>> PrepareAsyncSetChunks(::grpc::ClientContext* context, const ::chunksink::Chunks& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>>(PrepareAsyncSetChunksRaw(context, request, cq));
     }
     class async_interface {
      public:
       virtual ~async_interface() {}
-      virtual void StreamChunkData(::grpc::ClientContext* context, ::chunksink::StreamChunkDataReply* response, ::grpc::ClientWriteReactor< ::chunksink::ChunkData>* reactor) = 0;
-      virtual void SetRecorderStatus(::grpc::ClientContext* context, const ::chunksink::RecorderStatusRequest* request, ::chunksink::RecorderStatusReply* response, std::function<void(::grpc::Status)>) = 0;
-      virtual void SetRecorderStatus(::grpc::ClientContext* context, const ::chunksink::RecorderStatusRequest* request, ::chunksink::RecorderStatusReply* response, ::grpc::ClientUnaryReactor* reactor) = 0;
+      virtual void SetRecorderStatus(::grpc::ClientContext* context, const ::common::RecorderStatus* request, ::common::Respone* response, std::function<void(::grpc::Status)>) = 0;
+      virtual void SetRecorderStatus(::grpc::ClientContext* context, const ::common::RecorderStatus* request, ::common::Respone* response, ::grpc::ClientUnaryReactor* reactor) = 0;
+      virtual void SetChunks(::grpc::ClientContext* context, const ::chunksink::Chunks* request, ::common::Respone* response, std::function<void(::grpc::Status)>) = 0;
+      virtual void SetChunks(::grpc::ClientContext* context, const ::chunksink::Chunks* request, ::common::Respone* response, ::grpc::ClientUnaryReactor* reactor) = 0;
     };
     typedef class async_interface experimental_async_interface;
     virtual class async_interface* async() { return nullptr; }
     class async_interface* experimental_async() { return async(); }
    private:
-    virtual ::grpc::ClientWriterInterface< ::chunksink::ChunkData>* StreamChunkDataRaw(::grpc::ClientContext* context, ::chunksink::StreamChunkDataReply* response) = 0;
-    virtual ::grpc::ClientAsyncWriterInterface< ::chunksink::ChunkData>* AsyncStreamChunkDataRaw(::grpc::ClientContext* context, ::chunksink::StreamChunkDataReply* response, ::grpc::CompletionQueue* cq, void* tag) = 0;
-    virtual ::grpc::ClientAsyncWriterInterface< ::chunksink::ChunkData>* PrepareAsyncStreamChunkDataRaw(::grpc::ClientContext* context, ::chunksink::StreamChunkDataReply* response, ::grpc::CompletionQueue* cq) = 0;
-    virtual ::grpc::ClientAsyncResponseReaderInterface< ::chunksink::RecorderStatusReply>* AsyncSetRecorderStatusRaw(::grpc::ClientContext* context, const ::chunksink::RecorderStatusRequest& request, ::grpc::CompletionQueue* cq) = 0;
-    virtual ::grpc::ClientAsyncResponseReaderInterface< ::chunksink::RecorderStatusReply>* PrepareAsyncSetRecorderStatusRaw(::grpc::ClientContext* context, const ::chunksink::RecorderStatusRequest& request, ::grpc::CompletionQueue* cq) = 0;
+    virtual ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>* AsyncSetRecorderStatusRaw(::grpc::ClientContext* context, const ::common::RecorderStatus& request, ::grpc::CompletionQueue* cq) = 0;
+    virtual ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>* PrepareAsyncSetRecorderStatusRaw(::grpc::ClientContext* context, const ::common::RecorderStatus& request, ::grpc::CompletionQueue* cq) = 0;
+    virtual ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>* AsyncSetChunksRaw(::grpc::ClientContext* context, const ::chunksink::Chunks& request, ::grpc::CompletionQueue* cq) = 0;
+    virtual ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>* PrepareAsyncSetChunksRaw(::grpc::ClientContext* context, const ::chunksink::Chunks& request, ::grpc::CompletionQueue* cq) = 0;
   };
   class Stub final : public StubInterface {
    public:
     Stub(const std::shared_ptr< ::grpc::ChannelInterface>& channel, const ::grpc::StubOptions& options = ::grpc::StubOptions());
-    std::unique_ptr< ::grpc::ClientWriter< ::chunksink::ChunkData>> StreamChunkData(::grpc::ClientContext* context, ::chunksink::StreamChunkDataReply* response) {
-      return std::unique_ptr< ::grpc::ClientWriter< ::chunksink::ChunkData>>(StreamChunkDataRaw(context, response));
+    ::grpc::Status SetRecorderStatus(::grpc::ClientContext* context, const ::common::RecorderStatus& request, ::common::Respone* response) override;
+    std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::common::Respone>> AsyncSetRecorderStatus(::grpc::ClientContext* context, const ::common::RecorderStatus& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::common::Respone>>(AsyncSetRecorderStatusRaw(context, request, cq));
     }
-    std::unique_ptr< ::grpc::ClientAsyncWriter< ::chunksink::ChunkData>> AsyncStreamChunkData(::grpc::ClientContext* context, ::chunksink::StreamChunkDataReply* response, ::grpc::CompletionQueue* cq, void* tag) {
-      return std::unique_ptr< ::grpc::ClientAsyncWriter< ::chunksink::ChunkData>>(AsyncStreamChunkDataRaw(context, response, cq, tag));
+    std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::common::Respone>> PrepareAsyncSetRecorderStatus(::grpc::ClientContext* context, const ::common::RecorderStatus& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::common::Respone>>(PrepareAsyncSetRecorderStatusRaw(context, request, cq));
     }
-    std::unique_ptr< ::grpc::ClientAsyncWriter< ::chunksink::ChunkData>> PrepareAsyncStreamChunkData(::grpc::ClientContext* context, ::chunksink::StreamChunkDataReply* response, ::grpc::CompletionQueue* cq) {
-      return std::unique_ptr< ::grpc::ClientAsyncWriter< ::chunksink::ChunkData>>(PrepareAsyncStreamChunkDataRaw(context, response, cq));
+    ::grpc::Status SetChunks(::grpc::ClientContext* context, const ::chunksink::Chunks& request, ::common::Respone* response) override;
+    std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::common::Respone>> AsyncSetChunks(::grpc::ClientContext* context, const ::chunksink::Chunks& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::common::Respone>>(AsyncSetChunksRaw(context, request, cq));
     }
-    ::grpc::Status SetRecorderStatus(::grpc::ClientContext* context, const ::chunksink::RecorderStatusRequest& request, ::chunksink::RecorderStatusReply* response) override;
-    std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::chunksink::RecorderStatusReply>> AsyncSetRecorderStatus(::grpc::ClientContext* context, const ::chunksink::RecorderStatusRequest& request, ::grpc::CompletionQueue* cq) {
-      return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::chunksink::RecorderStatusReply>>(AsyncSetRecorderStatusRaw(context, request, cq));
-    }
-    std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::chunksink::RecorderStatusReply>> PrepareAsyncSetRecorderStatus(::grpc::ClientContext* context, const ::chunksink::RecorderStatusRequest& request, ::grpc::CompletionQueue* cq) {
-      return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::chunksink::RecorderStatusReply>>(PrepareAsyncSetRecorderStatusRaw(context, request, cq));
+    std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::common::Respone>> PrepareAsyncSetChunks(::grpc::ClientContext* context, const ::chunksink::Chunks& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::common::Respone>>(PrepareAsyncSetChunksRaw(context, request, cq));
     }
     class async final :
       public StubInterface::async_interface {
      public:
-      void StreamChunkData(::grpc::ClientContext* context, ::chunksink::StreamChunkDataReply* response, ::grpc::ClientWriteReactor< ::chunksink::ChunkData>* reactor) override;
-      void SetRecorderStatus(::grpc::ClientContext* context, const ::chunksink::RecorderStatusRequest* request, ::chunksink::RecorderStatusReply* response, std::function<void(::grpc::Status)>) override;
-      void SetRecorderStatus(::grpc::ClientContext* context, const ::chunksink::RecorderStatusRequest* request, ::chunksink::RecorderStatusReply* response, ::grpc::ClientUnaryReactor* reactor) override;
+      void SetRecorderStatus(::grpc::ClientContext* context, const ::common::RecorderStatus* request, ::common::Respone* response, std::function<void(::grpc::Status)>) override;
+      void SetRecorderStatus(::grpc::ClientContext* context, const ::common::RecorderStatus* request, ::common::Respone* response, ::grpc::ClientUnaryReactor* reactor) override;
+      void SetChunks(::grpc::ClientContext* context, const ::chunksink::Chunks* request, ::common::Respone* response, std::function<void(::grpc::Status)>) override;
+      void SetChunks(::grpc::ClientContext* context, const ::chunksink::Chunks* request, ::common::Respone* response, ::grpc::ClientUnaryReactor* reactor) override;
      private:
       friend class Stub;
       explicit async(Stub* stub): stub_(stub) { }
@@ -104,13 +101,12 @@ class ChunkSink final {
    private:
     std::shared_ptr< ::grpc::ChannelInterface> channel_;
     class async async_stub_{this};
-    ::grpc::ClientWriter< ::chunksink::ChunkData>* StreamChunkDataRaw(::grpc::ClientContext* context, ::chunksink::StreamChunkDataReply* response) override;
-    ::grpc::ClientAsyncWriter< ::chunksink::ChunkData>* AsyncStreamChunkDataRaw(::grpc::ClientContext* context, ::chunksink::StreamChunkDataReply* response, ::grpc::CompletionQueue* cq, void* tag) override;
-    ::grpc::ClientAsyncWriter< ::chunksink::ChunkData>* PrepareAsyncStreamChunkDataRaw(::grpc::ClientContext* context, ::chunksink::StreamChunkDataReply* response, ::grpc::CompletionQueue* cq) override;
-    ::grpc::ClientAsyncResponseReader< ::chunksink::RecorderStatusReply>* AsyncSetRecorderStatusRaw(::grpc::ClientContext* context, const ::chunksink::RecorderStatusRequest& request, ::grpc::CompletionQueue* cq) override;
-    ::grpc::ClientAsyncResponseReader< ::chunksink::RecorderStatusReply>* PrepareAsyncSetRecorderStatusRaw(::grpc::ClientContext* context, const ::chunksink::RecorderStatusRequest& request, ::grpc::CompletionQueue* cq) override;
-    const ::grpc::internal::RpcMethod rpcmethod_StreamChunkData_;
+    ::grpc::ClientAsyncResponseReader< ::common::Respone>* AsyncSetRecorderStatusRaw(::grpc::ClientContext* context, const ::common::RecorderStatus& request, ::grpc::CompletionQueue* cq) override;
+    ::grpc::ClientAsyncResponseReader< ::common::Respone>* PrepareAsyncSetRecorderStatusRaw(::grpc::ClientContext* context, const ::common::RecorderStatus& request, ::grpc::CompletionQueue* cq) override;
+    ::grpc::ClientAsyncResponseReader< ::common::Respone>* AsyncSetChunksRaw(::grpc::ClientContext* context, const ::chunksink::Chunks& request, ::grpc::CompletionQueue* cq) override;
+    ::grpc::ClientAsyncResponseReader< ::common::Respone>* PrepareAsyncSetChunksRaw(::grpc::ClientContext* context, const ::chunksink::Chunks& request, ::grpc::CompletionQueue* cq) override;
     const ::grpc::internal::RpcMethod rpcmethod_SetRecorderStatus_;
+    const ::grpc::internal::RpcMethod rpcmethod_SetChunks_;
   };
   static std::unique_ptr<Stub> NewStub(const std::shared_ptr< ::grpc::ChannelInterface>& channel, const ::grpc::StubOptions& options = ::grpc::StubOptions());
 
@@ -118,28 +114,8 @@ class ChunkSink final {
    public:
     Service();
     virtual ~Service();
-    virtual ::grpc::Status StreamChunkData(::grpc::ServerContext* context, ::grpc::ServerReader< ::chunksink::ChunkData>* reader, ::chunksink::StreamChunkDataReply* response);
-    virtual ::grpc::Status SetRecorderStatus(::grpc::ServerContext* context, const ::chunksink::RecorderStatusRequest* request, ::chunksink::RecorderStatusReply* response);
-  };
-  template <class BaseClass>
-  class WithAsyncMethod_StreamChunkData : public BaseClass {
-   private:
-    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
-   public:
-    WithAsyncMethod_StreamChunkData() {
-      ::grpc::Service::MarkMethodAsync(0);
-    }
-    ~WithAsyncMethod_StreamChunkData() override {
-      BaseClassMustBeDerivedFromService(this);
-    }
-    // disable synchronous version of this method
-    ::grpc::Status StreamChunkData(::grpc::ServerContext* /*context*/, ::grpc::ServerReader< ::chunksink::ChunkData>* /*reader*/, ::chunksink::StreamChunkDataReply* /*response*/) override {
-      abort();
-      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
-    }
-    void RequestStreamChunkData(::grpc::ServerContext* context, ::grpc::ServerAsyncReader< ::chunksink::StreamChunkDataReply, ::chunksink::ChunkData>* reader, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
-      ::grpc::Service::RequestAsyncClientStreaming(0, context, reader, new_call_cq, notification_cq, tag);
-    }
+    virtual ::grpc::Status SetRecorderStatus(::grpc::ServerContext* context, const ::common::RecorderStatus* request, ::common::Respone* response);
+    virtual ::grpc::Status SetChunks(::grpc::ServerContext* context, const ::chunksink::Chunks* request, ::common::Respone* response);
   };
   template <class BaseClass>
   class WithAsyncMethod_SetRecorderStatus : public BaseClass {
@@ -147,124 +123,129 @@ class ChunkSink final {
     void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
    public:
     WithAsyncMethod_SetRecorderStatus() {
-      ::grpc::Service::MarkMethodAsync(1);
+      ::grpc::Service::MarkMethodAsync(0);
     }
     ~WithAsyncMethod_SetRecorderStatus() override {
       BaseClassMustBeDerivedFromService(this);
     }
     // disable synchronous version of this method
-    ::grpc::Status SetRecorderStatus(::grpc::ServerContext* /*context*/, const ::chunksink::RecorderStatusRequest* /*request*/, ::chunksink::RecorderStatusReply* /*response*/) override {
+    ::grpc::Status SetRecorderStatus(::grpc::ServerContext* /*context*/, const ::common::RecorderStatus* /*request*/, ::common::Respone* /*response*/) override {
       abort();
       return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
     }
-    void RequestSetRecorderStatus(::grpc::ServerContext* context, ::chunksink::RecorderStatusRequest* request, ::grpc::ServerAsyncResponseWriter< ::chunksink::RecorderStatusReply>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
-      ::grpc::Service::RequestAsyncUnary(1, context, request, response, new_call_cq, notification_cq, tag);
+    void RequestSetRecorderStatus(::grpc::ServerContext* context, ::common::RecorderStatus* request, ::grpc::ServerAsyncResponseWriter< ::common::Respone>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
+      ::grpc::Service::RequestAsyncUnary(0, context, request, response, new_call_cq, notification_cq, tag);
     }
   };
-  typedef WithAsyncMethod_StreamChunkData<WithAsyncMethod_SetRecorderStatus<Service > > AsyncService;
   template <class BaseClass>
-  class WithCallbackMethod_StreamChunkData : public BaseClass {
+  class WithAsyncMethod_SetChunks : public BaseClass {
    private:
     void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
    public:
-    WithCallbackMethod_StreamChunkData() {
-      ::grpc::Service::MarkMethodCallback(0,
-          new ::grpc::internal::CallbackClientStreamingHandler< ::chunksink::ChunkData, ::chunksink::StreamChunkDataReply>(
-            [this](
-                   ::grpc::CallbackServerContext* context, ::chunksink::StreamChunkDataReply* response) { return this->StreamChunkData(context, response); }));
+    WithAsyncMethod_SetChunks() {
+      ::grpc::Service::MarkMethodAsync(1);
     }
-    ~WithCallbackMethod_StreamChunkData() override {
+    ~WithAsyncMethod_SetChunks() override {
       BaseClassMustBeDerivedFromService(this);
     }
     // disable synchronous version of this method
-    ::grpc::Status StreamChunkData(::grpc::ServerContext* /*context*/, ::grpc::ServerReader< ::chunksink::ChunkData>* /*reader*/, ::chunksink::StreamChunkDataReply* /*response*/) override {
+    ::grpc::Status SetChunks(::grpc::ServerContext* /*context*/, const ::chunksink::Chunks* /*request*/, ::common::Respone* /*response*/) override {
       abort();
       return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
     }
-    virtual ::grpc::ServerReadReactor< ::chunksink::ChunkData>* StreamChunkData(
-      ::grpc::CallbackServerContext* /*context*/, ::chunksink::StreamChunkDataReply* /*response*/)  { return nullptr; }
+    void RequestSetChunks(::grpc::ServerContext* context, ::chunksink::Chunks* request, ::grpc::ServerAsyncResponseWriter< ::common::Respone>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
+      ::grpc::Service::RequestAsyncUnary(1, context, request, response, new_call_cq, notification_cq, tag);
+    }
   };
+  typedef WithAsyncMethod_SetRecorderStatus<WithAsyncMethod_SetChunks<Service > > AsyncService;
   template <class BaseClass>
   class WithCallbackMethod_SetRecorderStatus : public BaseClass {
    private:
     void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
    public:
     WithCallbackMethod_SetRecorderStatus() {
-      ::grpc::Service::MarkMethodCallback(1,
-          new ::grpc::internal::CallbackUnaryHandler< ::chunksink::RecorderStatusRequest, ::chunksink::RecorderStatusReply>(
+      ::grpc::Service::MarkMethodCallback(0,
+          new ::grpc::internal::CallbackUnaryHandler< ::common::RecorderStatus, ::common::Respone>(
             [this](
-                   ::grpc::CallbackServerContext* context, const ::chunksink::RecorderStatusRequest* request, ::chunksink::RecorderStatusReply* response) { return this->SetRecorderStatus(context, request, response); }));}
+                   ::grpc::CallbackServerContext* context, const ::common::RecorderStatus* request, ::common::Respone* response) { return this->SetRecorderStatus(context, request, response); }));}
     void SetMessageAllocatorFor_SetRecorderStatus(
-        ::grpc::MessageAllocator< ::chunksink::RecorderStatusRequest, ::chunksink::RecorderStatusReply>* allocator) {
-      ::grpc::internal::MethodHandler* const handler = ::grpc::Service::GetHandler(1);
-      static_cast<::grpc::internal::CallbackUnaryHandler< ::chunksink::RecorderStatusRequest, ::chunksink::RecorderStatusReply>*>(handler)
+        ::grpc::MessageAllocator< ::common::RecorderStatus, ::common::Respone>* allocator) {
+      ::grpc::internal::MethodHandler* const handler = ::grpc::Service::GetHandler(0);
+      static_cast<::grpc::internal::CallbackUnaryHandler< ::common::RecorderStatus, ::common::Respone>*>(handler)
               ->SetMessageAllocator(allocator);
     }
     ~WithCallbackMethod_SetRecorderStatus() override {
       BaseClassMustBeDerivedFromService(this);
     }
     // disable synchronous version of this method
-    ::grpc::Status SetRecorderStatus(::grpc::ServerContext* /*context*/, const ::chunksink::RecorderStatusRequest* /*request*/, ::chunksink::RecorderStatusReply* /*response*/) override {
+    ::grpc::Status SetRecorderStatus(::grpc::ServerContext* /*context*/, const ::common::RecorderStatus* /*request*/, ::common::Respone* /*response*/) override {
       abort();
       return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
     }
     virtual ::grpc::ServerUnaryReactor* SetRecorderStatus(
-      ::grpc::CallbackServerContext* /*context*/, const ::chunksink::RecorderStatusRequest* /*request*/, ::chunksink::RecorderStatusReply* /*response*/)  { return nullptr; }
+      ::grpc::CallbackServerContext* /*context*/, const ::common::RecorderStatus* /*request*/, ::common::Respone* /*response*/)  { return nullptr; }
   };
-  typedef WithCallbackMethod_StreamChunkData<WithCallbackMethod_SetRecorderStatus<Service > > CallbackService;
-  typedef CallbackService ExperimentalCallbackService;
   template <class BaseClass>
-  class WithGenericMethod_StreamChunkData : public BaseClass {
+  class WithCallbackMethod_SetChunks : public BaseClass {
    private:
     void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
    public:
-    WithGenericMethod_StreamChunkData() {
-      ::grpc::Service::MarkMethodGeneric(0);
+    WithCallbackMethod_SetChunks() {
+      ::grpc::Service::MarkMethodCallback(1,
+          new ::grpc::internal::CallbackUnaryHandler< ::chunksink::Chunks, ::common::Respone>(
+            [this](
+                   ::grpc::CallbackServerContext* context, const ::chunksink::Chunks* request, ::common::Respone* response) { return this->SetChunks(context, request, response); }));}
+    void SetMessageAllocatorFor_SetChunks(
+        ::grpc::MessageAllocator< ::chunksink::Chunks, ::common::Respone>* allocator) {
+      ::grpc::internal::MethodHandler* const handler = ::grpc::Service::GetHandler(1);
+      static_cast<::grpc::internal::CallbackUnaryHandler< ::chunksink::Chunks, ::common::Respone>*>(handler)
+              ->SetMessageAllocator(allocator);
     }
-    ~WithGenericMethod_StreamChunkData() override {
+    ~WithCallbackMethod_SetChunks() override {
       BaseClassMustBeDerivedFromService(this);
     }
     // disable synchronous version of this method
-    ::grpc::Status StreamChunkData(::grpc::ServerContext* /*context*/, ::grpc::ServerReader< ::chunksink::ChunkData>* /*reader*/, ::chunksink::StreamChunkDataReply* /*response*/) override {
+    ::grpc::Status SetChunks(::grpc::ServerContext* /*context*/, const ::chunksink::Chunks* /*request*/, ::common::Respone* /*response*/) override {
       abort();
       return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
     }
+    virtual ::grpc::ServerUnaryReactor* SetChunks(
+      ::grpc::CallbackServerContext* /*context*/, const ::chunksink::Chunks* /*request*/, ::common::Respone* /*response*/)  { return nullptr; }
   };
+  typedef WithCallbackMethod_SetRecorderStatus<WithCallbackMethod_SetChunks<Service > > CallbackService;
+  typedef CallbackService ExperimentalCallbackService;
   template <class BaseClass>
   class WithGenericMethod_SetRecorderStatus : public BaseClass {
    private:
     void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
    public:
     WithGenericMethod_SetRecorderStatus() {
-      ::grpc::Service::MarkMethodGeneric(1);
+      ::grpc::Service::MarkMethodGeneric(0);
     }
     ~WithGenericMethod_SetRecorderStatus() override {
       BaseClassMustBeDerivedFromService(this);
     }
     // disable synchronous version of this method
-    ::grpc::Status SetRecorderStatus(::grpc::ServerContext* /*context*/, const ::chunksink::RecorderStatusRequest* /*request*/, ::chunksink::RecorderStatusReply* /*response*/) override {
+    ::grpc::Status SetRecorderStatus(::grpc::ServerContext* /*context*/, const ::common::RecorderStatus* /*request*/, ::common::Respone* /*response*/) override {
       abort();
       return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
     }
   };
   template <class BaseClass>
-  class WithRawMethod_StreamChunkData : public BaseClass {
+  class WithGenericMethod_SetChunks : public BaseClass {
    private:
     void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
    public:
-    WithRawMethod_StreamChunkData() {
-      ::grpc::Service::MarkMethodRaw(0);
+    WithGenericMethod_SetChunks() {
+      ::grpc::Service::MarkMethodGeneric(1);
     }
-    ~WithRawMethod_StreamChunkData() override {
+    ~WithGenericMethod_SetChunks() override {
       BaseClassMustBeDerivedFromService(this);
     }
     // disable synchronous version of this method
-    ::grpc::Status StreamChunkData(::grpc::ServerContext* /*context*/, ::grpc::ServerReader< ::chunksink::ChunkData>* /*reader*/, ::chunksink::StreamChunkDataReply* /*response*/) override {
+    ::grpc::Status SetChunks(::grpc::ServerContext* /*context*/, const ::chunksink::Chunks* /*request*/, ::common::Respone* /*response*/) override {
       abort();
       return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
-    }
-    void RequestStreamChunkData(::grpc::ServerContext* context, ::grpc::ServerAsyncReader< ::grpc::ByteBuffer, ::grpc::ByteBuffer>* reader, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
-      ::grpc::Service::RequestAsyncClientStreaming(0, context, reader, new_call_cq, notification_cq, tag);
     }
   };
   template <class BaseClass>
@@ -273,41 +254,39 @@ class ChunkSink final {
     void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
    public:
     WithRawMethod_SetRecorderStatus() {
-      ::grpc::Service::MarkMethodRaw(1);
+      ::grpc::Service::MarkMethodRaw(0);
     }
     ~WithRawMethod_SetRecorderStatus() override {
       BaseClassMustBeDerivedFromService(this);
     }
     // disable synchronous version of this method
-    ::grpc::Status SetRecorderStatus(::grpc::ServerContext* /*context*/, const ::chunksink::RecorderStatusRequest* /*request*/, ::chunksink::RecorderStatusReply* /*response*/) override {
+    ::grpc::Status SetRecorderStatus(::grpc::ServerContext* /*context*/, const ::common::RecorderStatus* /*request*/, ::common::Respone* /*response*/) override {
       abort();
       return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
     }
     void RequestSetRecorderStatus(::grpc::ServerContext* context, ::grpc::ByteBuffer* request, ::grpc::ServerAsyncResponseWriter< ::grpc::ByteBuffer>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
-      ::grpc::Service::RequestAsyncUnary(1, context, request, response, new_call_cq, notification_cq, tag);
+      ::grpc::Service::RequestAsyncUnary(0, context, request, response, new_call_cq, notification_cq, tag);
     }
   };
   template <class BaseClass>
-  class WithRawCallbackMethod_StreamChunkData : public BaseClass {
+  class WithRawMethod_SetChunks : public BaseClass {
    private:
     void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
    public:
-    WithRawCallbackMethod_StreamChunkData() {
-      ::grpc::Service::MarkMethodRawCallback(0,
-          new ::grpc::internal::CallbackClientStreamingHandler< ::grpc::ByteBuffer, ::grpc::ByteBuffer>(
-            [this](
-                   ::grpc::CallbackServerContext* context, ::grpc::ByteBuffer* response) { return this->StreamChunkData(context, response); }));
+    WithRawMethod_SetChunks() {
+      ::grpc::Service::MarkMethodRaw(1);
     }
-    ~WithRawCallbackMethod_StreamChunkData() override {
+    ~WithRawMethod_SetChunks() override {
       BaseClassMustBeDerivedFromService(this);
     }
     // disable synchronous version of this method
-    ::grpc::Status StreamChunkData(::grpc::ServerContext* /*context*/, ::grpc::ServerReader< ::chunksink::ChunkData>* /*reader*/, ::chunksink::StreamChunkDataReply* /*response*/) override {
+    ::grpc::Status SetChunks(::grpc::ServerContext* /*context*/, const ::chunksink::Chunks* /*request*/, ::common::Respone* /*response*/) override {
       abort();
       return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
     }
-    virtual ::grpc::ServerReadReactor< ::grpc::ByteBuffer>* StreamChunkData(
-      ::grpc::CallbackServerContext* /*context*/, ::grpc::ByteBuffer* /*response*/)  { return nullptr; }
+    void RequestSetChunks(::grpc::ServerContext* context, ::grpc::ByteBuffer* request, ::grpc::ServerAsyncResponseWriter< ::grpc::ByteBuffer>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
+      ::grpc::Service::RequestAsyncUnary(1, context, request, response, new_call_cq, notification_cq, tag);
+    }
   };
   template <class BaseClass>
   class WithRawCallbackMethod_SetRecorderStatus : public BaseClass {
@@ -315,7 +294,7 @@ class ChunkSink final {
     void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
    public:
     WithRawCallbackMethod_SetRecorderStatus() {
-      ::grpc::Service::MarkMethodRawCallback(1,
+      ::grpc::Service::MarkMethodRawCallback(0,
           new ::grpc::internal::CallbackUnaryHandler< ::grpc::ByteBuffer, ::grpc::ByteBuffer>(
             [this](
                    ::grpc::CallbackServerContext* context, const ::grpc::ByteBuffer* request, ::grpc::ByteBuffer* response) { return this->SetRecorderStatus(context, request, response); }));
@@ -324,11 +303,33 @@ class ChunkSink final {
       BaseClassMustBeDerivedFromService(this);
     }
     // disable synchronous version of this method
-    ::grpc::Status SetRecorderStatus(::grpc::ServerContext* /*context*/, const ::chunksink::RecorderStatusRequest* /*request*/, ::chunksink::RecorderStatusReply* /*response*/) override {
+    ::grpc::Status SetRecorderStatus(::grpc::ServerContext* /*context*/, const ::common::RecorderStatus* /*request*/, ::common::Respone* /*response*/) override {
       abort();
       return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
     }
     virtual ::grpc::ServerUnaryReactor* SetRecorderStatus(
+      ::grpc::CallbackServerContext* /*context*/, const ::grpc::ByteBuffer* /*request*/, ::grpc::ByteBuffer* /*response*/)  { return nullptr; }
+  };
+  template <class BaseClass>
+  class WithRawCallbackMethod_SetChunks : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithRawCallbackMethod_SetChunks() {
+      ::grpc::Service::MarkMethodRawCallback(1,
+          new ::grpc::internal::CallbackUnaryHandler< ::grpc::ByteBuffer, ::grpc::ByteBuffer>(
+            [this](
+                   ::grpc::CallbackServerContext* context, const ::grpc::ByteBuffer* request, ::grpc::ByteBuffer* response) { return this->SetChunks(context, request, response); }));
+    }
+    ~WithRawCallbackMethod_SetChunks() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status SetChunks(::grpc::ServerContext* /*context*/, const ::chunksink::Chunks* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    virtual ::grpc::ServerUnaryReactor* SetChunks(
       ::grpc::CallbackServerContext* /*context*/, const ::grpc::ByteBuffer* /*request*/, ::grpc::ByteBuffer* /*response*/)  { return nullptr; }
   };
   template <class BaseClass>
@@ -337,12 +338,12 @@ class ChunkSink final {
     void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
    public:
     WithStreamedUnaryMethod_SetRecorderStatus() {
-      ::grpc::Service::MarkMethodStreamed(1,
+      ::grpc::Service::MarkMethodStreamed(0,
         new ::grpc::internal::StreamedUnaryHandler<
-          ::chunksink::RecorderStatusRequest, ::chunksink::RecorderStatusReply>(
+          ::common::RecorderStatus, ::common::Respone>(
             [this](::grpc::ServerContext* context,
                    ::grpc::ServerUnaryStreamer<
-                     ::chunksink::RecorderStatusRequest, ::chunksink::RecorderStatusReply>* streamer) {
+                     ::common::RecorderStatus, ::common::Respone>* streamer) {
                        return this->StreamedSetRecorderStatus(context,
                          streamer);
                   }));
@@ -351,16 +352,43 @@ class ChunkSink final {
       BaseClassMustBeDerivedFromService(this);
     }
     // disable regular version of this method
-    ::grpc::Status SetRecorderStatus(::grpc::ServerContext* /*context*/, const ::chunksink::RecorderStatusRequest* /*request*/, ::chunksink::RecorderStatusReply* /*response*/) override {
+    ::grpc::Status SetRecorderStatus(::grpc::ServerContext* /*context*/, const ::common::RecorderStatus* /*request*/, ::common::Respone* /*response*/) override {
       abort();
       return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
     }
     // replace default version of method with streamed unary
-    virtual ::grpc::Status StreamedSetRecorderStatus(::grpc::ServerContext* context, ::grpc::ServerUnaryStreamer< ::chunksink::RecorderStatusRequest,::chunksink::RecorderStatusReply>* server_unary_streamer) = 0;
+    virtual ::grpc::Status StreamedSetRecorderStatus(::grpc::ServerContext* context, ::grpc::ServerUnaryStreamer< ::common::RecorderStatus,::common::Respone>* server_unary_streamer) = 0;
   };
-  typedef WithStreamedUnaryMethod_SetRecorderStatus<Service > StreamedUnaryService;
+  template <class BaseClass>
+  class WithStreamedUnaryMethod_SetChunks : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithStreamedUnaryMethod_SetChunks() {
+      ::grpc::Service::MarkMethodStreamed(1,
+        new ::grpc::internal::StreamedUnaryHandler<
+          ::chunksink::Chunks, ::common::Respone>(
+            [this](::grpc::ServerContext* context,
+                   ::grpc::ServerUnaryStreamer<
+                     ::chunksink::Chunks, ::common::Respone>* streamer) {
+                       return this->StreamedSetChunks(context,
+                         streamer);
+                  }));
+    }
+    ~WithStreamedUnaryMethod_SetChunks() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable regular version of this method
+    ::grpc::Status SetChunks(::grpc::ServerContext* /*context*/, const ::chunksink::Chunks* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    // replace default version of method with streamed unary
+    virtual ::grpc::Status StreamedSetChunks(::grpc::ServerContext* context, ::grpc::ServerUnaryStreamer< ::chunksink::Chunks,::common::Respone>* server_unary_streamer) = 0;
+  };
+  typedef WithStreamedUnaryMethod_SetRecorderStatus<WithStreamedUnaryMethod_SetChunks<Service > > StreamedUnaryService;
   typedef Service SplitStreamedService;
-  typedef WithStreamedUnaryMethod_SetRecorderStatus<Service > StreamedService;
+  typedef WithStreamedUnaryMethod_SetRecorderStatus<WithStreamedUnaryMethod_SetChunks<Service > > StreamedService;
 };
 
 }  // namespace chunksink

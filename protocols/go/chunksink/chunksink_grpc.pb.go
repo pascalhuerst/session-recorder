@@ -4,6 +4,7 @@ package chunksink
 
 import (
 	context "context"
+	common "github.com/pascalhuerst/session-recorder/protocols/go/common"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -18,8 +19,8 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ChunkSinkClient interface {
-	StreamChunkData(ctx context.Context, opts ...grpc.CallOption) (ChunkSink_StreamChunkDataClient, error)
-	SetRecorderStatus(ctx context.Context, in *RecorderStatusRequest, opts ...grpc.CallOption) (*RecorderStatusReply, error)
+	SetRecorderStatus(ctx context.Context, in *common.RecorderStatus, opts ...grpc.CallOption) (*common.Respone, error)
+	SetChunks(ctx context.Context, in *Chunks, opts ...grpc.CallOption) (*common.Respone, error)
 }
 
 type chunkSinkClient struct {
@@ -30,43 +31,18 @@ func NewChunkSinkClient(cc grpc.ClientConnInterface) ChunkSinkClient {
 	return &chunkSinkClient{cc}
 }
 
-func (c *chunkSinkClient) StreamChunkData(ctx context.Context, opts ...grpc.CallOption) (ChunkSink_StreamChunkDataClient, error) {
-	stream, err := c.cc.NewStream(ctx, &ChunkSink_ServiceDesc.Streams[0], "/chunksink.ChunkSink/StreamChunkData", opts...)
+func (c *chunkSinkClient) SetRecorderStatus(ctx context.Context, in *common.RecorderStatus, opts ...grpc.CallOption) (*common.Respone, error) {
+	out := new(common.Respone)
+	err := c.cc.Invoke(ctx, "/chunksink.ChunkSink/SetRecorderStatus", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &chunkSinkStreamChunkDataClient{stream}
-	return x, nil
+	return out, nil
 }
 
-type ChunkSink_StreamChunkDataClient interface {
-	Send(*ChunkData) error
-	CloseAndRecv() (*StreamChunkDataReply, error)
-	grpc.ClientStream
-}
-
-type chunkSinkStreamChunkDataClient struct {
-	grpc.ClientStream
-}
-
-func (x *chunkSinkStreamChunkDataClient) Send(m *ChunkData) error {
-	return x.ClientStream.SendMsg(m)
-}
-
-func (x *chunkSinkStreamChunkDataClient) CloseAndRecv() (*StreamChunkDataReply, error) {
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
-	m := new(StreamChunkDataReply)
-	if err := x.ClientStream.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
-}
-
-func (c *chunkSinkClient) SetRecorderStatus(ctx context.Context, in *RecorderStatusRequest, opts ...grpc.CallOption) (*RecorderStatusReply, error) {
-	out := new(RecorderStatusReply)
-	err := c.cc.Invoke(ctx, "/chunksink.ChunkSink/SetRecorderStatus", in, out, opts...)
+func (c *chunkSinkClient) SetChunks(ctx context.Context, in *Chunks, opts ...grpc.CallOption) (*common.Respone, error) {
+	out := new(common.Respone)
+	err := c.cc.Invoke(ctx, "/chunksink.ChunkSink/SetChunks", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -77,19 +53,19 @@ func (c *chunkSinkClient) SetRecorderStatus(ctx context.Context, in *RecorderSta
 // All implementations should embed UnimplementedChunkSinkServer
 // for forward compatibility
 type ChunkSinkServer interface {
-	StreamChunkData(ChunkSink_StreamChunkDataServer) error
-	SetRecorderStatus(context.Context, *RecorderStatusRequest) (*RecorderStatusReply, error)
+	SetRecorderStatus(context.Context, *common.RecorderStatus) (*common.Respone, error)
+	SetChunks(context.Context, *Chunks) (*common.Respone, error)
 }
 
 // UnimplementedChunkSinkServer should be embedded to have forward compatible implementations.
 type UnimplementedChunkSinkServer struct {
 }
 
-func (UnimplementedChunkSinkServer) StreamChunkData(ChunkSink_StreamChunkDataServer) error {
-	return status.Errorf(codes.Unimplemented, "method StreamChunkData not implemented")
-}
-func (UnimplementedChunkSinkServer) SetRecorderStatus(context.Context, *RecorderStatusRequest) (*RecorderStatusReply, error) {
+func (UnimplementedChunkSinkServer) SetRecorderStatus(context.Context, *common.RecorderStatus) (*common.Respone, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetRecorderStatus not implemented")
+}
+func (UnimplementedChunkSinkServer) SetChunks(context.Context, *Chunks) (*common.Respone, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SetChunks not implemented")
 }
 
 // UnsafeChunkSinkServer may be embedded to opt out of forward compatibility for this service.
@@ -103,34 +79,8 @@ func RegisterChunkSinkServer(s grpc.ServiceRegistrar, srv ChunkSinkServer) {
 	s.RegisterService(&ChunkSink_ServiceDesc, srv)
 }
 
-func _ChunkSink_StreamChunkData_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(ChunkSinkServer).StreamChunkData(&chunkSinkStreamChunkDataServer{stream})
-}
-
-type ChunkSink_StreamChunkDataServer interface {
-	SendAndClose(*StreamChunkDataReply) error
-	Recv() (*ChunkData, error)
-	grpc.ServerStream
-}
-
-type chunkSinkStreamChunkDataServer struct {
-	grpc.ServerStream
-}
-
-func (x *chunkSinkStreamChunkDataServer) SendAndClose(m *StreamChunkDataReply) error {
-	return x.ServerStream.SendMsg(m)
-}
-
-func (x *chunkSinkStreamChunkDataServer) Recv() (*ChunkData, error) {
-	m := new(ChunkData)
-	if err := x.ServerStream.RecvMsg(m); err != nil {
-		return nil, err
-	}
-	return m, nil
-}
-
 func _ChunkSink_SetRecorderStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(RecorderStatusRequest)
+	in := new(common.RecorderStatus)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -142,7 +92,25 @@ func _ChunkSink_SetRecorderStatus_Handler(srv interface{}, ctx context.Context, 
 		FullMethod: "/chunksink.ChunkSink/SetRecorderStatus",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ChunkSinkServer).SetRecorderStatus(ctx, req.(*RecorderStatusRequest))
+		return srv.(ChunkSinkServer).SetRecorderStatus(ctx, req.(*common.RecorderStatus))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ChunkSink_SetChunks_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(Chunks)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ChunkSinkServer).SetChunks(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/chunksink.ChunkSink/SetChunks",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ChunkSinkServer).SetChunks(ctx, req.(*Chunks))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -158,13 +126,11 @@ var ChunkSink_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "SetRecorderStatus",
 			Handler:    _ChunkSink_SetRecorderStatus_Handler,
 		},
-	},
-	Streams: []grpc.StreamDesc{
 		{
-			StreamName:    "StreamChunkData",
-			Handler:       _ChunkSink_StreamChunkData_Handler,
-			ClientStreams: true,
+			MethodName: "SetChunks",
+			Handler:    _ChunkSink_SetChunks_Handler,
 		},
 	},
+	Streams:  []grpc.StreamDesc{},
 	Metadata: "chunksink.proto",
 }

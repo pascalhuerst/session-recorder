@@ -4,10 +4,19 @@ package common;
 
 option go_package = "github.com/pascalhuerst/session-recorder/protocols/go/common";
 
-enum AudioInputStatus {
+enum SignalStatus {
     UNKNOWN = 0;
     NO_SIGNAL = 1;
     SIGNAL = 2;
+}   
+
+message RecorderStatus {
+    string recorderID = 1;
+    string recorderName = 2;
+
+    SignalStatus signalStatus = 3;
+    double rmsPercent = 4;
+    bool clipping = 5;
 }
 
 message Respone {

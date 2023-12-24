@@ -1,19 +1,24 @@
 <script setup lang="ts">
-import { type SessionInfo } from "protocols/ts/sessionsource.ts";
+import { type SessionInfo } from "@session-recorder/protocols/ts/sessionsource.ts";
 import { computed } from "vue";
-import { setKeepSession } from "../grpc/procedures/setKeepSession.ts";
-import { deleteSession } from "../grpc/procedures/deleteSession.ts";
-import { useConfirmation } from "../lib/disclosure/useConfirmation.ts";
-import Modal from "../lib/disclosure/Modal.vue";
-import Button from "../lib/controls/Button.vue";
+import { setKeepSession } from "../../../grpc/procedures/setKeepSession.ts";
+import { deleteSession } from "../../../grpc/procedures/deleteSession.ts";
+import { useConfirmation } from "../../../lib/disclosure/useConfirmation.ts";
+import Modal from "../../../lib/disclosure/Modal.vue";
+import Button from "../../../lib/controls/Button.vue";
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
+import { useSessionData } from "../../../utils/useSessionData.ts";
+
+// @todo: break this down and make composable
 
 const props = defineProps<{
   session: SessionInfo
-  audioUrls: Array<{ src: string, type: string }>
+  recorderId: string
 }>();
 
 const { awaitConfirmation, modalProps } = useConfirmation();
+
+const { audioUrls } = useSessionData({ sessionId: props.session.ID, recorderId: props.recorderId });
 
 const ttl = computed(() => {
   if (!props.session.lifetime) {
@@ -45,10 +50,16 @@ const onDelete = () => {
       {{ ttl }} until deleted
     </div>
     <Button size="xs" v-if="!session.keepSession" @click="onKeep">
+      <font-awesome-icon icon="fa-solid fa-heart"></font-awesome-icon>
       Keep
     </Button>
     <Button size="xs" @click="onDelete">
+      <font-awesome-icon icon="fa-solid fa-trash"></font-awesome-icon>
       Delete
+    </Button>
+    <Button tag-name="router-link" size="xs" :to="`/recorders/${recorderId}/sessions/${session.ID}`">
+      <font-awesome-icon icon="fa-solid fa-thumbtack"></font-awesome-icon>
+      Markers
     </Button>
     <template v-for="audioUrl in audioUrls" :key="audioUrl.src">
       <Button size="xs" tag-name="a" :href="audioUrl.src" target="_blank" download color="primary" variant="ghost">
@@ -64,8 +75,8 @@ const onDelete = () => {
       <Button @click="modalProps.onConfirm" variant="ghost" color="neutral">
         Delete
       </Button>
-      <Button @click="modalProps.onClose" variant="ghost" color="primary">
-        Skip
+      <Button @click="modalProps.onClose" variant="solid" color="primary">
+        Keep
       </Button>
     </template>
   </Modal>
@@ -75,18 +86,12 @@ const onDelete = () => {
 .menu {
   display: flex;
   align-items: center;
-  gap: var(--size-2);
+  gap: var(--size-1);
 }
 
 .balance {
-  font-size: var(--scale-00);
+  font-size: var(--scale-0);
   color: var(--color-red-500);
-}
-
-button {
-  border: 0;
-  background: none;
-  font-size: var(--scale-00);
-  color: var(--color-grey-600);
+  margin: 0 var(--size-1);
 }
 </style>

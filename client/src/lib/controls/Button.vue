@@ -3,6 +3,7 @@
 const props = withDefaults(defineProps<{
   color?: "primary" | "neutral" | "outlined"
   variant?: "ghost" | "solid"
+  shape?: "normal" | "circle"
   size?: "md" | "sm" | "xs"
   isLoading?: boolean
   tagName?: string
@@ -10,6 +11,7 @@ const props = withDefaults(defineProps<{
   color: "neutral",
   size: "md",
   variant: "ghost",
+  shape: "normal",
   isLoading: false,
   tagName: "button"
 });
@@ -24,6 +26,7 @@ const props = withDefaults(defineProps<{
     [`is-${props.variant}`]: true,
     [`is-${props.color}`]: true,
     [`is-${props.size}`]: true,
+    [`is-${props.shape}`]: true,
   }">
     <slot />
   </component>
@@ -40,22 +43,25 @@ const props = withDefaults(defineProps<{
   --btn-padding-y: 0.25rem;
   --btn-padding-x: 1rem;
   --btn-font-size: var(--scale-1);
-  --btn-icon-size: var(--scale-0);
+  --btn-icon-size: calc(var(--btn-font-size) * 0.9);
   --btn-line-height: 1.15;
   --btn-font-weight: var(--weight-semibold);
   --btn-border-radius: 4px;
   --btn-min-height: var(--size-10);
   --btn-min-width: 6rem;
 
+  appearance: initial;
   display: inline-flex;
   gap: 0.25rem;
   align-items: center;
   justify-content: center;
-  line-height: var(--btn-line-height);
+  line-height: var(--btn-line-height) !important;
   background-color: var(--btn-bg-color);
   color: var(--btn-text-color);
   border: 1px solid var(--btn-border-color);
   border-radius: var(--btn-border-radius);
+  padding-block: 0;
+  padding-inline: 0;
   padding: var(--btn-padding-y) var(--btn-padding-x);
   font-size: var(--btn-font-size);
   font-weight: var(--btn-font-weight);
@@ -67,18 +73,18 @@ const props = withDefaults(defineProps<{
   transition: color 0.15s ease-in-out, background-color 0.15s ease-in-out, border-color 0.15s ease-in-out;
 
   &.is-sm {
-    --btn-font-size: var(--scale-0);
-    --btn-icon-size: var(--scale-0);
-    --btn-min-height: var(--size-6);
+    --btn-font-size: var(--scale-1);
+    --btn-min-height: var(--size-10);
     --btn-min-width: 0;
+    padding: var(--btn-padding-y) var(--btn-padding-x);
   }
 
   &.is-xs {
-    --btn-font-size: var(--scale-00);
-    --btn-icon-size: var(--scale-00);
-    --btn-min-height: var(--size-4);
+    --btn-font-size: var(--scale-0);
+    --btn-min-height: var(--size-6);
     --btn-min-width: 0;
     text-transform: none;
+    padding: var(--btn-padding-y) var(--btn-padding-x);
   }
 
   &.is-ghost {
@@ -204,6 +210,26 @@ const props = withDefaults(defineProps<{
   :slotted(svg) {
     font-size: var(--btn-icon-size);
     margin-right: 0.25rem;
+    vertical-align: baseline;
+  }
+
+  &.is-circle {
+    --btn-font-size: calc(var(--btn-min-height) / 2);
+
+    flex: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: var(--btn-padding-y);
+    width: var(--btn-min-height);
+    height: var(--btn-min-height);
+    min-width: 0;
+    min-height: 0;
+    border-radius: var(--radius-full);
+  }
+
+  :slotted(&.is-circle svg) {
+    margin: 0;
   }
 }
 

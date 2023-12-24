@@ -8,13 +8,17 @@ import { faTimes } from "@fortawesome/free-solid-svg-icons/faTimes";
 import { faPlay } from "@fortawesome/free-solid-svg-icons/faPlay";
 import { faPause } from "@fortawesome/free-solid-svg-icons/faPause";
 import RecordersView from "./views/recorders/RecordersView.vue";
-import RecordersIndexView from "./views/recorders/index/RecordersIndexView.vue";
-import RecorderView from "./views/recorders/:recorderId/RecorderView.vue";
-import SessionsView from "./views/recorders/:recorderId/sessions/SessionsView.vue";
-import SessionsIndexView from "./views/recorders/:recorderId/sessions/index/SessionsIndexView.vue";
-import SessionView from "./views/recorders/:recorderId/sessions/:sessionId/SessionView.vue";
+import RecordersIndexView from "./views/recorders/views/index/RecordersIndexView.vue";
+import RecorderView from "./views/recorders/views/:recorderId/RecorderView.vue";
+import SessionsView from "./views/recorders/views/:recorderId/views/sessions/SessionsView.vue";
+import SessionsIndexView from "./views/recorders/views/:recorderId/views/sessions/views/index/SessionsIndexView.vue";
+import SessionView from "./views/recorders/views/:recorderId/views/sessions/views/:sessionId/SessionView.vue";
 import { faWaveSquare } from "@fortawesome/free-solid-svg-icons/faWaveSquare";
 import { faMicrochip } from "@fortawesome/free-solid-svg-icons/faMicrochip";
+import { faHeart } from "@fortawesome/free-solid-svg-icons/faHeart";
+import { faTrash } from "@fortawesome/free-solid-svg-icons/faTrash";
+import { faThumbtack } from "@fortawesome/free-solid-svg-icons/faThumbtack";
+import { faArrowLeft } from "@fortawesome/free-solid-svg-icons/faArrowLeft";
 
 const router = createRouter({
   history: createWebHistory(),
@@ -55,7 +59,7 @@ const router = createRouter({
 });
 
 /* add icons to the library */
-library.add(faTimes, faPlay, faPause, faMicrochip, faWaveSquare);
+library.add(faTimes, faPlay, faPause, faMicrochip, faWaveSquare, faTrash, faHeart, faThumbtack, faArrowLeft);
 
 const app = createApp(App);
 

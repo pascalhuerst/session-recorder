@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import PageShell from "../../lib/layout/PageShell.vue";
 import Container from "../../lib/layout/Container.vue";
-import DevicePicker from "../../shared/DevicePicker.vue";
+import DevicePicker from "./elements/DevicePicker.vue";
 import { storeToRefs } from "pinia";
 import { useRecordersStore } from "../../store/useRecordersStore.ts";
 

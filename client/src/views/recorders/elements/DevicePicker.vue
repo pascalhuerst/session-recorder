@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useRouter } from "vue-router";
-import { RecorderInfo } from "protocols/ts/sessionsource.ts";
+import { RecorderInfo } from "@session-recorder/protocols/ts/sessionsource.ts";
 import { computed } from "vue";
 
 const router = useRouter();

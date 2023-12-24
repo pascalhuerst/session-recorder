@@ -9,6 +9,7 @@
 
 * {
     font-family: var(--font-sans);
+    box-sizing: border-box;
 }
 
 body {

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { storeToRefs } from "pinia";
-import { useRecordersStore } from "../../../store/useRecordersStore";
-import EmptyScreen from "../../../lib/display/EmptyScreen.vue";
+import { useRecordersStore } from "../../../../store/useRecordersStore.ts";
+import EmptyScreen from "../../../../lib/display/EmptyScreen.vue";
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 import { watch } from "vue";
 

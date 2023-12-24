@@ -23,8 +23,7 @@ export const streamSessions = async (args: {
   await fetch(new URL("introspect", env.VITE_SERVER_URL))
     .then((res) => res.json())
     .then((data) => {
-      data[args.request.recorderID].open_sessions.forEach((session: any) => {
-        console.log(session);
+      (data[args.request.recorderID].open_sessions || []).forEach((session: any) => {
         args.onMessage({
           ID: session.id,
           state: SessionState.SESSION_STATE_CREATED,

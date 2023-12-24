@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 import { computed, onMounted, ref, useAttrs, watch } from "vue";
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
+import Button from "../controls/Button.vue";
 
 const props = defineProps<{
   open: boolean;
@@ -55,15 +56,17 @@ function close() {
     <dialog ref="dialogEl" @cancel="close" v-bind="attrs">
       <div class="content-container" :style="customStyle">
         <header>
-          <slot name="header"></slot>
-          <button class="close" @click="close">
+          <div class="heading">
+            <slot name="header"></slot>
+          </div>
+          <Button size="md" shape="circle" @click="close">
             <font-awesome-icon icon="fa-solid fa-times" />
-          </button>
+          </Button>
         </header>
 
-        <section>
+        <main>
           <slot name="body"></slot>
-        </section>
+        </main>
 
         <footer>
           <slot name="footer"></slot>
@@ -114,24 +117,21 @@ header {
   font-weight: var(--weight-bold);
   text-transform: uppercase;
   font-size: var(--scale-3);
-  color: var(--color-purple-700);
 }
 
-.close {
+.heading {
+  min-height: var(--size-10);
   display: flex;
-  width: var(--size-6);
-  height: var(--size-6);
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-end;
   justify-content: center;
-  border: none;
-  background: none;
-  font-size: var(--scale-2);
 }
 
-section {
+main {
   flex-grow: 1;
   margin: var(--size-6) 0;
   overflow-y: auto;
+  font-size: var(--scale-2);
 }
 
 footer {

@@ -11,38 +11,51 @@ option go_package = "github.com/pascalhuerst/session-recorder/protocols/go/sessi
 message StreamRecordersRequest {}
 
 message RecorderInfo {
-	string ID = 1;
-	string name = 2;
-	chunksink.AudioInputStatus audioInputStatus = 3; 
+  string ID = 1;
+  string name = 2;
+  chunksink.AudioInputStatus audioInputStatus = 3;
 }
 
 message StreamSeesionRequst {
-	string recorderID = 1;
+  string recorderID = 1;
 }
 
 enum SessionState {
-	SESSION_STATE_UNKNOWN = 0;
-	SESSION_STATE_CREATED = 1;
-	SESSION_STATE_RECORDING = 2;
-	SESSION_STATE_FINISHED = 3;
-	SESSION_STATE_ERROR = 4;
+  SESSION_STATE_UNKNOWN = 0;
+  SESSION_STATE_CREATED = 1;
+  SESSION_STATE_RECORDING = 2;
+  SESSION_STATE_FINISHED = 3;
+  SESSION_STATE_ERROR = 4;
 }
 
 message SessionInfo {
-	string ID = 1;
-	google.protobuf.Timestamp timeCreated = 2;
-	google.protobuf.Timestamp timeFinished = 3;
+  string ID = 1;
+  google.protobuf.Timestamp timeCreated = 2;
+  google.protobuf.Timestamp timeFinished = 3;
 
-	google.protobuf.Duration lifetime = 4;
-	string audioFileName = 5;
-	string waveformDataFile = 6;
-	bool keepSession = 7;
+  google.protobuf.Duration lifetime = 4;
+  string audioFileName = 5;
+  string waveformDataFile = 6;
+  bool keepSession = 7;
 
-	SessionState state = 8;
+  SessionState state = 8;
+}
+
+message HealthCheckRequest {
+}
+
+enum HealthState {
+  OK = 0;
+  ERROR = 1;
+}
+
+message HealthCheckResponse {
+  HealthState status = 1;
 }
 
 service SessionSource {
-	rpc StreamRecorders(StreamRecordersRequest) returns (stream RecorderInfo);
-	rpc StreamSessions(StreamSeesionRequst) returns (stream SessionInfo);
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+  rpc StreamRecorders(StreamRecordersRequest) returns (stream RecorderInfo);
+  rpc StreamSessions(StreamSeesionRequst) returns (stream SessionInfo);
 }
 

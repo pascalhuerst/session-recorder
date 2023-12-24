@@ -41,6 +41,36 @@ func (s *SessionSourceServer) announcement() [][]byte {
 	}
 }
 
+func (s *SessionSourceServer) HealthCheck(request *sspb.HealthCheck, server sspb.SessionSource_StreamRecordersServer) error {
+	status := cspb.AudioInputStatus_NO_SIGNAL
+
+	for {
+
+		server.Send(&sspb.RecorderInfo{
+			ID:               uuid.NewString(),
+			Name:             "Test Recorder 1",
+			AudioInputStatus: status,
+		})
+
+		server.Send(&sspb.RecorderInfo{
+			ID:               uuid.NewString(),
+			Name:             "Test Recorder 2",
+			AudioInputStatus: status,
+		})
+
+		time.Sleep(5 * time.Second)
+
+		if status == cspb.AudioInputStatus_NO_SIGNAL {
+			status = cspb.AudioInputStatus_SIGNAL
+		} else {
+			status = cspb.AudioInputStatus_NO_SIGNAL
+		}
+
+	}
+
+	return nil
+}
+
 func (s *SessionSourceServer) StreamRecorders(request *sspb.StreamRecordersRequest, server sspb.SessionSource_StreamRecordersServer) error {
 	status := cspb.AudioInputStatus_NO_SIGNAL
 

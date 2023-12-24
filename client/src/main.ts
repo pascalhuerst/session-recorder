@@ -1,32 +1,37 @@
 import { createApp } from "vue";
 import { createRouter, createWebHistory } from "vue-router";
 import App from "./App.vue";
-import SessionDetail from "./components/SessionDetail.vue";
-import SessionsView from "./modules/sessions/SessionsView.vue";
 import { createPinia } from "pinia";
-import RecordersView from "./modules/recorders/RecordersView.vue";
-/* import the fontawesome core */
 import { library } from "@fortawesome/fontawesome-svg-core";
-
-/* import font awesome icon component */
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
-
-/* import specific icons */
 import { faTimes } from "@fortawesome/free-solid-svg-icons/faTimes";
 import { faPlay } from "@fortawesome/free-solid-svg-icons/faPlay";
 import { faPause } from "@fortawesome/free-solid-svg-icons/faPause";
+import RecordersIndexView from "./views/recorders/RecordersIndexView.vue";
+import RecorderIndexView from "./views/recorders/:recorderId/RecorderIndexView.vue";
+import SessionsIndexView from "./views/recorders/:recorderId/sessions/SessionsIndexView.vue";
+import SessionView from "./views/recorders/:recorderId/sessions/:sessionId/SessionView.vue";
 
 const router = createRouter({
   history: createWebHistory(),
-  mode: "history",
   routes: [
-    { path: "/recorders", component: RecordersView },
-    { path: "/recorders/:recorderId/sessions", component: SessionsView },
     {
-      path: "/detail/:recorderID/:sessionID",
-      component: SessionDetail,
-      props: true
+      path: "/recorders",
+      component: RecordersIndexView,
+      children: [{
+        path: ":recorderId",
+        component: RecorderIndexView,
+        children: [{
+          path: "sessions",
+          component: SessionsIndexView,
+          children: [{
+            path: ":sessionId",
+            component: SessionView
+          }]
+        }]
+      }]
     },
+
     { path: "/:pathMatch(.*)*", redirect: "/recorders" }
   ]
 });

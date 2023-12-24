@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import DevicePicker from "./elements/DevicePicker.vue";
 import OpenSessionList from "./elements/OpenSessionsList.vue";
-import Container from "../../lib/layout/Container.vue";
+import Container from "../../../../../lib/layout/Container.vue";
 </script>
 
 <template>

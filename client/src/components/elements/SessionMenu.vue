@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { type SessionInfo } from "@session-recorder/protocols/ts/sessionsource.ts";
+import { type SessionInfo } from "protocols/ts/sessionsource.ts";
 import { computed } from "vue";
-import { setKeepSession } from "../../../grpc/procedures/setKeepSession.ts";
-import { deleteSession } from "../../../grpc/procedures/deleteSession.ts";
-import { useConfirmation } from "../../../lib/disclosure/useConfirmation.ts";
-import Modal from "../../../lib/disclosure/Modal.vue";
-import Button from "../../../lib/controls/Button.vue";
+import { setKeepSession } from "../../grpc/procedures/setKeepSession.ts";
+import { deleteSession } from "../../grpc/procedures/deleteSession.ts";
+import { useConfirmation } from "../../lib/disclosure/useConfirmation.ts";
+import Modal from "../../lib/disclosure/Modal.vue";
+import Button from "../../lib/controls/Button.vue";
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 
 const props = defineProps<{

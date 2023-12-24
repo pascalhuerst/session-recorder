@@ -1,24 +1,19 @@
 <script setup lang="ts">
-import { useRoute, useRouter } from "vue-router";
-import { computed, ref } from "vue";
-import { streamRecorders } from "../../../grpc/procedures/streamRecorders.ts";
-import { RecorderInfo } from "@session-recorder/protocols/ts/sessionsource.ts";
+import { useRouter } from "vue-router";
+import { RecorderInfo } from "protocols/ts/sessionsource.ts";
+import { computed } from "vue";
 
 const router = useRouter();
-const route = useRoute();
 
-const recorders = ref<Set<RecorderInfo>>(new Set);
+const props = defineProps<{
+  recorders: Map<string, RecorderInfo>
+  selectedRecorderId?: string
+}>();
 
-streamRecorders({
-  onMessage: (recorderInfo) => {
-    recorders.value.add(recorderInfo);
-  }
-});
-
-const selectedRecorderId = computed(() => route.params.recorderId);
+const recorders = computed(() => Array.from(Object.values(props.recorders)));
 
 const setSelected = (item: string) => {
-  router.push(`/recorders/${item}/sessions`);
+  router.push(`/recorders/${item}`);
 };
 </script>
 
@@ -26,7 +21,8 @@ const setSelected = (item: string) => {
   <nav>
     <ul>
       <li v-for="recorder in recorders" :key="recorder.ID">
-        <button :class="['link', { 'is-active': selectedRecorderId === recorder.ID }]" @click="setSelected(recorder.ID)">
+        <button :class="['link', { 'is-active': selectedRecorderId === recorder.ID }]"
+                @click="setSelected(recorder.ID)">
           {{ recorder.name }}
         </button>
       </li>

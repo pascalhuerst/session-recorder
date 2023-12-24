@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import WaveformCanvas from "../../../lib/waveform/WaveformCanvas.vue";
+import WaveformCanvas from "../../lib/waveform/WaveformCanvas.vue";
 import { computed } from "vue";
-import { env } from "../../../env.ts";
+import { env } from "../../env.ts";
 import SessionMenu from "./SessionMenu.vue";
-import { SessionInfo } from "@session-recorder/protocols/ts/sessionsource.ts";
+import { SessionInfo } from "protocols/ts/sessionsource.ts";
 
 const props = defineProps<{
   session: SessionInfo,

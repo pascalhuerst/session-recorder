@@ -1,28 +1,33 @@
 package grpc
 
 import (
+	"context"
 	"fmt"
 	"sync"
-	"time"
 
-	"github.com/google/uuid"
-	cspb "github.com/pascalhuerst/session-recorder/protocols/go/chunksink"
+	cmpb "github.com/pascalhuerst/session-recorder/protocols/go/common"
 	sspb "github.com/pascalhuerst/session-recorder/protocols/go/sessionsource"
 	"google.golang.org/grpc"
-	"google.golang.org/protobuf/types/known/durationpb"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
+
+type StreamSessionsCB func(ctx context.Context, request *sspb.StreamSessionRequest, server sspb.SessionSource_StreamSessionsServer) error
+type StreamRecordersCB func(ctx context.Context, request *sspb.StreamRecordersRequest, server sspb.SessionSource_StreamRecordersServer) error
 
 type SessionSourceServer struct {
 	mutex   sync.Mutex
 	version string
 	name    string
+
+	streamRecordersCB StreamRecordersCB
+	streamSessionsCB  StreamSessionsCB
 }
 
-func NewSessionSourceServer(name, version string) *SessionSourceServer {
+func NewSessionSourceServer(name, version string, streamRecordersCB StreamRecordersCB, streamSessionsCB StreamSessionsCB) *SessionSourceServer {
 	return &SessionSourceServer{
-		name:    name,
-		version: version,
+		name:              name,
+		version:           version,
+		streamRecordersCB: streamRecordersCB,
+		streamSessionsCB:  streamSessionsCB,
 	}
 }
 
@@ -42,51 +47,29 @@ func (s *SessionSourceServer) announcement() [][]byte {
 }
 
 func (s *SessionSourceServer) StreamRecorders(request *sspb.StreamRecordersRequest, server sspb.SessionSource_StreamRecordersServer) error {
-	status := cspb.AudioInputStatus_NO_SIGNAL
-
-	for {
-
-		server.Send(&sspb.RecorderInfo{
-			ID:               uuid.NewString(),
-			Name:             "Test Recorder 1",
-			AudioInputStatus: status,
-		})
-
-		server.Send(&sspb.RecorderInfo{
-			ID:               uuid.NewString(),
-			Name:             "Test Recorder 2",
-			AudioInputStatus: status,
-		})
-
-		time.Sleep(5 * time.Second)
-
-		if status == cspb.AudioInputStatus_NO_SIGNAL {
-			status = cspb.AudioInputStatus_SIGNAL
-		} else {
-			status = cspb.AudioInputStatus_NO_SIGNAL
-		}
-
+	if s.streamRecordersCB != nil {
+		return s.streamRecordersCB(server.Context(), request, server)
 	}
 
 	return nil
 }
 
-func (s *SessionSourceServer) StreamSessions(request *sspb.StreamSeesionRequst, server sspb.SessionSource_StreamSessionsServer) error {
-	now := timestamppb.Now()
-	earlier := timestamppb.New(now.AsTime().Add(-time.Hour * 72))
-
-	for i := 0; i < 10; i++ {
-		server.Send(&sspb.SessionInfo{
-			ID:               uuid.NewString(),
-			TimeCreated:      earlier,
-			TimeFinished:     now,
-			Lifetime:         durationpb.New(time.Hour * 72),
-			AudioFileName:    fmt.Sprintf("whatever_filename_%d.flac", i),
-			WaveformDataFile: fmt.Sprintf("whatever_filename_%d.waveform", i),
-			KeepSession:      false,
-			State:            0,
-		})
+func (s *SessionSourceServer) StreamSessions(request *sspb.StreamSessionRequest, server sspb.SessionSource_StreamSessionsServer) error {
+	if s.streamSessionsCB != nil {
+		return s.streamSessionsCB(server.Context(), request, server)
 	}
 
 	return nil
+}
+
+func (s *SessionSourceServer) SetKeepSession(ctx context.Context, in *sspb.SetKeepSessionRequest) (*cmpb.Respone, error) {
+	return nil, nil
+}
+
+func (s *SessionSourceServer) DeleteSession(ctx context.Context, in *sspb.DeleteSessionRequest) (*cmpb.Respone, error) {
+	return nil, nil
+}
+
+func (s *SessionSourceServer) SetName(ctx context.Context, in *sspb.SetNameRequest) (*cmpb.Respone, error) {
+	return nil, nil
 }

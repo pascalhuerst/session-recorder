@@ -67,7 +67,7 @@ func (s *Server) PublishRecord(serviceName, serviceType, serviceSubtype string, 
 	}
 
 	if len(serviceSubtype) > 0 {
-		err := eg.AddServiceSubType(avahi.InterfaceUnspec, avahi.ProtoUnspec, 0, serviceName, serviceType, "local", serviceSubtype)
+		err := eg.AddServiceSubtype(avahi.InterfaceUnspec, avahi.ProtoUnspec, 0, serviceName, serviceType, "local", serviceSubtype)
 		if err != nil {
 			return nil, err
 		}

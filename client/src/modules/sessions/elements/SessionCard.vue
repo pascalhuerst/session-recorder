@@ -20,7 +20,11 @@ const audioUrls = computed(() => {
     {
       src: new URL(`${props.recorderId}/${props.session.ID}/data.ogg`, env.VITE_FILE_SERVER_URL).toString(),
       type: "audio/ogg"
-    }
+    },
+    {
+      src: new URL(`${props.recorderId}/${props.session.ID}/data.flac`, env.VITE_FILE_SERVER_URL).toString(),
+      type: "audio/flac"
+    },
   ];
 });
 

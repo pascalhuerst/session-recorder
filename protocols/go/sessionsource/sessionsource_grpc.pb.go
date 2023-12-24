@@ -4,6 +4,7 @@ package sessionsource
 
 import (
 	context "context"
+	common "github.com/pascalhuerst/session-recorder/protocols/go/common"
 	grpc "google.golang.org/grpc"
 	codes "google.golang.org/grpc/codes"
 	status "google.golang.org/grpc/status"
@@ -18,8 +19,13 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type SessionSourceClient interface {
+	// Recorder RPC
 	StreamRecorders(ctx context.Context, in *StreamRecordersRequest, opts ...grpc.CallOption) (SessionSource_StreamRecordersClient, error)
+	// Session RPC
 	StreamSessions(ctx context.Context, in *StreamSeesionRequst, opts ...grpc.CallOption) (SessionSource_StreamSessionsClient, error)
+	SetKeepSession(ctx context.Context, in *SetKeepSessionRequest, opts ...grpc.CallOption) (*common.Respone, error)
+	DeleteSession(ctx context.Context, in *DeleteSessionRequest, opts ...grpc.CallOption) (*common.Respone, error)
+	SetName(ctx context.Context, in *SetNameRequest, opts ...grpc.CallOption) (*common.Respone, error)
 }
 
 type sessionSourceClient struct {
@@ -46,7 +52,7 @@ func (c *sessionSourceClient) StreamRecorders(ctx context.Context, in *StreamRec
 }
 
 type SessionSource_StreamRecordersClient interface {
-	Recv() (*RecorderInfo, error)
+	Recv() (*Recorder, error)
 	grpc.ClientStream
 }
 
@@ -54,8 +60,8 @@ type sessionSourceStreamRecordersClient struct {
 	grpc.ClientStream
 }
 
-func (x *sessionSourceStreamRecordersClient) Recv() (*RecorderInfo, error) {
-	m := new(RecorderInfo)
+func (x *sessionSourceStreamRecordersClient) Recv() (*Recorder, error) {
+	m := new(Recorder)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
@@ -78,7 +84,7 @@ func (c *sessionSourceClient) StreamSessions(ctx context.Context, in *StreamSees
 }
 
 type SessionSource_StreamSessionsClient interface {
-	Recv() (*SessionInfo, error)
+	Recv() (*Session, error)
 	grpc.ClientStream
 }
 
@@ -86,20 +92,52 @@ type sessionSourceStreamSessionsClient struct {
 	grpc.ClientStream
 }
 
-func (x *sessionSourceStreamSessionsClient) Recv() (*SessionInfo, error) {
-	m := new(SessionInfo)
+func (x *sessionSourceStreamSessionsClient) Recv() (*Session, error) {
+	m := new(Session)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
 	}
 	return m, nil
 }
 
+func (c *sessionSourceClient) SetKeepSession(ctx context.Context, in *SetKeepSessionRequest, opts ...grpc.CallOption) (*common.Respone, error) {
+	out := new(common.Respone)
+	err := c.cc.Invoke(ctx, "/sessionsource.SessionSource/SetKeepSession", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sessionSourceClient) DeleteSession(ctx context.Context, in *DeleteSessionRequest, opts ...grpc.CallOption) (*common.Respone, error) {
+	out := new(common.Respone)
+	err := c.cc.Invoke(ctx, "/sessionsource.SessionSource/DeleteSession", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sessionSourceClient) SetName(ctx context.Context, in *SetNameRequest, opts ...grpc.CallOption) (*common.Respone, error) {
+	out := new(common.Respone)
+	err := c.cc.Invoke(ctx, "/sessionsource.SessionSource/SetName", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SessionSourceServer is the server API for SessionSource service.
 // All implementations should embed UnimplementedSessionSourceServer
 // for forward compatibility
 type SessionSourceServer interface {
+	// Recorder RPC
 	StreamRecorders(*StreamRecordersRequest, SessionSource_StreamRecordersServer) error
+	// Session RPC
 	StreamSessions(*StreamSeesionRequst, SessionSource_StreamSessionsServer) error
+	SetKeepSession(context.Context, *SetKeepSessionRequest) (*common.Respone, error)
+	DeleteSession(context.Context, *DeleteSessionRequest) (*common.Respone, error)
+	SetName(context.Context, *SetNameRequest) (*common.Respone, error)
 }
 
 // UnimplementedSessionSourceServer should be embedded to have forward compatible implementations.
@@ -111,6 +149,15 @@ func (UnimplementedSessionSourceServer) StreamRecorders(*StreamRecordersRequest,
 }
 func (UnimplementedSessionSourceServer) StreamSessions(*StreamSeesionRequst, SessionSource_StreamSessionsServer) error {
 	return status.Errorf(codes.Unimplemented, "method StreamSessions not implemented")
+}
+func (UnimplementedSessionSourceServer) SetKeepSession(context.Context, *SetKeepSessionRequest) (*common.Respone, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SetKeepSession not implemented")
+}
+func (UnimplementedSessionSourceServer) DeleteSession(context.Context, *DeleteSessionRequest) (*common.Respone, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteSession not implemented")
+}
+func (UnimplementedSessionSourceServer) SetName(context.Context, *SetNameRequest) (*common.Respone, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SetName not implemented")
 }
 
 // UnsafeSessionSourceServer may be embedded to opt out of forward compatibility for this service.
@@ -133,7 +180,7 @@ func _SessionSource_StreamRecorders_Handler(srv interface{}, stream grpc.ServerS
 }
 
 type SessionSource_StreamRecordersServer interface {
-	Send(*RecorderInfo) error
+	Send(*Recorder) error
 	grpc.ServerStream
 }
 
@@ -141,7 +188,7 @@ type sessionSourceStreamRecordersServer struct {
 	grpc.ServerStream
 }
 
-func (x *sessionSourceStreamRecordersServer) Send(m *RecorderInfo) error {
+func (x *sessionSourceStreamRecordersServer) Send(m *Recorder) error {
 	return x.ServerStream.SendMsg(m)
 }
 
@@ -154,7 +201,7 @@ func _SessionSource_StreamSessions_Handler(srv interface{}, stream grpc.ServerSt
 }
 
 type SessionSource_StreamSessionsServer interface {
-	Send(*SessionInfo) error
+	Send(*Session) error
 	grpc.ServerStream
 }
 
@@ -162,8 +209,62 @@ type sessionSourceStreamSessionsServer struct {
 	grpc.ServerStream
 }
 
-func (x *sessionSourceStreamSessionsServer) Send(m *SessionInfo) error {
+func (x *sessionSourceStreamSessionsServer) Send(m *Session) error {
 	return x.ServerStream.SendMsg(m)
+}
+
+func _SessionSource_SetKeepSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetKeepSessionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SessionSourceServer).SetKeepSession(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/sessionsource.SessionSource/SetKeepSession",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SessionSourceServer).SetKeepSession(ctx, req.(*SetKeepSessionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SessionSource_DeleteSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteSessionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SessionSourceServer).DeleteSession(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/sessionsource.SessionSource/DeleteSession",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SessionSourceServer).DeleteSession(ctx, req.(*DeleteSessionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SessionSource_SetName_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetNameRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SessionSourceServer).SetName(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/sessionsource.SessionSource/SetName",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SessionSourceServer).SetName(ctx, req.(*SetNameRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 // SessionSource_ServiceDesc is the grpc.ServiceDesc for SessionSource service.
@@ -172,7 +273,20 @@ func (x *sessionSourceStreamSessionsServer) Send(m *SessionInfo) error {
 var SessionSource_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "sessionsource.SessionSource",
 	HandlerType: (*SessionSourceServer)(nil),
-	Methods:     []grpc.MethodDesc{},
+	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "SetKeepSession",
+			Handler:    _SessionSource_SetKeepSession_Handler,
+		},
+		{
+			MethodName: "DeleteSession",
+			Handler:    _SessionSource_DeleteSession_Handler,
+		},
+		{
+			MethodName: "SetName",
+			Handler:    _SessionSource_SetName_Handler,
+		},
+	},
 	Streams: []grpc.StreamDesc{
 		{
 			StreamName:    "StreamRecorders",

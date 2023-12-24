@@ -5,10 +5,9 @@ MD ?= mkdir
 CP ?= cp
 
 PROTOS = \
+	common \
 	chunksink \
 	sessionsource
-
-
 
 all: create_dirs ${PROTOS} gomod
 
@@ -50,7 +49,22 @@ sessionsource:
 		--go-grpc_opt=require_unimplemented_servers=false,paths=source_relative \
 		--proto_path=proto \
 		--go-grpc_out=./go/$@ $@.proto
-	
+
+common:
+	$(PROTOC) \
+		--plugin=protoc-gen-ts_proto=$(GRPC_TS_PLUGIN) \
+		--ts_proto_out=./ts \
+		--ts_proto_opt=outputServices=nice-grpc,outputServices=generic-definitions,useExactTypes=false,esModuleInterop=true \
+		--proto_path=proto \
+		$@.proto
+
+	$(MD) -p go/$@
+	$(PROTOC) \
+		--go_out=paths=source_relative:./go/$@ $@.proto \
+		--go-grpc_opt=require_unimplemented_servers=false,paths=source_relative \
+		--proto_path=proto \
+		--go-grpc_out=./go/$@ $@.proto
+
 clean:
 	rm -rf cpp
 	rm -rf ts

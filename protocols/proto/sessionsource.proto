@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package sessionsource;
 
-import "chunksink.proto";
+import "common.proto";
 import "google/protobuf/timestamp.proto";
 import "google/protobuf/duration.proto";
 
@@ -11,9 +11,19 @@ option go_package = "github.com/pascalhuerst/session-recorder/protocols/go/sessi
 message StreamRecordersRequest {}
 
 message RecorderInfo {
-	string ID = 1;
 	string name = 2;
-	chunksink.AudioInputStatus audioInputStatus = 3; 
+	common.AudioInputStatus audioInputStatus = 3; 
+}
+
+message RecordereRemoved {}
+
+message Recorder {
+	string ID = 1;
+	
+	oneof info {
+		RecorderInfo updated = 2;
+		RecordereRemoved removed = 3;
+	}
 }
 
 message StreamSeesionRequst {
@@ -22,27 +32,55 @@ message StreamSeesionRequst {
 
 enum SessionState {
 	SESSION_STATE_UNKNOWN = 0;
-	SESSION_STATE_CREATED = 1;
-	SESSION_STATE_RECORDING = 2;
-	SESSION_STATE_FINISHED = 3;
-	SESSION_STATE_ERROR = 4;
+	SESSION_STATE_RECORDING = 1;
+	SESSION_STATE_FINISHED = 2;
 }
 
 message SessionInfo {
-	string ID = 1;
 	google.protobuf.Timestamp timeCreated = 2;
 	google.protobuf.Timestamp timeFinished = 3;
-
 	google.protobuf.Duration lifetime = 4;
-	string audioFileName = 5;
-	string waveformDataFile = 6;
-	bool keepSession = 7;
+	
+	string name = 5;
+	string audioFileName = 6;
+	string waveformDataFile = 7;
+	bool keep = 8;
 
-	SessionState state = 8;
+	SessionState state = 9;
+}
+
+message SessionRemoved {}
+
+message Session {
+	string ID = 1;
+	
+	oneof info {
+		SessionInfo updated = 2;
+		SessionRemoved removed = 3;
+	}
+}
+
+message SetKeepSessionRequest {
+	string sessionID = 1;
+	bool keep = 2;
+}
+
+message DeleteSessionRequest {
+	string sessionID = 1;
+}
+
+message SetNameRequest {
+	string sessionID = 1;
+	string name = 2;
 }
 
 service SessionSource {
-	rpc StreamRecorders(StreamRecordersRequest) returns (stream RecorderInfo);
-	rpc StreamSessions(StreamSeesionRequst) returns (stream SessionInfo);
+	// Recorder RPC
+	rpc StreamRecorders(StreamRecordersRequest) returns (stream Recorder);
+	
+	// Session RPC
+	rpc StreamSessions(StreamSeesionRequst) returns (stream Session);
+	rpc SetKeepSession(SetKeepSessionRequest) returns (common.Respone);
+	rpc DeleteSession(DeleteSessionRequest) returns (common.Respone);
+	rpc SetName(SetNameRequest) returns (common.Respone);
 }
-

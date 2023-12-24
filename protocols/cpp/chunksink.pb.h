@@ -31,8 +31,8 @@
 #include <google/protobuf/message.h>
 #include <google/protobuf/repeated_field.h>  // IWYU pragma: export
 #include <google/protobuf/extension_set.h>  // IWYU pragma: export
-#include <google/protobuf/generated_enum_reflection.h>
 #include <google/protobuf/unknown_field_set.h>
+#include "common.pb.h"
 // @@protoc_insertion_point(includes)
 #include <google/protobuf/port_def.inc>
 #define PROTOBUF_INTERNAL_EXPORT_chunksink_2eproto
@@ -68,45 +68,19 @@ extern RecorderStatusReplyDefaultTypeInternal _RecorderStatusReply_default_insta
 class RecorderStatusRequest;
 struct RecorderStatusRequestDefaultTypeInternal;
 extern RecorderStatusRequestDefaultTypeInternal _RecorderStatusRequest_default_instance_;
-class StreamChunkDataRequest;
-struct StreamChunkDataRequestDefaultTypeInternal;
-extern StreamChunkDataRequestDefaultTypeInternal _StreamChunkDataRequest_default_instance_;
+class StreamChunkDataReply;
+struct StreamChunkDataReplyDefaultTypeInternal;
+extern StreamChunkDataReplyDefaultTypeInternal _StreamChunkDataReply_default_instance_;
 }  // namespace chunksink
 PROTOBUF_NAMESPACE_OPEN
 template<> ::chunksink::ChunkData* Arena::CreateMaybeMessage<::chunksink::ChunkData>(Arena*);
 template<> ::chunksink::ChunkSourceMetrics* Arena::CreateMaybeMessage<::chunksink::ChunkSourceMetrics>(Arena*);
 template<> ::chunksink::RecorderStatusReply* Arena::CreateMaybeMessage<::chunksink::RecorderStatusReply>(Arena*);
 template<> ::chunksink::RecorderStatusRequest* Arena::CreateMaybeMessage<::chunksink::RecorderStatusRequest>(Arena*);
-template<> ::chunksink::StreamChunkDataRequest* Arena::CreateMaybeMessage<::chunksink::StreamChunkDataRequest>(Arena*);
+template<> ::chunksink::StreamChunkDataReply* Arena::CreateMaybeMessage<::chunksink::StreamChunkDataReply>(Arena*);
 PROTOBUF_NAMESPACE_CLOSE
 namespace chunksink {
 
-enum AudioInputStatus : int {
-  UNKNOWN = 0,
-  NO_SIGNAL = 1,
-  SIGNAL = 2,
-  AudioInputStatus_INT_MIN_SENTINEL_DO_NOT_USE_ = std::numeric_limits<int32_t>::min(),
-  AudioInputStatus_INT_MAX_SENTINEL_DO_NOT_USE_ = std::numeric_limits<int32_t>::max()
-};
-bool AudioInputStatus_IsValid(int value);
-constexpr AudioInputStatus AudioInputStatus_MIN = UNKNOWN;
-constexpr AudioInputStatus AudioInputStatus_MAX = SIGNAL;
-constexpr int AudioInputStatus_ARRAYSIZE = AudioInputStatus_MAX + 1;
-
-const ::PROTOBUF_NAMESPACE_ID::EnumDescriptor* AudioInputStatus_descriptor();
-template<typename T>
-inline const std::string& AudioInputStatus_Name(T enum_t_value) {
-  static_assert(::std::is_same<T, AudioInputStatus>::value ||
-    ::std::is_integral<T>::value,
-    "Incorrect type passed to function AudioInputStatus_Name.");
-  return ::PROTOBUF_NAMESPACE_ID::internal::NameOfEnum(
-    AudioInputStatus_descriptor(), enum_t_value);
-}
-inline bool AudioInputStatus_Parse(
-    ::PROTOBUF_NAMESPACE_ID::ConstStringParam name, AudioInputStatus* value) {
-  return ::PROTOBUF_NAMESPACE_ID::internal::ParseNamedEnum<AudioInputStatus>(
-    AudioInputStatus_descriptor(), name, value);
-}
 // ===================================================================
 
 class RecorderStatusRequest final :
@@ -263,13 +237,13 @@ class RecorderStatusRequest final :
   std::string* _internal_mutable_uuid();
   public:
 
-  // .chunksink.AudioInputStatus status = 3;
+  // .common.AudioInputStatus status = 3;
   void clear_status();
-  ::chunksink::AudioInputStatus status() const;
-  void set_status(::chunksink::AudioInputStatus value);
+  ::common::AudioInputStatus status() const;
+  void set_status(::common::AudioInputStatus value);
   private:
-  ::chunksink::AudioInputStatus _internal_status() const;
-  void _internal_set_status(::chunksink::AudioInputStatus value);
+  ::common::AudioInputStatus _internal_status() const;
+  void _internal_set_status(::common::AudioInputStatus value);
   public:
 
   // @@protoc_insertion_point(class_scope:chunksink.RecorderStatusRequest)
@@ -433,23 +407,23 @@ class RecorderStatusReply final :
 };
 // -------------------------------------------------------------------
 
-class StreamChunkDataRequest final :
-    public ::PROTOBUF_NAMESPACE_ID::internal::ZeroFieldsBase /* @@protoc_insertion_point(class_definition:chunksink.StreamChunkDataRequest) */ {
+class StreamChunkDataReply final :
+    public ::PROTOBUF_NAMESPACE_ID::internal::ZeroFieldsBase /* @@protoc_insertion_point(class_definition:chunksink.StreamChunkDataReply) */ {
  public:
-  inline StreamChunkDataRequest() : StreamChunkDataRequest(nullptr) {}
-  explicit constexpr StreamChunkDataRequest(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
+  inline StreamChunkDataReply() : StreamChunkDataReply(nullptr) {}
+  explicit constexpr StreamChunkDataReply(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
 
-  StreamChunkDataRequest(const StreamChunkDataRequest& from);
-  StreamChunkDataRequest(StreamChunkDataRequest&& from) noexcept
-    : StreamChunkDataRequest() {
+  StreamChunkDataReply(const StreamChunkDataReply& from);
+  StreamChunkDataReply(StreamChunkDataReply&& from) noexcept
+    : StreamChunkDataReply() {
     *this = ::std::move(from);
   }
 
-  inline StreamChunkDataRequest& operator=(const StreamChunkDataRequest& from) {
+  inline StreamChunkDataReply& operator=(const StreamChunkDataReply& from) {
     CopyFrom(from);
     return *this;
   }
-  inline StreamChunkDataRequest& operator=(StreamChunkDataRequest&& from) noexcept {
+  inline StreamChunkDataReply& operator=(StreamChunkDataReply&& from) noexcept {
     if (this == &from) return *this;
     if (GetOwningArena() == from.GetOwningArena()
   #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
@@ -472,20 +446,20 @@ class StreamChunkDataRequest final :
   static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
     return default_instance().GetMetadata().reflection;
   }
-  static const StreamChunkDataRequest& default_instance() {
+  static const StreamChunkDataReply& default_instance() {
     return *internal_default_instance();
   }
-  static inline const StreamChunkDataRequest* internal_default_instance() {
-    return reinterpret_cast<const StreamChunkDataRequest*>(
-               &_StreamChunkDataRequest_default_instance_);
+  static inline const StreamChunkDataReply* internal_default_instance() {
+    return reinterpret_cast<const StreamChunkDataReply*>(
+               &_StreamChunkDataReply_default_instance_);
   }
   static constexpr int kIndexInFileMessages =
     2;
 
-  friend void swap(StreamChunkDataRequest& a, StreamChunkDataRequest& b) {
+  friend void swap(StreamChunkDataReply& a, StreamChunkDataReply& b) {
     a.Swap(&b);
   }
-  inline void Swap(StreamChunkDataRequest* other) {
+  inline void Swap(StreamChunkDataReply* other) {
     if (other == this) return;
   #ifdef PROTOBUF_FORCE_COPY_IN_SWAP
     if (GetOwningArena() != nullptr &&
@@ -498,7 +472,7 @@ class StreamChunkDataRequest final :
       ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
     }
   }
-  void UnsafeArenaSwap(StreamChunkDataRequest* other) {
+  void UnsafeArenaSwap(StreamChunkDataReply* other) {
     if (other == this) return;
     GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
     InternalSwap(other);
@@ -506,15 +480,15 @@ class StreamChunkDataRequest final :
 
   // implements Message ----------------------------------------------
 
-  StreamChunkDataRequest* New(::PROTOBUF_NAMESPACE_ID::Arena* arena = nullptr) const final {
-    return CreateMaybeMessage<StreamChunkDataRequest>(arena);
+  StreamChunkDataReply* New(::PROTOBUF_NAMESPACE_ID::Arena* arena = nullptr) const final {
+    return CreateMaybeMessage<StreamChunkDataReply>(arena);
   }
   using ::PROTOBUF_NAMESPACE_ID::internal::ZeroFieldsBase::CopyFrom;
-  inline void CopyFrom(const StreamChunkDataRequest& from) {
+  inline void CopyFrom(const StreamChunkDataReply& from) {
     ::PROTOBUF_NAMESPACE_ID::internal::ZeroFieldsBase::CopyImpl(this, from);
   }
   using ::PROTOBUF_NAMESPACE_ID::internal::ZeroFieldsBase::MergeFrom;
-  void MergeFrom(const StreamChunkDataRequest& from) {
+  void MergeFrom(const StreamChunkDataReply& from) {
     ::PROTOBUF_NAMESPACE_ID::internal::ZeroFieldsBase::MergeImpl(this, from);
   }
   public:
@@ -522,10 +496,10 @@ class StreamChunkDataRequest final :
   private:
   friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
   static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
-    return "chunksink.StreamChunkDataRequest";
+    return "chunksink.StreamChunkDataReply";
   }
   protected:
-  explicit StreamChunkDataRequest(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+  explicit StreamChunkDataReply(::PROTOBUF_NAMESPACE_ID::Arena* arena,
                        bool is_message_owned = false);
   private:
   public:
@@ -539,7 +513,7 @@ class StreamChunkDataRequest final :
 
   // accessors -------------------------------------------------------
 
-  // @@protoc_insertion_point(class_scope:chunksink.StreamChunkDataRequest)
+  // @@protoc_insertion_point(class_scope:chunksink.StreamChunkDataReply)
  private:
   class _Internal;
 
@@ -1047,22 +1021,22 @@ inline void RecorderStatusRequest::set_allocated_uuid(std::string* uuid) {
   // @@protoc_insertion_point(field_set_allocated:chunksink.RecorderStatusRequest.uuid)
 }
 
-// .chunksink.AudioInputStatus status = 3;
+// .common.AudioInputStatus status = 3;
 inline void RecorderStatusRequest::clear_status() {
   status_ = 0;
 }
-inline ::chunksink::AudioInputStatus RecorderStatusRequest::_internal_status() const {
-  return static_cast< ::chunksink::AudioInputStatus >(status_);
+inline ::common::AudioInputStatus RecorderStatusRequest::_internal_status() const {
+  return static_cast< ::common::AudioInputStatus >(status_);
 }
-inline ::chunksink::AudioInputStatus RecorderStatusRequest::status() const {
+inline ::common::AudioInputStatus RecorderStatusRequest::status() const {
   // @@protoc_insertion_point(field_get:chunksink.RecorderStatusRequest.status)
   return _internal_status();
 }
-inline void RecorderStatusRequest::_internal_set_status(::chunksink::AudioInputStatus value) {
+inline void RecorderStatusRequest::_internal_set_status(::common::AudioInputStatus value) {
   
   status_ = value;
 }
-inline void RecorderStatusRequest::set_status(::chunksink::AudioInputStatus value) {
+inline void RecorderStatusRequest::set_status(::common::AudioInputStatus value) {
   _internal_set_status(value);
   // @@protoc_insertion_point(field_set:chunksink.RecorderStatusRequest.status)
 }
@@ -1093,7 +1067,7 @@ inline void RecorderStatusReply::set_sendchunks(bool value) {
 
 // -------------------------------------------------------------------
 
-// StreamChunkDataRequest
+// StreamChunkDataReply
 
 // -------------------------------------------------------------------
 
@@ -1448,16 +1422,6 @@ ChunkData::mutable_samples() {
 // @@protoc_insertion_point(namespace_scope)
 
 }  // namespace chunksink
-
-PROTOBUF_NAMESPACE_OPEN
-
-template <> struct is_proto_enum< ::chunksink::AudioInputStatus> : ::std::true_type {};
-template <>
-inline const EnumDescriptor* GetEnumDescriptor< ::chunksink::AudioInputStatus>() {
-  return ::chunksink::AudioInputStatus_descriptor();
-}
-
-PROTOBUF_NAMESPACE_CLOSE
 
 // @@protoc_insertion_point(global_scope)
 

@@ -54,7 +54,7 @@ export interface RecorderStatusReply {
   sendChunks: boolean;
 }
 
-export interface StreamChunkDataRequest {
+export interface StreamChunkDataReply {
 }
 
 export interface ChunkSourceMetrics {
@@ -216,19 +216,19 @@ export const RecorderStatusReply = {
   },
 };
 
-function createBaseStreamChunkDataRequest(): StreamChunkDataRequest {
+function createBaseStreamChunkDataReply(): StreamChunkDataReply {
   return {};
 }
 
-export const StreamChunkDataRequest = {
-  encode(_: StreamChunkDataRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+export const StreamChunkDataReply = {
+  encode(_: StreamChunkDataReply, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
     return writer;
   },
 
-  decode(input: _m0.Reader | Uint8Array, length?: number): StreamChunkDataRequest {
+  decode(input: _m0.Reader | Uint8Array, length?: number): StreamChunkDataReply {
     const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
     let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseStreamChunkDataRequest();
+    const message = createBaseStreamChunkDataReply();
     while (reader.pos < end) {
       const tag = reader.uint32();
       switch (tag >>> 3) {
@@ -241,20 +241,20 @@ export const StreamChunkDataRequest = {
     return message;
   },
 
-  fromJSON(_: any): StreamChunkDataRequest {
+  fromJSON(_: any): StreamChunkDataReply {
     return {};
   },
 
-  toJSON(_: StreamChunkDataRequest): unknown {
+  toJSON(_: StreamChunkDataReply): unknown {
     const obj: any = {};
     return obj;
   },
 
-  create(base?: DeepPartial<StreamChunkDataRequest>): StreamChunkDataRequest {
-    return StreamChunkDataRequest.fromPartial(base ?? {});
+  create(base?: DeepPartial<StreamChunkDataReply>): StreamChunkDataReply {
+    return StreamChunkDataReply.fromPartial(base ?? {});
   },
-  fromPartial(_: DeepPartial<StreamChunkDataRequest>): StreamChunkDataRequest {
-    const message = createBaseStreamChunkDataRequest();
+  fromPartial(_: DeepPartial<StreamChunkDataReply>): StreamChunkDataReply {
+    const message = createBaseStreamChunkDataReply();
     return message;
   },
 };
@@ -473,10 +473,10 @@ export const ChunkSinkDefinition = {
   methods: {
     streamChunkData: {
       name: "StreamChunkData",
-      requestType: StreamChunkDataRequest,
-      requestStream: false,
-      responseType: ChunkData,
-      responseStream: true,
+      requestType: ChunkData,
+      requestStream: true,
+      responseType: StreamChunkDataReply,
+      responseStream: false,
       options: {},
     },
     setRecorderStatus: {
@@ -492,9 +492,9 @@ export const ChunkSinkDefinition = {
 
 export interface ChunkSinkServiceImplementation<CallContextExt = {}> {
   streamChunkData(
-    request: StreamChunkDataRequest,
+    request: AsyncIterable<ChunkData>,
     context: CallContext & CallContextExt,
-  ): ServerStreamingMethodResult<DeepPartial<ChunkData>>;
+  ): Promise<DeepPartial<StreamChunkDataReply>>;
   setRecorderStatus(
     request: RecorderStatusRequest,
     context: CallContext & CallContextExt,
@@ -503,9 +503,9 @@ export interface ChunkSinkServiceImplementation<CallContextExt = {}> {
 
 export interface ChunkSinkClient<CallOptionsExt = {}> {
   streamChunkData(
-    request: DeepPartial<StreamChunkDataRequest>,
+    request: AsyncIterable<DeepPartial<ChunkData>>,
     options?: CallOptions & CallOptionsExt,
-  ): AsyncIterable<ChunkData>;
+  ): Promise<StreamChunkDataReply>;
   setRecorderStatus(
     request: DeepPartial<RecorderStatusRequest>,
     options?: CallOptions & CallOptionsExt,
@@ -535,5 +535,3 @@ if (_m0.util.Long !== Long) {
 function isSet(value: any): boolean {
   return value !== null && value !== undefined;
 }
-
-export type ServerStreamingMethodResult<Response> = { [Symbol.asyncIterator](): AsyncIterator<Response, void> };

@@ -44,17 +44,17 @@ struct RecorderStatusReplyDefaultTypeInternal {
   };
 };
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT RecorderStatusReplyDefaultTypeInternal _RecorderStatusReply_default_instance_;
-constexpr StreamChunkDataRequest::StreamChunkDataRequest(
+constexpr StreamChunkDataReply::StreamChunkDataReply(
   ::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized){}
-struct StreamChunkDataRequestDefaultTypeInternal {
-  constexpr StreamChunkDataRequestDefaultTypeInternal()
+struct StreamChunkDataReplyDefaultTypeInternal {
+  constexpr StreamChunkDataReplyDefaultTypeInternal()
     : _instance(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized{}) {}
-  ~StreamChunkDataRequestDefaultTypeInternal() {}
+  ~StreamChunkDataReplyDefaultTypeInternal() {}
   union {
-    StreamChunkDataRequest _instance;
+    StreamChunkDataReply _instance;
   };
 };
-PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT StreamChunkDataRequestDefaultTypeInternal _StreamChunkDataRequest_default_instance_;
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT StreamChunkDataReplyDefaultTypeInternal _StreamChunkDataReply_default_instance_;
 constexpr ChunkSourceMetrics::ChunkSourceMetrics(
   ::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized)
   : sessionid_(&::PROTOBUF_NAMESPACE_ID::internal::fixed_address_empty_string)
@@ -87,7 +87,7 @@ struct ChunkDataDefaultTypeInternal {
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT ChunkDataDefaultTypeInternal _ChunkData_default_instance_;
 }  // namespace chunksink
 static ::PROTOBUF_NAMESPACE_ID::Metadata file_level_metadata_chunksink_2eproto[5];
-static const ::PROTOBUF_NAMESPACE_ID::EnumDescriptor* file_level_enum_descriptors_chunksink_2eproto[1];
+static constexpr ::PROTOBUF_NAMESPACE_ID::EnumDescriptor const** file_level_enum_descriptors_chunksink_2eproto = nullptr;
 static constexpr ::PROTOBUF_NAMESPACE_ID::ServiceDescriptor const** file_level_service_descriptors_chunksink_2eproto = nullptr;
 
 const uint32_t TableStruct_chunksink_2eproto::offsets[] PROTOBUF_SECTION_VARIABLE(protodesc_cold) = {
@@ -108,7 +108,7 @@ const uint32_t TableStruct_chunksink_2eproto::offsets[] PROTOBUF_SECTION_VARIABL
   ~0u,  // no _inlined_string_donated_
   PROTOBUF_FIELD_OFFSET(::chunksink::RecorderStatusReply, sendchunks_),
   ~0u,  // no _has_bits_
-  PROTOBUF_FIELD_OFFSET(::chunksink::StreamChunkDataRequest, _internal_metadata_),
+  PROTOBUF_FIELD_OFFSET(::chunksink::StreamChunkDataReply, _internal_metadata_),
   ~0u,  // no _extensions_
   ~0u,  // no _oneof_case_
   ~0u,  // no _weak_field_map_
@@ -136,7 +136,7 @@ const uint32_t TableStruct_chunksink_2eproto::offsets[] PROTOBUF_SECTION_VARIABL
 static const ::PROTOBUF_NAMESPACE_ID::internal::MigrationSchema schemas[] PROTOBUF_SECTION_VARIABLE(protodesc_cold) = {
   { 0, -1, -1, sizeof(::chunksink::RecorderStatusRequest)},
   { 9, -1, -1, sizeof(::chunksink::RecorderStatusReply)},
-  { 16, -1, -1, sizeof(::chunksink::StreamChunkDataRequest)},
+  { 16, -1, -1, sizeof(::chunksink::StreamChunkDataReply)},
   { 22, -1, -1, sizeof(::chunksink::ChunkSourceMetrics)},
   { 31, -1, -1, sizeof(::chunksink::ChunkData)},
 };
@@ -144,35 +144,37 @@ static const ::PROTOBUF_NAMESPACE_ID::internal::MigrationSchema schemas[] PROTOB
 static ::PROTOBUF_NAMESPACE_ID::Message const * const file_default_instances[] = {
   reinterpret_cast<const ::PROTOBUF_NAMESPACE_ID::Message*>(&::chunksink::_RecorderStatusRequest_default_instance_),
   reinterpret_cast<const ::PROTOBUF_NAMESPACE_ID::Message*>(&::chunksink::_RecorderStatusReply_default_instance_),
-  reinterpret_cast<const ::PROTOBUF_NAMESPACE_ID::Message*>(&::chunksink::_StreamChunkDataRequest_default_instance_),
+  reinterpret_cast<const ::PROTOBUF_NAMESPACE_ID::Message*>(&::chunksink::_StreamChunkDataReply_default_instance_),
   reinterpret_cast<const ::PROTOBUF_NAMESPACE_ID::Message*>(&::chunksink::_ChunkSourceMetrics_default_instance_),
   reinterpret_cast<const ::PROTOBUF_NAMESPACE_ID::Message*>(&::chunksink::_ChunkData_default_instance_),
 };
 
 const char descriptor_table_protodef_chunksink_2eproto[] PROTOBUF_SECTION_VARIABLE(protodesc_cold) =
-  "\n\017chunksink.proto\022\tchunksink\"`\n\025Recorder"
-  "StatusRequest\022\014\n\004name\030\001 \001(\t\022\014\n\004uuid\030\002 \001("
-  "\t\022+\n\006status\030\003 \001(\0162\033.chunksink.AudioInput"
-  "Status\")\n\023RecorderStatusReply\022\022\n\nsendChu"
-  "nks\030\001 \001(\010\"\030\n\026StreamChunkDataRequest\"N\n\022C"
-  "hunkSourceMetrics\022\021\n\tsessionID\030\001 \001(\t\022\022\n\n"
-  "chunkCount\030\002 \001(\r\022\021\n\tstartTime\030\003 \001(\004\"h\n\tC"
-  "hunkData\022\014\n\004name\030\001 \001(\t\022\014\n\004uuid\030\002 \001(\t\022.\n\007"
-  "metrics\030\003 \001(\0132\035.chunksink.ChunkSourceMet"
-  "rics\022\017\n\007samples\030\004 \003(\r*:\n\020AudioInputStatu"
-  "s\022\013\n\007UNKNOWN\020\000\022\r\n\tNO_SIGNAL\020\001\022\n\n\006SIGNAL\020"
-  "\0022\260\001\n\tChunkSink\022L\n\017StreamChunkData\022!.chu"
-  "nksink.StreamChunkDataRequest\032\024.chunksin"
-  "k.ChunkData0\001\022U\n\021SetRecorderStatus\022 .chu"
-  "nksink.RecorderStatusRequest\032\036.chunksink"
-  ".RecorderStatusReplyBAZ\?github.com/pasca"
-  "lhuerst/session-recorder/protocols/go/ch"
-  "unksinkb\006proto3"
+  "\n\017chunksink.proto\022\tchunksink\032\014common.pro"
+  "to\"]\n\025RecorderStatusRequest\022\014\n\004name\030\001 \001("
+  "\t\022\014\n\004uuid\030\002 \001(\t\022(\n\006status\030\003 \001(\0162\030.common"
+  ".AudioInputStatus\")\n\023RecorderStatusReply"
+  "\022\022\n\nsendChunks\030\001 \001(\010\"\026\n\024StreamChunkDataR"
+  "eply\"N\n\022ChunkSourceMetrics\022\021\n\tsessionID\030"
+  "\001 \001(\t\022\022\n\nchunkCount\030\002 \001(\r\022\021\n\tstartTime\030\003"
+  " \001(\004\"h\n\tChunkData\022\014\n\004name\030\001 \001(\t\022\014\n\004uuid\030"
+  "\002 \001(\t\022.\n\007metrics\030\003 \001(\0132\035.chunksink.Chunk"
+  "SourceMetrics\022\017\n\007samples\030\004 \003(\r2\256\001\n\tChunk"
+  "Sink\022J\n\017StreamChunkData\022\024.chunksink.Chun"
+  "kData\032\037.chunksink.StreamChunkDataReply(\001"
+  "\022U\n\021SetRecorderStatus\022 .chunksink.Record"
+  "erStatusRequest\032\036.chunksink.RecorderStat"
+  "usReplyBAZ\?github.com/pascalhuerst/sessi"
+  "on-recorder/protocols/go/chunksinkb\006prot"
+  "o3"
   ;
+static const ::PROTOBUF_NAMESPACE_ID::internal::DescriptorTable*const descriptor_table_chunksink_2eproto_deps[1] = {
+  &::descriptor_table_common_2eproto,
+};
 static ::PROTOBUF_NAMESPACE_ID::internal::once_flag descriptor_table_chunksink_2eproto_once;
 const ::PROTOBUF_NAMESPACE_ID::internal::DescriptorTable descriptor_table_chunksink_2eproto = {
-  false, false, 695, descriptor_table_protodef_chunksink_2eproto, "chunksink.proto", 
-  &descriptor_table_chunksink_2eproto_once, nullptr, 0, 5,
+  false, false, 642, descriptor_table_protodef_chunksink_2eproto, "chunksink.proto", 
+  &descriptor_table_chunksink_2eproto_once, descriptor_table_chunksink_2eproto_deps, 1, 5,
   schemas, file_default_instances, TableStruct_chunksink_2eproto::offsets,
   file_level_metadata_chunksink_2eproto, file_level_enum_descriptors_chunksink_2eproto, file_level_service_descriptors_chunksink_2eproto,
 };
@@ -183,21 +185,6 @@ PROTOBUF_ATTRIBUTE_WEAK const ::PROTOBUF_NAMESPACE_ID::internal::DescriptorTable
 // Force running AddDescriptors() at dynamic initialization time.
 PROTOBUF_ATTRIBUTE_INIT_PRIORITY static ::PROTOBUF_NAMESPACE_ID::internal::AddDescriptorsRunner dynamic_init_dummy_chunksink_2eproto(&descriptor_table_chunksink_2eproto);
 namespace chunksink {
-const ::PROTOBUF_NAMESPACE_ID::EnumDescriptor* AudioInputStatus_descriptor() {
-  ::PROTOBUF_NAMESPACE_ID::internal::AssignDescriptors(&descriptor_table_chunksink_2eproto);
-  return file_level_enum_descriptors_chunksink_2eproto[0];
-}
-bool AudioInputStatus_IsValid(int value) {
-  switch (value) {
-    case 0:
-    case 1:
-    case 2:
-      return true;
-    default:
-      return false;
-  }
-}
-
 
 // ===================================================================
 
@@ -310,12 +297,12 @@ const char* RecorderStatusRequest::_InternalParse(const char* ptr, ::PROTOBUF_NA
         } else
           goto handle_unusual;
         continue;
-      // .chunksink.AudioInputStatus status = 3;
+      // .common.AudioInputStatus status = 3;
       case 3:
         if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 24)) {
           uint64_t val = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
           CHK_(ptr);
-          _internal_set_status(static_cast<::chunksink::AudioInputStatus>(val));
+          _internal_set_status(static_cast<::common::AudioInputStatus>(val));
         } else
           goto handle_unusual;
         continue;
@@ -368,7 +355,7 @@ uint8_t* RecorderStatusRequest::_InternalSerialize(
         2, this->_internal_uuid(), target);
   }
 
-  // .chunksink.AudioInputStatus status = 3;
+  // .common.AudioInputStatus status = 3;
   if (this->_internal_status() != 0) {
     target = stream->EnsureSpace(target);
     target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::WriteEnumToArray(
@@ -405,7 +392,7 @@ size_t RecorderStatusRequest::ByteSizeLong() const {
         this->_internal_uuid());
   }
 
-  // .chunksink.AudioInputStatus status = 3;
+  // .common.AudioInputStatus status = 3;
   if (this->_internal_status() != 0) {
     total_size += 1 +
       ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::EnumSize(this->_internal_status());
@@ -660,30 +647,30 @@ void RecorderStatusReply::InternalSwap(RecorderStatusReply* other) {
 
 // ===================================================================
 
-class StreamChunkDataRequest::_Internal {
+class StreamChunkDataReply::_Internal {
  public:
 };
 
-StreamChunkDataRequest::StreamChunkDataRequest(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+StreamChunkDataReply::StreamChunkDataReply(::PROTOBUF_NAMESPACE_ID::Arena* arena,
                          bool is_message_owned)
   : ::PROTOBUF_NAMESPACE_ID::internal::ZeroFieldsBase(arena, is_message_owned) {
-  // @@protoc_insertion_point(arena_constructor:chunksink.StreamChunkDataRequest)
+  // @@protoc_insertion_point(arena_constructor:chunksink.StreamChunkDataReply)
 }
-StreamChunkDataRequest::StreamChunkDataRequest(const StreamChunkDataRequest& from)
+StreamChunkDataReply::StreamChunkDataReply(const StreamChunkDataReply& from)
   : ::PROTOBUF_NAMESPACE_ID::internal::ZeroFieldsBase() {
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
-  // @@protoc_insertion_point(copy_constructor:chunksink.StreamChunkDataRequest)
+  // @@protoc_insertion_point(copy_constructor:chunksink.StreamChunkDataReply)
 }
 
 
 
 
 
-const ::PROTOBUF_NAMESPACE_ID::Message::ClassData StreamChunkDataRequest::_class_data_ = {
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData StreamChunkDataReply::_class_data_ = {
     ::PROTOBUF_NAMESPACE_ID::internal::ZeroFieldsBase::CopyImpl,
     ::PROTOBUF_NAMESPACE_ID::internal::ZeroFieldsBase::MergeImpl,
 };
-const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*StreamChunkDataRequest::GetClassData() const { return &_class_data_; }
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*StreamChunkDataReply::GetClassData() const { return &_class_data_; }
 
 
 
@@ -691,7 +678,7 @@ const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*StreamChunkDataRequest::GetCla
 
 
 
-::PROTOBUF_NAMESPACE_ID::Metadata StreamChunkDataRequest::GetMetadata() const {
+::PROTOBUF_NAMESPACE_ID::Metadata StreamChunkDataReply::GetMetadata() const {
   return ::PROTOBUF_NAMESPACE_ID::internal::AssignDescriptors(
       &descriptor_table_chunksink_2eproto_getter, &descriptor_table_chunksink_2eproto_once,
       file_level_metadata_chunksink_2eproto[2]);
@@ -1304,8 +1291,8 @@ template<> PROTOBUF_NOINLINE ::chunksink::RecorderStatusRequest* Arena::CreateMa
 template<> PROTOBUF_NOINLINE ::chunksink::RecorderStatusReply* Arena::CreateMaybeMessage< ::chunksink::RecorderStatusReply >(Arena* arena) {
   return Arena::CreateMessageInternal< ::chunksink::RecorderStatusReply >(arena);
 }
-template<> PROTOBUF_NOINLINE ::chunksink::StreamChunkDataRequest* Arena::CreateMaybeMessage< ::chunksink::StreamChunkDataRequest >(Arena* arena) {
-  return Arena::CreateMessageInternal< ::chunksink::StreamChunkDataRequest >(arena);
+template<> PROTOBUF_NOINLINE ::chunksink::StreamChunkDataReply* Arena::CreateMaybeMessage< ::chunksink::StreamChunkDataReply >(Arena* arena) {
+  return Arena::CreateMessageInternal< ::chunksink::StreamChunkDataReply >(arena);
 }
 template<> PROTOBUF_NOINLINE ::chunksink::ChunkSourceMetrics* Arena::CreateMaybeMessage< ::chunksink::ChunkSourceMetrics >(Arena* arena) {
   return Arena::CreateMessageInternal< ::chunksink::ChunkSourceMetrics >(arena);

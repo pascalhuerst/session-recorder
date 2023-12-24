@@ -58,39 +58,6 @@ export function sessionStateToJSON(object: SessionState): string {
   }
 }
 
-export enum HealthState {
-  OK = 0,
-  ERROR = 1,
-  UNRECOGNIZED = -1,
-}
-
-export function healthStateFromJSON(object: any): HealthState {
-  switch (object) {
-    case 0:
-    case "OK":
-      return HealthState.OK;
-    case 1:
-    case "ERROR":
-      return HealthState.ERROR;
-    case -1:
-    case "UNRECOGNIZED":
-    default:
-      return HealthState.UNRECOGNIZED;
-  }
-}
-
-export function healthStateToJSON(object: HealthState): string {
-  switch (object) {
-    case HealthState.OK:
-      return "OK";
-    case HealthState.ERROR:
-      return "ERROR";
-    case HealthState.UNRECOGNIZED:
-    default:
-      return "UNRECOGNIZED";
-  }
-}
-
 export interface StreamRecordersRequest {
 }
 
@@ -113,13 +80,6 @@ export interface SessionInfo {
   waveformDataFile: string;
   keepSession: boolean;
   state: SessionState;
-}
-
-export interface HealthCheckRequest {
-}
-
-export interface HealthCheckResponse {
-  status: HealthState;
 }
 
 function createBaseStreamRecordersRequest(): StreamRecordersRequest {
@@ -486,119 +446,11 @@ export const SessionInfo = {
   },
 };
 
-function createBaseHealthCheckRequest(): HealthCheckRequest {
-  return {};
-}
-
-export const HealthCheckRequest = {
-  encode(_: HealthCheckRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
-    return writer;
-  },
-
-  decode(input: _m0.Reader | Uint8Array, length?: number): HealthCheckRequest {
-    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseHealthCheckRequest();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skipType(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(_: any): HealthCheckRequest {
-    return {};
-  },
-
-  toJSON(_: HealthCheckRequest): unknown {
-    const obj: any = {};
-    return obj;
-  },
-
-  create(base?: DeepPartial<HealthCheckRequest>): HealthCheckRequest {
-    return HealthCheckRequest.fromPartial(base ?? {});
-  },
-  fromPartial(_: DeepPartial<HealthCheckRequest>): HealthCheckRequest {
-    const message = createBaseHealthCheckRequest();
-    return message;
-  },
-};
-
-function createBaseHealthCheckResponse(): HealthCheckResponse {
-  return { status: 0 };
-}
-
-export const HealthCheckResponse = {
-  encode(message: HealthCheckResponse, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
-    if (message.status !== 0) {
-      writer.uint32(8).int32(message.status);
-    }
-    return writer;
-  },
-
-  decode(input: _m0.Reader | Uint8Array, length?: number): HealthCheckResponse {
-    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
-    let end = length === undefined ? reader.len : reader.pos + length;
-    const message = createBaseHealthCheckResponse();
-    while (reader.pos < end) {
-      const tag = reader.uint32();
-      switch (tag >>> 3) {
-        case 1:
-          if (tag !== 8) {
-            break;
-          }
-
-          message.status = reader.int32() as any;
-          continue;
-      }
-      if ((tag & 7) === 4 || tag === 0) {
-        break;
-      }
-      reader.skipType(tag & 7);
-    }
-    return message;
-  },
-
-  fromJSON(object: any): HealthCheckResponse {
-    return { status: isSet(object.status) ? healthStateFromJSON(object.status) : 0 };
-  },
-
-  toJSON(message: HealthCheckResponse): unknown {
-    const obj: any = {};
-    if (message.status !== 0) {
-      obj.status = healthStateToJSON(message.status);
-    }
-    return obj;
-  },
-
-  create(base?: DeepPartial<HealthCheckResponse>): HealthCheckResponse {
-    return HealthCheckResponse.fromPartial(base ?? {});
-  },
-  fromPartial(object: DeepPartial<HealthCheckResponse>): HealthCheckResponse {
-    const message = createBaseHealthCheckResponse();
-    message.status = object.status ?? 0;
-    return message;
-  },
-};
-
 export type SessionSourceDefinition = typeof SessionSourceDefinition;
 export const SessionSourceDefinition = {
   name: "SessionSource",
   fullName: "sessionsource.SessionSource",
   methods: {
-    healthCheck: {
-      name: "HealthCheck",
-      requestType: HealthCheckRequest,
-      requestStream: false,
-      responseType: HealthCheckResponse,
-      responseStream: false,
-      options: {},
-    },
     streamRecorders: {
       name: "StreamRecorders",
       requestType: StreamRecordersRequest,
@@ -619,10 +471,6 @@ export const SessionSourceDefinition = {
 } as const;
 
 export interface SessionSourceServiceImplementation<CallContextExt = {}> {
-  healthCheck(
-    request: HealthCheckRequest,
-    context: CallContext & CallContextExt,
-  ): Promise<DeepPartial<HealthCheckResponse>>;
   streamRecorders(
     request: StreamRecordersRequest,
     context: CallContext & CallContextExt,
@@ -634,10 +482,6 @@ export interface SessionSourceServiceImplementation<CallContextExt = {}> {
 }
 
 export interface SessionSourceClient<CallOptionsExt = {}> {
-  healthCheck(
-    request: DeepPartial<HealthCheckRequest>,
-    options?: CallOptions & CallOptionsExt,
-  ): Promise<HealthCheckResponse>;
   streamRecorders(
     request: DeepPartial<StreamRecordersRequest>,
     options?: CallOptions & CallOptionsExt,

@@ -354,7 +354,7 @@ func main() {
 
 	chunkSinkServer := grpc.NewChunkSinkServer(hostname, version)
 
-	port, err := grpc.StartProtocolServer(chunkSinkServer, i.mdns, chunkSinkService, chunkSinkPort)
+	port, err := grpc.StartProtocolServer(chunkSinkServer, i.mdns, chunkSinkService, chunkSinkPort, false)
 	if err != nil {
 		log.Err(err).Msg("Cannot start chunk sink server")
 
@@ -369,7 +369,7 @@ func main() {
 		return
 	}
 
-	port, err = grpc.StartProtocolServer(sessionSourceServer, i.mdns, sessionSourceService, sessionSourcePort)
+	port, err = grpc.StartProtocolServer(sessionSourceServer, i.mdns, sessionSourceService, sessionSourcePort, true)
 	if err != nil {
 		log.Err(err).Msg("Cannot start session source server")
 

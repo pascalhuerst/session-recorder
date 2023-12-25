@@ -11,8 +11,11 @@ require (
 	github.com/google/uuid v1.5.0
 	github.com/holoplot/go-avahi v1.0.1
 	github.com/mattn/go-colorable v0.1.13
+	github.com/minio/minio-go/v7 v7.0.66
 	github.com/pascalhuerst/session-recorder/protocols/go v0.0.0-20231224222119-4c95a5ded8d9
 	github.com/rs/zerolog v1.31.0
+	golang.org/x/mod v0.8.0
+	golang.org/x/sync v0.5.0
 	google.golang.org/grpc v1.59.0
 )
 
@@ -25,7 +28,6 @@ require (
 	github.com/klauspost/cpuid/v2 v2.2.6 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/minio/md5-simd v1.1.2 // indirect
-	github.com/minio/minio-go/v7 v7.0.66 // indirect
 	github.com/minio/sha256-simd v1.0.1 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect

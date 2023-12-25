@@ -52,6 +52,20 @@ func main() {
 	}
 	var sessionStorage storage.Storage = s
 
+	system, err := storage.NewSystem(sessionStorage)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Cannot create system model. Giving up")
+	}
+
+	for _, recorder := range system.Recorders {
+		recorderID, err := uuid.Parse(recorder.Metadata.GenericMetadata.ID)
+		if err != nil {
+			continue
+		}
+
+		sessionStorage.CloseOpenSessions(ctx, recorderID)
+	}
+
 	mdnsServer, err := mdns.ServerNew()
 	if err != nil {
 		log.Fatal().Err(err).Msg("Cannot create mdns server. Giving up")
@@ -71,7 +85,7 @@ func main() {
 
 	sessionSourceServer := grpc.NewSessionSourceServer(hostname, version,
 		func(ctx context.Context, request *sspb.StreamRecordersRequest, server sspb.SessionSource_StreamRecordersServer) error {
-			recordersIDs, err := sessionStorage.GetRecorders(ctx)
+			recordersIDs, err := sessionStorage.GetRecorderIDs(ctx)
 			if err != nil {
 				log.Err(err).Msg("Cannot get recorders")
 			}
@@ -111,7 +125,7 @@ func main() {
 				return err
 			}
 
-			sessionIDs, err := sessionStorage.GetSessions(ctx, recorderID)
+			sessionIDs, err := sessionStorage.GetSessionIDs(ctx, recorderID)
 			if err != nil {
 				log.Err(err).Msg("Cannot get sessions")
 			}
@@ -215,7 +229,7 @@ func main() {
 	go func() {
 		time.Sleep(10 * time.Second)
 
-		recorders, err := sessionStorage.GetRecorders(ctx)
+		recorders, err := sessionStorage.GetRecorderIDs(ctx)
 		if err != nil {
 			log.Err(err).Msg("Cannot get recorders")
 		}
@@ -225,7 +239,7 @@ func main() {
 		for _, recorderID := range recorders {
 			fmt.Printf("  %s\n", recorderID)
 
-			sessions, err := sessionStorage.GetSessions(ctx, recorderID)
+			sessions, err := sessionStorage.GetSessionIDs(ctx, recorderID)
 			if err != nil {
 				log.Err(err).Msg("Cannot get sessions")
 			}

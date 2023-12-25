@@ -195,6 +195,7 @@ const chooseSegment = (segmentId: string) => {
 
 const currentTime = ref(peaksInstanceRef.value?.player.getCurrentTime());
 let interval = shallowRef();
+
 onMounted(() => {
   interval.value = setInterval(() => {
     const zoomview = peaksInstanceRef.value?.views.getView("zoomview");

@@ -38,5 +38,8 @@ export const streamSessions = async (args: {
           timeFinished: new Date(session.timestamp)
         });
       });
+    }).catch((err) => {
+      console.error(err);
+      return;
     });
 };

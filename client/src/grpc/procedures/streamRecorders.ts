@@ -20,5 +20,8 @@ export const streamRecorders = async (args: { onMessage: (info: RecorderInfo) =>
           audioInputStatus: AudioInputStatus.SIGNAL
         });
       });
+    }).catch((err) => {
+      console.error(err);
+      return;
     });
 };

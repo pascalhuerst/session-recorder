@@ -40,6 +40,6 @@ const sortedSessions = computed(() => {
 .list {
   display: flex;
   flex-direction: column;
-  gap: var(--size-16);
+  gap: var(--size-20);
 }
 </style>

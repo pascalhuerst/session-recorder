@@ -20,12 +20,20 @@ const session = computed(() => {
 </script>
 
 <template>
-  <div v-if="session">
+  <div v-if="session" class="widgets">
     <SessionHeader :session="session" :recorder-id="selectedRecorderId" />
     <SessionEditor :session="session" :recorder-id="selectedRecorderId" />
   </div>
 </template>
 
 <style scoped>
+.widgets {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-6);
+}
 
+.widgets > * {
+  width: 100%;
+}
 </style>

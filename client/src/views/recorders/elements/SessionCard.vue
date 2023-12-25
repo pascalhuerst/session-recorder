@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import WaveformPlayer from "../../../lib/waveform/WaveformPlayer.vue";
 import { computed } from "vue";
 import SessionMenu from "./SessionMenu.vue";
 import { SessionInfo } from "@session-recorder/protocols/ts/sessionsource";
 import { useSessionData } from "../../../utils/useSessionData.ts";
 import { useDateFormat } from "@vueuse/core";
+import WaveformEditor from "../../../lib/waveform/WaveformEditor.vue";
 
 const props = defineProps<{
   session: SessionInfo,
@@ -42,7 +42,7 @@ const { waveformUrl, audioUrls } = useSessionData({ sessionId: props.session.ID,
       </div>
     </div>
 
-    <WaveformPlayer :waveform-url="waveformUrl" :audio-urls="audioUrls"></WaveformPlayer>
+    <WaveformEditor :waveform-url="waveformUrl" :audio-urls="audioUrls"></WaveformEditor>
   </div>
 </template>
 

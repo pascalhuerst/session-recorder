@@ -4,6 +4,7 @@ import VirtualizedItem from "../disclosure/VirtualizedItem.vue";
 import Peaks, { type PeaksInstance, type PeaksOptions } from "peaks.js";
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 import { onClickOutside } from "@vueuse/core";
+import Button from "../controls/Button.vue";
 
 const props = withDefaults(defineProps<{
   waveformUrl: string
@@ -21,7 +22,7 @@ const peaksInstanceRef = shallowRef<PeaksInstance>();
 watch([containerEl, mediaEl, props], () => {
   if (containerEl.value && mediaEl.value) {
     const options = {
-      overview: {
+      zoomview: {
         container: containerEl.value,
         enablePoints: false,
         enableSegments: false,
@@ -29,7 +30,8 @@ watch([containerEl, mediaEl, props], () => {
         playheadColor: "#6b46c1",
         playedWaveformColor: "#bdafe3",
         showPlayheadTime: true,
-        playheadTextColor: "#6b46c1"
+        playheadTextColor: "#6b46c1",
+        waveformColor: "#d4d7dd"
       },
       mediaElement: mediaEl.value,
       dataUri: {
@@ -44,18 +46,18 @@ watch([containerEl, mediaEl, props], () => {
       }
 
       peaksInstanceRef.value = peaksInstance;
+
       // const overview = peaksInstance.views.getView("overview");
-      // const zoomview = peaksInstance.views.getView("zoomview");
-      //
-      // overview?.enableSeek(false);
-      // zoomview?.enableSeek(false);
+      const zoomview = peaksInstance.views.getView("zoomview");
+
+      zoomview?.setZoom({ seconds: 300 });
     });
   }
 });
 
 const isPlaying = ref(false);
 
-const onClick = () => {
+const onPlay = () => {
   const player = peaksInstanceRef.value?.player as PeaksOptions["player"];
   if (!player) {
     return;
@@ -84,18 +86,19 @@ const onClick = () => {
     <audio ref="mediaEl">
       <source v-for="url in audioUrls" :key="url.type" v-bind="url">
     </audio>
-    <button v-if="peaksInstanceRef" class="play" @click="onClick">
+    <Button shape="circle" variant="outlined" color="primary" v-if="peaksInstanceRef" class="play" @click="onPlay">
       <font-awesome-icon v-if="isPlaying" icon="fa-solid fa-pause" />
       <font-awesome-icon v-else icon="fa-solid fa-play" />
-    </button>
+    </Button>
   </VirtualizedItem>
 </template>
 
 <style scoped>
 .canvas {
   position: relative;
-  border-radius: var(--radius-sm);
-  box-shadow: rgba(0, 0, 0, 0.05) 0px 6px 24px 0px, rgba(0, 0, 0, 0.08) 0px 0px 0px 1px;
+  border-width: 1px 0;
+  border-color: var(--color-grey-300);
+  border-style: solid;
 }
 
 .overview {

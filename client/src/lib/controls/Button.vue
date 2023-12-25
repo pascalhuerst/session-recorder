@@ -1,10 +1,10 @@
 <script setup lang="ts">
 
 const props = withDefaults(defineProps<{
-  color?: "primary" | "neutral" | "outlined"
-  variant?: "ghost" | "solid"
-  shape?: "normal" | "circle"
-  size?: "md" | "sm" | "xs"
+  color?: "primary" | "neutral"
+  variant?: "ghost" | "solid" | "outlined"
+  shape?: "normal" | "circle" | "square"
+  size?: "lg" | "md" | "sm" | "xs"
   isLoading?: boolean
   tagName?: string
 }>(), {
@@ -39,7 +39,7 @@ const props = withDefaults(defineProps<{
   --btn-text-color: var(--color-grey-800);
   --btn-text-color-hover: var(--color-grey-900);
   --btn-border-color: transparent;
-  --btn-border-color-hover: transparent;
+  --btn-border-color-hover: var(--color-grey-400);
   --btn-padding-y: 0.25rem;
   --btn-padding-x: 1rem;
   --btn-font-size: var(--scale-1);
@@ -87,14 +87,19 @@ const props = withDefaults(defineProps<{
     padding: var(--btn-padding-y) var(--btn-padding-x);
   }
 
+  &.is-lg {
+    --btn-font-size: var(--scale-1);
+    --btn-min-height: var(--size-14);
+  }
+
   &.is-ghost {
     --btn-text-color: var(--color-grey-500);
     --btn-text-color-hover: var(--color-grey-900);
     --btn-text-color-disabled: #cccccc;
-
+    --btn-bg-color: var(--color-grey-100);
     &.is-primary {
       --btn-text-color: var(--color-purple-700);
-      --btn-text-color-hover: var(--color-purple-900);
+      --btn-text-color-hover: var(--color-purple-700);
     }
   }
 
@@ -213,6 +218,7 @@ const props = withDefaults(defineProps<{
     vertical-align: baseline;
   }
 
+  &.is-square,
   &.is-circle {
     --btn-font-size: calc(var(--btn-min-height) / 2);
 
@@ -228,6 +234,11 @@ const props = withDefaults(defineProps<{
     border-radius: var(--radius-full);
   }
 
+  &.is-square {
+    border-radius: var(--radius-sm);
+  }
+
+  :slotted(&.is-square svg),
   :slotted(&.is-circle svg) {
     margin: 0;
   }

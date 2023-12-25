@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, shallowRef, watch } from "vue";
+import { onMounted, onUnmounted, ref, shallowRef, watch } from "vue";
 import VirtualizedItem from "../disclosure/VirtualizedItem.vue";
 import Peaks, { type PeaksInstance, type PeaksOptions } from "peaks.js";
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
@@ -10,9 +10,25 @@ import TextInput from "../forms/TextInput.vue";
 const props = withDefaults(defineProps<{
   waveformUrl: string
   audioUrls: Array<{ src: string, type: string }>
-  height?: number
+  height?: number,
+  segments?: Array<any>
 }>(), {
-  height: 200
+  height: 200,
+  segments: [{
+    id: "foo",
+    startTime: 0,
+    endTime: 1000.0,
+    color: "#fc8181",
+    labelText: "0 to 10.5 seconds non-editable demo segment"
+  },
+    {
+      id: "bar",
+      startTime: 2500,
+      endTime: 4000,
+      editable: true,
+      color: "#fc8181",
+      labelText: "Edit me"
+    }]
 });
 
 const canvasEl = ref<HTMLElement>();
@@ -32,14 +48,19 @@ watch([containerEl, zoomViewEl, mediaEl, props], () => {
       overview: {
         container: containerEl.value,
         enablePoints: false,
-        enableSegments: false,
+        enableSegments: true,
         playheadPadding: 0,
         playheadColor: "red",
         playedWaveformColor: "#6b46c1",
         showPlayheadTime: true,
         playheadTextColor: "#6b46c1",
         playheadBackgroundColor: "rgb(107,70,193,0.1)",
-        waveformColor: "#767c89"
+        waveformColor: "#767c89",
+        segmentOptions: {
+          startMarkerColor: "#2c7a7b",
+          endMarkerColor: "#2c7a7b",
+          waveformColor: "#fbd38d"
+        }
       },
       zoomview: {
         container: zoomViewEl.value,
@@ -50,7 +71,12 @@ watch([containerEl, zoomViewEl, mediaEl, props], () => {
         waveformColor: "#a5aab4",
         showPlayheadTime: true,
         playedWaveformColor: "#bdafe3",
-        playheadTextColor: "#6b46c1"
+        playheadTextColor: "#6b46c1",
+        segmentOptions: {
+          startMarkerColor: "#e53e3e",
+          endMarkerColor: "#e53e3e",
+          waveformColor: "#fc8181"
+        }
       },
       mediaElement: mediaEl.value,
       dataUri: {
@@ -65,10 +91,45 @@ watch([containerEl, zoomViewEl, mediaEl, props], () => {
       }
 
       peaksInstanceRef.value = peaksInstance;
+
+      console.log(peaksInstance.player.getCurrentTime());
     });
   }
 });
 
+const segments = ref(props.segments);
+
+watch([segments, peaksInstanceRef], () => {
+  if (peaksInstanceRef.value && segments.value.length) {
+    try {
+      peaksInstanceRef.value?.segments.add(
+        segments.value
+      );
+    } catch (err) {
+      console.log(err);
+    }
+    const overview = peaksInstanceRef.value?.views.getView("overview");
+    overview?.setPlayedWaveformColor("#767c89");
+
+    const zoomview = peaksInstanceRef.value?.views.getView("zoomview");
+    zoomview?.setPlayedWaveformColor("#767c89");
+  }
+}, {
+  immediate: true
+});
+
+
+const addSegment = () => {
+  segments.value.push(
+    {
+      id: Math.random(), // @todo use uuid
+      startTime: peaksInstanceRef.value?.player.getCurrentTime(),
+      endTime: Number(peaksInstanceRef.value?.player.getCurrentTime()) + 120,
+      color: "#fc8181",
+      labelText: "0 to 10.5 seconds non-editable demo segment"
+    }
+  );
+};
 
 const isPlaying = ref(false);
 
@@ -123,6 +184,33 @@ watch(zoomviewAmpZoom, () => {
   const zoomview = peaksInstanceRef.value?.views.getView("zoomview");
   zoomview?.setAmplitudeScale(zoomviewAmpZoom.value);
 }, { immediate: true });
+
+const chooseSegment = (segmentId: string) => {
+  const player = peaksInstanceRef.value?.player;
+  const segment = segments.value.find((seg) => seg.id === segmentId);
+  if (segment) {
+    player?.seek(segment.startTime);
+  }
+};
+
+const currentTime = ref(peaksInstanceRef.value?.player.getCurrentTime());
+let interval = shallowRef();
+onMounted(() => {
+  interval.value = setInterval(() => {
+    const zoomview = peaksInstanceRef.value?.views.getView("zoomview");
+
+    console.log(peaksInstanceRef.value?.points.getPoints())
+    zoomview?.setAmplitudeScale(zoomviewAmpZoom.value);
+
+    currentTime.value = peaksInstanceRef.value?.player.getCurrentTime();
+  }, 500);
+});
+
+onUnmounted(() => {
+  if (interval.value) {
+    clearInterval(interval.value);
+  }
+});
 </script>
 
 <template>
@@ -178,7 +266,7 @@ watch(zoomviewAmpZoom, () => {
                 shape="square" size="xs"
                 color="primary"
                 variant="ghost"
-                @click="onAmpPlus">
+                @click="onAmpMinus">
                 <font-awesome-icon icon="fa-solid fa-minus" />
               </Button>
 
@@ -186,15 +274,48 @@ watch(zoomviewAmpZoom, () => {
                 shape="square" size="xs"
                 color="primary"
                 variant="ghost"
-                @click="onAmpMinus">
+                @click="onAmpPlus">
                 <font-awesome-icon icon="fa-solid fa-plus" />
               </Button>
             </div>
           </template>
         </TextInput>
+
+        <div>{{ currentTime }}</div>
+        <Button size="xs" @click="addSegment">
+          Add Segment
+        </Button>
       </div>
     </div>
 
+    <div class="segments">
+      <table>
+        <tr v-for="segment in segments" :key="segment.key" @click="chooseSegment">
+          <td>
+            <div class="badge" :style="{ backgroundColor: segment.color }" :aria-label="segment.color">
+
+            </div>
+          </td>
+          <td>{{ segment.startTime }}</td>
+          <td>{{ segment.endTime }}</td>
+          <td>{{ segment.labelText }}</td>
+          <td></td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>
+
+          </td>
+          <td>
+
+          </td>
+          <td>
+
+          </td>
+
+        </tr>
+      </table>
+    </div>
     <audio ref="mediaEl">
       <source v-for="url in audioUrls" :key="url.type" v-bind="url">
     </audio>
@@ -274,5 +395,26 @@ watch(zoomviewAmpZoom, () => {
   height: 100%;
   gap: var(--input-padding);
   margin: var(--input-padding);
+}
+
+.segments {
+  margin-top: var(--size-10);
+  padding: var(--size-6);
+}
+
+.segments table {
+  width: 100%;
+
+  td, th {
+    padding: var(--size-2);
+    border-bottom: 1px solid var(--color-grey-300);
+  }
+}
+
+.badge {
+  width: var(--size-5);
+  height: var(--size-5);
+  display: block;
+  border-radius: var(--radius-sm);
 }
 </style>

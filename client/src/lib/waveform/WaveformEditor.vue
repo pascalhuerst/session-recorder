@@ -1,34 +1,33 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, shallowRef, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from "vue";
 import VirtualizedItem from "../disclosure/VirtualizedItem.vue";
 import Peaks, { type PeaksInstance, type PeaksOptions } from "peaks.js";
 import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
 import { onClickOutside } from "@vueuse/core";
 import Button from "../controls/Button.vue";
 import TextInput from "../forms/TextInput.vue";
+import uuid from "uuidv4";
+import { CustomSegmentMarker } from "./CustomeSegmentMarker.ts";
+import Marker from "../controls/Marker.vue";
+import { parsePlayTime } from "../../utils/parsePlayTime.ts";
+
+type Segment = {
+  startTime: number;
+  endTime: number;
+  editable?: boolean;
+  color?: string;
+  labelText?: string;
+  id?: string;
+  [key: string]: any
+}
 
 const props = withDefaults(defineProps<{
-  waveformUrl: string
+  waveformUrl?: string
   audioUrls: Array<{ src: string, type: string }>
   height?: number,
-  segments?: Array<any>
+  segments?: Map<string, Segment & { id: string }>
 }>(), {
-  height: 200,
-  segments: [{
-    id: "foo",
-    startTime: 0,
-    endTime: 1000.0,
-    color: "#fc8181",
-    labelText: "0 to 10.5 seconds non-editable demo segment"
-  },
-    {
-      id: "bar",
-      startTime: 2500,
-      endTime: 4000,
-      editable: true,
-      color: "#fc8181",
-      labelText: "Edit me"
-    }]
+  height: 200
 });
 
 const canvasEl = ref<HTMLElement>();
@@ -55,12 +54,7 @@ watch([containerEl, zoomViewEl, mediaEl, props], () => {
         showPlayheadTime: true,
         playheadTextColor: "#6b46c1",
         playheadBackgroundColor: "rgb(107,70,193,0.1)",
-        waveformColor: "#767c89",
-        segmentOptions: {
-          startMarkerColor: "#2c7a7b",
-          endMarkerColor: "#2c7a7b",
-          waveformColor: "#fbd38d"
-        }
+        waveformColor: "#767c89"
       },
       zoomview: {
         container: zoomViewEl.value,
@@ -73,14 +67,23 @@ watch([containerEl, zoomViewEl, mediaEl, props], () => {
         playedWaveformColor: "#bdafe3",
         playheadTextColor: "#6b46c1",
         segmentOptions: {
-          startMarkerColor: "#e53e3e",
-          endMarkerColor: "#e53e3e",
-          waveformColor: "#fc8181"
+          startMarkerColor: "#d53f8c",
+          endMarkerColor: "#d53f8c"
         }
       },
       mediaElement: mediaEl.value,
-      dataUri: {
-        arraybuffer: props.waveformUrl
+      ...props.waveformUrl ? {
+        dataUri: {
+          arraybuffer: props.waveformUrl
+        }
+      } : {
+        webAudio: {
+          audioContext: new AudioContext(),
+          multiChannel: false
+        }
+      },
+      createSegmentMarker(options) {
+        return new CustomSegmentMarker(options);
       }
     } satisfies PeaksOptions;
 
@@ -92,41 +95,54 @@ watch([containerEl, zoomViewEl, mediaEl, props], () => {
 
       peaksInstanceRef.value = peaksInstance;
 
-      console.log(peaksInstance.player.getCurrentTime());
     });
   }
 });
 
-const segments = ref(props.segments);
+const segments = ref(new Map(props.segments));
 
 watch([segments, peaksInstanceRef], () => {
-  if (peaksInstanceRef.value && segments.value.length) {
+  if (peaksInstanceRef.value && segments.value.size) {
     try {
-      peaksInstanceRef.value?.segments.add(
-        segments.value
-      );
+      segments.value.forEach((segment) => {
+        peaksInstanceRef.value?.segments.removeById(segment.id);
+        peaksInstanceRef.value?.segments.add(
+          segment
+        );
+      });
+
     } catch (err) {
       console.log(err);
     }
-    const overview = peaksInstanceRef.value?.views.getView("overview");
-    overview?.setPlayedWaveformColor("#767c89");
-
-    const zoomview = peaksInstanceRef.value?.views.getView("zoomview");
-    zoomview?.setPlayedWaveformColor("#767c89");
+    // const overview = peaksInstanceRef.value?.views.getView("overview");
+    // overview?.setPlayedWaveformColor("#767c89");
+    //
+    // const zoomview = peaksInstanceRef.value?.views.getView("zoomview");
+    // zoomview?.setPlayedWaveformColor("#767c89");
   }
 }, {
-  immediate: true
+  immediate: true,
+  deep: true
 });
 
-
+const intToChar = (int: number) => {
+  const start = "a".charCodeAt(0);
+  return String.fromCharCode(start + int).toUpperCase();
+};
 const addSegment = () => {
-  segments.value.push(
+  const segmentId = uuid();
+  const size = segments.value.size * 2;
+  segments.value.set(
+    segmentId,
     {
-      id: Math.random(), // @todo use uuid
-      startTime: peaksInstanceRef.value?.player.getCurrentTime(),
-      endTime: Number(peaksInstanceRef.value?.player.getCurrentTime()) + 120,
-      color: "#fc8181",
-      labelText: "0 to 10.5 seconds non-editable demo segment"
+      id: segmentId,
+      startTime: Number(peaksInstanceRef.value?.player.getCurrentTime()),
+      endTime: Number(peaksInstanceRef.value?.player.getCurrentTime()) + 5,
+      color: "#ed64a6",
+      labelText: "0 to 10.5 seconds non-editable demo segment",
+      editable: true,
+      startIndex: intToChar(size),
+      endIndex: intToChar(size + 1)
     }
   );
 };
@@ -186,10 +202,9 @@ watch(zoomviewAmpZoom, () => {
 }, { immediate: true });
 
 const chooseSegment = (segmentId: string) => {
-  const player = peaksInstanceRef.value?.player;
-  const segment = segments.value.find((seg) => seg.id === segmentId);
+  const segment = peaksInstanceRef.value?.segments.getSegment(segmentId);
   if (segment) {
-    player?.seek(segment.startTime);
+    peaksInstanceRef.value?.player.seek(segment.startTime);
   }
 };
 
@@ -200,11 +215,14 @@ onMounted(() => {
   interval.value = setInterval(() => {
     const zoomview = peaksInstanceRef.value?.views.getView("zoomview");
 
-    console.log(peaksInstanceRef.value?.points.getPoints())
     zoomview?.setAmplitudeScale(zoomviewAmpZoom.value);
 
     currentTime.value = peaksInstanceRef.value?.player.getCurrentTime();
-  }, 500);
+  }, 100);
+});
+
+const playTime = computed(() => {
+  return currentTime.value ? parsePlayTime(currentTime.value) : null;
 });
 
 onUnmounted(() => {
@@ -282,8 +300,16 @@ onUnmounted(() => {
           </template>
         </TextInput>
 
-        <div>{{ currentTime }}</div>
-        <Button size="xs" @click="addSegment">
+        <div class="playtime">
+          <template v-if="playTime">
+            {{ `${playTime.hours}:${playTime.minutes}:${playTime.seconds}` }}<small>.{{ playTime.milliseconds }}</small>
+          </template>
+          <template v-else>
+            00:00:00.<small>000</small>
+          </template>
+        </div>
+
+        <Button size="xs" @click="addSegment" class="add-segment-btn">
           Add Segment
         </Button>
       </div>
@@ -291,14 +317,13 @@ onUnmounted(() => {
 
     <div class="segments">
       <table>
-        <tr v-for="segment in segments" :key="segment.key" @click="chooseSegment">
+        <tr v-for="segment in segments.values()" :key="segment.id" @click="() => chooseSegment(segment.id)">
           <td>
-            <div class="badge" :style="{ backgroundColor: segment.color }" :aria-label="segment.color">
-
-            </div>
+            <Marker :index="segment.startIndex" :time="segment.startTime" />
           </td>
-          <td>{{ segment.startTime }}</td>
-          <td>{{ segment.endTime }}</td>
+          <td>
+            <Marker :index="segment.endIndex" :time="segment.endTime" />
+          </td>
           <td>{{ segment.labelText }}</td>
           <td></td>
         </tr>
@@ -412,10 +437,24 @@ onUnmounted(() => {
   }
 }
 
-.badge {
-  width: var(--size-5);
-  height: var(--size-5);
-  display: block;
+.playtime {
+  width: 100%;
+  padding: var(--size-2);
   border-radius: var(--radius-sm);
+  border: 2px solid var(--color-grey-200);
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  background-color: var(--color-grey-50);
+  font-size: var(--scale-4);
+
+  small {
+    font-size: var(--scale-2);
+    color: var(--color-grey-700);
+  }
+}
+
+.add-segment-btn {
+  width: 100%;
 }
 </style>

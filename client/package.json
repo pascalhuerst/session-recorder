@@ -23,6 +23,7 @@
     "peaks.js": "^3.2.1",
     "pinia": "^2.1.7",
     "pollen-css": "^4.6.2",
+    "uuidv4": "^5.0.1",
     "vue": "^3.3.13",
     "vue-router": "^4.2.5",
     "waveform-data": "^4.4.0",

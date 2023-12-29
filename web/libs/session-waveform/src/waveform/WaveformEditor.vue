@@ -174,11 +174,11 @@ const onPlay = () => {
 };
 
 const onZoomIn = async () => {
-  zoomLevel.value += zoomStep.value;
+  zoomLevel.value = Math.max(0, zoomLevel.value + zoomStep.value);
 };
 
 const onZoomOut = async () => {
-  zoomLevel.value -= zoomStep.value;
+  zoomLevel.value = Math.max(0, zoomLevel.value - zoomStep.value);
 };
 
 watch(
@@ -191,17 +191,16 @@ watch(
 );
 
 const onAmpPlus = async () => {
-  zoomviewAmpZoom.value += zoomAmpStep.value;
+  zoomviewAmpZoom.value = Math.max(0, (zoomviewAmpZoom.value * 100 + zoomAmpStep.value * 100) / 100);
 };
 
 const onAmpMinus = async () => {
-  zoomviewAmpZoom.value -= zoomAmpStep.value;
+  zoomviewAmpZoom.value = Math.max(0, (zoomviewAmpZoom.value * 100 - zoomAmpStep.value * 100) / 100);
 };
 
 watch(
   zoomviewAmpZoom,
   () => {
-    zoomviewAmpZoom.value = Math.ceil(zoomviewAmpZoom.value * 100) / 100;
     const overview = peaksInstanceRef.value?.views.getView('overview');
     overview?.setAmplitudeScale(zoomviewAmpZoom.value);
 
@@ -218,21 +217,17 @@ const chooseSegment = (segmentId: string) => {
   }
 };
 
+
 const currentTime = ref(peaksInstanceRef.value?.player.getCurrentTime());
 let interval = shallowRef();
 
 onMounted(() => {
+  const zoomview = peaksInstanceRef.value?.views.getView('zoomview');
+  zoomview?.setAmplitudeScale(zoomviewAmpZoom.value);
+
   interval.value = setInterval(() => {
-    const zoomview = peaksInstanceRef.value?.views.getView('zoomview');
-
-    zoomview?.setAmplitudeScale(zoomviewAmpZoom.value);
-
     currentTime.value = peaksInstanceRef.value?.player.getCurrentTime();
   }, 100);
-});
-
-const playTime = computed(() => {
-  return currentTime.value ? parsePlayTime(currentTime.value) : null;
 });
 
 onUnmounted(() => {
@@ -240,6 +235,35 @@ onUnmounted(() => {
     clearInterval(interval.value);
   }
 });
+
+const playTime = computed({
+  get: () => {
+    if (!currentTime.value) {
+      return '00:00:00';
+    }
+    const parsed = parsePlayTime(currentTime.value);
+    return `${parsed.hours}:${parsed.minutes}:${parsed.seconds}.${parsed.milliseconds}`;
+  },
+  set: (value: string) => {
+    const [h, m, s, ms] = value.match(/(\d{2}):(\d{2}):(\d{2})\.(\d{3})/)?.slice(1, 5).map((val) => parseInt(val)) || [];
+    const seconds = h * 3600 + m * 60 + s + ms / 1000;
+    peaksInstanceRef.value?.player.seek(seconds);
+  }
+});
+
+const maxPlayTime = computed(() => {
+  if (!peaksInstanceRef.value?.player.getDuration()) {
+    return '00:00:00';
+  }
+
+  const parsed = parsePlayTime(peaksInstanceRef.value?.player.getDuration());
+  return `${parsed.hours}:${parsed.minutes}:${parsed.seconds}.${parsed.milliseconds}`;
+});
+
+const showPicker = (ref?: HTMLInputElement) => {
+  return ref?.showPicker();
+};
+
 </script>
 
 <template>
@@ -270,15 +294,31 @@ onUnmounted(() => {
       <div ref="zoomViewEl" class="zoomview__waveform"></div>
       <div class="zoomview__controls">
         <TextInput
+          type="time"
+          v-model="playTime"
+          :step="0.01"
+          min="00:00:00"
+          :max="maxPlayTime"
+          size="md"
+          variant="outlined"
+          color="neutral"
+        >
+          <template #prepend="{ inputRef }">
+            <font-awesome-icon icon="fa-regular fa-clock" @click="showPicker(inputRef)" />
+          </template>
+        </TextInput>
+
+        <TextInput
           type="number"
           v-model="zoomLevel"
           :step="zoomStep"
+          :min="0"
           size="md"
           variant="outlined"
           color="neutral"
         >
           <template #prepend>
-            <font-awesome-icon icon="fa-solid fa-stopwatch" />
+            <font-awesome-icon icon="fa-solid fa-arrows-left-right-to-line" />
           </template>
 
           <template #actions>
@@ -289,6 +329,7 @@ onUnmounted(() => {
                 color="primary"
                 variant="ghost"
                 @click="onZoomOut"
+                :disabled="zoomLevel <= 0"
               >
                 <font-awesome-icon icon="fa-solid fa-minus" />
               </Button>
@@ -326,6 +367,7 @@ onUnmounted(() => {
                 color="primary"
                 variant="ghost"
                 @click="onAmpMinus"
+                :disabled="zoomviewAmpZoom <= 0"
               >
                 <font-awesome-icon icon="fa-solid fa-minus" />
               </Button>
@@ -342,14 +384,6 @@ onUnmounted(() => {
             </div>
           </template>
         </TextInput>
-
-        <div class="playtime">
-          <template v-if="playTime">
-            {{ `${playTime.hours}:${playTime.minutes}:${playTime.seconds}`
-            }}<small>.{{ playTime.milliseconds }}</small>
-          </template>
-          <template v-else> 00:00:00.<small>000</small></template>
-        </div>
 
         <Button size="xs" @click="addSegment" class="add-segment-btn">
           Add Segment
@@ -460,6 +494,10 @@ onUnmounted(() => {
   height: 100%;
   gap: var(--input-padding);
   margin: var(--input-padding);
+}
+
+.zoomview__controls > * {
+  width: 100%;
 }
 
 .segments {

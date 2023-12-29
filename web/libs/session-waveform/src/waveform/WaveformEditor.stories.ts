@@ -37,6 +37,6 @@ export const Primary: StoryObj = {
       </WaveformEditor>`
   }),
   args: {
-    audioUrl: 'https://cdn.freesound.org/previews/567/567984_1648170-lq.ogg'
+    audioUrl: 'https://cdn.pixabay.com/audio/2023/10/17/audio_65ea4766f8.mp3'
   }
 };

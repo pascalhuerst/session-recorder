@@ -4,20 +4,20 @@
     v-bind="inheritedAttrs.container"
   >
     <div v-if="$slots.prepend" class="prepend">
-      <slot name="prepend" v-bind="{ inputProps, resetProps }" />
+      <slot name="prepend" v-bind="{ inputProps, resetProps, inputRef }" />
     </div>
-    <input v-model="value" v-bind="inputProps" />
+    <input v-model="value" v-bind="inputProps" ref="inputRef"/>
     <div v-if="$slots.actions" class="actions">
-      <slot name="actions" v-bind="{ inputProps, resetProps }" />
+      <slot name="actions" v-bind="{ inputProps, resetProps, inputRef }" />
     </div>
     <div v-if="$slots.append" class="append">
-      <slot name="append" v-bind="{ inputProps, resetProps }" />
+      <slot name="append" v-bind="{ inputProps, resetProps, inputRef }" />
     </div>
   </div>
 </template>
 
 <script setup lang="ts" generic="T extends string | number">
-import { computed, useAttrs } from 'vue';
+import { computed, ref, useAttrs } from 'vue';
 
 const props = withDefaults(
   defineProps<{
@@ -42,6 +42,8 @@ defineOptions({
   inheritAttrs: false,
 });
 const attrs = useAttrs();
+
+const inputRef = ref<HTMLInputElement>()
 
 const inheritedAttrs = computed(() => {
   const { style, class: className, ...rest } = attrs;
@@ -165,6 +167,11 @@ input::-webkit-outer-spin-button,
 input::-webkit-inner-spin-button {
   -webkit-appearance: none;
   margin: 0;
+}
+
+input::-webkit-calendar-picker-indicator {
+  appearance: none;
+  display: none;
 }
 
 input::placeholder {

@@ -10,10 +10,11 @@ import { faPlus } from '@fortawesome/free-solid-svg-icons/faPlus';
 import { faMinus } from '@fortawesome/free-solid-svg-icons/faMinus';
 import { faMagnifyingGlassChart } from '@fortawesome/free-solid-svg-icons/faMagnifyingGlassChart';
 import { faArrowUpRightDots } from '@fortawesome/free-solid-svg-icons/faArrowUpRightDots';
-import { faStopwatch } from '@fortawesome/free-solid-svg-icons/faStopwatch';
 import { faTimes } from '@fortawesome/free-solid-svg-icons/faTimes';
 import { faPlay } from '@fortawesome/free-solid-svg-icons/faPlay';
 import { faPause } from '@fortawesome/free-solid-svg-icons/faPause';
+import { faClock } from '@fortawesome/free-regular-svg-icons/faClock';
+import { faArrowsLeftRightToLine } from '@fortawesome/free-solid-svg-icons/faArrowsLeftRightToLine';
 
 export const setup = () => {
   library.add(
@@ -30,6 +31,7 @@ export const setup = () => {
     faMinus,
     faMagnifyingGlassChart,
     faArrowUpRightDots,
-    faStopwatch
+    faArrowsLeftRightToLine,
+    faClock
   );
 };

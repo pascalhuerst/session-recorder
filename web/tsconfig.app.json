@@ -8,7 +8,9 @@
     "src/**/*.spec.ts",
     "src/**/*.test.ts",
     "src/**/*.spec.vue",
-    "src/**/*.test.vue"
+    "src/**/*.test.vue",
+    "**/*.stories.ts",
+    "**/*.stories.js"
   ],
   "include": ["src/**/*.js", "src/**/*.jsx", "src/**/*.ts", "src/**/*.vue"]
 }

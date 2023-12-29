@@ -1,0 +1,30 @@
+{
+  "name": "@web/session-waveform",
+  "version": "0.0.1",
+  "main": "./index.js",
+  "types": "./index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./index.mjs",
+      "require": "./index.js"
+    }
+  },
+  "dependencies": {
+    "peaks.js": "^3.2.1",
+    "uuidv4": "^5.0.1",
+    "waveform-data": "^4.4.0",
+    "konva": "^9.3.0"
+  },
+  "peerDependencies": {
+    "@fortawesome/fontawesome-svg-core": "^6.5.1",
+    "@fortawesome/free-brands-svg-icons": "^6.5.1",
+    "@fortawesome/free-regular-svg-icons": "^6.5.1",
+    "@fortawesome/free-solid-svg-icons": "^6.5.1",
+    "@fortawesome/vue-fontawesome": "^3.0.5",
+    "@vueuse/core": "^10.7.0",
+    "pinia": "^2.1.7",
+    "pollen-css": "^4.6.2",
+    "vue": "^3.3.13",
+    "vue-router": "^4.2.5"
+  }
+}

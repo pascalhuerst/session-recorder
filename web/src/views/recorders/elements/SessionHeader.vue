@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { SessionInfo } from '@session-recorder/protocols/ts/sessionsource.ts';
+import { type SessionInfo } from '@session-recorder/protocols/ts/sessionsource';
 import SessionMenu from './SessionMenu.vue';
-import Button from '../../../../../web/session-waveform/src/controls/Button.vue';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { useDateFormat } from '@vueuse/core';
+import { Button } from '@session-recorder/session-waveform';
 
 const props = defineProps<{
   session: SessionInfo;
@@ -40,9 +40,9 @@ const createdAt = computed(() => {
     </div>
     <div class="heading">
       <h1 class="name">Untitled</h1>
-      <time class="timestamp" :datetime="createdAt.iso">{{
-        createdAt.formatted
-      }}</time>
+      <time class="timestamp" :datetime="createdAt.iso"
+        >{{ createdAt.formatted }}
+      </time>
     </div>
     <div class="menu">
       <SessionMenu :session="session" :recorder-id="recorderId" />

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { SessionInfo } from '@session-recorder/protocols/ts/sessionsource';
-import { useSessionData } from '../../../useSessionData.ts';
-import WaveformEditor from '../../../../../web/session-waveform/src/waveform/WaveformEditor.vue';
+import { useSessionData } from '@/useSessionData';
+import { WaveformEditor } from '@session-recorder/session-waveform';
 
 const props = defineProps<{
   session: SessionInfo;

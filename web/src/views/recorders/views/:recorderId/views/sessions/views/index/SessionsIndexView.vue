@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { storeToRefs } from 'pinia';
-import { useRecordersStore } from '../../../../../../../../store/useRecordersStore.ts';
-import { useSessionsStore } from '../../../../../../../../store/useSessionsStore.ts';
-import SessionCard from '../../../../../../elements/SessionCard.vue';
-import EmptyScreen from '../../../../../../../../../../web/session-waveform/src/display/EmptyScreen.vue';
+import { useRecordersStore } from '@/store/useRecordersStore';
+import { useSessionsStore } from '@/store/useSessionsStore';
+import { EmptyScreen } from '@session-recorder/session-waveform';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
+import SessionCard from '@/views/recorders/elements/SessionCard.vue';
 
 const { selectedRecorderId } = storeToRefs(useRecordersStore());
 const { sessions } = storeToRefs(useSessionsStore());

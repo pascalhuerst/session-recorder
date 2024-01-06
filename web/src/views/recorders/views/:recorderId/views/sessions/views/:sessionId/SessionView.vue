@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { useSessionsStore } from "../../../../../../../../store/useSessionsStore";
-import { useRoute } from "vue-router";
-import { computed } from "vue";
-import { storeToRefs } from "pinia";
-import SessionHeader from "../../../../../../elements/SessionHeader.vue";
-import { useRecordersStore } from "../../../../../../../../store/useRecordersStore.ts";
-import SessionEditor from "../../../../../../elements/SessionEditor.vue";
+import { useSessionsStore } from '@/store/useSessionsStore';
+import { useRoute } from 'vue-router';
+import { computed } from 'vue';
+import { storeToRefs } from 'pinia';
+import { useRecordersStore } from '@/store/useRecordersStore';
+import SessionHeader from '@/views/recorders/elements/SessionHeader.vue';
+import SessionEditor from '@/views/recorders/elements/SessionEditor.vue';
 
 const route = useRoute();
 const sessionId = computed(() => route.params.sessionId as string);

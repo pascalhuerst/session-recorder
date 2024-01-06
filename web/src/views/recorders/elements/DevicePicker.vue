@@ -1,13 +1,13 @@
 <script setup lang="ts">
-import { useRouter } from "vue-router";
-import { RecorderInfo } from "@session-recorder/protocols/ts/sessionsource.ts";
-import { computed } from "vue";
+import { useRouter } from 'vue-router';
+import { type Recorder } from '@session-recorder/protocols/ts/sessionsource';
+import { computed } from 'vue';
 
 const router = useRouter();
 
 const props = defineProps<{
-  recorders: Map<string, RecorderInfo>
-  selectedRecorderId?: string
+  recorders: Map<string, Recorder>;
+  selectedRecorderId?: string;
 }>();
 
 const recorders = computed(() => Array.from(props.recorders.values()));
@@ -20,10 +20,15 @@ const setSelected = (item: string) => {
 <template>
   <nav>
     <ul>
-      <li v-for="recorder in recorders" :key="recorder.ID">
-        <button :class="['link', { 'is-active': selectedRecorderId === recorder.ID }]"
-                @click="setSelected(recorder.ID)">
-          {{ recorder.name }}
+      <li v-for="recorder in recorders" :key="recorder.recorderID">
+        <button
+          :class="[
+            'link',
+            { 'is-active': selectedRecorderId === recorder.recorderID },
+          ]"
+          @click="setSelected(recorder.recorderID)"
+        >
+          {{ recorder.recorderName }}
         </button>
       </li>
     </ul>

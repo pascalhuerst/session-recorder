@@ -1,5 +1,5 @@
 import { computed } from 'vue';
-import { env } from './env.ts';
+import { env } from '@/env';
 
 export const useSessionData = ({
   recorderId,

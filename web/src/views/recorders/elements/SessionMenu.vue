@@ -1,13 +1,15 @@
 <script setup lang="ts">
-import { type SessionInfo } from '@session-recorder/protocols/ts/sessionsource.ts';
+import { type SessionInfo } from '@session-recorder/protocols/ts/sessionsource';
 import { computed } from 'vue';
-import { setKeepSession } from '../../../grpc/procedures/setKeepSession.ts';
-import { deleteSession } from '../../../grpc/procedures/deleteSession.ts';
-import { useConfirmation } from '../../../../../web/session-waveform/src/disclosure/useConfirmation.ts';
-import Modal from '../../../../../web/session-waveform/src/disclosure/Modal.vue';
-import Button from '../../../../../web/session-waveform/src/controls/Button.vue';
+import { setKeepSession } from '@/grpc/procedures/setKeepSession';
+import { deleteSession } from '@/grpc/procedures/deleteSession';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
-import { useSessionData } from '../../../useSessionData.ts';
+import { useSessionData } from '@/useSessionData';
+import {
+  Button,
+  Modal,
+  useConfirmation,
+} from '@session-recorder/session-waveform';
 
 // @todo: break this down and make composable
 
@@ -48,10 +50,10 @@ const onDelete = () => {
 
 <template>
   <div class="menu">
-    <div v-if="ttl && !session.keepSession" class="balance">
+    <div v-if="ttl && !session.keep" class="balance">
       {{ ttl }} until deleted
     </div>
-    <Button size="xs" v-if="!session.keepSession" @click="onKeep">
+    <Button size="xs" v-if="!session.keep" @click="onKeep">
       <font-awesome-icon icon="fa-solid fa-heart"></font-awesome-icon>
       Keep
     </Button>
@@ -85,8 +87,8 @@ const onDelete = () => {
   <Modal :open="modalProps.open.value" @close="modalProps.onClose">
     <template #header>Are you sure?</template>
     <template #body
-      >You are about to permanently delete a session recording?</template
-    >
+      >You are about to permanently delete a session recording?
+    </template>
     <template #footer>
       <Button @click="modalProps.onConfirm" variant="ghost" color="neutral">
         Delete

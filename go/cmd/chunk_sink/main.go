@@ -80,10 +80,11 @@ func main() {
 		hostname = "unknown_hostname_" + uuid.NewString()
 	}
 
-	recorderUpdateCh := make(chan *sspb.Recorder, 100)
-	sessionUpdateCh := make(chan *sspb.Session, 100)
+	recorderUpdateCh := make(chan *sspb.Recorder)
+	sessionUpdateCh := make(chan *sspb.Session)
 
 	sessionSourceServer := grpc.NewSessionSourceServer(hostname, version,
+		// This is called for every frontend client that connects
 		func(ctx context.Context, request *sspb.StreamRecordersRequest, server sspb.SessionSource_StreamRecordersServer) error {
 			recordersIDs, err := sessionStorage.GetRecorderIDs(ctx)
 			if err != nil {
@@ -91,7 +92,7 @@ func main() {
 			}
 
 			for _, recorderID := range recordersIDs {
-				server.Send(
+				if err := server.SendMsg(
 					&sspb.Recorder{
 						RecorderID:   recorderID.String(),
 						RecorderName: "TODO",
@@ -105,13 +106,17 @@ func main() {
 							},
 						},
 					},
-				)
+				); err != nil {
+					log.Err(err).Msg("Cannot send recorder data")
+				}
 			}
 
 			for {
 				select {
 				case recorder := <-recorderUpdateCh:
-					server.Send(recorder)
+					if err := server.SendMsg(recorder); err != nil {
+						log.Err(err).Msg("Cannot send recorder data")
+					}
 				case <-ctx.Done():
 					return nil
 				}
@@ -131,7 +136,7 @@ func main() {
 			}
 
 			for _, sessionID := range sessionIDs {
-				server.Send(
+				server.SendMsg(
 					&sspb.Session{
 						ID: sessionID.String(),
 						Info: &sspb.Session_Updated{
@@ -146,7 +151,7 @@ func main() {
 			for {
 				select {
 				case session := <-sessionUpdateCh:
-					server.Send(session)
+					server.SendMsg(session)
 				case <-ctx.Done():
 					return nil
 				}
@@ -168,6 +173,7 @@ func main() {
 	log.Info().Msgf("Session source server is now being served on port %d", port)
 
 	chunkSinkServer := grpc.NewChunkSinkServer(hostname, version,
+		// Recorder Status Updates. These are forwarded to session source clients
 		func(ctx context.Context, status *cmpb.RecorderStatus) error {
 			recorderID, err := uuid.Parse(status.RecorderID)
 			if err != nil {
@@ -176,18 +182,20 @@ func main() {
 				return err
 			}
 
-			fmt.Printf("Received recorder status: %v\n", status)
-
-			recorderUpdateCh <- &sspb.Recorder{
+			select {
+			case recorderUpdateCh <- &sspb.Recorder{
 				RecorderID:   recorderID.String(),
 				RecorderName: "TODO",
 				Info: &sspb.Recorder_Status{
 					Status: status,
 				},
+			}:
+			default:
 			}
 
 			return nil
 		},
+		// Chunks are pushed to a storage backend
 		func(ctx context.Context, chunks *cspb.Chunks) error {
 			chunkID := fmt.Sprintf("%016d", chunks.ChunkCount)
 			sessionID, err := uuid.Parse(chunks.SessionID)
@@ -196,6 +204,8 @@ func main() {
 
 				return err
 			}
+
+			log.Debug().Str("session-id", chunks.SessionID).Msgf("Received chunks: %d", len(chunks.Data))
 
 			recorderID, err := uuid.Parse(chunks.RecorderID)
 			if err != nil {

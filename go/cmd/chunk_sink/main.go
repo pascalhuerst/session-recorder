@@ -205,8 +205,6 @@ func main() {
 				return err
 			}
 
-			log.Debug().Str("session-id", chunks.SessionID).Msgf("Received chunks: %d", len(chunks.Data))
-
 			recorderID, err := uuid.Parse(chunks.RecorderID)
 			if err != nil {
 				log.Err(err).Str("recorder-id", chunks.RecorderID).Msg("Cannot parse recorder ID")

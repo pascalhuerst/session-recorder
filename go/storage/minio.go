@@ -10,6 +10,7 @@ import (
 	"os"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/pascalhuerst/session-recorder/model"
@@ -22,8 +23,15 @@ import (
 )
 
 const (
-	bucketName = "session-recorder"
+	bucketName   = "session-recorder"
+	minChunkSize = 5 * 1024 * 1024 // As per s3 documentation
 )
+
+type minioChunk struct {
+	number    int
+	sessionID uuid.UUID
+	buffer    *bytes.Buffer
+}
 
 type Minio struct {
 	endpoint  string
@@ -31,6 +39,9 @@ type Minio struct {
 	secretLey string
 
 	client *minio.Client
+
+	// Key is recorder ID
+	chunks map[uuid.UUID]*minioChunk
 }
 
 func NewMinioStorage(endpoint, accessKey, secretKey string) (*Minio, error) {
@@ -38,6 +49,9 @@ func NewMinioStorage(endpoint, accessKey, secretKey string) (*Minio, error) {
 		Creds:  credentials.NewStaticV4(accessKey, secretKey, ""),
 		Secure: false,
 	})
+	if err != nil {
+		return nil, fmt.Errorf("cannot create minio client: %w", err)
+	}
 
 	exists, err := c.BucketExists(context.Background(), bucketName)
 	if err != nil {
@@ -60,24 +74,46 @@ func NewMinioStorage(endpoint, accessKey, secretKey string) (*Minio, error) {
 		accessKey: accessKey,
 		secretLey: secretKey,
 		client:    c,
+		chunks:    make(map[uuid.UUID]*minioChunk),
 	}, nil
 }
 
-func (m *Minio) SafeChunks(ctx context.Context, recorderID, sessionID uuid.UUID, chunkID string, samples []int16) error {
-	objectName := fmt.Sprintf("%s/sessions/%s/chunks/%s", recorderID, sessionID, chunkID)
+func (m *Minio) initSession(recorderID, sessionID uuid.UUID) {
+	m.chunks[recorderID] = &minioChunk{
+		number:    0,
+		sessionID: sessionID,
+		buffer:    new(bytes.Buffer),
+	}
+}
 
-	buffer := new(bytes.Buffer)
-
-	for _, chunk := range samples {
-		binary.Write(buffer, binary.LittleEndian, chunk)
+func (m *Minio) SafeChunks(ctx context.Context, recorderID, sessionID uuid.UUID, _ string, samples []int16) error {
+	if _, ok := m.chunks[recorderID]; !ok {
+		m.initSession(recorderID, sessionID)
 	}
 
-	_, err := m.client.PutObject(ctx, bucketName, objectName, buffer, int64(buffer.Len()), minio.PutObjectOptions{})
-	if err != nil {
-		return fmt.Errorf("cannot put object: %w", err)
+	chunk := m.chunks[recorderID]
+	if chunk.sessionID != sessionID {
+		m.CloseSession(ctx, recorderID, chunk.sessionID, os.TempDir())
+
+		m.initSession(recorderID, sessionID)
+
+		return nil
 	}
 
-	//log.Info().Msgf("Successfully uploaded (object=%s) %s/%s", objectName, sessionID, chunkID)
+	for _, s := range samples {
+		binary.Write(chunk.buffer, binary.LittleEndian, s)
+	}
+
+	// To be able to concatinate the chunks, we need to make sure that the chunk size is at least 5MB
+	if chunk.buffer.Len() >= minChunkSize {
+		objectName := fmt.Sprintf("%s/sessions/%s/chunks/%s", recorderID, sessionID, fmt.Sprintf("%016d", chunk.number))
+		chunk.number++
+
+		_, err := m.client.PutObject(ctx, bucketName, objectName, chunk.buffer, minChunkSize, minio.PutObjectOptions{})
+		if err != nil {
+			return fmt.Errorf("cannot put object: %w", err)
+		}
+	}
 
 	return nil
 }
@@ -95,6 +131,104 @@ func (m *Minio) IsSessionClosed(ctx context.Context, recorderID, sessionID uuid.
 }
 
 func (m *Minio) CloseSession(ctx context.Context, recorderID, sessionID uuid.UUID, workDir string) error {
+	// If we have samples left for this session, let's push those first
+	if chunk, ok := m.chunks[recorderID]; ok {
+		objectName := fmt.Sprintf("%s/sessions/%s/chunks/%s", recorderID, sessionID, fmt.Sprintf("%016d", chunk.number))
+
+		if chunk.buffer.Len() > 0 {
+			if chunk.buffer.Len() < minChunkSize {
+				// If the last chunk is smaller than 5MB, we need to pad it with zeros
+				chunk.buffer.Write(make([]byte, minChunkSize-chunk.buffer.Len()))
+			}
+
+			_, err := m.client.PutObject(ctx, bucketName, objectName, chunk.buffer, int64(chunk.buffer.Len()), minio.PutObjectOptions{})
+			if err != nil {
+				return fmt.Errorf("cannot put object: %w", err)
+			}
+		}
+	}
+
+	delete(m.chunks, recorderID)
+
+	// Do the ComposeObject dance
+	chunksPrefix := fmt.Sprintf("%s/sessions/%s/chunks", recorderID, sessionID)
+
+	if !m.IsSessionClosed(ctx, recorderID, sessionID) {
+		log.Debug().Str("object", chunksPrefix).Msg("Already closed")
+
+		return nil
+	}
+
+	objectCh := m.client.ListObjects(ctx, bucketName, minio.ListObjectsOptions{Prefix: chunksPrefix, Recursive: true})
+	srcs := make([]minio.CopySrcOptions, 0)
+
+	for objectInfo := range objectCh {
+		if objectInfo.Err != nil {
+			log.Err(objectInfo.Err).Msg("Cannot list objects")
+
+			return objectInfo.Err
+		}
+
+		srcs = append(srcs, minio.CopySrcOptions{
+			Bucket: bucketName,
+			Object: objectInfo.Key,
+		})
+	}
+
+	dst := minio.CopyDestOptions{
+		Bucket: bucketName,
+		Object: fmt.Sprintf("%s/sessions/%s/data.raw", recorderID, sessionID),
+	}
+
+	info, err := m.client.ComposeObject(ctx, dst, srcs...)
+	if err != nil {
+		log.Err(err).Msg("Cannot compose object")
+
+		return err
+	}
+
+	log.Info().Str("object", info.Key).Int64("size", info.Size).Msg("Successfully composed")
+
+	var rawData *minio.Object
+	if rawData, err = m.client.GetObject(ctx, bucketName, dst.Object, minio.GetObjectOptions{}); err != nil {
+		log.Err(err).Str("object", dst.Object).Msg("Cannot get object")
+
+		return err
+	}
+
+	var flacBuffer *bytes.Buffer
+	if flacBuffer, err = render.Flac(rawData); err != nil {
+		log.Err(err).Msg("Cannot convert to flac")
+
+		return err
+	}
+
+	flacFile := fmt.Sprintf("%s/sessions/%s/data.flac", recorderID, sessionID)
+	if flacWriter, err := m.client.PutObject(ctx, bucketName, flacFile, flacBuffer, int64(flacBuffer.Len()), minio.PutObjectOptions{}); err != nil {
+		log.Err(err).Str("object", dst.Object).Msg("Cannot put object")
+
+		return err
+	} else {
+		log.Debug().Str("object", dst.Object).Int64("size", flacWriter.Size).Msg("Successfully uploaded")
+	}
+
+	presignedURL, err := m.client.PresignedGetObject(ctx, bucketName, flacFile, time.Hour, nil)
+	if err != nil {
+		log.Err(err).Str("object", dst.Object).Msg("Cannot create presigned URL")
+
+		return err
+	}
+
+	fmt.Printf("Flac File: %s\n", presignedURL.String())
+
+	if err = m.client.RemoveObject(ctx, bucketName, chunksPrefix, minio.RemoveObjectOptions{ForceDelete: true}); err != nil {
+		log.Err(err).Str("object", chunksPrefix).Msg("Cannot remove object")
+	}
+
+	return nil
+}
+
+func (m *Minio) CloseSessionOld(ctx context.Context, recorderID, sessionID uuid.UUID, workDir string) error {
 	err := os.MkdirAll(workDir, os.ModePerm)
 	if err != nil {
 		log.Err(err).Msg("Cannot create work dir")
@@ -249,7 +383,6 @@ func (m *Minio) GetSessionIDs(ctx context.Context, recorderID uuid.UUID) ([]uuid
 			return nil, object.Err
 		}
 
-		// 22a2a258-bc03-4836-a94a-d322d5e95b6a/sessions/3c48ad78-ddf7-4397-a3bd-1aaf769bb67d/chunks/0000000000000000
 		tokens := strings.Split(object.Key, "/")
 		idString := tokens[2]
 

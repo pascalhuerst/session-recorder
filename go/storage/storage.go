@@ -66,8 +66,13 @@ func makeRecorder(ctx context.Context, s Storage, recorderID uuid.UUID) (model.R
 		log.Error().Err(err).Str("recorder-id", recorderID.String()).Msg("Cannot get recorder metadata")
 
 		md = &model.RecorderMetadata{
-			GenericMetadata: &model.GenericMetadata{},
+			GenericMetadata: &model.GenericMetadata{
+				ID:   recorderID.String(),
+				Name: "TODO",
+			},
 		}
+
+		s.PutRecorderMetadata(ctx, recorderID, md)
 	}
 
 	return model.Recorder{
@@ -90,7 +95,14 @@ func makeSessions(ctx context.Context, s Storage, recorderID uuid.UUID) (map[str
 		if err != nil {
 			log.Error().Err(err).Str("recorder-id", recorderID.String()).Str("session-id", sessionID.String()).Msg("Cannot get session metadata")
 
-			continue
+			md = &model.SessionMetadata{
+				GenericMetadata: model.GenericMetadata{
+					ID:   sessionID.String(),
+					Name: "TODO",
+				},
+			}
+
+			s.PutSessionMetadata(ctx, recorderID, sessionID, md)
 		}
 
 		isClosed := s.IsSessionClosed(ctx, recorderID, sessionID)

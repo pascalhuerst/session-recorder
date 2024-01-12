@@ -7,8 +7,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os"
 	"strings"
+	"sync"
 
 	"github.com/google/uuid"
 	"github.com/pascalhuerst/session-recorder/model"
@@ -81,7 +81,8 @@ type Minio struct {
 	client *minio.Client
 
 	// Key is recorder ID
-	chunks map[uuid.UUID]*minioChunk
+	chunks     map[uuid.UUID]*minioChunk
+	chunksLock sync.Mutex
 }
 
 func NewMinioStorage(endpoint, accessKey, secretKey string) (*Minio, error) {
@@ -142,20 +143,22 @@ func (m *Minio) SafeChunks(ctx context.Context, recorderID, sessionID uuid.UUID,
 
 	chunk := m.chunks[recorderID]
 	if chunk.sessionID != sessionID {
-		go func() {
-			if err := m.CloseSession(context.Background(), recorderID, chunk.sessionID, os.TempDir()); err != nil {
-				log.Fatal().Err(err).Msg("Cannot close session")
+		if err := m.CloseSession(ctx, recorderID, chunk.sessionID); err != nil {
+			log.Fatal().Err(err).Msg("Cannot close session")
+		}
+
+		go func(recorderID, sessionID uuid.UUID) {
+			if err := m.renderClosedSession(recorderID, chunk.sessionID); err != nil {
+				log.Err(err).Msg("Cannot render session")
 			}
-		}()
+		}(recorderID, chunk.sessionID)
 
 		m.initSession(recorderID, sessionID)
-
-		return nil
 	}
 
-	for _, s := range samples {
-		binary.Write(chunk.buffer, binary.LittleEndian, s)
-	}
+	binary.Write(chunk.buffer, binary.LittleEndian, samples)
+
+	log.Info().Str("recorder-id", recorderID.String()).Str("session-id", sessionID.String()).Msgf("Added %d|%d (%.1f %%) samples", chunk.buffer.Len(), minChunkSize, float64(chunk.buffer.Len())/float64(minChunkSize)*100.0)
 
 	// To be able to concatinate the chunks, we need to make sure that the chunk size is at least 5MB
 	if chunk.buffer.Len() >= minChunkSize {
@@ -164,7 +167,7 @@ func (m *Minio) SafeChunks(ctx context.Context, recorderID, sessionID uuid.UUID,
 		objectName := fmt.Sprintf("%s/sessions/%s/chunks/%s", recorderID, sessionID, fmt.Sprintf("%016d", chunk.number))
 		chunk.number++
 
-		_, err := m.client.PutObject(ctx, bucketName, objectName, chunk.buffer, minChunkSize, minio.PutObjectOptions{})
+		_, err := m.client.PutObject(ctx, bucketName, objectName, chunk.buffer, int64(chunk.buffer.Len()), minio.PutObjectOptions{})
 		if err != nil {
 			return fmt.Errorf("cannot put object: %w", err)
 		}
@@ -185,7 +188,7 @@ func (m *Minio) IsSessionClosed(ctx context.Context, recorderID, sessionID uuid.
 	return false
 }
 
-func (m *Minio) CloseSession(ctx context.Context, recorderID, sessionID uuid.UUID, workDir string) error {
+func (m *Minio) CloseSession(ctx context.Context, recorderID, sessionID uuid.UUID) error {
 	// If we have samples left for this session, let's push those first
 	if chunk, ok := m.chunks[recorderID]; ok {
 		objectName := fmt.Sprintf("%s/sessions/%s/chunks/%s", recorderID, sessionID, fmt.Sprintf("%016d", chunk.number))
@@ -204,6 +207,14 @@ func (m *Minio) CloseSession(ctx context.Context, recorderID, sessionID uuid.UUI
 	}
 
 	delete(m.chunks, recorderID)
+
+	log.Info().Str("recorder-id", recorderID.String()).Str("session-id", sessionID.String()).Msg("Session closed")
+
+	return nil
+}
+
+func (m *Minio) renderClosedSession(recorderID, sessionID uuid.UUID) error {
+	ctx := context.Background()
 
 	// Do the ComposeObject dance
 	chunksPrefix := fmt.Sprintf("%s/sessions/%s/chunks", recorderID, sessionID)
@@ -327,7 +338,7 @@ func (m *Minio) CloseSession(ctx context.Context, recorderID, sessionID uuid.UUI
 		log.Err(err).Str("object", chunksPrefix).Msg("Cannot remove object")
 	}
 
-	log.Info().Str("recorder-id", recorderID.String()).Str("session-id", sessionID.String()).Msg("Session closed")
+	log.Info().Str("recorder-id", recorderID.String()).Str("session-id", sessionID.String()).Msg("Session rendered")
 
 	return nil
 }
@@ -482,10 +493,17 @@ func (m *Minio) CloseOpenSessions(ctx context.Context, recorderID uuid.UUID) err
 	}
 
 	for _, sessionID := range sessionIDs {
-		err = m.CloseSession(ctx, recorderID, sessionID, os.TempDir())
+		err = m.CloseSession(ctx, recorderID, sessionID)
 		if err != nil {
 			return fmt.Errorf("cannot close session: %w", err)
 		}
+
+		// Render the session assynchonously
+		go func(recorderID, sessionID uuid.UUID) {
+			if err := m.renderClosedSession(recorderID, sessionID); err != nil {
+				log.Err(err).Msg("Cannot render session")
+			}
+		}(recorderID, sessionID)
 	}
 
 	return nil

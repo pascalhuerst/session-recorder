@@ -16,7 +16,7 @@ type Storage interface {
 
 	GetSessionIDs(ctx context.Context, recorderID uuid.UUID) ([]uuid.UUID, error)
 	IsSessionClosed(ctx context.Context, recorderID, sessionID uuid.UUID) bool
-	CloseSession(ctx context.Context, recorderID, sessionID uuid.UUID, workDir string) error
+	CloseSession(ctx context.Context, recorderID, sessionID uuid.UUID) error
 	CloseOpenSessions(ctx context.Context, recorderID uuid.UUID) error
 	GetSessionMetadata(ctx context.Context, recorderID, sessionID uuid.UUID) (*model.SessionMetadata, error)
 	PutSessionMetadata(ctx context.Context, recorderID, sessionID uuid.UUID, session *model.SessionMetadata) error

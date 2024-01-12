@@ -69,11 +69,9 @@ func main() {
 
 		log.Info().Msgf("Closing open sessions for recorder %s", recorderID)
 
-		go func() {
-			if err := sessionStorage.CloseOpenSessions(context.Background(), recorderID); err != nil {
-				log.Fatal().Err(err).Msg("Cannot close open sessions")
-			}
-		}()
+		if err := sessionStorage.CloseOpenSessions(context.Background(), recorderID); err != nil {
+			log.Fatal().Err(err).Msg("Cannot close open sessions")
+		}
 	}
 
 	log.Info().Msg("Starting mdns server")
@@ -224,8 +222,8 @@ func main() {
 				return err
 			}
 
-			samples := make([]int16, 0)
-
+			// We have s16 samples, but stored int u32
+			samples := make([]int16, 0, len(chunks.Data))
 			for _, sample := range chunks.Data {
 				samples = append(samples, int16(sample))
 			}

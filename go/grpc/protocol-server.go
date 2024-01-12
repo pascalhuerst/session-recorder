@@ -19,7 +19,7 @@ type ProtocolServer interface {
 
 func StartProtocolServer(server ProtocolServer, mdnsServer *mdns.Server, mdnsName string, port uint16) (uint16, error) {
 	host := fmt.Sprintf(":%d", port)
-	listener, err := net.Listen("tcp", host)
+	listener, err := net.Listen("tcp4", host)
 	if err != nil {
 		return 0, fmt.Errorf("cannot listen on %s: %v", host, err)
 	}

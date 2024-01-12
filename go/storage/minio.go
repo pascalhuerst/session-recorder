@@ -8,9 +8,7 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"path"
 	"strings"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/pascalhuerst/session-recorder/model"
@@ -79,6 +77,8 @@ func NewMinioStorage(endpoint, accessKey, secretKey string) (*Minio, error) {
 }
 
 func (m *Minio) initSession(recorderID, sessionID uuid.UUID) {
+	log.Info().Str("recorder-id", recorderID.String()).Str("session-id", sessionID.String()).Msg("Starting new session")
+
 	m.chunks[recorderID] = &minioChunk{
 		number:    0,
 		sessionID: sessionID,
@@ -93,7 +93,11 @@ func (m *Minio) SafeChunks(ctx context.Context, recorderID, sessionID uuid.UUID,
 
 	chunk := m.chunks[recorderID]
 	if chunk.sessionID != sessionID {
-		m.CloseSession(ctx, recorderID, chunk.sessionID, os.TempDir())
+		go func() {
+			if err := m.CloseSession(context.Background(), recorderID, chunk.sessionID, os.TempDir()); err != nil {
+				log.Fatal().Err(err).Msg("Cannot close session")
+			}
+		}()
 
 		m.initSession(recorderID, sessionID)
 
@@ -106,6 +110,8 @@ func (m *Minio) SafeChunks(ctx context.Context, recorderID, sessionID uuid.UUID,
 
 	// To be able to concatinate the chunks, we need to make sure that the chunk size is at least 5MB
 	if chunk.buffer.Len() >= minChunkSize {
+		log.Debug().Str("recorder-id", recorderID.String()).Str("session-id", sessionID.String()).Msg("Chunk is full")
+
 		objectName := fmt.Sprintf("%s/sessions/%s/chunks/%s", recorderID, sessionID, fmt.Sprintf("%016d", chunk.number))
 		chunk.number++
 
@@ -154,8 +160,6 @@ func (m *Minio) CloseSession(ctx context.Context, recorderID, sessionID uuid.UUI
 	chunksPrefix := fmt.Sprintf("%s/sessions/%s/chunks", recorderID, sessionID)
 
 	if !m.IsSessionClosed(ctx, recorderID, sessionID) {
-		log.Debug().Str("object", chunksPrefix).Msg("Already closed")
-
 		return nil
 	}
 
@@ -180,14 +184,12 @@ func (m *Minio) CloseSession(ctx context.Context, recorderID, sessionID uuid.UUI
 		Object: fmt.Sprintf("%s/sessions/%s/data.raw", recorderID, sessionID),
 	}
 
-	info, err := m.client.ComposeObject(ctx, dst, srcs...)
+	_, err := m.client.ComposeObject(ctx, dst, srcs...)
 	if err != nil {
 		log.Err(err).Msg("Cannot compose object")
 
 		return err
 	}
-
-	log.Info().Str("object", info.Key).Int64("size", info.Size).Msg("Successfully composed")
 
 	var rawData *minio.Object
 	if rawData, err = m.client.GetObject(ctx, bucketName, dst.Object, minio.GetObjectOptions{}); err != nil {
@@ -196,149 +198,87 @@ func (m *Minio) CloseSession(ctx context.Context, recorderID, sessionID uuid.UUI
 		return err
 	}
 
-	var flacBuffer *bytes.Buffer
-	if flacBuffer, err = render.Flac(rawData); err != nil {
-		log.Err(err).Msg("Cannot convert to flac")
+	readers, writer, closer := makeReaders(3)
+	eg, _ := errgroup.WithContext(ctx)
 
-		return err
-	}
+	// Writer copies from raw data to all the readers
+	eg.Go(func() error {
+		defer closer.Close()
 
-	flacFile := fmt.Sprintf("%s/sessions/%s/data.flac", recorderID, sessionID)
-	if flacWriter, err := m.client.PutObject(ctx, bucketName, flacFile, flacBuffer, int64(flacBuffer.Len()), minio.PutObjectOptions{}); err != nil {
-		log.Err(err).Str("object", dst.Object).Msg("Cannot put object")
+		_, err := io.Copy(writer, rawData)
+		if err != nil {
+			log.Err(err).Msg("Cannot setup multiple readers")
 
-		return err
-	} else {
-		log.Debug().Str("object", dst.Object).Int64("size", flacWriter.Size).Msg("Successfully uploaded")
-	}
-
-	presignedURL, err := m.client.PresignedGetObject(ctx, bucketName, flacFile, time.Hour, nil)
-	if err != nil {
-		log.Err(err).Str("object", dst.Object).Msg("Cannot create presigned URL")
-
-		return err
-	}
-
-	fmt.Printf("Flac File: %s\n", presignedURL.String())
-
-	if err = m.client.RemoveObject(ctx, bucketName, chunksPrefix, minio.RemoveObjectOptions{ForceDelete: true}); err != nil {
-		log.Err(err).Str("object", chunksPrefix).Msg("Cannot remove object")
-	}
-
-	return nil
-}
-
-func (m *Minio) CloseSessionOld(ctx context.Context, recorderID, sessionID uuid.UUID, workDir string) error {
-	err := os.MkdirAll(workDir, os.ModePerm)
-	if err != nil {
-		log.Err(err).Msg("Cannot create work dir")
-
-		return err
-	}
-
-	chunksPrefix := fmt.Sprintf("%s/sessions/%s/chunks", recorderID, sessionID)
-
-	if !m.IsSessionClosed(ctx, recorderID, sessionID) {
-		log.Debug().Str("object", chunksPrefix).Msg("Already closed")
+			return err
+		}
 
 		return nil
-	}
-
-	objectCh := m.client.ListObjects(ctx, bucketName, minio.ListObjectsOptions{Prefix: chunksPrefix, Recursive: true})
-
-	toBeDeleted := make([]string, 0)
-
-	file, err := os.Create(path.Join(workDir, "data.raw"))
-	if err != nil {
-		log.
-			Err(err).Msg("Cannot create file")
-	}
-	defer file.Close()
-
-	for objectInfo := range objectCh {
-		if objectInfo.Err != nil {
-			log.Err(objectInfo.Err).Msg("Cannot list objects")
-
-			return objectInfo.Err
-		}
-
-		object, err := m.client.GetObject(ctx, bucketName, objectInfo.Key, minio.GetObjectOptions{})
-		if err != nil {
-			log.Err(err).Msg("Cannot get object")
-		}
-
-		_, err = io.Copy(file, object)
-		if err != nil {
-			log.Err(err).Msg("Cannot copy object")
-		}
-
-		toBeDeleted = append(toBeDeleted, objectInfo.Key)
-	}
-
-	eg, _ := errgroup.WithContext(ctx)
-	eg.Go(func() error {
-		return render.CreateAudioFile(path.Join(workDir, "data.raw"), workDir, "flac")
 	})
 
+	// Create waveform dat file. Reads from reader 2
 	eg.Go(func() error {
-		return render.CreateAudioFile(path.Join(workDir, "data.raw"), workDir, "mp3")
+		waveformData, err := render.CreateWaveform(readers[0], 300, 10000, 200)
+		if err != nil {
+			return fmt.Errorf("cannot create waveform: %w", err)
+		}
+
+		waveformObject := fmt.Sprintf("%s/sessions/%s/waveform.dat", recorderID, sessionID)
+		if _, err := m.client.PutObject(ctx, bucketName, waveformObject, waveformData, int64(waveformData.Len()), minio.PutObjectOptions{}); err != nil {
+			log.Err(err).Str("object", waveformObject).Msg("Cannot put object")
+
+			return err
+		}
+
+		return nil
 	})
 
+	// Create waveform png overview file. Reads from reader 1
 	eg.Go(func() error {
-		return render.CreateAudioFile(path.Join(workDir, "data.raw"), workDir, "ogg")
+		overviewData, err := render.CreateOverview(readers[1], 300, 1000, 200)
+		if err != nil {
+			return fmt.Errorf("cannot create waveform overview: %w", err)
+		}
+
+		overviewObject := fmt.Sprintf("%s/sessions/%s/overview.png", recorderID, sessionID)
+		if _, err := m.client.PutObject(ctx, bucketName, overviewObject, overviewData, int64(overviewData.Len()), minio.PutObjectOptions{}); err != nil {
+			log.Err(err).Str("object", overviewObject).Msg("Cannot put object")
+
+			return err
+		}
+
+		return nil
+	})
+
+	// Create flac file. Reads from reader 1
+	eg.Go(func() error {
+		var flacBuffer *bytes.Buffer
+		if flacBuffer, err = render.Flac(readers[2]); err != nil {
+			log.Err(err).Msg("Cannot convert to flac")
+
+			return err
+		}
+
+		flacObject := fmt.Sprintf("%s/sessions/%s/data.flac", recorderID, sessionID)
+		if _, err := m.client.PutObject(ctx, bucketName, flacObject, flacBuffer, int64(flacBuffer.Len()), minio.PutObjectOptions{}); err != nil {
+			log.Err(err).Str("object", flacObject).Msg("Cannot put object")
+
+			return err
+		}
+
+		return nil
 	})
 
 	if err := eg.Wait(); err != nil {
-		log.Err(err).Msg("Cannot create audio files")
+		log.Err(err).Msg("An error occured while rendering")
 
 		return err
-	}
-
-	eg, _ = errgroup.WithContext(ctx)
-
-	eg.Go(func() error {
-		return render.CreateWaveform(path.Join(workDir, "data.flac"), path.Join(workDir, "waveform.dat"), 300, 10000, 200)
-	})
-
-	eg.Go(func() error {
-		return render.CreateWaveform(path.Join(workDir, "data.flac"), path.Join(workDir, "overview.png"), 300, 1000, 200)
-	})
-
-	eg.Go(func() error {
-		return render.CreateWaveform(path.Join(workDir, "data.flac"), path.Join(workDir, "full.png"), 300, 10000, 200)
-	})
-
-	if err := eg.Wait(); err != nil {
-		log.Err(err).Msg("Cannot create waveform files")
-
-		return err
-	}
-
-	for _, f := range []string{"data.flac", "data.mp3", "data.ogg", "data.raw", "full.png", "overview.png", "waveform.dat"} {
-		objectName := fmt.Sprintf("%s/sessions/%s/%s", recorderID, sessionID, f)
-		file := path.Join(workDir, f)
-
-		i, err := m.client.FPutObject(ctx, bucketName, objectName, file, minio.PutObjectOptions{})
-		if err != nil {
-			log.Err(err).Str("object", f).Msg("Cannot put object")
-
-			continue
-		}
-
-		log.Info().Str("object", f).Int64("size", i.Size).Msg("Successfully uploaded")
-	}
-
-	os.RemoveAll(workDir)
-
-	for _, objectName := range toBeDeleted {
-		if err := m.client.RemoveObject(ctx, bucketName, objectName, minio.RemoveObjectOptions{ForceDelete: true}); err != nil {
-			log.Err(err).Str("object", objectName).Msg("Cannot remove object")
-		}
 	}
 
 	if err = m.client.RemoveObject(ctx, bucketName, chunksPrefix, minio.RemoveObjectOptions{ForceDelete: true}); err != nil {
 		log.Err(err).Str("object", chunksPrefix).Msg("Cannot remove object")
 	}
+
+	log.Info().Str("recorder-id", recorderID.String()).Str("session-id", sessionID.String()).Msg("Session closed")
 
 	return nil
 }

@@ -44,6 +44,8 @@ func main() {
 	s3AccessKey := utils.MustGet("S3_ACCESS_KEY")
 	s3SecretKey := utils.MustGet("S3_SECRET_KEY")
 
+	log.Info().Msg("Setting up storage server")
+
 	s, err := storage.NewMinioStorage(s3Endpoint, s3AccessKey, s3SecretKey)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Cannot create storage. Giving up")
@@ -51,6 +53,8 @@ func main() {
 		return
 	}
 	var sessionStorage storage.Storage = s
+
+	log.Info().Msg("Creating system model")
 
 	system, err := storage.NewSystem(sessionStorage)
 	if err != nil {
@@ -63,8 +67,16 @@ func main() {
 			continue
 		}
 
-		sessionStorage.CloseOpenSessions(ctx, recorderID)
+		log.Info().Msgf("Closing open sessions for recorder %s", recorderID)
+
+		go func() {
+			if err := sessionStorage.CloseOpenSessions(context.Background(), recorderID); err != nil {
+				log.Fatal().Err(err).Msg("Cannot close open sessions")
+			}
+		}()
 	}
+
+	log.Info().Msg("Starting mdns server")
 
 	mdnsServer, err := mdns.ServerNew()
 	if err != nil {
@@ -258,6 +270,8 @@ func main() {
 		}
 
 	}()
+
+	log.Info().Msg("chunk sink server setup successfully")
 
 	<-ctx.Done()
 }

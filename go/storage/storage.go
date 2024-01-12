@@ -93,7 +93,10 @@ func makeSessions(ctx context.Context, s Storage, recorderID uuid.UUID) (map[str
 	for _, sessionID := range sessionIDs {
 		md, err := s.GetSessionMetadata(ctx, recorderID, sessionID)
 		if err != nil {
-			log.Error().Err(err).Str("recorder-id", recorderID.String()).Str("session-id", sessionID.String()).Msg("Cannot get session metadata")
+			log.Error().Err(err).
+				Str("recorder-id", recorderID.String()).
+				Str("session-id", sessionID.String()).
+				Msg("Cannot get session metadata")
 
 			md = &model.SessionMetadata{
 				GenericMetadata: model.GenericMetadata{

@@ -1,33 +1,42 @@
 package render
 
 import (
+	"bytes"
 	"fmt"
 	"io"
+
 	"os/exec"
-	"path/filepath"
+
+	"errors"
+
+	"github.com/rs/zerolog/log"
+	"golang.org/x/sync/errgroup"
 )
 
-func CreateWaveform(inFile, outFile string, zoom, width, height int) error {
+func CreateWaveform(raw io.Reader, zoom, width, height int) (*bytes.Buffer, error) {
+	cmd := exec.Command("audiowaveform",
+		"--input-format", "raw",
+		"--output-format", "dat",
+		"--zoom", "256",
+		"-b", "8")
+
+	return run(cmd, raw, width, height)
+}
+
+func CreateOverview(rawAudio io.Reader, zoom, width, height int) (*bytes.Buffer, error) {
 	const (
-		// --background-color
-		backgroundColor = "333333"
-		// --waveform-color
-		waveformColor = "ed730c"
-		// --axis-label-color
-		fontColor = "0c86ed"
-		// --border-color
-		borderColor = "0c86ed"
+		backgroundColor = "333333fe"
+		waveformColor   = "ed730cfe"
+		fontColor       = "0c86edfe"
+		borderColor     = "0c86edfe"
 	)
 
-	//strZoom := fmt.Sprintf("%d", zoom)
-
 	strWidth := fmt.Sprintf("%d", width)
-
 	strHeight := fmt.Sprintf("%d", height)
 
 	cmd := exec.Command("audiowaveform",
-		"--input-filename", inFile,
-		"--output-filename", outFile,
+		"--input-format", "raw",
+		"--output-format", "png",
 		"--zoom", "auto",
 		"--width", strWidth,
 		"--height", strHeight,
@@ -36,37 +45,90 @@ func CreateWaveform(inFile, outFile string, zoom, width, height int) error {
 		"--axis-label-color", fontColor,
 		"--border-color", borderColor)
 
-	// Actual waveform dat files have other params
-	if filepath.Ext(outFile) == ".dat" {
-		cmd = exec.Command("audiowaveform",
-			"--input-filename", inFile,
-			"--output-filename", outFile,
-			"--zoom", "256",
-			"-b", "8")
+	return run(cmd, rawAudio, width, height)
+}
+
+func run(cmd *exec.Cmd, rawAudio io.Reader, width, height int) (*bytes.Buffer, error) {
+	eg := errgroup.Group{}
+
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return nil, fmt.Errorf("Cannot read from stdin: %w", err)
 	}
 
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		return err
-	}
+	eg.Go(func() error {
+		defer stdin.Close()
+
+		_, err := io.Copy(stdin, rawAudio)
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+
+		if err != nil {
+			return fmt.Errorf("Cannot write to stdin: %w", err)
+		}
+
+		return nil
+	})
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return err
+		return nil, fmt.Errorf("Cannot read from stdout: %w", err)
 	}
+
+	stdoutBuffer := new(bytes.Buffer)
+
+	eg.Go(func() error {
+		defer stdin.Close()
+
+		_, err := io.Copy(stdoutBuffer, stdout)
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+
+		if err != nil {
+			return fmt.Errorf("Cannot read from stdin: %w", err)
+		}
+
+		return nil
+	})
+
+	stderr, err := cmd.StderrPipe()
+	if err != nil {
+		return nil, err
+	}
+
+	stderrBuffer := new(bytes.Buffer)
+
+	eg.Go(func() error {
+		_, err := io.Copy(stderrBuffer, stderr)
+
+		if errors.Is(err, io.EOF) {
+			return nil
+		}
+
+		if err != nil {
+			return fmt.Errorf("Cannot read from stderr: %w", err)
+		}
+
+		return nil
+	})
 
 	err = cmd.Start()
 	if err != nil {
-		errorBuffer, _ := io.ReadAll(stderr)
-		errorBuffer2, _ := io.ReadAll(stdout)
-
-		return fmt.Errorf("stderr=%s, stdout=%s", string(errorBuffer), string(errorBuffer2))
+		return nil, fmt.Errorf("Cannot create waveform: %w", err)
 	}
 
 	err = cmd.Wait()
 	if err != nil {
-		return fmt.Errorf("Canot create waveform %s: %w", outFile, err)
+		log.Error().Str("stderr", stderrBuffer.String()).Msg("Cannot create waveform overview")
+
+		return nil, fmt.Errorf("Cannot create waveform: %w", err)
 	}
 
-	return nil
+	if err := eg.Wait(); err != nil {
+		return nil, fmt.Errorf("Cannot create waveform: %w", err)
+	}
+
+	return stdoutBuffer, nil
 }

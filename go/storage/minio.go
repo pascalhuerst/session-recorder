@@ -25,6 +25,48 @@ const (
 	minChunkSize = 5 * 1024 * 1024 // As per s3 documentation
 )
 
+const publicAccessFormula = `
+{
+	"Version": "2012-10-17",
+	"Statement": [
+	  {
+		"Effect": "Allow",
+		"Principal": {
+		  "AWS": [
+			"*"
+		  ]
+		},
+		"Action": [
+		  "s3:GetBucketLocation",
+		  "s3:ListBucket",
+		  "s3:ListBucketMultipartUploads"
+		],
+		"Resource": [
+		  "arn:aws:s3:::%s"
+		]
+	  },
+	  {
+		"Effect": "Allow",
+		"Principal": {
+		  "AWS": [
+			"*"
+		  ]
+		},
+		"Action": [
+		  "s3:AbortMultipartUpload",
+		  "s3:DeleteObject",
+		  "s3:GetObject",
+		  "s3:ListMultipartUploadParts",
+		  "s3:PutObject"
+		],
+		"Resource": [
+		  "arn:aws:s3:::%s/*"
+		]
+	  }
+	]
+  }
+`
+
 type minioChunk struct {
 	number    int
 	sessionID uuid.UUID
@@ -43,6 +85,8 @@ type Minio struct {
 }
 
 func NewMinioStorage(endpoint, accessKey, secretKey string) (*Minio, error) {
+	ctx := context.Background()
+
 	c, err := minio.New(endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(accessKey, secretKey, ""),
 		Secure: false,
@@ -51,15 +95,20 @@ func NewMinioStorage(endpoint, accessKey, secretKey string) (*Minio, error) {
 		return nil, fmt.Errorf("cannot create minio client: %w", err)
 	}
 
-	exists, err := c.BucketExists(context.Background(), bucketName)
+	exists, err := c.BucketExists(ctx, bucketName)
 	if err != nil {
 		return nil, fmt.Errorf("cannot check if bucket exists: %w", err)
 	}
 
 	if !exists {
-		err = c.MakeBucket(context.Background(), bucketName, minio.MakeBucketOptions{})
+		err = c.MakeBucket(ctx, bucketName, minio.MakeBucketOptions{})
 		if err != nil {
 			return nil, fmt.Errorf("cannot create bucket: %w", err)
+		}
+
+		policy := fmt.Sprintf(publicAccessFormula, bucketName, bucketName)
+		if err := c.SetBucketPolicy(ctx, bucketName, policy); err != nil {
+			log.Error().Err(err).Str("bucket", bucketName).Msg("Cannot set bucket policy")
 		}
 	}
 

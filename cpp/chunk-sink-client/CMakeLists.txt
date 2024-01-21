@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.5.1)
 project(chunk-recorder C CXX)
 
 include(FindPkgConfig)
+include(CMakeFindDependencyMacro)
 
 function(addLib name)
   pkg_check_modules(${name} REQUIRED ${name})
@@ -35,8 +36,7 @@ foreach(lib ${LIBS})
   addLib(${lib})
 endforeach(lib)
 
-#find_package(protobuf REQUIRED)
-find_package(gRPC CONFIG REQUIRED)
+find_package(gRPC REQUIRED)
 find_package(Threads REQUIRED)
 find_package(Boost 1.81 COMPONENTS program_options REQUIRED)
 

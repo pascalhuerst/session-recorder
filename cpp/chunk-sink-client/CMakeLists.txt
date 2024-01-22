@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.5.1)
 
-project(chunk-recorder C CXX)
+project(chunk-sink-client C CXX)
 
 include(FindPkgConfig)
 include(CMakeFindDependencyMacro)
@@ -22,7 +22,7 @@ set(LIBS alsa avahi-client avahi-core)
 set(SOURCES 
   ${GRPC_SOURCES}
   
-  chunk-recorder.cpp
+  chunk-sink-client.cpp
   AlsaAudioInput.cpp
   publishZeroConf/publishAvahi.cpp
   AudioStreamManager.cpp

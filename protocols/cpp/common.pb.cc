@@ -4,109 +4,158 @@
 #include "common.pb.h"
 
 #include <algorithm>
-
-#include <google/protobuf/io/coded_stream.h>
-#include <google/protobuf/extension_set.h>
-#include <google/protobuf/wire_format_lite.h>
-#include <google/protobuf/descriptor.h>
-#include <google/protobuf/generated_message_reflection.h>
-#include <google/protobuf/reflection_ops.h>
-#include <google/protobuf/wire_format.h>
+#include "google/protobuf/io/coded_stream.h"
+#include "google/protobuf/extension_set.h"
+#include "google/protobuf/wire_format_lite.h"
+#include "google/protobuf/descriptor.h"
+#include "google/protobuf/generated_message_reflection.h"
+#include "google/protobuf/reflection_ops.h"
+#include "google/protobuf/wire_format.h"
 // @@protoc_insertion_point(includes)
-#include <google/protobuf/port_def.inc>
 
+// Must be included last.
+#include "google/protobuf/port_def.inc"
 PROTOBUF_PRAGMA_INIT_SEG
+namespace _pb = ::PROTOBUF_NAMESPACE_ID;
+namespace _pbi = ::PROTOBUF_NAMESPACE_ID::internal;
 namespace common {
-constexpr RecorderStatus::RecorderStatus(
-  ::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized)
-  : recorderid_(&::PROTOBUF_NAMESPACE_ID::internal::fixed_address_empty_string)
-  , recordername_(&::PROTOBUF_NAMESPACE_ID::internal::fixed_address_empty_string)
-  , rmspercent_(0)
-  , signalstatus_(0)
+template <typename>
+PROTOBUF_CONSTEXPR RecorderStatus::RecorderStatus(
+    ::_pbi::ConstantInitialized): _impl_{
+    /*decltype(_impl_.recorderid_)*/ {
+    &::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized {}
+  }
 
-  , clipping_(false){}
+  , /*decltype(_impl_.recordername_)*/ {
+    &::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized {}
+  }
+
+  , /*decltype(_impl_.rmspercent_)*/ 0
+
+  , /*decltype(_impl_.signalstatus_)*/ 0
+
+  , /*decltype(_impl_.clipping_)*/ false
+
+  , /*decltype(_impl_._cached_size_)*/{}} {}
 struct RecorderStatusDefaultTypeInternal {
-  constexpr RecorderStatusDefaultTypeInternal()
-    : _instance(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized{}) {}
+  PROTOBUF_CONSTEXPR RecorderStatusDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
   ~RecorderStatusDefaultTypeInternal() {}
   union {
     RecorderStatus _instance;
   };
 };
-PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT RecorderStatusDefaultTypeInternal _RecorderStatus_default_instance_;
-constexpr Respone::Respone(
-  ::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized)
-  : errormessage_(&::PROTOBUF_NAMESPACE_ID::internal::fixed_address_empty_string)
-  , success_(false){}
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 RecorderStatusDefaultTypeInternal _RecorderStatus_default_instance_;
+template <typename>
+PROTOBUF_CONSTEXPR Respone::Respone(
+    ::_pbi::ConstantInitialized): _impl_{
+    /*decltype(_impl_.errormessage_)*/ {
+    &::_pbi::fixed_address_empty_string, ::_pbi::ConstantInitialized {}
+  }
+
+  , /*decltype(_impl_.success_)*/ false
+
+  , /*decltype(_impl_._cached_size_)*/{}} {}
 struct ResponeDefaultTypeInternal {
-  constexpr ResponeDefaultTypeInternal()
-    : _instance(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized{}) {}
+  PROTOBUF_CONSTEXPR ResponeDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
   ~ResponeDefaultTypeInternal() {}
   union {
     Respone _instance;
   };
 };
-PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT ResponeDefaultTypeInternal _Respone_default_instance_;
+
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT
+    PROTOBUF_ATTRIBUTE_INIT_PRIORITY1 ResponeDefaultTypeInternal _Respone_default_instance_;
 }  // namespace common
-static ::PROTOBUF_NAMESPACE_ID::Metadata file_level_metadata_common_2eproto[2];
-static const ::PROTOBUF_NAMESPACE_ID::EnumDescriptor* file_level_enum_descriptors_common_2eproto[1];
-static constexpr ::PROTOBUF_NAMESPACE_ID::ServiceDescriptor const** file_level_service_descriptors_common_2eproto = nullptr;
-
-const uint32_t TableStruct_common_2eproto::offsets[] PROTOBUF_SECTION_VARIABLE(protodesc_cold) = {
-  ~0u,  // no _has_bits_
-  PROTOBUF_FIELD_OFFSET(::common::RecorderStatus, _internal_metadata_),
-  ~0u,  // no _extensions_
-  ~0u,  // no _oneof_case_
-  ~0u,  // no _weak_field_map_
-  ~0u,  // no _inlined_string_donated_
-  PROTOBUF_FIELD_OFFSET(::common::RecorderStatus, recorderid_),
-  PROTOBUF_FIELD_OFFSET(::common::RecorderStatus, recordername_),
-  PROTOBUF_FIELD_OFFSET(::common::RecorderStatus, signalstatus_),
-  PROTOBUF_FIELD_OFFSET(::common::RecorderStatus, rmspercent_),
-  PROTOBUF_FIELD_OFFSET(::common::RecorderStatus, clipping_),
-  ~0u,  // no _has_bits_
-  PROTOBUF_FIELD_OFFSET(::common::Respone, _internal_metadata_),
-  ~0u,  // no _extensions_
-  ~0u,  // no _oneof_case_
-  ~0u,  // no _weak_field_map_
-  ~0u,  // no _inlined_string_donated_
-  PROTOBUF_FIELD_OFFSET(::common::Respone, success_),
-  PROTOBUF_FIELD_OFFSET(::common::Respone, errormessage_),
-};
-static const ::PROTOBUF_NAMESPACE_ID::internal::MigrationSchema schemas[] PROTOBUF_SECTION_VARIABLE(protodesc_cold) = {
-  { 0, -1, -1, sizeof(::common::RecorderStatus)},
-  { 11, -1, -1, sizeof(::common::Respone)},
-};
-
-static ::PROTOBUF_NAMESPACE_ID::Message const * const file_default_instances[] = {
-  reinterpret_cast<const ::PROTOBUF_NAMESPACE_ID::Message*>(&::common::_RecorderStatus_default_instance_),
-  reinterpret_cast<const ::PROTOBUF_NAMESPACE_ID::Message*>(&::common::_Respone_default_instance_),
+static ::_pb::Metadata file_level_metadata_common_2eproto[2];
+static const ::_pb::EnumDescriptor* file_level_enum_descriptors_common_2eproto[1];
+static constexpr const ::_pb::ServiceDescriptor**
+    file_level_service_descriptors_common_2eproto = nullptr;
+const ::uint32_t TableStruct_common_2eproto::offsets[] PROTOBUF_SECTION_VARIABLE(
+    protodesc_cold) = {
+    ~0u,  // no _has_bits_
+    PROTOBUF_FIELD_OFFSET(::common::RecorderStatus, _internal_metadata_),
+    ~0u,  // no _extensions_
+    ~0u,  // no _oneof_case_
+    ~0u,  // no _weak_field_map_
+    ~0u,  // no _inlined_string_donated_
+    ~0u,  // no _split_
+    ~0u,  // no sizeof(Split)
+    PROTOBUF_FIELD_OFFSET(::common::RecorderStatus, _impl_.recorderid_),
+    PROTOBUF_FIELD_OFFSET(::common::RecorderStatus, _impl_.recordername_),
+    PROTOBUF_FIELD_OFFSET(::common::RecorderStatus, _impl_.signalstatus_),
+    PROTOBUF_FIELD_OFFSET(::common::RecorderStatus, _impl_.rmspercent_),
+    PROTOBUF_FIELD_OFFSET(::common::RecorderStatus, _impl_.clipping_),
+    ~0u,  // no _has_bits_
+    PROTOBUF_FIELD_OFFSET(::common::Respone, _internal_metadata_),
+    ~0u,  // no _extensions_
+    ~0u,  // no _oneof_case_
+    ~0u,  // no _weak_field_map_
+    ~0u,  // no _inlined_string_donated_
+    ~0u,  // no _split_
+    ~0u,  // no sizeof(Split)
+    PROTOBUF_FIELD_OFFSET(::common::Respone, _impl_.success_),
+    PROTOBUF_FIELD_OFFSET(::common::Respone, _impl_.errormessage_),
 };
 
-const char descriptor_table_protodef_common_2eproto[] PROTOBUF_SECTION_VARIABLE(protodesc_cold) =
-  "\n\014common.proto\022\006common\"\214\001\n\016RecorderStatu"
-  "s\022\022\n\nrecorderID\030\001 \001(\t\022\024\n\014recorderName\030\002 "
-  "\001(\t\022*\n\014signalStatus\030\003 \001(\0162\024.common.Signa"
-  "lStatus\022\022\n\nrmsPercent\030\004 \001(\001\022\020\n\010clipping\030"
-  "\005 \001(\010\"0\n\007Respone\022\017\n\007success\030\001 \001(\010\022\024\n\014err"
-  "orMessage\030\002 \001(\t*6\n\014SignalStatus\022\013\n\007UNKNO"
-  "WN\020\000\022\r\n\tNO_SIGNAL\020\001\022\n\n\006SIGNAL\020\002B>Z<githu"
-  "b.com/pascalhuerst/session-recorder/prot"
-  "ocols/go/commonb\006proto3"
-  ;
-static ::PROTOBUF_NAMESPACE_ID::internal::once_flag descriptor_table_common_2eproto_once;
-const ::PROTOBUF_NAMESPACE_ID::internal::DescriptorTable descriptor_table_common_2eproto = {
-  false, false, 343, descriptor_table_protodef_common_2eproto, "common.proto", 
-  &descriptor_table_common_2eproto_once, nullptr, 0, 2,
-  schemas, file_default_instances, TableStruct_common_2eproto::offsets,
-  file_level_metadata_common_2eproto, file_level_enum_descriptors_common_2eproto, file_level_service_descriptors_common_2eproto,
+static const ::_pbi::MigrationSchema
+    schemas[] PROTOBUF_SECTION_VARIABLE(protodesc_cold) = {
+        { 0, -1, -1, sizeof(::common::RecorderStatus)},
+        { 13, -1, -1, sizeof(::common::Respone)},
 };
-PROTOBUF_ATTRIBUTE_WEAK const ::PROTOBUF_NAMESPACE_ID::internal::DescriptorTable* descriptor_table_common_2eproto_getter() {
+
+static const ::_pb::Message* const file_default_instances[] = {
+    &::common::_RecorderStatus_default_instance_._instance,
+    &::common::_Respone_default_instance_._instance,
+};
+const char descriptor_table_protodef_common_2eproto[] PROTOBUF_SECTION_VARIABLE(protodesc_cold) = {
+    "\n\014common.proto\022\006common\"\214\001\n\016RecorderStatu"
+    "s\022\022\n\nrecorderID\030\001 \001(\t\022\024\n\014recorderName\030\002 "
+    "\001(\t\022*\n\014signalStatus\030\003 \001(\0162\024.common.Signa"
+    "lStatus\022\022\n\nrmsPercent\030\004 \001(\001\022\020\n\010clipping\030"
+    "\005 \001(\010\"0\n\007Respone\022\017\n\007success\030\001 \001(\010\022\024\n\014err"
+    "orMessage\030\002 \001(\t*6\n\014SignalStatus\022\013\n\007UNKNO"
+    "WN\020\000\022\r\n\tNO_SIGNAL\020\001\022\n\n\006SIGNAL\020\002B>Z<githu"
+    "b.com/pascalhuerst/session-recorder/prot"
+    "ocols/go/commonb\006proto3"
+};
+static ::absl::once_flag descriptor_table_common_2eproto_once;
+const ::_pbi::DescriptorTable descriptor_table_common_2eproto = {
+    false,
+    false,
+    343,
+    descriptor_table_protodef_common_2eproto,
+    "common.proto",
+    &descriptor_table_common_2eproto_once,
+    nullptr,
+    0,
+    2,
+    schemas,
+    file_default_instances,
+    TableStruct_common_2eproto::offsets,
+    file_level_metadata_common_2eproto,
+    file_level_enum_descriptors_common_2eproto,
+    file_level_service_descriptors_common_2eproto,
+};
+
+// This function exists to be marked as weak.
+// It can significantly speed up compilation by breaking up LLVM's SCC
+// in the .pb.cc translation units. Large translation units see a
+// reduction of more than 35% of walltime for optimized builds. Without
+// the weak attribute all the messages in the file, including all the
+// vtables and everything they use become part of the same SCC through
+// a cycle like:
+// GetMetadata -> descriptor table -> default instances ->
+//   vtables -> GetMetadata
+// By adding a weak function here we break the connection from the
+// individual vtables back into the descriptor table.
+PROTOBUF_ATTRIBUTE_WEAK const ::_pbi::DescriptorTable* descriptor_table_common_2eproto_getter() {
   return &descriptor_table_common_2eproto;
 }
-
 // Force running AddDescriptors() at dynamic initialization time.
-PROTOBUF_ATTRIBUTE_INIT_PRIORITY static ::PROTOBUF_NAMESPACE_ID::internal::AddDescriptorsRunner dynamic_init_dummy_common_2eproto(&descriptor_table_common_2eproto);
+PROTOBUF_ATTRIBUTE_INIT_PRIORITY2
+static ::_pbi::AddDescriptorsRunner dynamic_init_dummy_common_2eproto(&descriptor_table_common_2eproto);
 namespace common {
 const ::PROTOBUF_NAMESPACE_ID::EnumDescriptor* SignalStatus_descriptor() {
   ::PROTOBUF_NAMESPACE_ID::internal::AssignDescriptors(&descriptor_table_common_2eproto);
@@ -122,150 +171,167 @@ bool SignalStatus_IsValid(int value) {
       return false;
   }
 }
-
-
 // ===================================================================
 
 class RecorderStatus::_Internal {
  public:
 };
 
-RecorderStatus::RecorderStatus(::PROTOBUF_NAMESPACE_ID::Arena* arena,
-                         bool is_message_owned)
-  : ::PROTOBUF_NAMESPACE_ID::Message(arena, is_message_owned) {
-  SharedCtor();
-  if (!is_message_owned) {
-    RegisterArenaDtor(arena);
-  }
+RecorderStatus::RecorderStatus(::PROTOBUF_NAMESPACE_ID::Arena* arena)
+  : ::PROTOBUF_NAMESPACE_ID::Message(arena) {
+  SharedCtor(arena);
   // @@protoc_insertion_point(arena_constructor:common.RecorderStatus)
 }
 RecorderStatus::RecorderStatus(const RecorderStatus& from)
   : ::PROTOBUF_NAMESPACE_ID::Message() {
+  RecorderStatus* const _this = this; (void)_this;
+  new (&_impl_) Impl_{
+      decltype(_impl_.recorderid_) {}
+
+    , decltype(_impl_.recordername_) {}
+
+    , decltype(_impl_.rmspercent_) {}
+
+    , decltype(_impl_.signalstatus_) {}
+
+    , decltype(_impl_.clipping_) {}
+
+    , /*decltype(_impl_._cached_size_)*/{}};
+
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
-  recorderid_.UnsafeSetDefault(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited());
+  _impl_.recorderid_.InitDefault();
   #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
-    recorderid_.Set(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), "", GetArenaForAllocation());
-  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+        _impl_.recorderid_.Set("", GetArenaForAllocation());
+  #endif  // PROTOBUF_FORCE_COPY_DEFAULT_STRING
   if (!from._internal_recorderid().empty()) {
-    recorderid_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, from._internal_recorderid(), 
-      GetArenaForAllocation());
+    _this->_impl_.recorderid_.Set(from._internal_recorderid(), _this->GetArenaForAllocation());
   }
-  recordername_.UnsafeSetDefault(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited());
+  _impl_.recordername_.InitDefault();
   #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
-    recordername_.Set(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), "", GetArenaForAllocation());
-  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+        _impl_.recordername_.Set("", GetArenaForAllocation());
+  #endif  // PROTOBUF_FORCE_COPY_DEFAULT_STRING
   if (!from._internal_recordername().empty()) {
-    recordername_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, from._internal_recordername(), 
-      GetArenaForAllocation());
+    _this->_impl_.recordername_.Set(from._internal_recordername(), _this->GetArenaForAllocation());
   }
-  ::memcpy(&rmspercent_, &from.rmspercent_,
-    static_cast<size_t>(reinterpret_cast<char*>(&clipping_) -
-    reinterpret_cast<char*>(&rmspercent_)) + sizeof(clipping_));
+  ::memcpy(&_impl_.rmspercent_, &from._impl_.rmspercent_,
+    static_cast<::size_t>(reinterpret_cast<char*>(&_impl_.clipping_) -
+    reinterpret_cast<char*>(&_impl_.rmspercent_)) + sizeof(_impl_.clipping_));
   // @@protoc_insertion_point(copy_constructor:common.RecorderStatus)
 }
 
-inline void RecorderStatus::SharedCtor() {
-recorderid_.UnsafeSetDefault(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited());
-#ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
-  recorderid_.Set(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), "", GetArenaForAllocation());
-#endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
-recordername_.UnsafeSetDefault(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited());
-#ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
-  recordername_.Set(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), "", GetArenaForAllocation());
-#endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
-::memset(reinterpret_cast<char*>(this) + static_cast<size_t>(
-    reinterpret_cast<char*>(&rmspercent_) - reinterpret_cast<char*>(this)),
-    0, static_cast<size_t>(reinterpret_cast<char*>(&clipping_) -
-    reinterpret_cast<char*>(&rmspercent_)) + sizeof(clipping_));
+inline void RecorderStatus::SharedCtor(::_pb::Arena* arena) {
+  (void)arena;
+  new (&_impl_) Impl_{
+      decltype(_impl_.recorderid_) {}
+
+    , decltype(_impl_.recordername_) {}
+
+    , decltype(_impl_.rmspercent_) { 0 }
+
+    , decltype(_impl_.signalstatus_) { 0 }
+
+    , decltype(_impl_.clipping_) { false }
+
+    , /*decltype(_impl_._cached_size_)*/{}
+  };
+  _impl_.recorderid_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+        _impl_.recorderid_.Set("", GetArenaForAllocation());
+  #endif  // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  _impl_.recordername_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+        _impl_.recordername_.Set("", GetArenaForAllocation());
+  #endif  // PROTOBUF_FORCE_COPY_DEFAULT_STRING
 }
 
 RecorderStatus::~RecorderStatus() {
   // @@protoc_insertion_point(destructor:common.RecorderStatus)
-  if (GetArenaForAllocation() != nullptr) return;
+  if (auto *arena = _internal_metadata_.DeleteReturnArena<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>()) {
+  (void)arena;
+    return;
+  }
   SharedDtor();
-  _internal_metadata_.Delete<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
 inline void RecorderStatus::SharedDtor() {
-  GOOGLE_DCHECK(GetArenaForAllocation() == nullptr);
-  recorderid_.DestroyNoArena(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited());
-  recordername_.DestroyNoArena(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited());
+  ABSL_DCHECK(GetArenaForAllocation() == nullptr);
+  _impl_.recorderid_.Destroy();
+  _impl_.recordername_.Destroy();
 }
 
-void RecorderStatus::ArenaDtor(void* object) {
-  RecorderStatus* _this = reinterpret_cast< RecorderStatus* >(object);
-  (void)_this;
-}
-void RecorderStatus::RegisterArenaDtor(::PROTOBUF_NAMESPACE_ID::Arena*) {
-}
 void RecorderStatus::SetCachedSize(int size) const {
-  _cached_size_.Set(size);
+  _impl_._cached_size_.Set(size);
 }
 
 void RecorderStatus::Clear() {
 // @@protoc_insertion_point(message_clear_start:common.RecorderStatus)
-  uint32_t cached_has_bits = 0;
+  ::uint32_t cached_has_bits = 0;
   // Prevent compiler warnings about cached_has_bits being unused
   (void) cached_has_bits;
 
-  recorderid_.ClearToEmpty();
-  recordername_.ClearToEmpty();
-  ::memset(&rmspercent_, 0, static_cast<size_t>(
-      reinterpret_cast<char*>(&clipping_) -
-      reinterpret_cast<char*>(&rmspercent_)) + sizeof(clipping_));
+  _impl_.recorderid_.ClearToEmpty();
+  _impl_.recordername_.ClearToEmpty();
+  ::memset(&_impl_.rmspercent_, 0, static_cast<::size_t>(
+      reinterpret_cast<char*>(&_impl_.clipping_) -
+      reinterpret_cast<char*>(&_impl_.rmspercent_)) + sizeof(_impl_.clipping_));
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
-const char* RecorderStatus::_InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID::internal::ParseContext* ctx) {
+const char* RecorderStatus::_InternalParse(const char* ptr, ::_pbi::ParseContext* ctx) {
 #define CHK_(x) if (PROTOBUF_PREDICT_FALSE(!(x))) goto failure
   while (!ctx->Done(&ptr)) {
-    uint32_t tag;
-    ptr = ::PROTOBUF_NAMESPACE_ID::internal::ReadTag(ptr, &tag);
+    ::uint32_t tag;
+    ptr = ::_pbi::ReadTag(ptr, &tag);
     switch (tag >> 3) {
       // string recorderID = 1;
       case 1:
-        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 10)) {
+        if (PROTOBUF_PREDICT_TRUE(static_cast<::uint8_t>(tag) == 10)) {
           auto str = _internal_mutable_recorderid();
-          ptr = ::PROTOBUF_NAMESPACE_ID::internal::InlineGreedyStringParser(str, ptr, ctx);
-          CHK_(::PROTOBUF_NAMESPACE_ID::internal::VerifyUTF8(str, "common.RecorderStatus.recorderID"));
+          ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
           CHK_(ptr);
-        } else
+          CHK_(::_pbi::VerifyUTF8(str, "common.RecorderStatus.recorderID"));
+        } else {
           goto handle_unusual;
+        }
         continue;
       // string recorderName = 2;
       case 2:
-        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 18)) {
+        if (PROTOBUF_PREDICT_TRUE(static_cast<::uint8_t>(tag) == 18)) {
           auto str = _internal_mutable_recordername();
-          ptr = ::PROTOBUF_NAMESPACE_ID::internal::InlineGreedyStringParser(str, ptr, ctx);
-          CHK_(::PROTOBUF_NAMESPACE_ID::internal::VerifyUTF8(str, "common.RecorderStatus.recorderName"));
+          ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
           CHK_(ptr);
-        } else
+          CHK_(::_pbi::VerifyUTF8(str, "common.RecorderStatus.recorderName"));
+        } else {
           goto handle_unusual;
+        }
         continue;
       // .common.SignalStatus signalStatus = 3;
       case 3:
-        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 24)) {
-          uint64_t val = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+        if (PROTOBUF_PREDICT_TRUE(static_cast<::uint8_t>(tag) == 24)) {
+          ::int32_t val = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
           CHK_(ptr);
           _internal_set_signalstatus(static_cast<::common::SignalStatus>(val));
-        } else
+        } else {
           goto handle_unusual;
+        }
         continue;
       // double rmsPercent = 4;
       case 4:
-        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 33)) {
-          rmspercent_ = ::PROTOBUF_NAMESPACE_ID::internal::UnalignedLoad<double>(ptr);
+        if (PROTOBUF_PREDICT_TRUE(static_cast<::uint8_t>(tag) == 33)) {
+          _impl_.rmspercent_ = ::PROTOBUF_NAMESPACE_ID::internal::UnalignedLoad<double>(ptr);
           ptr += sizeof(double);
-        } else
+        } else {
           goto handle_unusual;
+        }
         continue;
       // bool clipping = 5;
       case 5:
-        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 40)) {
-          clipping_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+        if (PROTOBUF_PREDICT_TRUE(static_cast<::uint8_t>(tag) == 40)) {
+          _impl_.clipping_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
           CHK_(ptr);
-        } else
+        } else {
           goto handle_unusual;
+        }
         continue;
       default:
         goto handle_unusual;
@@ -290,147 +356,139 @@ failure:
 #undef CHK_
 }
 
-uint8_t* RecorderStatus::_InternalSerialize(
-    uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const {
+::uint8_t* RecorderStatus::_InternalSerialize(
+    ::uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const {
   // @@protoc_insertion_point(serialize_to_array_start:common.RecorderStatus)
-  uint32_t cached_has_bits = 0;
+  ::uint32_t cached_has_bits = 0;
   (void) cached_has_bits;
 
   // string recorderID = 1;
   if (!this->_internal_recorderid().empty()) {
+    const std::string& _s = this->_internal_recorderid();
     ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::VerifyUtf8String(
-      this->_internal_recorderid().data(), static_cast<int>(this->_internal_recorderid().length()),
-      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::SERIALIZE,
-      "common.RecorderStatus.recorderID");
-    target = stream->WriteStringMaybeAliased(
-        1, this->_internal_recorderid(), target);
+        _s.data(), static_cast<int>(_s.length()), ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::SERIALIZE, "common.RecorderStatus.recorderID");
+    target = stream->WriteStringMaybeAliased(1, _s, target);
   }
 
   // string recorderName = 2;
   if (!this->_internal_recordername().empty()) {
+    const std::string& _s = this->_internal_recordername();
     ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::VerifyUtf8String(
-      this->_internal_recordername().data(), static_cast<int>(this->_internal_recordername().length()),
-      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::SERIALIZE,
-      "common.RecorderStatus.recorderName");
-    target = stream->WriteStringMaybeAliased(
-        2, this->_internal_recordername(), target);
+        _s.data(), static_cast<int>(_s.length()), ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::SERIALIZE, "common.RecorderStatus.recorderName");
+    target = stream->WriteStringMaybeAliased(2, _s, target);
   }
 
   // .common.SignalStatus signalStatus = 3;
   if (this->_internal_signalstatus() != 0) {
     target = stream->EnsureSpace(target);
-    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::WriteEnumToArray(
-      3, this->_internal_signalstatus(), target);
+    target = ::_pbi::WireFormatLite::WriteEnumToArray(
+        3, this->_internal_signalstatus(), target);
   }
 
   // double rmsPercent = 4;
-  static_assert(sizeof(uint64_t) == sizeof(double), "Code assumes uint64_t and double are the same size.");
+  static_assert(sizeof(::uint64_t) == sizeof(double), "Code assumes ::uint64_t and double are the same size.");
   double tmp_rmspercent = this->_internal_rmspercent();
-  uint64_t raw_rmspercent;
+  ::uint64_t raw_rmspercent;
   memcpy(&raw_rmspercent, &tmp_rmspercent, sizeof(tmp_rmspercent));
   if (raw_rmspercent != 0) {
     target = stream->EnsureSpace(target);
-    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::WriteDoubleToArray(4, this->_internal_rmspercent(), target);
+    target = ::_pbi::WireFormatLite::WriteDoubleToArray(
+        4, this->_internal_rmspercent(), target);
   }
 
   // bool clipping = 5;
   if (this->_internal_clipping() != 0) {
     target = stream->EnsureSpace(target);
-    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::WriteBoolToArray(5, this->_internal_clipping(), target);
+    target = ::_pbi::WireFormatLite::WriteBoolToArray(
+        5, this->_internal_clipping(), target);
   }
 
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
-    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormat::InternalSerializeUnknownFieldsToArray(
+    target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
   }
   // @@protoc_insertion_point(serialize_to_array_end:common.RecorderStatus)
   return target;
 }
 
-size_t RecorderStatus::ByteSizeLong() const {
+::size_t RecorderStatus::ByteSizeLong() const {
 // @@protoc_insertion_point(message_byte_size_start:common.RecorderStatus)
-  size_t total_size = 0;
+  ::size_t total_size = 0;
 
-  uint32_t cached_has_bits = 0;
+  ::uint32_t cached_has_bits = 0;
   // Prevent compiler warnings about cached_has_bits being unused
   (void) cached_has_bits;
 
   // string recorderID = 1;
   if (!this->_internal_recorderid().empty()) {
-    total_size += 1 +
-      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
-        this->_internal_recorderid());
+    total_size += 1 + ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
+                                    this->_internal_recorderid());
   }
 
   // string recorderName = 2;
   if (!this->_internal_recordername().empty()) {
-    total_size += 1 +
-      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
-        this->_internal_recordername());
+    total_size += 1 + ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
+                                    this->_internal_recordername());
   }
 
   // double rmsPercent = 4;
-  static_assert(sizeof(uint64_t) == sizeof(double), "Code assumes uint64_t and double are the same size.");
+  static_assert(sizeof(::uint64_t) == sizeof(double), "Code assumes ::uint64_t and double are the same size.");
   double tmp_rmspercent = this->_internal_rmspercent();
-  uint64_t raw_rmspercent;
+  ::uint64_t raw_rmspercent;
   memcpy(&raw_rmspercent, &tmp_rmspercent, sizeof(tmp_rmspercent));
   if (raw_rmspercent != 0) {
-    total_size += 1 + 8;
+    total_size += 9;
   }
 
   // .common.SignalStatus signalStatus = 3;
   if (this->_internal_signalstatus() != 0) {
     total_size += 1 +
-      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::EnumSize(this->_internal_signalstatus());
+                  ::_pbi::WireFormatLite::EnumSize(this->_internal_signalstatus());
   }
 
   // bool clipping = 5;
   if (this->_internal_clipping() != 0) {
-    total_size += 1 + 1;
+    total_size += 2;
   }
 
-  return MaybeComputeUnknownFieldsSize(total_size, &_cached_size_);
+  return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
 }
 
 const ::PROTOBUF_NAMESPACE_ID::Message::ClassData RecorderStatus::_class_data_ = {
-    ::PROTOBUF_NAMESPACE_ID::Message::CopyWithSizeCheck,
+    ::PROTOBUF_NAMESPACE_ID::Message::CopyWithSourceCheck,
     RecorderStatus::MergeImpl
 };
 const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*RecorderStatus::GetClassData() const { return &_class_data_; }
 
-void RecorderStatus::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message* to,
-                      const ::PROTOBUF_NAMESPACE_ID::Message& from) {
-  static_cast<RecorderStatus *>(to)->MergeFrom(
-      static_cast<const RecorderStatus &>(from));
-}
 
-
-void RecorderStatus::MergeFrom(const RecorderStatus& from) {
-// @@protoc_insertion_point(class_specific_merge_from_start:common.RecorderStatus)
-  GOOGLE_DCHECK_NE(&from, this);
-  uint32_t cached_has_bits = 0;
+void RecorderStatus::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTOBUF_NAMESPACE_ID::Message& from_msg) {
+  auto* const _this = static_cast<RecorderStatus*>(&to_msg);
+  auto& from = static_cast<const RecorderStatus&>(from_msg);
+  // @@protoc_insertion_point(class_specific_merge_from_start:common.RecorderStatus)
+  ABSL_DCHECK_NE(&from, _this);
+  ::uint32_t cached_has_bits = 0;
   (void) cached_has_bits;
 
   if (!from._internal_recorderid().empty()) {
-    _internal_set_recorderid(from._internal_recorderid());
+    _this->_internal_set_recorderid(from._internal_recorderid());
   }
   if (!from._internal_recordername().empty()) {
-    _internal_set_recordername(from._internal_recordername());
+    _this->_internal_set_recordername(from._internal_recordername());
   }
-  static_assert(sizeof(uint64_t) == sizeof(double), "Code assumes uint64_t and double are the same size.");
+  static_assert(sizeof(::uint64_t) == sizeof(double), "Code assumes ::uint64_t and double are the same size.");
   double tmp_rmspercent = from._internal_rmspercent();
-  uint64_t raw_rmspercent;
+  ::uint64_t raw_rmspercent;
   memcpy(&raw_rmspercent, &tmp_rmspercent, sizeof(tmp_rmspercent));
   if (raw_rmspercent != 0) {
-    _internal_set_rmspercent(from._internal_rmspercent());
+    _this->_internal_set_rmspercent(from._internal_rmspercent());
   }
   if (from._internal_signalstatus() != 0) {
-    _internal_set_signalstatus(from._internal_signalstatus());
+    _this->_internal_set_signalstatus(from._internal_signalstatus());
   }
   if (from._internal_clipping() != 0) {
-    _internal_set_clipping(from._internal_clipping());
+    _this->_internal_set_clipping(from._internal_clipping());
   }
-  _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+  _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
 }
 
 void RecorderStatus::CopyFrom(const RecorderStatus& from) {
@@ -449,124 +507,125 @@ void RecorderStatus::InternalSwap(RecorderStatus* other) {
   auto* lhs_arena = GetArenaForAllocation();
   auto* rhs_arena = other->GetArenaForAllocation();
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
-  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
-      &::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(),
-      &recorderid_, lhs_arena,
-      &other->recorderid_, rhs_arena
-  );
-  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
-      &::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(),
-      &recordername_, lhs_arena,
-      &other->recordername_, rhs_arena
-  );
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.recorderid_, lhs_arena,
+                                       &other->_impl_.recorderid_, rhs_arena);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.recordername_, lhs_arena,
+                                       &other->_impl_.recordername_, rhs_arena);
   ::PROTOBUF_NAMESPACE_ID::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(RecorderStatus, clipping_)
-      + sizeof(RecorderStatus::clipping_)
-      - PROTOBUF_FIELD_OFFSET(RecorderStatus, rmspercent_)>(
-          reinterpret_cast<char*>(&rmspercent_),
-          reinterpret_cast<char*>(&other->rmspercent_));
+      PROTOBUF_FIELD_OFFSET(RecorderStatus, _impl_.clipping_)
+      + sizeof(RecorderStatus::_impl_.clipping_)
+      - PROTOBUF_FIELD_OFFSET(RecorderStatus, _impl_.rmspercent_)>(
+          reinterpret_cast<char*>(&_impl_.rmspercent_),
+          reinterpret_cast<char*>(&other->_impl_.rmspercent_));
 }
 
 ::PROTOBUF_NAMESPACE_ID::Metadata RecorderStatus::GetMetadata() const {
-  return ::PROTOBUF_NAMESPACE_ID::internal::AssignDescriptors(
+  return ::_pbi::AssignDescriptors(
       &descriptor_table_common_2eproto_getter, &descriptor_table_common_2eproto_once,
       file_level_metadata_common_2eproto[0]);
 }
-
 // ===================================================================
 
 class Respone::_Internal {
  public:
 };
 
-Respone::Respone(::PROTOBUF_NAMESPACE_ID::Arena* arena,
-                         bool is_message_owned)
-  : ::PROTOBUF_NAMESPACE_ID::Message(arena, is_message_owned) {
-  SharedCtor();
-  if (!is_message_owned) {
-    RegisterArenaDtor(arena);
-  }
+Respone::Respone(::PROTOBUF_NAMESPACE_ID::Arena* arena)
+  : ::PROTOBUF_NAMESPACE_ID::Message(arena) {
+  SharedCtor(arena);
   // @@protoc_insertion_point(arena_constructor:common.Respone)
 }
 Respone::Respone(const Respone& from)
   : ::PROTOBUF_NAMESPACE_ID::Message() {
+  Respone* const _this = this; (void)_this;
+  new (&_impl_) Impl_{
+      decltype(_impl_.errormessage_) {}
+
+    , decltype(_impl_.success_) {}
+
+    , /*decltype(_impl_._cached_size_)*/{}};
+
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
-  errormessage_.UnsafeSetDefault(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited());
+  _impl_.errormessage_.InitDefault();
   #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
-    errormessage_.Set(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), "", GetArenaForAllocation());
-  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+        _impl_.errormessage_.Set("", GetArenaForAllocation());
+  #endif  // PROTOBUF_FORCE_COPY_DEFAULT_STRING
   if (!from._internal_errormessage().empty()) {
-    errormessage_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, from._internal_errormessage(), 
-      GetArenaForAllocation());
+    _this->_impl_.errormessage_.Set(from._internal_errormessage(), _this->GetArenaForAllocation());
   }
-  success_ = from.success_;
+  _this->_impl_.success_ = from._impl_.success_;
   // @@protoc_insertion_point(copy_constructor:common.Respone)
 }
 
-inline void Respone::SharedCtor() {
-errormessage_.UnsafeSetDefault(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited());
-#ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
-  errormessage_.Set(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), "", GetArenaForAllocation());
-#endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
-success_ = false;
+inline void Respone::SharedCtor(::_pb::Arena* arena) {
+  (void)arena;
+  new (&_impl_) Impl_{
+      decltype(_impl_.errormessage_) {}
+
+    , decltype(_impl_.success_) { false }
+
+    , /*decltype(_impl_._cached_size_)*/{}
+  };
+  _impl_.errormessage_.InitDefault();
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+        _impl_.errormessage_.Set("", GetArenaForAllocation());
+  #endif  // PROTOBUF_FORCE_COPY_DEFAULT_STRING
 }
 
 Respone::~Respone() {
   // @@protoc_insertion_point(destructor:common.Respone)
-  if (GetArenaForAllocation() != nullptr) return;
+  if (auto *arena = _internal_metadata_.DeleteReturnArena<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>()) {
+  (void)arena;
+    return;
+  }
   SharedDtor();
-  _internal_metadata_.Delete<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
 inline void Respone::SharedDtor() {
-  GOOGLE_DCHECK(GetArenaForAllocation() == nullptr);
-  errormessage_.DestroyNoArena(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited());
+  ABSL_DCHECK(GetArenaForAllocation() == nullptr);
+  _impl_.errormessage_.Destroy();
 }
 
-void Respone::ArenaDtor(void* object) {
-  Respone* _this = reinterpret_cast< Respone* >(object);
-  (void)_this;
-}
-void Respone::RegisterArenaDtor(::PROTOBUF_NAMESPACE_ID::Arena*) {
-}
 void Respone::SetCachedSize(int size) const {
-  _cached_size_.Set(size);
+  _impl_._cached_size_.Set(size);
 }
 
 void Respone::Clear() {
 // @@protoc_insertion_point(message_clear_start:common.Respone)
-  uint32_t cached_has_bits = 0;
+  ::uint32_t cached_has_bits = 0;
   // Prevent compiler warnings about cached_has_bits being unused
   (void) cached_has_bits;
 
-  errormessage_.ClearToEmpty();
-  success_ = false;
+  _impl_.errormessage_.ClearToEmpty();
+  _impl_.success_ = false;
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
-const char* Respone::_InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID::internal::ParseContext* ctx) {
+const char* Respone::_InternalParse(const char* ptr, ::_pbi::ParseContext* ctx) {
 #define CHK_(x) if (PROTOBUF_PREDICT_FALSE(!(x))) goto failure
   while (!ctx->Done(&ptr)) {
-    uint32_t tag;
-    ptr = ::PROTOBUF_NAMESPACE_ID::internal::ReadTag(ptr, &tag);
+    ::uint32_t tag;
+    ptr = ::_pbi::ReadTag(ptr, &tag);
     switch (tag >> 3) {
       // bool success = 1;
       case 1:
-        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 8)) {
-          success_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+        if (PROTOBUF_PREDICT_TRUE(static_cast<::uint8_t>(tag) == 8)) {
+          _impl_.success_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
           CHK_(ptr);
-        } else
+        } else {
           goto handle_unusual;
+        }
         continue;
       // string errorMessage = 2;
       case 2:
-        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 18)) {
+        if (PROTOBUF_PREDICT_TRUE(static_cast<::uint8_t>(tag) == 18)) {
           auto str = _internal_mutable_errormessage();
-          ptr = ::PROTOBUF_NAMESPACE_ID::internal::InlineGreedyStringParser(str, ptr, ctx);
-          CHK_(::PROTOBUF_NAMESPACE_ID::internal::VerifyUTF8(str, "common.Respone.errorMessage"));
+          ptr = ::_pbi::InlineGreedyStringParser(str, ptr, ctx);
           CHK_(ptr);
-        } else
+          CHK_(::_pbi::VerifyUTF8(str, "common.Respone.errorMessage"));
+        } else {
           goto handle_unusual;
+        }
         continue;
       default:
         goto handle_unusual;
@@ -591,85 +650,79 @@ failure:
 #undef CHK_
 }
 
-uint8_t* Respone::_InternalSerialize(
-    uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const {
+::uint8_t* Respone::_InternalSerialize(
+    ::uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const {
   // @@protoc_insertion_point(serialize_to_array_start:common.Respone)
-  uint32_t cached_has_bits = 0;
+  ::uint32_t cached_has_bits = 0;
   (void) cached_has_bits;
 
   // bool success = 1;
   if (this->_internal_success() != 0) {
     target = stream->EnsureSpace(target);
-    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::WriteBoolToArray(1, this->_internal_success(), target);
+    target = ::_pbi::WireFormatLite::WriteBoolToArray(
+        1, this->_internal_success(), target);
   }
 
   // string errorMessage = 2;
   if (!this->_internal_errormessage().empty()) {
+    const std::string& _s = this->_internal_errormessage();
     ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::VerifyUtf8String(
-      this->_internal_errormessage().data(), static_cast<int>(this->_internal_errormessage().length()),
-      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::SERIALIZE,
-      "common.Respone.errorMessage");
-    target = stream->WriteStringMaybeAliased(
-        2, this->_internal_errormessage(), target);
+        _s.data(), static_cast<int>(_s.length()), ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::SERIALIZE, "common.Respone.errorMessage");
+    target = stream->WriteStringMaybeAliased(2, _s, target);
   }
 
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
-    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormat::InternalSerializeUnknownFieldsToArray(
+    target = ::_pbi::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
   }
   // @@protoc_insertion_point(serialize_to_array_end:common.Respone)
   return target;
 }
 
-size_t Respone::ByteSizeLong() const {
+::size_t Respone::ByteSizeLong() const {
 // @@protoc_insertion_point(message_byte_size_start:common.Respone)
-  size_t total_size = 0;
+  ::size_t total_size = 0;
 
-  uint32_t cached_has_bits = 0;
+  ::uint32_t cached_has_bits = 0;
   // Prevent compiler warnings about cached_has_bits being unused
   (void) cached_has_bits;
 
   // string errorMessage = 2;
   if (!this->_internal_errormessage().empty()) {
-    total_size += 1 +
-      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
-        this->_internal_errormessage());
+    total_size += 1 + ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
+                                    this->_internal_errormessage());
   }
 
   // bool success = 1;
   if (this->_internal_success() != 0) {
-    total_size += 1 + 1;
+    total_size += 2;
   }
 
-  return MaybeComputeUnknownFieldsSize(total_size, &_cached_size_);
+  return MaybeComputeUnknownFieldsSize(total_size, &_impl_._cached_size_);
 }
 
 const ::PROTOBUF_NAMESPACE_ID::Message::ClassData Respone::_class_data_ = {
-    ::PROTOBUF_NAMESPACE_ID::Message::CopyWithSizeCheck,
+    ::PROTOBUF_NAMESPACE_ID::Message::CopyWithSourceCheck,
     Respone::MergeImpl
 };
 const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*Respone::GetClassData() const { return &_class_data_; }
 
-void Respone::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message* to,
-                      const ::PROTOBUF_NAMESPACE_ID::Message& from) {
-  static_cast<Respone *>(to)->MergeFrom(
-      static_cast<const Respone &>(from));
-}
 
-
-void Respone::MergeFrom(const Respone& from) {
-// @@protoc_insertion_point(class_specific_merge_from_start:common.Respone)
-  GOOGLE_DCHECK_NE(&from, this);
-  uint32_t cached_has_bits = 0;
+void Respone::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message& to_msg, const ::PROTOBUF_NAMESPACE_ID::Message& from_msg) {
+  auto* const _this = static_cast<Respone*>(&to_msg);
+  auto& from = static_cast<const Respone&>(from_msg);
+  // @@protoc_insertion_point(class_specific_merge_from_start:common.Respone)
+  ABSL_DCHECK_NE(&from, _this);
+  ::uint32_t cached_has_bits = 0;
   (void) cached_has_bits;
 
   if (!from._internal_errormessage().empty()) {
-    _internal_set_errormessage(from._internal_errormessage());
+    _this->_internal_set_errormessage(from._internal_errormessage());
   }
   if (from._internal_success() != 0) {
-    _internal_set_success(from._internal_success());
+    _this->_internal_set_success(from._internal_success());
   }
-  _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+  _this->_internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
 }
 
 void Respone::CopyFrom(const Respone& from) {
@@ -688,30 +741,28 @@ void Respone::InternalSwap(Respone* other) {
   auto* lhs_arena = GetArenaForAllocation();
   auto* rhs_arena = other->GetArenaForAllocation();
   _internal_metadata_.InternalSwap(&other->_internal_metadata_);
-  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
-      &::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(),
-      &errormessage_, lhs_arena,
-      &other->errormessage_, rhs_arena
-  );
-  swap(success_, other->success_);
+  ::_pbi::ArenaStringPtr::InternalSwap(&_impl_.errormessage_, lhs_arena,
+                                       &other->_impl_.errormessage_, rhs_arena);
+
+  swap(_impl_.success_, other->_impl_.success_);
 }
 
 ::PROTOBUF_NAMESPACE_ID::Metadata Respone::GetMetadata() const {
-  return ::PROTOBUF_NAMESPACE_ID::internal::AssignDescriptors(
+  return ::_pbi::AssignDescriptors(
       &descriptor_table_common_2eproto_getter, &descriptor_table_common_2eproto_once,
       file_level_metadata_common_2eproto[1]);
 }
-
 // @@protoc_insertion_point(namespace_scope)
 }  // namespace common
 PROTOBUF_NAMESPACE_OPEN
-template<> PROTOBUF_NOINLINE ::common::RecorderStatus* Arena::CreateMaybeMessage< ::common::RecorderStatus >(Arena* arena) {
+template<> PROTOBUF_NOINLINE ::common::RecorderStatus*
+Arena::CreateMaybeMessage< ::common::RecorderStatus >(Arena* arena) {
   return Arena::CreateMessageInternal< ::common::RecorderStatus >(arena);
 }
-template<> PROTOBUF_NOINLINE ::common::Respone* Arena::CreateMaybeMessage< ::common::Respone >(Arena* arena) {
+template<> PROTOBUF_NOINLINE ::common::Respone*
+Arena::CreateMaybeMessage< ::common::Respone >(Arena* arena) {
   return Arena::CreateMessageInternal< ::common::Respone >(arena);
 }
 PROTOBUF_NAMESPACE_CLOSE
-
 // @@protoc_insertion_point(global_scope)
-#include <google/protobuf/port_undef.inc>
+#include "google/protobuf/port_undef.inc"

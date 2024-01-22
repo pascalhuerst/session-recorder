@@ -1,4 +1,5 @@
 PROTOC ?= protoc
+PROTOC_INCLUDES ?= /usr/include/google/protobuf
 GRPC_CPP_PLUGIN ?= $(shell which grpc_cpp_plugin)
 GRPC_TS_PLUGIN ?= ./node_modules/.bin/protoc-gen-ts_proto
 MD ?= mkdir
@@ -21,6 +22,7 @@ create_dirs:
 
 chunksink:
 	${PROTOC} \
+		--proto_path=${PROTOC_INCLUDES} \
 		--grpc_out=generate_mock_code=false:./cpp \
 		--cpp_out=./cpp \
 		--plugin=protoc-gen-grpc=${GRPC_CPP_PLUGIN} \
@@ -29,6 +31,7 @@ chunksink:
 
 	$(MD) -p go/$@
 	$(PROTOC) \
+		--proto_path=${PROTOC_INCLUDES} \
 		--go_out=paths=source_relative:./go/$@ $@.proto \
 		--go-grpc_opt=require_unimplemented_servers=false,paths=source_relative \
 		--proto_path=proto \
@@ -37,6 +40,7 @@ chunksink:
 
 sessionsource:
 	$(PROTOC) \
+		--proto_path=${PROTOC_INCLUDES} \
 		--plugin=protoc-gen-ts_proto=$(GRPC_TS_PLUGIN) \
 		--ts_proto_out=./ts \
 		--ts_proto_opt=outputServices=nice-grpc,outputServices=generic-definitions,useExactTypes=false,esModuleInterop=true \
@@ -45,6 +49,7 @@ sessionsource:
 
 	$(MD) -p go/$@
 	$(PROTOC) \
+		--proto_path=${PROTOC_INCLUDES} \
 		--go_out=paths=source_relative:./go/$@ $@.proto \
 		--go-grpc_opt=require_unimplemented_servers=false,paths=source_relative \
 		--proto_path=proto \
@@ -52,6 +57,7 @@ sessionsource:
 
 common:
 	$(PROTOC) \
+		--proto_path=${PROTOC_INCLUDES} \
 		--plugin=protoc-gen-ts_proto=$(GRPC_TS_PLUGIN) \
 		--ts_proto_out=./ts \
 		--ts_proto_opt=outputServices=nice-grpc,outputServices=generic-definitions,useExactTypes=false,esModuleInterop=true \
@@ -60,12 +66,14 @@ common:
 
 	$(MD) -p go/$@
 	$(PROTOC) \
+		--proto_path=${PROTOC_INCLUDES} \
 		--go_out=paths=source_relative:./go/$@ $@.proto \
 		--go-grpc_opt=require_unimplemented_servers=false,paths=source_relative \
 		--proto_path=proto \
 		--go-grpc_out=./go/$@ $@.proto
 
 	${PROTOC} \
+		--proto_path=${PROTOC_INCLUDES} \
 		--grpc_out=generate_mock_code=false:./cpp \
 		--cpp_out=./cpp \
 		--plugin=protoc-gen-grpc=${GRPC_CPP_PLUGIN} \

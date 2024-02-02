@@ -1,0 +1,7 @@
+*.user
+*.autosave
+.*.stash
+Makefile
+*.o
+nubbock
+moc_*

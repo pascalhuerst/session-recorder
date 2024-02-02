@@ -137,6 +137,9 @@ func (m *Minio) initSession(recorderID, sessionID uuid.UUID) {
 }
 
 func (m *Minio) SafeChunks(ctx context.Context, recorderID, sessionID uuid.UUID, _ string, samples []int16) error {
+	m.chunksLock.Lock()
+	defer m.chunksLock.Unlock()
+
 	if _, ok := m.chunks[recorderID]; !ok {
 		m.initSession(recorderID, sessionID)
 	}
@@ -144,16 +147,14 @@ func (m *Minio) SafeChunks(ctx context.Context, recorderID, sessionID uuid.UUID,
 	chunk := m.chunks[recorderID]
 	if chunk.sessionID != sessionID {
 		if err := m.CloseSession(ctx, recorderID, chunk.sessionID); err != nil {
-			log.Fatal().Err(err).Msg("Cannot close session")
+			log.Error().Err(err).Stringer("recorder-id", recorderID).Stringer("session-id", chunk.sessionID).Msg("Cannot close session")
 		}
 
 		go func(recorderID, sessionID uuid.UUID) {
 			if err := m.renderClosedSession(recorderID, chunk.sessionID); err != nil {
-				log.Err(err).Msg("Cannot render session")
+				log.Err(err).Stringer("recorder-id", recorderID).Stringer("session-id", chunk.sessionID).Msg("Cannot render closed session")
 			}
 		}(recorderID, chunk.sessionID)
-
-		m.initSession(recorderID, sessionID)
 	}
 
 	binary.Write(chunk.buffer, binary.LittleEndian, samples)
@@ -189,6 +190,9 @@ func (m *Minio) IsSessionClosed(ctx context.Context, recorderID, sessionID uuid.
 }
 
 func (m *Minio) CloseSession(ctx context.Context, recorderID, sessionID uuid.UUID) error {
+	m.chunksLock.Lock()
+	defer m.chunksLock.Unlock()
+
 	// If we have samples left for this session, let's push those first
 	if chunk, ok := m.chunks[recorderID]; ok {
 		objectName := fmt.Sprintf("%s/sessions/%s/chunks/%s", recorderID, sessionID, fmt.Sprintf("%016d", chunk.number))

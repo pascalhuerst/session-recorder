@@ -198,7 +198,7 @@ const showPicker = (ref?: HTMLInputElement) => {
     :min-height="props.height"
     :preload-margin="400"
     class="canvas"
-    ref="canvasEl"
+    ref="canvasElement"
   >
     <Overview />
     <div class="zoomview">

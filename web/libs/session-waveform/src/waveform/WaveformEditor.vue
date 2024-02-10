@@ -1,15 +1,16 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue';
 import VirtualizedItem from '../disclosure/VirtualizedItem.vue';
-import Peaks, { type PeaksInstance, type PeaksOptions } from 'peaks.js';
+import { type PeaksOptions } from 'peaks.js';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { onClickOutside } from '@vueuse/core';
 import Button from '../controls/Button.vue';
 import TextInput from '../forms/TextInput.vue';
 import uuid from 'uuidv4';
-import { CustomSegmentMarker } from './CustomSegmentMarker';
 import Marker from '../controls/Marker.vue';
 import { parsePlayTime } from '../utils/parsePlayTime';
+import { createPeaks } from '../context/context';
+import { overviewTheme, zoomviewTheme } from '../context/theme';
 
 type Segment = {
   startTime: number;
@@ -29,104 +30,46 @@ const props = withDefaults(
     segments?: Map<string, Segment & { id: string }>;
   }>(),
   {
-    height: 200
+    height: 200,
   }
 );
-
-const canvasEl = ref<HTMLElement>();
-const containerEl = ref<HTMLElement>();
-const zoomViewEl = ref<HTMLElement>();
-const mediaEl = ref<HTMLAudioElement>();
-const peaksInstanceRef = shallowRef<PeaksInstance>();
 
 const zoomLevel = ref(300);
 const zoomviewAmpZoom = ref(0.6);
 const zoomStep = ref(100);
 const zoomAmpStep = ref(0.1);
 
-watch([containerEl, zoomViewEl, mediaEl, props], () => {
-  if (containerEl.value && mediaEl.value) {
-    const options = {
-      overview: {
-        container: containerEl.value,
-        enablePoints: false,
-        enableSegments: true,
-        playheadPadding: 0,
-        playheadColor: 'red',
-        playedWaveformColor: '#6b46c1',
-        showPlayheadTime: true,
-        playheadTextColor: '#6b46c1',
-        playheadBackgroundColor: 'rgb(107,70,193,0.1)',
-        waveformColor: '#767c89'
-      },
-      zoomview: {
-        container: zoomViewEl.value,
-        enablePoints: false,
-        enableSegments: true,
-        playheadPadding: 16,
-        playheadColor: '#6b46c1',
-        waveformColor: '#a5aab4',
-        showPlayheadTime: true,
-        playedWaveformColor: '#bdafe3',
-        playheadTextColor: '#6b46c1',
-        segmentOptions: {
-          startMarkerColor: '#d53f8c',
-          endMarkerColor: '#d53f8c'
-        }
-      },
-      mediaElement: mediaEl.value,
-      ...(props.waveformUrl
-        ? {
-          dataUri: {
-            arraybuffer: props.waveformUrl
-          }
-        }
-        : {
-          webAudio: {
-            audioContext: new AudioContext(),
-            multiChannel: false
-          }
-        }),
-      createSegmentMarker(options) {
-        return new CustomSegmentMarker(options);
-      }
-    } satisfies PeaksOptions;
-
-    Peaks.init(options, function(err, peaksInstance) {
-      if (err || !peaksInstance) {
-        console.warn(err.message);
-        return null;
-      }
-
-      peaksInstanceRef.value = peaksInstance;
-    });
-  }
-});
+const { peaks, canvasElement, overviewElement, zoomviewElement, audioElement } =
+  createPeaks({
+    overviewTheme,
+    zoomviewTheme,
+    waveformUrl: computed(() => props.waveformUrl),
+  });
 
 const segments = ref(new Map(props.segments));
 
 watch(
-  [segments, peaksInstanceRef],
+  [segments, peaks],
   () => {
-    if (peaksInstanceRef.value && segments.value.size) {
+    if (peaks.value && segments.value.size) {
       try {
         segments.value.forEach((segment) => {
-          peaksInstanceRef.value?.segments.removeById(segment.id);
-          peaksInstanceRef.value?.segments.add(segment);
+          peaks.value?.segments.removeById(segment.id);
+          peaks.value?.segments.add(segment);
         });
       } catch (err) {
         console.log(err);
       }
-      // const overview = peaksInstanceRef.value?.views.getView("overview");
+      // const overview = peaks.value?.views.getView("overview");
       // overview?.setPlayedWaveformColor("#767c89");
       //
-      // const zoomview = peaksInstanceRef.value?.views.getView("zoomview");
+      // const zoomview = peaks.value?.views.getView("zoomview");
       // zoomview?.setPlayedWaveformColor("#767c89");
     }
   },
   {
     immediate: true,
-    deep: true
+    deep: true,
   }
 );
 
@@ -134,25 +77,26 @@ const intToChar = (int: number) => {
   const start = 'a'.charCodeAt(0);
   return String.fromCharCode(start + int).toUpperCase();
 };
+
 const addSegment = () => {
   const segmentId = uuid();
   const size = segments.value.size * 2;
   segments.value.set(segmentId, {
     id: segmentId,
-    startTime: Number(peaksInstanceRef.value?.player.getCurrentTime()),
-    endTime: Number(peaksInstanceRef.value?.player.getCurrentTime()) + 5,
+    startTime: Number(peaks.value?.player.getCurrentTime()),
+    endTime: Number(peaks.value?.player.getCurrentTime()) + 5,
     color: '#ed64a6',
     labelText: '0 to 10.5 seconds non-editable demo segment',
     editable: true,
     startIndex: intToChar(size),
-    endIndex: intToChar(size + 1)
+    endIndex: intToChar(size + 1),
   });
 };
 
 const isPlaying = ref(false);
 
 const onPlay = () => {
-  const player = peaksInstanceRef.value?.player as PeaksOptions['player'];
+  const player = peaks.value?.player as PeaksOptions['player'];
   if (!player) {
     return;
   }
@@ -165,7 +109,7 @@ const onPlay = () => {
     isPlaying.value = true;
   }
 
-  onClickOutside(canvasEl.value, () => {
+  onClickOutside(canvasElement.value, () => {
     if (isPlaying.value) {
       player.pause();
       isPlaying.value = false;
@@ -184,49 +128,54 @@ const onZoomOut = async () => {
 watch(
   zoomLevel,
   () => {
-    const zoomview = peaksInstanceRef.value?.views.getView('zoomview');
+    const zoomview = peaks.value?.views.getView('zoomview');
     zoomview?.setZoom({ seconds: zoomLevel.value });
   },
   { immediate: true }
 );
 
 const onAmpPlus = async () => {
-  zoomviewAmpZoom.value = Math.max(0, (zoomviewAmpZoom.value * 100 + zoomAmpStep.value * 100) / 100);
+  zoomviewAmpZoom.value = Math.max(
+    0,
+    (zoomviewAmpZoom.value * 100 + zoomAmpStep.value * 100) / 100
+  );
 };
 
 const onAmpMinus = async () => {
-  zoomviewAmpZoom.value = Math.max(0, (zoomviewAmpZoom.value * 100 - zoomAmpStep.value * 100) / 100);
+  zoomviewAmpZoom.value = Math.max(
+    0,
+    (zoomviewAmpZoom.value * 100 - zoomAmpStep.value * 100) / 100
+  );
 };
 
 watch(
   zoomviewAmpZoom,
   () => {
-    const overview = peaksInstanceRef.value?.views.getView('overview');
+    const overview = peaks.value?.views.getView('overview');
     overview?.setAmplitudeScale(zoomviewAmpZoom.value);
 
-    const zoomview = peaksInstanceRef.value?.views.getView('zoomview');
+    const zoomview = peaks.value?.views.getView('zoomview');
     zoomview?.setAmplitudeScale(zoomviewAmpZoom.value);
   },
   { immediate: true }
 );
 
 const chooseSegment = (segmentId: string) => {
-  const segment = peaksInstanceRef.value?.segments.getSegment(segmentId);
+  const segment = peaks.value?.segments.getSegment(segmentId);
   if (segment) {
-    peaksInstanceRef.value?.player.seek(segment.startTime);
+    peaks.value?.player.seek(segment.startTime);
   }
 };
 
-
-const currentTime = ref(peaksInstanceRef.value?.player.getCurrentTime());
+const currentTime = ref(peaks.value?.player.getCurrentTime());
 let interval = shallowRef();
 
 onMounted(() => {
-  const zoomview = peaksInstanceRef.value?.views.getView('zoomview');
+  const zoomview = peaks.value?.views.getView('zoomview');
   zoomview?.setAmplitudeScale(zoomviewAmpZoom.value);
 
   interval.value = setInterval(() => {
-    currentTime.value = peaksInstanceRef.value?.player.getCurrentTime();
+    currentTime.value = peaks.value?.player.getCurrentTime();
   }, 100);
 });
 
@@ -245,25 +194,28 @@ const playTime = computed({
     return `${parsed.hours}:${parsed.minutes}:${parsed.seconds}.${parsed.milliseconds}`;
   },
   set: (value: string) => {
-    const [h, m, s, ms] = value.match(/(\d{2}):(\d{2}):(\d{2})\.(\d{3})/)?.slice(1, 5).map((val) => parseInt(val)) || [];
+    const [h, m, s, ms] =
+      value
+        .match(/(\d{2}):(\d{2}):(\d{2})\.(\d{3})/)
+        ?.slice(1, 5)
+        .map((val) => parseInt(val)) || [];
     const seconds = h * 3600 + m * 60 + s + ms / 1000;
-    peaksInstanceRef.value?.player.seek(seconds);
-  }
+    peaks.value?.player.seek(seconds);
+  },
 });
 
 const maxPlayTime = computed(() => {
-  if (!peaksInstanceRef.value?.player.getDuration()) {
+  if (!peaks.value?.player.getDuration()) {
     return '00:00:00';
   }
 
-  const parsed = parsePlayTime(peaksInstanceRef.value?.player.getDuration());
+  const parsed = parsePlayTime(peaks.value?.player.getDuration());
   return `${parsed.hours}:${parsed.minutes}:${parsed.seconds}.${parsed.milliseconds}`;
 });
 
 const showPicker = (ref?: HTMLInputElement) => {
   return ref?.showPicker();
 };
-
 </script>
 
 <template>
@@ -274,10 +226,10 @@ const showPicker = (ref?: HTMLInputElement) => {
     ref="canvasEl"
   >
     <div class="overview">
-      <div class="overview__waveform" ref="containerEl"></div>
+      <div class="overview__waveform" ref="overviewElement"></div>
       <div class="overview__controls">
         <Button
-          v-if="peaksInstanceRef"
+          v-if="peaks"
           shape="square"
           size="lg"
           variant="ghost"
@@ -291,7 +243,7 @@ const showPicker = (ref?: HTMLInputElement) => {
     </div>
 
     <div class="zoomview">
-      <div ref="zoomViewEl" class="zoomview__waveform"></div>
+      <div ref="zoomviewElement" class="zoomview__waveform"></div>
       <div class="zoomview__controls">
         <TextInput
           type="time"
@@ -304,7 +256,10 @@ const showPicker = (ref?: HTMLInputElement) => {
           color="neutral"
         >
           <template #prepend="{ inputRef }">
-            <font-awesome-icon icon="fa-regular fa-clock" @click="showPicker(inputRef)" />
+            <font-awesome-icon
+              icon="fa-regular fa-clock"
+              @click="showPicker(inputRef)"
+            />
           </template>
         </TextInput>
 
@@ -415,7 +370,7 @@ const showPicker = (ref?: HTMLInputElement) => {
         </tr>
       </table>
     </div>
-    <audio ref="mediaEl">
+    <audio ref="audioElement">
       <source v-for="url in audioUrls" :key="url.type" v-bind="url" />
     </audio>
   </VirtualizedItem>

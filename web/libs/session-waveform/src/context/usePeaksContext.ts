@@ -14,7 +14,7 @@ import {
   watch,
 } from 'vue';
 import type { MaybeReactive } from '../types';
-import type { OverviewTheme, ZoomviewTheme } from '../context/theme';
+import type { OverviewTheme, ZoomviewTheme } from './theme';
 import { CustomSegmentMarker } from '../waveform/CustomSegmentMarker';
 
 export type CreatePeaksProps = {
@@ -32,7 +32,7 @@ export type PeaksContext = {
 };
 const PeaksInjectionKey = Symbol();
 
-export const createPeaks = (props: CreatePeaksProps): PeaksContext => {
+export const createPeaksContext = (props: CreatePeaksProps): PeaksContext => {
   const peaks = shallowRef<PeaksInstance>();
 
   const canvasElement = ref<HTMLElement>();
@@ -109,7 +109,7 @@ export const createPeaks = (props: CreatePeaksProps): PeaksContext => {
   };
 };
 
-export const context = () => {
+export const usePeaksContext = () => {
   const context = inject(PeaksInjectionKey);
   if (!context) {
     throw new Error('You must create a peaks instance first');

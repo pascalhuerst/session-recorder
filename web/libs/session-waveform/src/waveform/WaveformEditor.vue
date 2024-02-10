@@ -1,16 +1,15 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue';
 import VirtualizedItem from '../disclosure/VirtualizedItem.vue';
-import { type PeaksOptions } from 'peaks.js';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
-import { onClickOutside } from '@vueuse/core';
 import Button from '../controls/Button.vue';
 import TextInput from '../forms/TextInput.vue';
 import uuid from 'uuidv4';
 import Marker from '../controls/Marker.vue';
 import { parsePlayTime } from '../utils/parsePlayTime';
-import { createPeaks } from '../context/context';
 import { overviewTheme, zoomviewTheme } from '../context/theme';
+import { createPeaksContext } from '../context/usePeaksContext';
+import Overview from '../elements/Overview/Overview.vue';
 
 type Segment = {
   startTime: number;
@@ -39,8 +38,8 @@ const zoomviewAmpZoom = ref(0.6);
 const zoomStep = ref(100);
 const zoomAmpStep = ref(0.1);
 
-const { peaks, canvasElement, overviewElement, zoomviewElement, audioElement } =
-  createPeaks({
+const { peaks, canvasElement, zoomviewElement, audioElement } =
+  createPeaksContext({
     overviewTheme,
     zoomviewTheme,
     waveformUrl: computed(() => props.waveformUrl),
@@ -90,30 +89,6 @@ const addSegment = () => {
     editable: true,
     startIndex: intToChar(size),
     endIndex: intToChar(size + 1),
-  });
-};
-
-const isPlaying = ref(false);
-
-const onPlay = () => {
-  const player = peaks.value?.player as PeaksOptions['player'];
-  if (!player) {
-    return;
-  }
-
-  if (isPlaying.value) {
-    player.pause();
-    isPlaying.value = false;
-  } else {
-    player.play();
-    isPlaying.value = true;
-  }
-
-  onClickOutside(canvasElement.value, () => {
-    if (isPlaying.value) {
-      player.pause();
-      isPlaying.value = false;
-    }
   });
 };
 
@@ -225,23 +200,7 @@ const showPicker = (ref?: HTMLInputElement) => {
     class="canvas"
     ref="canvasEl"
   >
-    <div class="overview">
-      <div class="overview__waveform" ref="overviewElement"></div>
-      <div class="overview__controls">
-        <Button
-          v-if="peaks"
-          shape="square"
-          size="lg"
-          variant="ghost"
-          color="primary"
-          @click="onPlay"
-        >
-          <font-awesome-icon v-if="isPlaying" icon="fa-solid fa-pause" />
-          <font-awesome-icon v-else icon="fa-solid fa-play" />
-        </Button>
-      </div>
-    </div>
-
+    <Overview />
     <div class="zoomview">
       <div ref="zoomviewElement" class="zoomview__waveform"></div>
       <div class="zoomview__controls">
@@ -414,34 +373,6 @@ const showPicker = (ref?: HTMLInputElement) => {
   top: 0;
   right: 0;
   margin: var(--size-1);
-}
-
-.overview {
-  display: flex;
-  flex-direction: row;
-  flex-wrap: nowrap;
-  align-items: stretch;
-  width: 100%;
-  height: 80px;
-}
-
-.overview > * {
-  height: 80px;
-}
-
-.overview__controls {
-  flex: none;
-  width: 80px;
-  height: 80px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-}
-
-.overview__waveform {
-  flex: 1;
-  height: 80px;
 }
 
 .zoomview__input__controls {

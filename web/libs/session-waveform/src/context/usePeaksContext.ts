@@ -1,118 +1,64 @@
-import Peaks, {
-  type PeaksInstance,
-  type PeaksOptions,
-  type SegmentMarker,
-} from 'peaks.js';
+import { type PeaksInstance } from 'peaks.js';
+import { inject, provide, type Ref } from 'vue';
+import { createZoomControls } from './createZoomControls';
+import { createAmplitudeControls } from './createAmplitudeControls';
+import { createPlayerControls } from './createPlayerControls';
+import type { CreatePeaksCanvasProps } from './createPeaksCanvas';
+import { createPeaksCanvas } from './createPeaksCanvas';
+import type { AudioSourceUrl } from '../types';
 import {
-  computed,
-  inject,
-  provide,
-  type Ref,
-  ref,
-  shallowRef,
-  toValue,
-  watch,
-} from 'vue';
-import type { MaybeReactive } from '../types';
-import type { OverviewTheme, ZoomviewTheme } from './theme';
-import { CustomSegmentMarker } from '../waveform/CustomSegmentMarker';
+  createSegmentControls,
+  type CreateSegmentControlsProps,
+} from './createSegmentControls';
 
-export type CreatePeaksProps = {
-  overviewTheme: MaybeReactive<OverviewTheme>;
-  zoomviewTheme: MaybeReactive<ZoomviewTheme>;
-  waveformUrl?: MaybeReactive<string | undefined>;
-};
+export type CreatePeaksProps = CreatePeaksCanvasProps &
+  CreateSegmentControlsProps & {
+    audioUrls: Ref<Array<AudioSourceUrl>>;
+  };
 
 export type PeaksContext = {
   peaks: Ref<PeaksInstance | undefined>;
-  canvasElement: Ref<HTMLElement | undefined>;
-  overviewElement: Ref<HTMLElement | undefined>;
-  zoomviewElement: Ref<HTMLElement | undefined>;
-  audioElement: Ref<HTMLAudioElement | undefined>;
+  audioUrls: Ref<Array<AudioSourceUrl>>;
+  waveformUrl?: Ref<string | undefined>;
+  layout: {
+    canvasElement: Ref<HTMLElement | undefined>;
+    overviewElement: Ref<HTMLElement | undefined>;
+    zoomviewElement: Ref<HTMLElement | undefined>;
+    audioElement: Ref<HTMLAudioElement | undefined>;
+  };
+  zoom: ReturnType<typeof createZoomControls>;
+  amplitude: ReturnType<typeof createAmplitudeControls>;
+  player: ReturnType<typeof createPlayerControls>;
+  segments: ReturnType<typeof createSegmentControls>;
 };
+
 const PeaksInjectionKey = Symbol();
 
 export const createPeaksContext = (props: CreatePeaksProps): PeaksContext => {
-  const peaks = shallowRef<PeaksInstance>();
+  const canvas = createPeaksCanvas(props);
 
-  const canvasElement = ref<HTMLElement>();
-  const overviewElement = ref<HTMLElement>();
-  const zoomviewElement = ref<HTMLElement>();
-  const audioElement = ref<HTMLAudioElement>();
+  const context = {
+    ...canvas,
+    audioUrls: props.audioUrls,
+    waveformUrl: props.waveformUrl,
+    zoom: createZoomControls(canvas),
+    amplitude: createAmplitudeControls(canvas),
+    player: createPlayerControls(canvas),
+    segments: createSegmentControls({
+      ...canvas,
+      segments: props.segments,
+      permissions: props.permissions,
+    }),
+  } satisfies PeaksContext;
 
-  const options = computed(() => {
-    if (!overviewElement.value || !audioElement.value) {
-      return;
-    }
-
-    const waveformUrl = toValue(props.waveformUrl);
-
-    return {
-      overview: {
-        container: overviewElement.value,
-        ...toValue(props.overviewTheme),
-      },
-      zoomview: {
-        container: zoomviewElement.value,
-        ...toValue(props.zoomviewTheme),
-      },
-      mediaElement: audioElement.value,
-      ...(waveformUrl
-        ? {
-            dataUri: {
-              arraybuffer: waveformUrl,
-            },
-          }
-        : {
-            webAudio: {
-              audioContext: new AudioContext(),
-              multiChannel: false,
-            },
-          }),
-      createSegmentMarker: (options) => {
-        return new CustomSegmentMarker(options) as SegmentMarker;
-      },
-    } satisfies PeaksOptions;
-  });
-
-  watch(
-    options,
-    () => {
-      if (options.value) {
-        Peaks.init(options.value, function (err, peaksInstance) {
-          if (err || !peaksInstance) {
-            console.warn(err.message);
-            return null;
-          }
-
-          peaks.value = peaksInstance;
-        });
-      }
-    },
-    { immediate: true }
-  );
-
-  provide(PeaksInjectionKey, {
-    peaks,
-    canvasElement,
-    overviewElement,
-    zoomviewElement,
-    audioElement,
-  });
-
-  return {
-    peaks,
-    canvasElement,
-    overviewElement,
-    zoomviewElement,
-    audioElement,
-  };
+  provide(PeaksInjectionKey, context);
+  return context;
 };
 
 export const usePeaksContext = () => {
   const context = inject(PeaksInjectionKey);
   if (!context) {
-    throw new Error('You must create a peaks instance first');
+    throw new Error('You must create a peaks context first');
   }
   return context as PeaksContext;
 };

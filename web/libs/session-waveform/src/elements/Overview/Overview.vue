@@ -1,8 +1,10 @@
 <script setup lang="ts">
 import { usePeaksContext } from '../../context/usePeaksContext';
-import PlayButton from '../../elements/Player/PlayButton.vue';
+import PlayButton from './controls/PlayButton.vue';
 
-const { overviewElement } = usePeaksContext();
+const {
+  layout: { overviewElement },
+} = usePeaksContext();
 </script>
 
 <template>

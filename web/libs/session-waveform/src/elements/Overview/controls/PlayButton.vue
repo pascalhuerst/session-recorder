@@ -1,9 +1,15 @@
 <script setup lang="ts">
-import Button from '../../controls/Button.vue';
+import Button from '../../../lib/controls/Button.vue';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
-import { useAudioControls } from '../../context/useAudioControls';
+import { usePeaksContext } from '../../../context/usePeaksContext';
 
-const { player, onToggle, isPlaying } = useAudioControls();
+const {
+  player: { duration, play, pause, isPlaying },
+} = usePeaksContext();
+
+const handleClick = () => {
+  isPlaying.value ? pause() : play();
+};
 </script>
 
 <template>
@@ -12,8 +18,8 @@ const { player, onToggle, isPlaying } = useAudioControls();
     size="lg"
     variant="ghost"
     color="primary"
-    :disabled="!player"
-    @click="onToggle"
+    :disabled="!duration"
+    @click="handleClick"
   >
     <font-awesome-icon v-if="isPlaying" icon="fa-solid fa-pause" />
     <font-awesome-icon v-else icon="fa-solid fa-play" />

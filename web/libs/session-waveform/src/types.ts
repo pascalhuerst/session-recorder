@@ -1,3 +1,17 @@
-import type { ComputedRef, MaybeRefOrGetter } from 'vue';
+export type Segment = {
+  id: string;
+  startTime: number;
+  endTime: number;
+  editable?: boolean;
+  color?: string;
+  labelText?: string;
+  [key: string]: any;
+};
 
-export type MaybeReactive<T> = MaybeRefOrGetter<T> | ComputedRef<T>;
+export type AudioSourceUrl = { src: string; type: string };
+
+export type Permissions = {
+  create: boolean;
+  update: boolean;
+  delete: boolean;
+};

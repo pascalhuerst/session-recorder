@@ -51,15 +51,18 @@ export const createSegmentControls = ({
     const segmentId = uuid();
     const size = segments.value.length * 2;
 
+    const startIndex = intToChar(size);
+    const endIndex = intToChar(size + 1);
+
     const segment = {
       id: segmentId,
       startTime: Number(peaks.value?.player.getCurrentTime()),
       endTime: Number(peaks.value?.player.getCurrentTime()) + 5,
       color: '#ed64a6',
-      labelText: '0 to 10.5 seconds non-editable demo segment',
+      labelText: `Segment ${startIndex}-${endIndex}`,
       editable: true,
-      startIndex: intToChar(size),
-      endIndex: intToChar(size + 1),
+      startIndex,
+      endIndex,
     } satisfies Segment;
 
     segments.value.push(segment);

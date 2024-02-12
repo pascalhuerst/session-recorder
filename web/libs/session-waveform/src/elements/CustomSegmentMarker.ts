@@ -76,7 +76,7 @@ export class CustomSegmentMarker {
   update(options: any) {
     if (this._options.segment.id) {
       this._options.emitter.emit(
-        'segmentUpdated',
+        'peaks.segment.updateById',
         this._options.segment.id,
         options
       );
@@ -85,7 +85,10 @@ export class CustomSegmentMarker {
 
   destroy() {
     if (this._options.segment.id) {
-      this._options.emitter.emit('segmentRemoved', this._options.segment.id!);
+      this._options.emitter.emit(
+        'peaks.segment.removeById',
+        this._options.segment.id
+      );
     }
   }
 }

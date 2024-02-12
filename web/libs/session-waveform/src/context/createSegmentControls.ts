@@ -66,25 +66,25 @@ export const createSegmentControls = ({
     } satisfies Segment;
 
     segments.value.push(segment);
-    emitter.emit('segmentAdded', segment);
+    emitter.emit('ui.segments.add', segment);
   };
 
   const selectSegment = (segmentId: string) => {
-    emitter.emit('segmentSelected', segmentId);
+    emitter.emit('ui.segment.selectById', segmentId);
   };
 
-  emitter.on('segmentSelected', (segmentId) => {
+  emitter.on('ui.segment.selectById', (segmentId) => {
     const segment = peaks.value?.segments.getSegment(segmentId);
     if (segment) {
       peaks.value?.player.seek(segment.startTime);
     }
   });
 
-  emitter.on('segmentAdded', (segment) => {
+  emitter.on('ui.segments.add', (segment) => {
     peaks.value?.segments.add(segment);
   });
 
-  emitter.on('segmentUpdated', (segmentId, patch) => {
+  emitter.on('peaks.segment.updateById', (segmentId, patch) => {
     const index = segments.value.findIndex((el) => el.id === segmentId);
     if (index > -1) {
       segments.value.splice(index, 1, {

@@ -2,10 +2,13 @@ import type { Segment } from '../types';
 import { createNanoEvents } from 'nanoevents';
 
 export interface Events {
-  segmentAdded: (segment: Segment) => void;
-  segmentUpdated: (segmentId: string, patch: Partial<Segment>) => void;
-  segmentRemoved: (segmentId: string) => void;
-  segmentSelected: (segmentId: string) => void;
+  'ui.segments.add': (segment: Segment) => void;
+  'ui.segment.selectById': (segmentId: string) => void;
+  'peaks.segment.updateById': (
+    segmentId: string,
+    patch: Partial<Segment>
+  ) => void;
+  'peaks.segment.removeById': (segmentId: string) => void;
 }
 
 export const createEventEmitter = () => {

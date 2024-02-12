@@ -1,5 +1,5 @@
 import { computed, type Ref, ref, shallowRef, toValue, watch } from 'vue';
-import { CustomSegmentMarker } from '../waveform/CustomSegmentMarker';
+import { CustomSegmentMarker } from '../elements/CustomSegmentMarker';
 import type { PeaksInstance, PeaksOptions, SegmentMarker } from 'peaks.js';
 import Peaks from 'peaks.js';
 import type { OverviewTheme, ZoomviewTheme } from './theme';

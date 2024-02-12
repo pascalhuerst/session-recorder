@@ -10,6 +10,7 @@ import {
   createSegmentControls,
   type CreateSegmentControlsProps,
 } from './createSegmentControls';
+import { createEventEmitter } from './createEventEmitter';
 
 export type CreatePeaksProps = CreatePeaksCanvasProps &
   CreateSegmentControlsProps & {
@@ -30,6 +31,7 @@ export type PeaksContext = {
   amplitude: ReturnType<typeof createAmplitudeControls>;
   player: ReturnType<typeof createPlayerControls>;
   segments: ReturnType<typeof createSegmentControls>;
+  emitter: ReturnType<typeof createEventEmitter>;
 };
 
 const PeaksInjectionKey = Symbol();

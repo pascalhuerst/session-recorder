@@ -1,15 +1,15 @@
 import { type CreateSegmentMarkerOptions } from 'peaks.js';
 import Konva from 'konva';
+import type { EventEmitter } from '../context/createEventEmitter';
 
 export class CustomSegmentMarker {
-  private _options: CreateSegmentMarkerOptions;
+  private _options: CreateSegmentMarkerOptions & { emitter: EventEmitter };
   private _handle?: Konva.Rect;
   private _index?: Konva.Text;
   private _line?: Konva.Line;
 
-  constructor(options: CreateSegmentMarkerOptions) {
+  constructor(options: CreateSegmentMarkerOptions & { emitter: EventEmitter }) {
     this._options = options;
-    console.log(options);
   }
 
   init(group: Konva.Group) {
@@ -74,35 +74,18 @@ export class CustomSegmentMarker {
   }
 
   update(options: any) {
-    // For a point marker:
-    if (options.time !== undefined) {
-      console.log('Updated point marker time', options.time);
-    }
-
-    // For a segment start/end marker:
-    if (options.startTime !== undefined && this._options.startMarker) {
-      console.log('Updated segment start marker time', options.startTime);
-    }
-
-    if (options.endTime !== undefined && !this._options.startMarker) {
-      console.log('Updated segment end marker time', options.endTime);
-    }
-
-    if (options.labelText !== undefined) {
-      console.log('Updated label text', options.labelText);
-    }
-
-    if (options.color !== undefined) {
-      this._line?.stroke(options.color);
-    }
-
-    if (options.editable !== undefined) {
-      // Show or hide the Konva shapes that draw the marker
-      console.log('Updated editable state', options.editable);
+    if (this._options.segment.id) {
+      this._options.emitter.emit(
+        'segmentUpdated',
+        this._options.segment.id,
+        options
+      );
     }
   }
 
   destroy() {
-    console.log('Marker destroyed');
+    if (this._options.segment.id) {
+      this._options.emitter.emit('segmentRemoved', this._options.segment.id!);
+    }
   }
 }

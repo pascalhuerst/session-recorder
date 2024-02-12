@@ -12,9 +12,10 @@ export const createSegmentControls = ({
   peaks,
   segments,
   permissions,
+  emitter,
 }: CreateSegmentControlsProps & ReturnType<typeof createPeaksCanvas>) => {
   watch(
-    [segments, peaks],
+    peaks,
     () => {
       if (peaks.value && segments.value.length) {
         try {
@@ -34,7 +35,6 @@ export const createSegmentControls = ({
     },
     {
       immediate: true,
-      deep: true,
     }
   );
 
@@ -50,7 +50,8 @@ export const createSegmentControls = ({
 
     const segmentId = uuid();
     const size = segments.value.length * 2;
-    segments.value.push({
+
+    const segment = {
       id: segmentId,
       startTime: Number(peaks.value?.player.getCurrentTime()),
       endTime: Number(peaks.value?.player.getCurrentTime()) + 5,
@@ -59,7 +60,10 @@ export const createSegmentControls = ({
       editable: true,
       startIndex: intToChar(size),
       endIndex: intToChar(size + 1),
-    });
+    } satisfies Segment;
+
+    segments.value.push(segment);
+    emitter.emit('segmentAdded', segment);
   };
 
   const selectSegment = (segmentId: string) => {
@@ -68,6 +72,20 @@ export const createSegmentControls = ({
       peaks.value?.player.seek(segment.startTime);
     }
   };
+
+  emitter.on('segmentAdded', (segment) => {
+    peaks.value?.segments.add(segment);
+  });
+
+  emitter.on('segmentUpdated', (segmentId, patch) => {
+    const index = segments.value.findIndex((el) => el.id === segmentId);
+    if (index > -1) {
+      segments.value.splice(index, 1, {
+        ...segments.value[index],
+        ...patch,
+      });
+    }
+  });
 
   return { segments, addSegment, selectSegment };
 };

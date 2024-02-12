@@ -3,6 +3,7 @@ import { CustomSegmentMarker } from '../waveform/CustomSegmentMarker';
 import type { PeaksInstance, PeaksOptions, SegmentMarker } from 'peaks.js';
 import Peaks from 'peaks.js';
 import type { OverviewTheme, ZoomviewTheme } from './theme';
+import { createEventEmitter } from './createEventEmitter';
 
 export type CreatePeaksCanvasProps = {
   overviewTheme: Ref<OverviewTheme>;
@@ -11,6 +12,7 @@ export type CreatePeaksCanvasProps = {
 };
 
 export const createPeaksCanvas = (props: CreatePeaksCanvasProps) => {
+  const emitter = createEventEmitter();
   const peaks = shallowRef<PeaksInstance>();
 
   const canvasElement = ref<HTMLElement>();
@@ -25,7 +27,6 @@ export const createPeaksCanvas = (props: CreatePeaksCanvasProps) => {
 
     const waveformUrl = toValue(props.waveformUrl);
 
-    console.log(audioElement.value);
     return {
       overview: {
         container: overviewElement.value,
@@ -49,7 +50,10 @@ export const createPeaksCanvas = (props: CreatePeaksCanvasProps) => {
             },
           }),
       createSegmentMarker: (options) => {
-        return new CustomSegmentMarker(options) as SegmentMarker;
+        return new CustomSegmentMarker({
+          ...options,
+          emitter,
+        }) as SegmentMarker;
       },
     } satisfies PeaksOptions;
   });
@@ -79,5 +83,6 @@ export const createPeaksCanvas = (props: CreatePeaksCanvasProps) => {
       zoomviewElement,
       audioElement,
     },
+    emitter,
   };
 };

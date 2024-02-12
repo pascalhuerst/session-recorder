@@ -13,7 +13,9 @@
     "peaks.js": "^3.2.1",
     "uuidv4": "^5.0.1",
     "waveform-data": "^4.4.0",
-    "konva": "^9.3.0"
+    "konva": "^9.3.0",
+    "nanostores": "^0.9.5",
+    "nanoevents": "^9.0.0"
   },
   "peerDependencies": {
     "@fortawesome/fontawesome-svg-core": "^6.5.1",

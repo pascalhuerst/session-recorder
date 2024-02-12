@@ -70,11 +70,15 @@ export const createSegmentControls = ({
   };
 
   const selectSegment = (segmentId: string) => {
+    emitter.emit('segmentSelected', segmentId);
+  };
+
+  emitter.on('segmentSelected', (segmentId) => {
     const segment = peaks.value?.segments.getSegment(segmentId);
     if (segment) {
       peaks.value?.player.seek(segment.startTime);
     }
-  };
+  });
 
   emitter.on('segmentAdded', (segment) => {
     peaks.value?.segments.add(segment);

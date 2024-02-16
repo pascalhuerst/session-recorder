@@ -5,11 +5,20 @@ import Button from '../../../lib/controls/Button.vue';
 import { usePeaksContext } from '../../../context/usePeaksContext';
 
 const {
-  amplitude: { amplitudeScale, amplitudeStep, adjustAmplitudeScale },
+  amplitude: { amplitudeScale, amplitudeStep },
+  commandEmitter,
 } = usePeaksContext();
 
-const onIncrease = () => adjustAmplitudeScale(amplitudeStep.value);
-const onDecrease = () => adjustAmplitudeScale(-1 * amplitudeStep.value);
+const toAbs = (step: number) => {
+  return Math.max(0, (amplitudeScale.value * 100 + step * 100) / 100);
+};
+
+const onIncrease = () => {
+  commandEmitter.emit('setAmplitudeScale', toAbs(amplitudeStep.value));
+};
+const onDecrease = () => {
+  commandEmitter.emit('setAmplitudeScale', toAbs(-1 * amplitudeStep.value));
+};
 </script>
 
 <template>

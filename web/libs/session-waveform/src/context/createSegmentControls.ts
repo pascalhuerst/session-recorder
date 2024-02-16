@@ -1,5 +1,5 @@
 import type { Permissions, Segment } from '../types';
-import { type Ref, watch } from 'vue';
+import { type Ref } from 'vue';
 import type { createPeaksCanvas } from './createPeaksCanvas';
 import uuid from 'uuidv4';
 
@@ -8,42 +8,19 @@ export type CreateSegmentControlsProps = {
   permissions: Ref<Permissions>;
 };
 
+const intToChar = (int: number) => {
+  const start = 'a'.charCodeAt(0);
+  return String.fromCharCode(start + int).toUpperCase();
+};
+
 export const createSegmentControls = ({
   peaks,
   segments,
   permissions,
-  emitter,
+  eventEmitter,
+  commandEmitter,
 }: CreateSegmentControlsProps & ReturnType<typeof createPeaksCanvas>) => {
-  watch(
-    peaks,
-    () => {
-      if (peaks.value && segments.value.length) {
-        try {
-          segments.value.forEach((segment) => {
-            peaks.value?.segments.removeById(segment.id);
-            peaks.value?.segments.add(segment);
-          });
-        } catch (err) {
-          console.log(err);
-        }
-        // const overview = peaks.value?.views.getView("overview");
-        // overview?.setPlayedWaveformColor("#767c89");
-        //
-        // const zoomview = peaks.value?.views.getView("zoomview");
-        // zoomview?.setPlayedWaveformColor("#767c89");
-      }
-    },
-    {
-      immediate: true,
-    }
-  );
-
-  const intToChar = (int: number) => {
-    const start = 'a'.charCodeAt(0);
-    return String.fromCharCode(start + int).toUpperCase();
-  };
-
-  const addSegment = () => {
+  commandEmitter.on('addSegment', () => {
     if (!permissions.value.create) {
       return;
     }
@@ -65,26 +42,54 @@ export const createSegmentControls = ({
       endIndex,
     } satisfies Segment;
 
-    segments.value.push(segment);
-    emitter.emit('ui.segments.add', segment);
-  };
+    peaks.value?.segments.add(segment);
+  });
 
-  const selectSegment = (segmentId: string) => {
-    emitter.emit('ui.segment.selectById', segmentId);
-  };
-
-  emitter.on('ui.segment.selectById', (segmentId) => {
+  commandEmitter.on('jumpToSegment', (segmentId) => {
     const segment = peaks.value?.segments.getSegment(segmentId);
     if (segment) {
       peaks.value?.player.seek(segment.startTime);
     }
   });
 
-  emitter.on('ui.segments.add', (segment) => {
-    peaks.value?.segments.add(segment);
+  commandEmitter.on('updateSegment', () => {
+    // @todo: implement
   });
 
-  emitter.on('peaks.segment.updateById', (segmentId, patch) => {
+  commandEmitter.on('removeSegment', (segmentId) => {
+    peaks.value?.segments.removeById(segmentId);
+  });
+
+  eventEmitter.on('ready', () => {
+    segments.value.forEach((segment) => {
+      peaks.value?.segments.add(segment);
+    });
+
+    peaks.value?.on('segments.add', (event) => {
+      event.segments.forEach((segment) => {
+        eventEmitter.emit('segmentAdded', segment as Segment);
+      });
+    });
+
+    peaks.value?.on('segments.remove', (event) => {
+      event.segments.forEach((segment) => {
+        eventEmitter.emit('segmentRemoved', segment.id!);
+      });
+    });
+  });
+
+  eventEmitter.on('segmentAdded', (segment) => {
+    segments.value.push(segment);
+  });
+
+  eventEmitter.on('segmentRemoved', (segmentId) => {
+    const index = segments.value.findIndex((el) => el.id === segmentId);
+    if (index > -1) {
+      segments.value.splice(index, 1);
+    }
+  });
+
+  eventEmitter.on('segmentUpdated', (segmentId, patch) => {
     const index = segments.value.findIndex((el) => el.id === segmentId);
     if (index > -1) {
       segments.value.splice(index, 1, {
@@ -94,5 +99,5 @@ export const createSegmentControls = ({
     }
   });
 
-  return { segments, addSegment, selectSegment };
+  return { segments };
 };

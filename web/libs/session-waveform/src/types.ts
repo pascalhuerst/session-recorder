@@ -5,6 +5,8 @@ export type Segment = {
   editable?: boolean;
   color?: string;
   labelText?: string;
+  startIndex: string;
+  endIndex: string;
   [key: string]: any;
 };
 

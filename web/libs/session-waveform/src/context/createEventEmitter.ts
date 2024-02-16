@@ -1,14 +1,13 @@
 import type { Segment } from '../types';
 import { createNanoEvents } from 'nanoevents';
+import type { PeaksInstance } from 'peaks.js';
 
 export interface Events {
-  'ui.segments.add': (segment: Segment) => void;
-  'ui.segment.selectById': (segmentId: string) => void;
-  'peaks.segment.updateById': (
-    segmentId: string,
-    patch: Partial<Segment>
-  ) => void;
-  'peaks.segment.removeById': (segmentId: string) => void;
+  ready: (peaks: PeaksInstance) => void;
+  segmentAdded: (segment: Segment) => void;
+  segmentUpdated: (segmentId: string, patch: Partial<Segment>) => void;
+  segmentRemoved: (segmentId: string) => void;
+  amplitudeScaleChanged: (scale: number) => void;
 }
 
 export const createEventEmitter = () => {

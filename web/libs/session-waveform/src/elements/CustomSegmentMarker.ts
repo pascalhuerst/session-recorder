@@ -2,14 +2,20 @@ import { type CreateSegmentMarkerOptions } from 'peaks.js';
 import Konva from 'konva';
 import type { EventEmitter } from '../context/createEventEmitter';
 
+type Services = {
+  eventEmitter: EventEmitter;
+};
+
 export class CustomSegmentMarker {
-  private _options: CreateSegmentMarkerOptions & { emitter: EventEmitter };
+  private _options: CreateSegmentMarkerOptions;
+  private _services: Services;
   private _handle?: Konva.Rect;
   private _index?: Konva.Text;
   private _line?: Konva.Line;
 
-  constructor(options: CreateSegmentMarkerOptions & { emitter: EventEmitter }) {
+  constructor(options: CreateSegmentMarkerOptions, services: Services) {
     this._options = options;
+    this._services = services;
   }
 
   init(group: Konva.Group) {
@@ -75,8 +81,8 @@ export class CustomSegmentMarker {
 
   update(options: any) {
     if (this._options.segment.id) {
-      this._options.emitter.emit(
-        'peaks.segment.updateById',
+      this._services.eventEmitter.emit(
+        'segmentUpdated',
         this._options.segment.id,
         options
       );
@@ -85,8 +91,8 @@ export class CustomSegmentMarker {
 
   destroy() {
     if (this._options.segment.id) {
-      this._options.emitter.emit(
-        'peaks.segment.removeById',
+      this._services.eventEmitter.emit(
+        'segmentRemoved',
         this._options.segment.id
       );
     }

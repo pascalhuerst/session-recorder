@@ -1,0 +1,16 @@
+import type { Segment } from '../types';
+import { createNanoEvents } from 'nanoevents';
+
+export interface Commands {
+  addSegment: (segment: Segment) => void;
+  updateSegment: (segmentId: string, patch: Partial<Segment>) => void;
+  removeSegment: (segmentId: string) => void;
+  jumpToSegment: (segmentId: string) => void;
+  setAmplitudeScale: (scale: number) => void;
+}
+
+export const createCommandEmitter = () => {
+  return createNanoEvents<Commands>();
+};
+
+export type CommandEmitter = ReturnType<typeof createCommandEmitter>;

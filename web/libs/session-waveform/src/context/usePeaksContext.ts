@@ -6,11 +6,13 @@ import { createPlayerControls } from './createPlayerControls';
 import type { CreatePeaksCanvasProps } from './createPeaksCanvas';
 import { createPeaksCanvas } from './createPeaksCanvas';
 import type { AudioSourceUrl } from '../types';
+import { type Permissions } from '../types';
 import {
   createSegmentControls,
   type CreateSegmentControlsProps,
 } from './createSegmentControls';
 import { createEventEmitter } from './createEventEmitter';
+import type { createCommandEmitter } from './createCommandEmitter';
 
 export type CreatePeaksProps = CreatePeaksCanvasProps &
   CreateSegmentControlsProps & {
@@ -31,7 +33,9 @@ export type PeaksContext = {
   amplitude: ReturnType<typeof createAmplitudeControls>;
   player: ReturnType<typeof createPlayerControls>;
   segments: ReturnType<typeof createSegmentControls>;
-  emitter: ReturnType<typeof createEventEmitter>;
+  eventEmitter: ReturnType<typeof createEventEmitter>;
+  commandEmitter: ReturnType<typeof createCommandEmitter>;
+  permissions: Ref<Permissions>;
 };
 
 const PeaksInjectionKey = Symbol();
@@ -51,6 +55,7 @@ export const createPeaksContext = (props: CreatePeaksProps): PeaksContext => {
       segments: props.segments,
       permissions: props.permissions,
     }),
+    permissions: props.permissions,
   } satisfies PeaksContext;
 
   provide(PeaksInjectionKey, context);

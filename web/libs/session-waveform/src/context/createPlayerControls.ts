@@ -3,14 +3,12 @@ import type { PeaksOptions } from 'peaks.js';
 import { onClickOutside } from '@vueuse/core';
 import type { createPeaksCanvas } from './createPeaksCanvas';
 
-export const createPlayerControls = (
-  props: ReturnType<typeof createPeaksCanvas>
-) => {
-  const {
-    peaks,
-    layout: { canvasElement },
-  } = props;
-
+export const createPlayerControls = ({
+  peaks,
+  eventEmitter,
+  commandEmitter,
+  layout: { canvasElement },
+}: ReturnType<typeof createPeaksCanvas>) => {
   const isPlaying = ref(false);
   const currentTime = ref(0);
 

@@ -4,6 +4,7 @@ import type { PeaksInstance, PeaksOptions, SegmentMarker } from 'peaks.js';
 import Peaks from 'peaks.js';
 import type { OverviewTheme, ZoomviewTheme } from './theme';
 import { createEventEmitter } from './createEventEmitter';
+import { createCommandEmitter } from './createCommandEmitter';
 
 export type CreatePeaksCanvasProps = {
   overviewTheme: Ref<OverviewTheme>;
@@ -12,7 +13,9 @@ export type CreatePeaksCanvasProps = {
 };
 
 export const createPeaksCanvas = (props: CreatePeaksCanvasProps) => {
-  const emitter = createEventEmitter();
+  const eventEmitter = createEventEmitter();
+  const commandEmitter = createCommandEmitter();
+
   const peaks = shallowRef<PeaksInstance>();
 
   const canvasElement = ref<HTMLElement>();
@@ -50,9 +53,8 @@ export const createPeaksCanvas = (props: CreatePeaksCanvasProps) => {
             },
           }),
       createSegmentMarker: (options) => {
-        return new CustomSegmentMarker({
-          ...options,
-          emitter,
+        return new CustomSegmentMarker(options, {
+          eventEmitter,
         }) as SegmentMarker;
       },
     } satisfies PeaksOptions;
@@ -69,6 +71,7 @@ export const createPeaksCanvas = (props: CreatePeaksCanvasProps) => {
           }
 
           peaks.value = peaksInstance;
+          eventEmitter.emit('ready', peaksInstance);
         });
       }
     },
@@ -83,6 +86,7 @@ export const createPeaksCanvas = (props: CreatePeaksCanvasProps) => {
       zoomviewElement,
       audioElement,
     },
-    emitter,
+    eventEmitter,
+    commandEmitter,
   };
 };

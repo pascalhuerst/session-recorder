@@ -45,29 +45,30 @@ export const createSegmentControls = ({
     peaks.value?.segments.add(segment);
   });
 
-  commandEmitter.on('jumpToSegment', (segmentId) => {
-    const segment = peaks.value?.segments.getSegment(segmentId);
-    if (segment) {
-      peaks.value?.player.seek(segment.startTime);
+  commandEmitter.on('updateSegment', () => {
+    // @todo: implement
+    if (!permissions.value.update) {
+      return;
     }
   });
 
-  commandEmitter.on('updateSegment', () => {
-    // @todo: implement
-  });
-
   commandEmitter.on('removeSegment', (segmentId) => {
+    if (!permissions.value.delete) {
+      return;
+    }
+
     peaks.value?.segments.removeById(segmentId);
   });
 
   eventEmitter.on('ready', () => {
     segments.value.forEach((segment) => {
+      console.log(segment);
       peaks.value?.segments.add(segment);
     });
 
     peaks.value?.on('segments.add', (event) => {
       event.segments.forEach((segment) => {
-        eventEmitter.emit('segmentAdded', segment as Segment);
+        eventEmitter.emit('segmentAdded', segment as unknown as Segment);
       });
     });
 

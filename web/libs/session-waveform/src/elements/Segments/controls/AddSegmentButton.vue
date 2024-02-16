@@ -2,13 +2,15 @@
 import Button from '../../../lib/controls/Button.vue';
 import { usePeaksContext } from '../../../context/usePeaksContext';
 
-const {
-  segments: { addSegment },
-} = usePeaksContext();
+const { commandEmitter } = usePeaksContext();
 </script>
 
 <template>
-  <Button size="sm" @click="addSegment" class="add-segment-btn">
+  <Button
+    size="sm"
+    @click="() => commandEmitter.emit('addSegment')"
+    class="add-segment-btn"
+  >
     Add Segment
   </Button>
 </template>

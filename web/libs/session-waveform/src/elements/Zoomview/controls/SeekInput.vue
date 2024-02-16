@@ -6,7 +6,8 @@ import { usePeaksContext } from '../../../context/usePeaksContext';
 import TextInput from '../../../lib/forms/TextInput.vue';
 
 const {
-  player: { duration, currentTime, seek },
+  player: { duration, currentTime },
+  commandEmitter,
 } = usePeaksContext();
 
 const playTime = computed({
@@ -24,7 +25,7 @@ const playTime = computed({
         ?.slice(1, 5)
         .map((val) => parseInt(val)) || [];
     const seconds = h * 3600 + m * 60 + s + ms / 1000;
-    seek(seconds);
+    commandEmitter.emit('seek', seconds);
   },
 });
 

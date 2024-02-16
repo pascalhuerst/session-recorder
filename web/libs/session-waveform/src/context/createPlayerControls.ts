@@ -1,5 +1,4 @@
-import { computed, onMounted, onUnmounted, ref, shallowRef, watch } from 'vue';
-import type { PeaksOptions } from 'peaks.js';
+import { ref } from 'vue';
 import { onClickOutside } from '@vueuse/core';
 import type { createPeaksCanvas } from './createPeaksCanvas';
 
@@ -9,69 +8,71 @@ export const createPlayerControls = ({
   commandEmitter,
   layout: { canvasElement },
 }: ReturnType<typeof createPeaksCanvas>) => {
+  const canPlay = ref(false);
   const isPlaying = ref(false);
   const currentTime = ref(0);
+  const duration = ref(0);
 
-  const player = computed(() => {
-    return peaks.value?.player as PeaksOptions['player'] | undefined;
+  commandEmitter.on('play', () => {
+    console.log(peaks.value?.player);
+    peaks.value?.player.play();
   });
 
-  const duration = computed(() => {
-    return player.value?.getDuration();
+  commandEmitter.on('pause', () => {
+    peaks.value?.player.pause();
   });
 
-  watch(
-    player,
-    () => {
-      if (player.value) {
-        currentTime.value = player.value.getCurrentTime();
-      }
-    },
-    { immediate: true }
-  );
+  commandEmitter.on('seek', (seconds) => {
+    peaks.value?.player.seek(seconds);
+  });
 
-  const play = () => {
-    player.value?.play();
-    isPlaying.value = true;
-  };
+  eventEmitter.on('ready', () => {
+    peaks.value?.on('player.canplay', () => {
+      console.log('player.canplay', peaks.value);
+      canPlay.value = true;
+      duration.value = peaks.value?.player.getDuration() || 0;
+    });
 
-  const pause = () => {
-    isPlaying.value = false;
-    player.value?.pause();
-  };
+    peaks.value?.on('player.playing', () => {
+      console.log('player.playing', peaks.value);
+      eventEmitter.emit('playbackStarted');
+    });
 
-  const seek = (seconds: number) => {
-    player.value?.seek(seconds);
-  };
+    peaks.value?.on('player.pause', () => {
+      eventEmitter.emit('playbackPaused');
+    });
 
-  const interval = shallowRef();
+    peaks.value?.on('player.ended', () => {
+      eventEmitter.emit('playbackEnded');
+    });
 
-  onMounted(() => {
-    currentTime.value = interval.value = setInterval(() => {
-      if (peaks.value) {
-        currentTime.value = peaks.value.player.getCurrentTime();
-      }
-    }, 100);
-
-    onClickOutside(canvasElement.value, () => {
-      if (isPlaying.value) {
-        player.value?.pause();
-        isPlaying.value = false;
-      }
+    peaks.value?.on('player.timeupdate', (time) => {
+      currentTime.value = time;
     });
   });
 
-  onUnmounted(() => {
-    clearInterval(interval.value);
+  eventEmitter.on('playbackStarted', () => {
+    isPlaying.value = true;
+  });
+
+  eventEmitter.on('playbackPaused', () => {
+    isPlaying.value = false;
+  });
+
+  eventEmitter.on('playbackEnded', () => {
+    isPlaying.value = false;
+  });
+
+  onClickOutside(canvasElement.value, () => {
+    if (isPlaying.value) {
+      peaks.value?.player.pause();
+    }
   });
 
   return {
-    player,
+    canPlay,
     isPlaying,
     currentTime,
     duration,
-    play,
-    pause,
-    seek,
   };
 };

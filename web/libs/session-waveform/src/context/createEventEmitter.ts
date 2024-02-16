@@ -4,6 +4,9 @@ import type { PeaksInstance } from 'peaks.js';
 
 export interface Events {
   ready: (peaks: PeaksInstance) => void;
+  playbackStarted: () => void;
+  playbackPaused: () => void;
+  playbackEnded: () => void;
   segmentAdded: (segment: Segment) => void;
   segmentUpdated: (segmentId: string, patch: Partial<Segment>) => void;
   segmentRemoved: (segmentId: string) => void;

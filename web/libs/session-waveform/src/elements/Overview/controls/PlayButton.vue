@@ -4,11 +4,12 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { usePeaksContext } from '../../../context/usePeaksContext';
 
 const {
-  player: { duration, play, pause, isPlaying },
+  commandEmitter,
+  player: { duration, canPlay, isPlaying },
 } = usePeaksContext();
 
 const handleClick = () => {
-  isPlaying.value ? pause() : play();
+  isPlaying.value ? commandEmitter.emit('pause') : commandEmitter.emit('play');
 };
 </script>
 
@@ -18,7 +19,7 @@ const handleClick = () => {
     size="lg"
     variant="ghost"
     color="primary"
-    :disabled="!duration"
+    :disabled="!duration || !canPlay"
     @click="handleClick"
   >
     <font-awesome-icon v-if="isPlaying" icon="fa-solid fa-pause" />

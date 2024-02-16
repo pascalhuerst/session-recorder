@@ -9,6 +9,7 @@ export interface Commands {
   updateSegment: (segmentId: string, patch: Partial<Segment>) => void;
   removeSegment: (segmentId: string) => void;
   setAmplitudeScale: (scale: number) => void;
+  setZoomLevel: (seconds: number) => void;
 }
 
 export const createCommandEmitter = () => {

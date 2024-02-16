@@ -5,11 +5,20 @@ import TextInput from '../../../lib/forms/TextInput.vue';
 import { usePeaksContext } from '../../../context/usePeaksContext';
 
 const {
-  zoom: { zoomLevel, zoomStep, adjustZoom },
+  commandEmitter,
+  zoom: { zoomLevel, zoomStep },
 } = usePeaksContext();
 
-const onZoomOut = () => adjustZoom(-1 * zoomStep.value);
-const onZoomIn = () => adjustZoom(zoomStep.value);
+const normalizeZoom = (offset: number) => {
+  return Math.max(zoomStep.value, zoomLevel.value + offset);
+};
+
+const onZoomOut = () => {
+  commandEmitter.emit('setZoomLevel', normalizeZoom(-1 * zoomStep.value));
+};
+const onZoomIn = () => {
+  commandEmitter.emit('setZoomLevel', normalizeZoom(zoomStep.value));
+};
 </script>
 
 <template>

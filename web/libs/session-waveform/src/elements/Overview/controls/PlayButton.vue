@@ -2,15 +2,32 @@
 import Button from '../../../lib/controls/Button.vue';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { usePeaksContext } from '../../../context/usePeaksContext';
+import { onClickOutside } from '@vueuse/core';
+import { watch } from 'vue';
 
 const {
   commandEmitter,
-  player: { duration, canPlay, isPlaying },
+  layout: { canvasElement },
+  player: { duration, isPlaying },
 } = usePeaksContext();
 
 const handleClick = () => {
   isPlaying.value ? commandEmitter.emit('pause') : commandEmitter.emit('play');
 };
+
+onClickOutside(canvasElement.value, () => {
+  if (isPlaying.value) {
+    commandEmitter.emit('pause');
+  }
+});
+
+watch(
+  duration,
+  () => {
+    console.log({ duration: duration.value });
+  },
+  { immediate: true }
+);
 </script>
 
 <template>
@@ -19,7 +36,7 @@ const handleClick = () => {
     size="lg"
     variant="ghost"
     color="primary"
-    :disabled="!duration || !canPlay"
+    :disabled="!duration"
     @click="handleClick"
   >
     <font-awesome-icon v-if="isPlaying" icon="fa-solid fa-pause" />

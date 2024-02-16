@@ -34,10 +34,13 @@ export const createSegmentControls = ({
     const segment = {
       id: segmentId,
       startTime: Number(peaks.value?.player.getCurrentTime()),
-      endTime: Number(peaks.value?.player.getCurrentTime()) + 5,
+      endTime: Math.min(
+        Number(peaks.value?.player.getDuration()),
+        Number(peaks.value?.player.getCurrentTime()) + 60
+      ),
       color: '#ed64a6',
       labelText: `Segment ${startIndex}-${endIndex}`,
-      editable: true,
+      editable: permissions.value.update,
       startIndex,
       endIndex,
     } satisfies Segment;
@@ -68,7 +71,16 @@ export const createSegmentControls = ({
 
     peaks.value?.on('segments.add', (event) => {
       event.segments.forEach((segment) => {
-        eventEmitter.emit('segmentAdded', segment as unknown as Segment);
+        eventEmitter.emit('segmentAdded', {
+          id: String(segment.id),
+          startTime: segment.startTime,
+          endTime: segment.endTime,
+          color: '#ed64a6',
+          labelText: segment.labelText,
+          editable: permissions.value.update,
+          startIndex: String(segment.startIndex),
+          endIndex: String(segment.endIndex),
+        });
       });
     });
 

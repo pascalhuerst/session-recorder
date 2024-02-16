@@ -11,6 +11,7 @@ export interface Events {
   segmentUpdated: (segmentId: string, patch: Partial<Segment>) => void;
   segmentRemoved: (segmentId: string) => void;
   amplitudeScaleChanged: (scale: number) => void;
+  zoomLevelChanged: (seconds: number) => void;
 }
 
 export const createEventEmitter = () => {

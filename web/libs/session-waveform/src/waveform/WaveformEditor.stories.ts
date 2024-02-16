@@ -45,6 +45,6 @@ export const Primary: StoryObj = {
     `,
   }),
   args: {
-    audioUrl: 'https://cdn.pixabay.com/audio/2023/10/17/audio_65ea4766f8.mp3',
+    audioUrl: '/Free_Test_Data_1OMB_MP3.mp3',
   },
 };

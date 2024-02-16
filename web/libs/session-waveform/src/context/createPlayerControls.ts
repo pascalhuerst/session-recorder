@@ -1,20 +1,16 @@
 import { ref } from 'vue';
-import { onClickOutside } from '@vueuse/core';
 import type { createPeaksCanvas } from './createPeaksCanvas';
 
 export const createPlayerControls = ({
   peaks,
   eventEmitter,
   commandEmitter,
-  layout: { canvasElement },
 }: ReturnType<typeof createPeaksCanvas>) => {
-  const canPlay = ref(false);
   const isPlaying = ref(false);
   const currentTime = ref(0);
   const duration = ref(0);
 
   commandEmitter.on('play', () => {
-    console.log(peaks.value?.player);
     peaks.value?.player.play();
   });
 
@@ -27,14 +23,15 @@ export const createPlayerControls = ({
   });
 
   eventEmitter.on('ready', () => {
+    // @todo: for some reason player.canplay doesn't fire unless you interact
+    // with the player
+    peaks.value?.player.seek(0);
+
     peaks.value?.on('player.canplay', () => {
-      console.log('player.canplay', peaks.value);
-      canPlay.value = true;
       duration.value = peaks.value?.player.getDuration() || 0;
     });
 
     peaks.value?.on('player.playing', () => {
-      console.log('player.playing', peaks.value);
       eventEmitter.emit('playbackStarted');
     });
 
@@ -63,14 +60,7 @@ export const createPlayerControls = ({
     isPlaying.value = false;
   });
 
-  onClickOutside(canvasElement.value, () => {
-    if (isPlaying.value) {
-      peaks.value?.player.pause();
-    }
-  });
-
   return {
-    canPlay,
     isPlaying,
     currentTime,
     duration,

@@ -24,7 +24,9 @@ const props = withDefaults(
   }
 );
 
-createPeaksContext({
+const {
+  layout: { canvasElement },
+} = createPeaksContext({
   overviewTheme: ref(overviewTheme),
   zoomviewTheme: ref(zoomviewTheme),
   waveformUrl: computed(() => props.waveformUrl),

@@ -3,7 +3,6 @@ import Button from '../../../lib/controls/Button.vue';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { usePeaksContext } from '../../../context/usePeaksContext';
 import { onClickOutside } from '@vueuse/core';
-import { watch } from 'vue';
 
 const {
   commandEmitter,
@@ -20,14 +19,6 @@ onClickOutside(canvasElement.value, () => {
     commandEmitter.emit('pause');
   }
 });
-
-watch(
-  duration,
-  () => {
-    console.log({ duration: duration.value });
-  },
-  { immediate: true }
-);
 </script>
 
 <template>

@@ -48,11 +48,17 @@ export const createSegmentControls = ({
     peaks.value?.segments.add(segment);
   });
 
-  commandEmitter.on('updateSegment', () => {
-    // @todo: implement
+  commandEmitter.on('updateSegment', (segmentId, patch) => {
     if (!permissions.value.update) {
       return;
     }
+
+    const segment = peaks.value?.segments.getSegment(segmentId);
+    if (!segment) {
+      return;
+    }
+
+    segment.update({ ...patch } as any);
   });
 
   commandEmitter.on('removeSegment', (segmentId) => {
@@ -65,7 +71,6 @@ export const createSegmentControls = ({
 
   eventEmitter.on('ready', () => {
     segments.value.forEach((segment) => {
-      console.log(segment);
       peaks.value?.segments.add(segment);
     });
 
@@ -98,7 +103,10 @@ export const createSegmentControls = ({
   eventEmitter.on('segmentRemoved', (segmentId) => {
     const index = segments.value.findIndex((el) => el.id === segmentId);
     if (index > -1) {
-      segments.value.splice(index, 1);
+      segments.value.splice(index, 1, {
+        ...segments.value[index],
+        deleted: true,
+      });
     }
   });
 

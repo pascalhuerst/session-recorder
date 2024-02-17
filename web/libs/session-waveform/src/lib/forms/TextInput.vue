@@ -6,7 +6,7 @@
     <div v-if="$slots.prepend" class="prepend">
       <slot name="prepend" v-bind="{ inputProps, resetProps, inputRef }" />
     </div>
-    <input v-model="value" v-bind="inputProps" ref="inputRef"/>
+    <input v-model="value" v-bind="inputProps" ref="inputRef" />
     <div v-if="$slots.actions" class="actions">
       <slot name="actions" v-bind="{ inputProps, resetProps, inputRef }" />
     </div>
@@ -43,7 +43,7 @@ defineOptions({
 });
 const attrs = useAttrs();
 
-const inputRef = ref<HTMLInputElement>()
+const inputRef = ref<HTMLInputElement>();
 
 const inheritedAttrs = computed(() => {
   const { style, class: className, ...rest } = attrs;
@@ -79,6 +79,7 @@ const resetProps = computed(() => {
   --input-padding: 0.25rem;
   --input-font-size: calc(var(--input-height) * 0.5);
   --input-line-height: 1;
+  --input-radius: var(--radius-sm);
 
   display: flex;
   align-items: center;
@@ -87,12 +88,17 @@ const resetProps = computed(() => {
   transition: all 0.5s;
   border: 1px solid transparent;
 
-  background: var(--color-grey-200);
+  background: var(--color-grey-100);
 
   padding: 0;
   height: var(--input-height);
   line-height: var(--input-font-size);
-  border-radius: var(--radius-sm);
+  border-radius: var(--input-radius);
+}
+
+.input-container *:only-child {
+  padding-left: var(--input-padding);
+  padding-right: var(--input-padding);
 }
 
 .input-container.xs {
@@ -101,8 +107,9 @@ const resetProps = computed(() => {
 }
 
 .input-container.sm {
-  --input-height: 1.5rem;
-  --input-padding: 0.175rem;
+  --input-height: 1.75rem;
+  --input-padding: 0.275rem;
+  --input-radius: var(--radius-xs);
 }
 
 .input-container.lg {

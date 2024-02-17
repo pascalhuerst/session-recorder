@@ -1,15 +1,7 @@
 <script setup lang="ts">
-import { computed } from 'vue';
-import { parsePlayTime } from '../utils/parsePlayTime';
-
-const props = defineProps<{
+defineProps<{
   index: string;
-  time: number;
 }>();
-
-const playTime = computed(() => {
-  return parsePlayTime(props.time);
-});
 </script>
 
 <template>
@@ -18,9 +10,7 @@ const playTime = computed(() => {
       {{ index }}
     </div>
     <div>
-      {{
-        `${playTime.hours}:${playTime.minutes}:${playTime.seconds}`
-      }}.<small>{{ playTime.milliseconds }}</small>
+      <slot />
     </div>
   </div>
 </template>

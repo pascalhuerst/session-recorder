@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { computed } from 'vue';
-import { parsePlayTime } from '../../../lib/utils/parsePlayTime';
+import { parseTimeFromSeconds } from '../../../lib/utils/parseTimeFromSeconds';
 import { usePeaksContext } from '../../../context/usePeaksContext';
 import TextInput from '../../../lib/forms/TextInput.vue';
+import { parseSecondsFromTime } from '../../../lib/utils/parseSecondsFromTime';
 
 const {
   player: { duration, currentTime },
@@ -15,16 +16,11 @@ const playTime = computed({
     if (!currentTime.value) {
       return '00:00:00';
     }
-    const parsed = parsePlayTime(currentTime.value);
+    const parsed = parseTimeFromSeconds(currentTime.value);
     return `${parsed.hours}:${parsed.minutes}:${parsed.seconds}.${parsed.milliseconds}`;
   },
   set: (value: string) => {
-    const [h, m, s, ms] =
-      value
-        .match(/(\d{2}):(\d{2}):(\d{2})\.(\d{3})/)
-        ?.slice(1, 5)
-        .map((val) => parseInt(val)) || [];
-    const seconds = h * 3600 + m * 60 + s + ms / 1000;
+    const seconds = parseSecondsFromTime(value);
     commandEmitter.emit('seek', seconds);
   },
 });
@@ -34,7 +30,7 @@ const maxPlayTime = computed(() => {
     return '00:00:00';
   }
 
-  const parsed = parsePlayTime(duration.value);
+  const parsed = parseTimeFromSeconds(duration.value);
   return `${parsed.hours}:${parsed.minutes}:${parsed.seconds}.${parsed.milliseconds}`;
 });
 

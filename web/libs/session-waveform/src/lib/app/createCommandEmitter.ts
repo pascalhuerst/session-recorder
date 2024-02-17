@@ -1,4 +1,4 @@
-import type { Segment } from '../types';
+import type { Segment } from '../../types';
 import { createNanoEvents } from 'nanoevents';
 
 export interface Commands {

@@ -1,5 +1,5 @@
-import type { Segment } from '../types';
-import { createNanoEvents } from 'nanoevents';
+import type { Segment } from '../../types';
+import { createNanoEvents, EventsMap } from 'nanoevents';
 import type { PeaksInstance } from 'peaks.js';
 
 export interface Events {
@@ -14,8 +14,8 @@ export interface Events {
   zoomLevelChanged: (seconds: number) => void;
 }
 
-export const createEventEmitter = () => {
-  return createNanoEvents<Events>();
+export const createEventEmitter = <T extends EventsMap>() => {
+  return createNanoEvents<T>();
 };
 
 export type EventEmitter = ReturnType<typeof createEventEmitter>;

@@ -1,6 +1,6 @@
 import { type CreateSegmentMarkerOptions } from 'peaks.js';
 import Konva from 'konva';
-import type { EventEmitter } from '../context/createEventEmitter';
+import type { EventEmitter } from '../lib/app/createEventEmitter';
 
 type Services = {
   eventEmitter: EventEmitter;

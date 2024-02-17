@@ -1,21 +1,21 @@
-import { computed, type Ref, ref, shallowRef, toValue, watch } from 'vue';
+import { computed, ref, type Ref, shallowRef, toValue, watch } from 'vue';
 import { CustomSegmentMarker } from '../elements/CustomSegmentMarker';
 import type { PeaksInstance, PeaksOptions, SegmentMarker } from 'peaks.js';
 import Peaks from 'peaks.js';
 import type { OverviewTheme, ZoomviewTheme } from './theme';
-import { createEventEmitter } from './createEventEmitter';
-import { createCommandEmitter } from './createCommandEmitter';
+import { createEventEmitter } from '../lib/app/createEventEmitter';
+import { createCommandEmitter } from '../lib/app/createCommandEmitter';
+import type { ContextState } from '../lib/app/createContextStore';
+import { createContextStore } from '../lib/app/createContextStore';
 
 export type CreatePeaksCanvasProps = {
   overviewTheme: Ref<OverviewTheme>;
   zoomviewTheme: Ref<ZoomviewTheme>;
   waveformUrl?: Ref<string | undefined>;
+  initialState: ContextState;
 };
 
-export const createPeaksCanvas = (props: CreatePeaksCanvasProps) => {
-  const eventEmitter = createEventEmitter();
-  const commandEmitter = createCommandEmitter();
-
+export const createPeaksModule = (props: CreatePeaksCanvasProps) => {
   const peaks = shallowRef<PeaksInstance>();
 
   const canvasElement = ref<HTMLElement>();
@@ -79,6 +79,7 @@ export const createPeaksCanvas = (props: CreatePeaksCanvasProps) => {
   );
 
   return {
+    state,
     peaks,
     layout: {
       canvasElement,

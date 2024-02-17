@@ -1,6 +1,6 @@
 import type { Permissions, Segment } from '../types';
 import { type Ref } from 'vue';
-import type { createPeaksCanvas } from './createPeaksCanvas';
+import type { createPeaksModule } from './createPeaksModule';
 import uuid from 'uuidv4';
 
 export type CreateSegmentControlsProps = {
@@ -19,7 +19,7 @@ export const createSegmentControls = ({
   permissions,
   eventEmitter,
   commandEmitter,
-}: CreateSegmentControlsProps & ReturnType<typeof createPeaksCanvas>) => {
+}: CreateSegmentControlsProps & ReturnType<typeof createPeaksModule>) => {
   commandEmitter.on('addSegment', () => {
     if (!permissions.value.create) {
       return;

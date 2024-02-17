@@ -1,37 +1,34 @@
-import { type PeaksInstance } from 'peaks.js';
-import { inject, provide, type Ref } from 'vue';
-import { createZoomControls } from './createZoomControls';
-import { createAmplitudeControls } from './createAmplitudeControls';
-import { createPlayerControls } from './createPlayerControls';
-import type { CreatePeaksCanvasProps } from './createPeaksCanvas';
-import { createPeaksCanvas } from './createPeaksCanvas';
-import type { AudioSourceUrl } from '../types';
-import { type Permissions } from '../types';
-import {
-  createSegmentControls,
-  type CreateSegmentControlsProps,
-} from './createSegmentControls';
-import { createEventEmitter } from './createEventEmitter';
-import type { createCommandEmitter } from './createCommandEmitter';
+import { type PeaksInstance } from "peaks.js";
+import { inject, provide, type Ref } from "vue";
+import { installZoomControls } from "./installZoomControls";
+import { installAmplitudeControls } from "./installAmplitudeControls";
+import { installPlayerControls } from "./installPlayerControls";
+import type { CreatePeaksCanvasProps } from "./createPeaksModule";
+import { createPeaksModule } from "./createPeaksModule";
+import type { AudioSourceUrl } from "../types";
+import { type Permissions } from "../types";
+import { createSegmentControls, type CreateSegmentControlsProps } from "./createSegmentControls";
+import { createEventEmitter } from "../lib/app/createEventEmitter";
+import type { createCommandEmitter } from "../lib/app/createCommandEmitter";
+import { createContextStore, defaultState } from "../lib/app/createContextStore";
+import { merge } from "lodash.merge";
+import { defineContext } from "../lib/app/defineContext";
 
 export type CreatePeaksProps = CreatePeaksCanvasProps &
   CreateSegmentControlsProps & {
-    audioUrls: Ref<Array<AudioSourceUrl>>;
-  };
+  audioUrls: Ref<Array<AudioSourceUrl>>;
+};
 
 export type PeaksContext = {
+  state: ReturnType<typeof createContextStore>;
   peaks: Ref<PeaksInstance | undefined>;
-  audioUrls: Ref<Array<AudioSourceUrl>>;
-  waveformUrl?: Ref<string | undefined>;
   layout: {
     canvasElement: Ref<HTMLElement | undefined>;
     overviewElement: Ref<HTMLElement | undefined>;
     zoomviewElement: Ref<HTMLElement | undefined>;
     audioElement: Ref<HTMLAudioElement | undefined>;
   };
-  zoom: ReturnType<typeof createZoomControls>;
-  amplitude: ReturnType<typeof createAmplitudeControls>;
-  player: ReturnType<typeof createPlayerControls>;
+  player: ReturnType<typeof installPlayerControls>;
   segments: ReturnType<typeof createSegmentControls>;
   eventEmitter: ReturnType<typeof createEventEmitter>;
   commandEmitter: ReturnType<typeof createCommandEmitter>;
@@ -41,21 +38,20 @@ export type PeaksContext = {
 const PeaksInjectionKey = Symbol();
 
 export const createPeaksContext = (props: CreatePeaksProps): PeaksContext => {
-  const canvas = createPeaksCanvas(props);
+  const module = createPeaksModule({
+    ...props,
+    initialState: merge({}, defaultState, props.initialState)
+  });
+
+  installZoomControls(module);
+  installAmplitudeControls(module);
+  installPlayerControls(module);
+  createSegmentControls(module);
 
   const context = {
-    ...canvas,
-    audioUrls: props.audioUrls,
-    waveformUrl: props.waveformUrl,
-    zoom: createZoomControls(canvas),
-    amplitude: createAmplitudeControls(canvas),
-    player: createPlayerControls(canvas),
-    segments: createSegmentControls({
-      ...canvas,
-      segments: props.segments,
-      permissions: props.permissions,
-    }),
-    permissions: props.permissions,
+    ...module,
+    segments:,
+    permissions: props.permissions
   } satisfies PeaksContext;
 
   provide(PeaksInjectionKey, context);
@@ -65,7 +61,7 @@ export const createPeaksContext = (props: CreatePeaksProps): PeaksContext => {
 export const usePeaksContext = () => {
   const context = inject(PeaksInjectionKey);
   if (!context) {
-    throw new Error('You must create a peaks context first');
+    throw new Error("You must create a peaks context first");
   }
   return context as PeaksContext;
 };

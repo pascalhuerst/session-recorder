@@ -1,15 +1,11 @@
-import { ref } from 'vue';
-import type { createPeaksCanvas } from './createPeaksCanvas';
+import type { createPeaksModule } from './createPeaksModule';
 
-export const createPlayerControls = ({
+export const installPlayerControls = ({
+  state,
   peaks,
   eventEmitter,
   commandEmitter,
-}: ReturnType<typeof createPeaksCanvas>) => {
-  const isPlaying = ref(false);
-  const currentTime = ref(0);
-  const duration = ref(0);
-
+}: ReturnType<typeof createPeaksModule>) => {
   commandEmitter.on('play', () => {
     peaks.value?.player.play();
   });
@@ -28,7 +24,12 @@ export const createPlayerControls = ({
     peaks.value?.player.seek(0);
 
     peaks.value?.on('player.canplay', () => {
-      duration.value = peaks.value?.player.getDuration() || 0;
+      state.update((prev) => {
+        return {
+          ...prev,
+          duration: peaks.value?.player.getDuration() || 0,
+        };
+      });
     });
 
     peaks.value?.on('player.playing', () => {
@@ -43,26 +44,40 @@ export const createPlayerControls = ({
       eventEmitter.emit('playbackEnded');
     });
 
-    peaks.value?.on('player.timeupdate', (time) => {
-      currentTime.value = time;
+    peaks.value?.on('player.timeupdate', (currentTime) => {
+      state.update((prev) => {
+        return {
+          ...prev,
+          currentTime,
+        };
+      });
     });
   });
 
   eventEmitter.on('playbackStarted', () => {
-    isPlaying.value = true;
+    state.update((prev) => {
+      return {
+        ...prev,
+        isPlaying: true,
+      };
+    });
   });
 
   eventEmitter.on('playbackPaused', () => {
-    isPlaying.value = false;
+    state.update((prev) => {
+      return {
+        ...prev,
+        isPlaying: false,
+      };
+    });
   });
 
   eventEmitter.on('playbackEnded', () => {
-    isPlaying.value = false;
+    state.update((prev) => {
+      return {
+        ...prev,
+        isPlaying: false,
+      };
+    });
   });
-
-  return {
-    isPlaying,
-    currentTime,
-    duration,
-  };
 };

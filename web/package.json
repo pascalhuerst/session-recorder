@@ -17,6 +17,7 @@
     "@session-recorder/protocols": "file:../protocols",
     "@vueuse/core": "^10.7.0",
     "google-protobuf": "^3.21.2",
+    "lodash.merge": "^4.6.2",
     "nanoevents": "^9.0.0",
     "nanostores": "^0.9.5",
     "nice-grpc-web": "^3.3.2",

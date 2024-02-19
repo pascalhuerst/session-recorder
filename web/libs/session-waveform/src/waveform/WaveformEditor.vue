@@ -1,20 +1,27 @@
 <script setup lang="ts">
-import { computed, defineModel, ref } from 'vue';
+import { defineModel, ref, watchEffect } from 'vue';
 import VirtualizedItem from '../lib/disclosure/VirtualizedItem.vue';
-import { overviewTheme, zoomviewTheme } from '../context/theme';
-import { createPeaksContext } from '../context/usePeaksContext';
+import {
+  createPeaksContext,
+  usePeaksContext,
+} from '../context/usePeaksContext';
 import Overview from '../elements/Overview/Overview.vue';
 import Zoomview from '../elements/Zoomview/Zoomview.vue';
-import type { AudioSourceUrl, Segment } from '../types';
-import { type Permissions } from '../types';
 import Audio from '../elements/Overview/Audio.vue';
 import Segments from '../elements/Segments/Segments.vue';
+import { onClickOutside } from '@vueuse/core';
+import type {
+  AudioSourceUrl,
+  Permissions,
+  Segment,
+} from '../context/models/state';
+import { useWaverformLayoutProvider } from './useWaverformLayoutProvider';
 
 const segments = defineModel<Segment[]>('segments', { required: true });
 
 const props = withDefaults(
   defineProps<{
-    audioUrls: AudioSourceUrl[];
+    audioUrls: [AudioSourceUrl, ...AudioSourceUrl[]];
     waveformUrl?: string;
     permissions: Permissions;
     height?: number;
@@ -24,15 +31,41 @@ const props = withDefaults(
   }
 );
 
-const {
-  layout: { canvasElement },
-} = createPeaksContext({
-  overviewTheme: ref(overviewTheme),
-  zoomviewTheme: ref(zoomviewTheme),
-  waveformUrl: computed(() => props.waveformUrl),
-  audioUrls: computed(() => props.audioUrls),
-  permissions: computed(() => props.permissions),
-  segments,
+const { provide } = useWaverformLayoutProvider();
+
+const overviewRef = ref<HTMLElement>();
+const zoomviewRef = ref<HTMLElement>();
+const audioRef = ref<HTMLElement>();
+
+provide({
+  overviewRef,
+  zoomviewRef,
+  audioRef,
+});
+
+const context = createPeaksContext({
+  initialState: {
+    waveformUrl: props.waveformUrl,
+    audioUrls: props.audioUrls,
+    permissions: props.permissions,
+    segments: segments.value,
+  },
+});
+
+watchEffect(() => {
+  if (overviewRef.value && zoomviewRef.value && audioRef.value) {
+    context.commandEmitter.emit('mount', {
+      overview: overviewRef.value,
+      zoomview: zoomviewRef.value,
+      audio: audioRef.value,
+    });
+  }
+});
+
+const canvasElement = ref<HTMLElement>();
+onClickOutside(canvasElement.value, () => {
+  const { eventEmitter } = usePeaksContext();
+  eventEmitter.emit('clickOutsideCanvas');
 });
 </script>
 

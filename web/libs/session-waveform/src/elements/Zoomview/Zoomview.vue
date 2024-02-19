@@ -4,15 +4,15 @@ import ZoomInput from './controls/ZoomInput.vue';
 import AmplitudeInput from './controls/AmplitudeInput.vue';
 import AddSegmentButton from '../Segments/controls/AddSegmentButton.vue';
 import { usePeaksContext } from '../../context/usePeaksContext';
+import { useWaverformLayoutProvider } from '../../waveform/useWaverformLayoutProvider';
 
-const {
-  layout: { zoomviewElement },
-} = usePeaksContext();
+const { inject } = useWaverformLayoutProvider();
+const { zoomviewRef } = inject();
 </script>
 
 <template>
   <div class="zoomview">
-    <div ref="zoomviewElement" class="zoomview__waveform"></div>
+    <div ref="zoomviewRef" class="zoomview__waveform"></div>
     <div class="zoomview__controls">
       <SeekInput />
       <ZoomInput />

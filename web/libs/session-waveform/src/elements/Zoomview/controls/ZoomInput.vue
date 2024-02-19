@@ -3,11 +3,12 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import Button from '../../../lib/controls/Button.vue';
 import TextInput from '../../../lib/forms/TextInput.vue';
 import { usePeaksContext } from '../../../context/usePeaksContext';
+import { computed } from 'vue';
 
-const {
-  commandEmitter,
-  zoom: { zoomLevel, zoomStep },
-} = usePeaksContext();
+const { commandEmitter, state } = usePeaksContext();
+
+const zoomLevel = computed(() => state.toRef().value.zoom.zoomLevel);
+const zoomStep = computed(() => state.toRef().value.zoom.zoomStep);
 
 const normalizeZoom = (offset: number) => {
   return Math.max(zoomStep.value, zoomLevel.value + offset);

@@ -1,14 +1,17 @@
 <script setup lang="ts">
 import { usePeaksContext } from '../../context/usePeaksContext';
+import { useWaverformLayoutProvider } from '../../waveform/useWaverformLayoutProvider';
+import { computed } from 'vue';
 
-const {
-  audioUrls,
-  layout: { audioElement },
-} = usePeaksContext();
+const { inject } = useWaverformLayoutProvider();
+const { audioRef } = inject();
+
+const { state } = usePeaksContext();
+const audioUrls = computed(() => state.toRef().value.audioUrls);
 </script>
 
 <template>
-  <audio ref="audioElement">
+  <audio ref="audioRef">
     <source v-for="url in audioUrls" :key="url.type" v-bind="url" />
   </audio>
 </template>

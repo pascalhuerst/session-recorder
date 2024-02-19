@@ -6,10 +6,10 @@ import { usePeaksContext } from '../../../context/usePeaksContext';
 import TextInput from '../../../lib/forms/TextInput.vue';
 import { parseSecondsFromTime } from '../../../lib/utils/parseSecondsFromTime';
 
-const {
-  player: { duration, currentTime },
-  commandEmitter,
-} = usePeaksContext();
+const { commandEmitter, state } = usePeaksContext();
+
+const duration = computed(() => state.toRef().value.player.duration);
+const currentTime = computed(() => state.toRef().value.player.currentTime);
 
 const playTime = computed({
   get: () => {

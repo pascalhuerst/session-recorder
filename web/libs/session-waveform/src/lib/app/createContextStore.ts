@@ -1,18 +1,26 @@
 import { atom } from 'nanostores';
-import { ZodSchema } from 'zod';
+import { z, ZodSchema } from 'zod';
+import { useStore } from '@nanostores/vue';
 
-export const createContextStore = <T>(options: {
-  initialState: T;
-  schema: ZodSchema<T>;
+export const createContextStore = <T extends ZodSchema>(options: {
+  initialState: z.input<T>;
+  schema: T;
 }) => {
   const normalize = (state: T) => options.schema.parse(state);
 
-  const $store = atom<T>(normalize(options.initialState));
+  const $store = atom<z.output<T>>(normalize(options.initialState));
 
   return {
     $store,
-    update: (reduce: (prev: T) => T) => {
-      $store.set(normalize(reduce($store.get())));
+    toRef: () => {
+      return useStore($store);
+    },
+    get: () => $store.get(),
+    select: <S>(fn: (st: z.output<T>) => S) => {
+      return fn($store.get());
+    },
+    update: (reduce: (prev: z.output<T>) => z.input<T>) => {
+      $store.set(normalize(reduce(Object.freeze($store.get()))));
     },
   };
 };

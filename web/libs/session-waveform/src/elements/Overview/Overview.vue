@@ -1,15 +1,14 @@
 <script setup lang="ts">
-import { usePeaksContext } from '../../context/usePeaksContext';
 import PlayButton from './controls/PlayButton.vue';
+import { useWaverformLayoutProvider } from '../../waveform/useWaverformLayoutProvider';
 
-const {
-  layout: { overviewElement },
-} = usePeaksContext();
+const { inject } = useWaverformLayoutProvider();
+const { overviewRef } = inject();
 </script>
 
 <template>
   <div class="overview">
-    <div class="overview__waveform" ref="overviewElement"></div>
+    <div class="overview__waveform" ref="overviewRef"></div>
     <div class="overview__controls">
       <PlayButton />
     </div>

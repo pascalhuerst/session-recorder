@@ -3,11 +3,16 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import TextInput from '../../../lib/forms/TextInput.vue';
 import Button from '../../../lib/controls/Button.vue';
 import { usePeaksContext } from '../../../context/usePeaksContext';
+import { computed } from 'vue';
 
-const {
-  amplitude: { amplitudeScale, amplitudeStep },
-  commandEmitter,
-} = usePeaksContext();
+const { commandEmitter, state } = usePeaksContext();
+
+const amplitudeScale = computed(
+  () => state.toRef().value.amplitude.amplitudeScale
+);
+const amplitudeStep = computed(
+  () => state.toRef().value.amplitude.amplitudeStep
+);
 
 const toAbs = (step: number) => {
   return Math.max(0, (amplitudeScale.value * 100 + step * 100) / 100);

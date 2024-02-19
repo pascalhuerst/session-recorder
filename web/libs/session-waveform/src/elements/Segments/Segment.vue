@@ -2,21 +2,20 @@
 import Button from '../../lib/controls/Button.vue';
 import Marker from '../../lib/controls/Marker.vue';
 import { usePeaksContext } from '../../context/usePeaksContext';
-import type { Segment } from '../../types';
 import TextInput from '../../lib/forms/TextInput.vue';
 import { computed } from 'vue';
 import { parseTimeFromSeconds } from '../../lib/utils/parseTimeFromSeconds';
 import { parseSecondsFromTime } from '../../lib/utils/parseSecondsFromTime';
+import type { Segment } from '../../context/models/state';
 
 const props = defineProps<{
   segment: Segment;
 }>();
 
-const {
-  commandEmitter,
-  permissions,
-  player: { duration },
-} = usePeaksContext();
+const { commandEmitter, state } = usePeaksContext();
+
+const permissions = computed(() => state.toRef().value.permissions);
+const duration = computed(() => state.toRef().value.player.duration);
 
 const segmentLabel = computed({
   get: () => props.segment.labelText,

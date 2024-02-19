@@ -2,55 +2,52 @@ import type { createPeaksModule } from './createPeaksModule';
 
 export const installPlayerControls = ({
   state,
-  peaks,
   eventEmitter,
   commandEmitter,
 }: ReturnType<typeof createPeaksModule>) => {
-  commandEmitter.on('play', () => {
-    peaks.value?.player.play();
-  });
+  eventEmitter.on('ready', (peaks) => {
+    const player = peaks.player;
 
-  commandEmitter.on('pause', () => {
-    peaks.value?.player.pause();
-  });
-
-  commandEmitter.on('seek', (seconds) => {
-    peaks.value?.player.seek(seconds);
-  });
-
-  eventEmitter.on('ready', () => {
     // @todo: for some reason player.canplay doesn't fire unless you interact
     // with the player
-    peaks.value?.player.seek(0);
+    player.seek(0);
 
-    peaks.value?.on('player.canplay', () => {
-      state.update((prev) => {
-        return {
-          ...prev,
-          duration: peaks.value?.player.getDuration() || 0,
-        };
-      });
+    peaks.on('player.canplay', () => {
+      state.update((prev) => ({
+        ...prev,
+        duration: peaks.player.getDuration(),
+      }));
     });
 
-    peaks.value?.on('player.playing', () => {
+    peaks.on('player.playing', () => {
       eventEmitter.emit('playbackStarted');
     });
 
-    peaks.value?.on('player.pause', () => {
+    peaks.on('player.pause', () => {
       eventEmitter.emit('playbackPaused');
     });
 
-    peaks.value?.on('player.ended', () => {
+    peaks.on('player.ended', () => {
       eventEmitter.emit('playbackEnded');
     });
 
-    peaks.value?.on('player.timeupdate', (currentTime) => {
-      state.update((prev) => {
-        return {
-          ...prev,
-          currentTime,
-        };
-      });
+    peaks.on('player.timeupdate', (currentTime: number) => {
+      state.update((prev) => ({
+        ...prev,
+        currentTime,
+      }));
+    });
+
+    commandEmitter.on('play', () => {
+      player?.play();
+    });
+
+    commandEmitter.on('pause', () => {
+      player?.pause();
+    });
+
+    commandEmitter.on('seek', (seconds) => {
+      player?.seek(seconds);
     });
   });
 
@@ -79,5 +76,11 @@ export const installPlayerControls = ({
         isPlaying: false,
       };
     });
+  });
+
+  eventEmitter.on('clickOutsideCanvas', () => {
+    if (state.select((st) => st.player.isPlaying)) {
+      commandEmitter.emit('pause');
+    }
   });
 };

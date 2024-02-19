@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { usePeaksContext } from '../../context/usePeaksContext';
 import Segment from './Segment.vue';
+import { computed } from 'vue';
 
-const {
-  segments: { segments },
-} = usePeaksContext();
+const { state } = usePeaksContext();
+const segments = computed(() => state.toRef().value.segments);
 </script>
 
 <template>

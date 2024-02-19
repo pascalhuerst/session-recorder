@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/vue3';
 import WaveformEditor from './WaveformEditor.vue';
 import { ref } from 'vue';
-import type { Segment } from '../types';
+import type { Segment } from '../context/models/state';
 
 const meta: Meta = {
   title: 'Waveform Editor',

@@ -6,13 +6,16 @@ import { usePeaksContext } from '../../../context/usePeaksContext';
 import { computed } from 'vue';
 
 const { commandEmitter, state } = usePeaksContext();
+const store = state.toRef();
 
-const amplitudeScale = computed(
-  () => state.toRef().value.amplitude.amplitudeScale
-);
-const amplitudeStep = computed(
-  () => state.toRef().value.amplitude.amplitudeStep
-);
+const amplitudeScale = computed({
+  get: () => store.value.amplitude.amplitudeScale,
+  set: (value) => {
+    commandEmitter.emit('setAmplitudeScale', Math.max(0, value));
+  },
+});
+
+const amplitudeStep = computed(() => store.value.amplitude.amplitudeStep);
 
 const toAbs = (step: number) => {
   return Math.max(0, (amplitudeScale.value * 100 + step * 100) / 100);

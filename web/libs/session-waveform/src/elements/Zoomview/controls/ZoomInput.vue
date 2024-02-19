@@ -6,9 +6,18 @@ import { usePeaksContext } from '../../../context/usePeaksContext';
 import { computed } from 'vue';
 
 const { commandEmitter, state } = usePeaksContext();
+const store = state.toRef();
 
-const zoomLevel = computed(() => state.toRef().value.zoom.zoomLevel);
-const zoomStep = computed(() => state.toRef().value.zoom.zoomStep);
+const zoomLevel = computed({
+  get: () => {
+    return store.value.zoom.zoomLevel;
+  },
+  set: (value) => {
+    commandEmitter.emit('setZoomLevel', normalizeZoom(value));
+  },
+});
+
+const zoomStep = computed(() => store.value.zoom.zoomStep);
 
 const normalizeZoom = (offset: number) => {
   return Math.max(zoomStep.value, zoomLevel.value + offset);

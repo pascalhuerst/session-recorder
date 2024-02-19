@@ -42,14 +42,8 @@ export const setupPeaksModule = ({
 
     Peaks.init(options, function (err, peaks) {
       if (err || !peaks) {
-        console.warn(err.message);
-        return null;
+        throw err;
       }
-
-      state.update((prev) => ({
-        ...prev,
-        peaks,
-      }));
 
       eventEmitter.emit('ready', peaks);
     });

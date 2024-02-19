@@ -6,11 +6,6 @@ export const installAmplitudeControls = ({
   eventEmitter,
 }: ReturnType<typeof createPeaksModule>) => {
   eventEmitter.on('ready', (peaks) => {
-    commandEmitter.emit(
-      'setAmplitudeScale',
-      state.select((st) => st.amplitude.amplitudeScale)
-    );
-
     commandEmitter.on('setAmplitudeScale', (value) => {
       const overview = peaks.views.getView('overview');
       overview?.setAmplitudeScale(value);
@@ -20,12 +15,20 @@ export const installAmplitudeControls = ({
 
       eventEmitter.emit('amplitudeScaleChanged', value);
     });
+
+    commandEmitter.emit(
+      'setAmplitudeScale',
+      state.select((st) => st.amplitude.amplitudeScale)
+    );
   });
 
   eventEmitter.on('amplitudeScaleChanged', (value: number) => {
     state.update((prev) => ({
       ...prev,
-      amplitudeScale: value,
+      amplitude: {
+        ...prev.amplitude,
+        amplitudeScale: value,
+      },
     }));
   });
 };

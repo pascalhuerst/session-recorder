@@ -6,14 +6,6 @@ export const installZoomControls = ({
   eventEmitter,
 }: ReturnType<typeof createPeaksModule>) => {
   eventEmitter.on('ready', (peaks) => {
-    const zoomLevel = state.select((st) => st.zoom.zoomLevel);
-    const duration = peaks.player.getDuration();
-
-    commandEmitter.emit(
-      'setZoomLevel',
-      Math.min(zoomLevel, Math.floor(duration))
-    );
-
     commandEmitter.on('setZoomLevel', (seconds) => {
       const zoomview = peaks.views.getView('zoomview');
       zoomview?.setZoom({ seconds });
@@ -22,5 +14,23 @@ export const installZoomControls = ({
       // hook into peaks zoom.update event
       eventEmitter.emit('zoomLevelChanged', seconds);
     });
+
+    commandEmitter.emit(
+      'setZoomLevel',
+      Math.min(
+        state.select((st) => st.zoom.zoomLevel),
+        Math.floor(peaks.player.getDuration())
+      )
+    );
+  });
+
+  eventEmitter.on('zoomLevelChanged', (seconds) => {
+    state.update((prev) => ({
+      ...prev,
+      zoom: {
+        ...prev.zoom,
+        zoomLevel: seconds,
+      },
+    }));
   });
 };

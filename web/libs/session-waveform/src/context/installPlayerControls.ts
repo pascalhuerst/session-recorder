@@ -15,7 +15,10 @@ export const installPlayerControls = ({
     peaks.on('player.canplay', () => {
       state.update((prev) => ({
         ...prev,
-        duration: peaks.player.getDuration(),
+        player: {
+          ...peaks.player,
+          duration: peaks.player.getDuration(),
+        },
       }));
     });
 
@@ -34,7 +37,10 @@ export const installPlayerControls = ({
     peaks.on('player.timeupdate', (currentTime: number) => {
       state.update((prev) => ({
         ...prev,
-        currentTime,
+        player: {
+          ...prev.player,
+          currentTime,
+        },
       }));
     });
 
@@ -55,7 +61,10 @@ export const installPlayerControls = ({
     state.update((prev) => {
       return {
         ...prev,
-        isPlaying: true,
+        player: {
+          ...prev.player,
+          isPlaying: true,
+        },
       };
     });
   });
@@ -64,7 +73,10 @@ export const installPlayerControls = ({
     state.update((prev) => {
       return {
         ...prev,
-        isPlaying: false,
+        player: {
+          ...prev.player,
+          isPlaying: false,
+        },
       };
     });
   });
@@ -73,7 +85,10 @@ export const installPlayerControls = ({
     state.update((prev) => {
       return {
         ...prev,
-        isPlaying: false,
+        player: {
+          ...prev.player,
+          isPlaying: false,
+        },
       };
     });
   });

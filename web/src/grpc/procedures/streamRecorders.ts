@@ -1,5 +1,5 @@
 import { type Recorder } from '@session-recorder/protocols/ts/sessionsource';
-import { sessionSourceClient } from '@/grpc/sessionSourceClient';
+import { sessionSourceClient } from '../sessionSourceClient';
 
 export const streamRecorders = async (args: {
   onMessage: (info: Recorder) => void;

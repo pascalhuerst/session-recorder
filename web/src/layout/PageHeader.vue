@@ -3,7 +3,7 @@
 <template>
   <div class="header">
     <router-link to="/" class="logo">
-      <img src="../../../../client/src/assets/logo.png" alt="Logo" />
+      <img src="/assets/logo.png" alt="Logo" />
       <span class="heading">Session Recorder</span>
     </router-link>
 

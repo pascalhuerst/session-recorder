@@ -18,6 +18,12 @@ const { waveformUrl, audioUrls } = useSessionData({
   <WaveformEditor
     :waveform-url="waveformUrl"
     :audio-urls="audioUrls"
+    :segments="[]"
+    :permissions="{
+      create: true,
+      update: true,
+      delete: true,
+    }"
   ></WaveformEditor>
 </template>
 

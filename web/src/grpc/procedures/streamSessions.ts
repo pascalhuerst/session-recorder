@@ -2,7 +2,7 @@ import {
   Session,
   StreamSessionRequest,
 } from '@session-recorder/protocols/ts/sessionsource';
-import { sessionSourceClient } from '@/grpc/sessionSourceClient';
+import { sessionSourceClient } from '../sessionSourceClient';
 
 export const streamSessions = async (args: {
   request: StreamSessionRequest;

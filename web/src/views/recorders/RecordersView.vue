@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia';
-import { useRecordersStore } from '@/store/useRecordersStore';
-import PageShell from '@/layout/PageShell.vue';
-import Container from '@/layout/Container.vue';
-import DevicePicker from '@/views/recorders/elements/DevicePicker.vue';
+import { useRecordersStore } from '../../store/useRecordersStore';
+import PageShell from '../../layout/PageShell.vue';
+import Container from '../../layout/Container.vue';
+import DevicePicker from './elements/DevicePicker.vue';
 
 const { recorders, selectedRecorderId } = storeToRefs(useRecordersStore());
 </script>

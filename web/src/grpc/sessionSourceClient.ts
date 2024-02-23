@@ -3,7 +3,7 @@ import {
   type SessionSourceClient,
   SessionSourceDefinition,
 } from '@session-recorder/protocols/ts/sessionsource';
-import { env } from '@/env';
+import { env } from '../env';
 
 const channel = createChannel(env.VITE_GRPC_SERVER_URL);
 

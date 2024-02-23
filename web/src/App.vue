@@ -4,4 +4,6 @@
   <router-view />
 </template>
 
-<style></style>
+<style>
+@import '../assets/styles/app.css';
+</style>

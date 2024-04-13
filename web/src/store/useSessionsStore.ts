@@ -1,12 +1,12 @@
 import { ref, watch } from 'vue';
-import { streamSessions } from '../grpc/procedures/streamSessions.ts';
-import { useRecordersStore } from './useRecordersStore.ts';
-import { SessionInfo } from '@session-recorder/protocols/ts/sessionsource.ts';
+import { streamSessions } from '../grpc/procedures/streamSessions';
+import { useRecordersStore } from './useRecordersStore';
+import { type Session } from '@session-recorder/protocols/ts/sessionsource';
 import { defineStore, storeToRefs } from 'pinia';
 
 export const useSessionsStore = defineStore('sessions', () => {
   const { selectedRecorderId } = storeToRefs(useRecordersStore());
-  const sessions = ref<Map<string, SessionInfo>>(new Map());
+  const sessions = ref<Map<string, Session>>(new Map());
 
   watch(
     selectedRecorderId,
@@ -22,7 +22,11 @@ export const useSessionsStore = defineStore('sessions', () => {
           recorderID: selectedRecorderId.value,
         },
         onMessage: (session) => {
-          sessions.value.set(session.ID, session);
+          if (session.removed) {
+            sessions.value.delete(session.ID);
+          } else {
+            sessions.value.set(session.ID, session);
+          }
         },
       });
     },

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { type SessionInfo } from '@session-recorder/protocols/ts/sessionsource';
+import { type Session } from '@session-recorder/protocols/ts/sessionsource';
 import { computed } from 'vue';
 import { setKeepSession } from '@/grpc/procedures/setKeepSession';
 import { deleteSession } from '@/grpc/procedures/deleteSession';
@@ -14,7 +14,7 @@ import {
 // @todo: break this down and make composable
 
 const props = defineProps<{
-  session: SessionInfo;
+  session: Session;
   recorderId: string;
 }>();
 
@@ -26,23 +26,27 @@ const { audioUrls } = useSessionData({
 });
 
 const ttl = computed(() => {
-  if (!props.session.lifetime) {
+  if (
+    !props.session.updated.lifetime.seconds &&
+    !props.session.updated.lifetime.nanos
+  ) {
     return undefined;
   }
-  const val = Math.floor(props.session.lifetime.seconds / 60);
+
+  const val = Math.floor(props.session.updated.lifetime.seconds / 60);
   if (val > 0) {
     return `${val} hours`;
   }
 
-  const minutes = Math.floor(props.session.lifetime.seconds);
+  const minutes = Math.floor(props.session.updated.lifetime.seconds);
   return `${minutes} minutes`;
 });
 
-const onKeep = () => setKeepSession({ streamID: props.session.ID });
+const onKeep = () => setKeepSession({ sessionId: props.session.ID });
 const onDelete = () => {
   awaitConfirmation().then(({ isConfirmed }) => {
     if (isConfirmed) {
-      deleteSession({ streamID: props.session.ID });
+      deleteSession({ sessionId: props.session.ID });
     }
   });
 };
@@ -50,10 +54,10 @@ const onDelete = () => {
 
 <template>
   <div class="menu">
-    <div v-if="ttl && !session.keep" class="balance">
+    <div v-if="ttl && !session.updated.keep" class="balance">
       {{ ttl }} until deleted
     </div>
-    <Button size="xs" v-if="!session.keep" @click="onKeep">
+    <Button size="xs" v-if="!session.updated.keep" @click="onKeep">
       <font-awesome-icon icon="fa-solid fa-heart"></font-awesome-icon>
       Keep
     </Button>

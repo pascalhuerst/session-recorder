@@ -1,3 +1,7 @@
-export const deleteSession = async (args: { streamID: string }) => {
-  alert(`Deleted ${args.streamID}`);
+import { sessionSourceClient } from '../sessionSourceClient';
+
+export const deleteSession = async (args: { sessionId: string }) => {
+  await sessionSourceClient.deleteSession({
+    sessionID: args.sessionId,
+  });
 };

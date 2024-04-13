@@ -36,16 +36,38 @@ const render = (args: Meta['args']) => ({
           update: true,
           delete: true,
         },
-        segments: [],
+        segments: [
+          {
+            id: '1',
+            startIndex: 'A',
+            endIndex: 'B',
+            startTime: 0,
+            endTime: 20,
+            labelText: 'Hello',
+            renders: [
+              {
+                type: 'audio/mp3',
+                src: 'hello.mpd',
+              },
+            ],
+          },
+          {
+            id: '2',
+            startIndex: 'A',
+            endIndex: 'B',
+            startTime: 0,
+            endTime: 20,
+            labelText: 'Hello',
+            renders: [],
+          },
+        ],
       },
     });
 
     providePeaksContext(context);
-
-    return { context };
   },
   template: `
-    <WaveformEditor :context="context" />
+    <WaveformEditor />
   `,
 });
 

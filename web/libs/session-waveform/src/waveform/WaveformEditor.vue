@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watchEffect } from 'vue';
 import VirtualizedItem from '../lib/disclosure/VirtualizedItem.vue';
-import { type PeaksContext, usePeaksContext } from '../context/usePeaksContext';
+import { usePeaksContext } from '../context/usePeaksContext';
 import Overview from '../elements/Overview/Overview.vue';
 import Zoomview from '../elements/Zoomview/Zoomview.vue';
 import Audio from '../elements/Overview/Audio.vue';
@@ -11,7 +11,6 @@ import { useWaverformLayoutProvider } from './useWaverformLayoutProvider';
 
 const props = withDefaults(
   defineProps<{
-    context: PeaksContext;
     height?: number;
   }>(),
   {
@@ -19,6 +18,7 @@ const props = withDefaults(
   }
 );
 
+const context = usePeaksContext();
 const { provide } = useWaverformLayoutProvider();
 
 const overviewRef = ref<HTMLElement>();
@@ -33,7 +33,7 @@ provide({
 
 watchEffect(() => {
   if (overviewRef.value && zoomviewRef.value && audioRef.value) {
-    props.context.commandEmitter.emit('mount', {
+    context.commandEmitter.emit('mount', {
       overview: overviewRef.value,
       zoomview: zoomviewRef.value,
       audio: audioRef.value,

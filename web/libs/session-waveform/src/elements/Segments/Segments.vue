@@ -10,6 +10,14 @@ const segments = computed(() => state.toRef().value.segments);
 <template>
   <div class="segments">
     <table>
+      <thead>
+        <tr>
+          <th :style="{ width: '10%' }"></th>
+          <th :style="{ width: '10%' }"></th>
+          <th></th>
+          <th :style="{ width: '20%' }"></th>
+        </tr>
+      </thead>
       <Segment
         v-for="segment in segments"
         :key="segment.id"
@@ -33,6 +41,7 @@ table {
 :deep(th) {
   padding: var(--size-2);
   border-bottom: 1px solid var(--color-grey-300);
+  vertical-align: center;
 }
 </style>
 

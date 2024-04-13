@@ -3,6 +3,7 @@ import { createSegment } from './procedures/createSegment';
 import { type Session } from '@session-recorder/protocols/ts/sessionsource';
 import { updateSegment } from './procedures/updateSegment';
 import { deleteSegment } from './procedures/deleteSegment';
+import { renderSegment } from './procedures/renderSegment';
 
 export const integrateSegments = (session: Session, ctx: PeaksContext) => {
   ctx.eventEmitter.on('segmentAdded', async (segment) => {
@@ -31,6 +32,13 @@ export const integrateSegments = (session: Session, ctx: PeaksContext) => {
 
   ctx.eventEmitter.on('segmentRemoved', async (segmentId) => {
     await deleteSegment({
+      sessionId: session.ID,
+      segmentId,
+    });
+  });
+
+  ctx.commandEmitter.on('renderSegment', async (segmentId) => {
+    await renderSegment({
       sessionId: session.ID,
       segmentId,
     });

@@ -13,7 +13,7 @@ export interface Events {
   playbackPaused: () => void;
   playbackEnded: () => void;
   segmentAdded: (segment: Segment) => void;
-  segdmentUpdated: (
+  segmentUpdated: (
     segmentId: string,
     patch: Partial<Segment>,
     segment: Segment
@@ -35,6 +35,7 @@ export interface Commands {
   addSegment: () => void;
   updateSegment: (segmentId: string, patch: Partial<Segment>) => void;
   removeSegment: (segmentId: string) => void;
+  renderSegment: (segmentId: string) => void;
   setAmplitudeScale: (scale: number) => void;
   setZoomLevel: (seconds: number) => void;
 }

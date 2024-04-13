@@ -7,6 +7,7 @@ import { computed } from 'vue';
 import { parseTimeFromSeconds } from '../../lib/utils/parseTimeFromSeconds';
 import { parseSecondsFromTime } from '../../lib/utils/parseSecondsFromTime';
 import type { Segment } from '../../context/models/state';
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 
 const props = defineProps<{
   segment: Segment;
@@ -113,13 +114,39 @@ const canDelete = computed(() => {
       </template>
     </td>
     <td>
-      <Button
-        v-if="canDelete"
-        size="xs"
-        variant="ghost"
-        @click="() => commandEmitter.emit('removeSegment', segment.id)"
-        >Remove
-      </Button>
+      <div class="buttons">
+        <template v-if="segment.renders.length">
+          <template v-for="render in segment.renders" :key="render.src">
+            <Button tag-name="a" size="xs" color="primary" :href="render.src">
+              <font-awesome-icon
+                icon="fa-solid fa-download"
+              ></font-awesome-icon>
+              {{ render.type.split('/').at(-1) }}
+            </Button>
+          </template>
+        </template>
+
+        <template v-else>
+          <Button
+            size="xs"
+            variant="solid"
+            @click="() => commandEmitter.emit('renderSegment', segment.id)"
+          >
+            <font-awesome-icon icon="fa-solid fa-music"></font-awesome-icon>
+            Render
+          </Button>
+        </template>
+
+        <Button
+          v-if="canDelete"
+          size="xs"
+          variant="ghost"
+          @click="() => commandEmitter.emit('removeSegment', segment.id)"
+        >
+          <font-awesome-icon icon="fa-solid fa-trash"></font-awesome-icon>
+          Remove
+        </Button>
+      </div>
     </td>
   </tr>
 </template>
@@ -127,6 +154,12 @@ const canDelete = computed(() => {
 <style scoped>
 .row--deleted {
   opacity: 0.5;
+}
+
+.buttons {
+  display: flex;
+  flex-direction: row;
+  gap: 0.25rem;
 }
 </style>
 

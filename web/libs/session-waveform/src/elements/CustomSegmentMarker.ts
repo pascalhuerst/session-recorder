@@ -84,7 +84,8 @@ export class CustomSegmentMarker {
       this._services.eventEmitter.emit(
         'segmentUpdated',
         this._options.segment.id,
-        options
+        options,
+        { ...this._options.segment, ...options }
       );
     }
   }

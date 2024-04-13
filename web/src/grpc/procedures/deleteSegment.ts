@@ -1,8 +1,11 @@
 import { sessionSourceClient } from '../sessionSourceClient';
 
-export const deleteSegment = async (sessionId: string, segmentId: string) => {
+export const deleteSegment = async (args: {
+  sessionId: string;
+  segmentId: string;
+}) => {
   await sessionSourceClient.deleteSegment({
-    sessionID: sessionId,
-    segmentID: segmentId,
+    sessionID: args.sessionId,
+    segmentID: args.segmentId,
   });
 };

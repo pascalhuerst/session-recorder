@@ -1,16 +1,14 @@
 import { type SegmentInfo } from '@session-recorder/protocols/ts/sessionsource';
 import { sessionSourceClient } from '../sessionSourceClient';
-import uuid from 'uuidv4';
 
-export const createSegment = async (
-  sessionId: string,
-  segment: Partial<SegmentInfo>
-) => {
+export const createSegment = async (args: {
+  sessionId: string;
+  segmentId: string;
+  segment: Partial<SegmentInfo>;
+}) => {
   await sessionSourceClient.createSegment({
-    sessionID: sessionId,
-    info: {
-      ID: uuid(),
-      ...segment,
-    },
+    sessionID: args.sessionId,
+    segmentID: args.segmentId,
+    info: args.segment,
   });
 };

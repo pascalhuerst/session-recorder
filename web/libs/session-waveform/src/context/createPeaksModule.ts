@@ -13,7 +13,11 @@ export interface Events {
   playbackPaused: () => void;
   playbackEnded: () => void;
   segmentAdded: (segment: Segment) => void;
-  segmentUpdated: (segmentId: string, patch: Partial<Segment>) => void;
+  segmentUpdated: (
+    segmentId: string,
+    patch: Partial<Segment>,
+    segment: Segment
+  ) => void;
   segmentRemoved: (segmentId: string) => void;
   amplitudeScaleChanged: (scale: number) => void;
   zoomLevelChanged: (seconds: number) => void;

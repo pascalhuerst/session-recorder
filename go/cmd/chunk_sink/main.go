@@ -7,12 +7,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/mattn/go-colorable"
 	"github.com/pascalhuerst/session-recorder/grpc"
+	"github.com/pascalhuerst/session-recorder/logger"
 	"github.com/pascalhuerst/session-recorder/mdns"
 	"github.com/pascalhuerst/session-recorder/storage"
 	"github.com/pascalhuerst/session-recorder/utils"
-	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 
 	cspb "github.com/pascalhuerst/session-recorder/protocols/go/chunksink"
@@ -34,11 +33,7 @@ var (
 func main() {
 	ctx := context.Background()
 
-	consoleWriter := zerolog.ConsoleWriter{
-		TimeFormat: time.StampMicro,
-		Out:        colorable.NewColorableStdout(),
-	}
-	log.Logger = log.Output(consoleWriter)
+	logger.Setup()
 
 	s3Endpoint := utils.MustGet("S3_ENDPOINT")
 	s3AccessKey := utils.MustGet("S3_ACCESS_KEY")

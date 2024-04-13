@@ -65,14 +65,6 @@ const onDelete = () => {
       <font-awesome-icon icon="fa-solid fa-trash"></font-awesome-icon>
       Delete
     </Button>
-    <Button
-      tag-name="router-link"
-      size="xs"
-      :to="`/recorders/${recorderId}/sessions/${session.ID}`"
-    >
-      <font-awesome-icon icon="fa-solid fa-thumbtack"></font-awesome-icon>
-      Markers
-    </Button>
     <template v-for="audioUrl in audioUrls" :key="audioUrl.src">
       <Button
         size="xs"

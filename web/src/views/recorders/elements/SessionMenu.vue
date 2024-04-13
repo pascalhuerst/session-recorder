@@ -33,7 +33,7 @@ const ttl = computed(() => {
     return undefined;
   }
 
-  const val = Math.floor(props.session.updated.lifetime.seconds / 60);
+  const val = Math.floor(props.session.updated.lifetime.seconds / 3600);
   if (val > 0) {
     return `${val} hours`;
   }

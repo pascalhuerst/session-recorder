@@ -43,7 +43,10 @@ const context = computed(() => {
         update: true,
         delete: true,
       },
-      segments: [],
+      segments: props.session.updated.segments.map((s) => ({
+        id: s.segmentID,
+        labelText: s.updated.name,
+      })),
     },
   });
 

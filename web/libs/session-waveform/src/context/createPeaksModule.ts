@@ -13,7 +13,7 @@ export interface Events {
   playbackPaused: () => void;
   playbackEnded: () => void;
   segmentAdded: (segment: Segment) => void;
-  segmentUpdated: (
+  segdmentUpdated: (
     segmentId: string,
     patch: Partial<Segment>,
     segment: Segment

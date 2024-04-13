@@ -1,6 +1,9 @@
 import type { Meta, StoryObj } from '@storybook/vue3';
 import WaveformEditor from './WaveformEditor.vue';
-import { createPeaksContext } from '../context/usePeaksContext';
+import {
+  createPeaksContext,
+  providePeaksContext,
+} from '../context/usePeaksContext';
 
 const meta: Meta = {
   title: 'Waveform Editor',
@@ -36,6 +39,8 @@ const render = (args: Meta['args']) => ({
         segments: [],
       },
     });
+
+    providePeaksContext(context);
 
     return { context };
   },

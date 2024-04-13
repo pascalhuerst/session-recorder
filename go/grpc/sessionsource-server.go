@@ -7,6 +7,7 @@ import (
 
 	cmpb "github.com/pascalhuerst/session-recorder/protocols/go/common"
 	sspb "github.com/pascalhuerst/session-recorder/protocols/go/sessionsource"
+	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
 )
 
@@ -63,13 +64,19 @@ func (s *SessionSourceServer) StreamSessions(request *sspb.StreamSessionRequest,
 }
 
 func (s *SessionSourceServer) SetKeepSession(ctx context.Context, in *sspb.SetKeepSessionRequest) (*cmpb.Respone, error) {
+	log.Warn().Str("session-id", in.GetSessionID()).Msg("SetKeepSession not implemented")
+
 	return nil, nil
 }
 
 func (s *SessionSourceServer) DeleteSession(ctx context.Context, in *sspb.DeleteSessionRequest) (*cmpb.Respone, error) {
+	log.Warn().Str("session-id", in.GetSessionID()).Msg("DeleteSession not implemented")
+
 	return nil, nil
 }
 
 func (s *SessionSourceServer) SetName(ctx context.Context, in *sspb.SetNameRequest) (*cmpb.Respone, error) {
+	log.Warn().Str("session-id", in.GetSessionID()).Str("name", in.GetName()).Msg("SetName not implemented")
+
 	return nil, nil
 }

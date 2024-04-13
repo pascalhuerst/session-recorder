@@ -13,6 +13,8 @@ import (
 	"github.com/pascalhuerst/session-recorder/storage"
 	"github.com/pascalhuerst/session-recorder/utils"
 	"github.com/rs/zerolog/log"
+	"google.golang.org/protobuf/types/known/durationpb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	cspb "github.com/pascalhuerst/session-recorder/protocols/go/chunksink"
 	cmpb "github.com/pascalhuerst/session-recorder/protocols/go/common"
@@ -88,6 +90,8 @@ func main() {
 	recorderUpdateCh := make(chan *sspb.Recorder)
 	sessionUpdateCh := make(chan *sspb.Session)
 
+	defaultLifetime := 4 * 24 * time.Hour
+
 	sessionSourceServer := grpc.NewSessionSourceServer(hostname, version,
 		// This is called for every frontend client that connects
 		func(ctx context.Context, request *sspb.StreamRecordersRequest, server sspb.SessionSource_StreamRecordersServer) error {
@@ -97,16 +101,23 @@ func main() {
 			}
 
 			for _, recorderID := range recordersIDs {
+				meta, err := sessionStorage.GetRecorderMetadata(ctx, recorderID)
+				if err != nil {
+					log.Err(err).Msg("Cannot get recorder metadata")
+
+					continue
+				}
+
 				if err := server.SendMsg(
 					&sspb.Recorder{
 						RecorderID:   recorderID.String(),
-						RecorderName: "TODO",
+						RecorderName: meta.GenericMetadata.Name,
 						Info: &sspb.Recorder_Status{
 							Status: &cmpb.RecorderStatus{
 								RecorderID:   recorderID.String(),
-								RecorderName: "TODO",
-								SignalStatus: 0,
-								RmsPercent:   0,
+								RecorderName: meta.GenericMetadata.Name,
+								SignalStatus: cmpb.SignalStatus_UNKNOWN,
+								RmsPercent:   0.0,
 								Clipping:     false,
 							},
 						},
@@ -141,12 +152,35 @@ func main() {
 			}
 
 			for _, sessionID := range sessionIDs {
+				meta, err := sessionStorage.GetSessionMetadata(ctx, recorderID, sessionID)
+				if err != nil {
+					log.Err(err).Msg("Cannot get session metadata")
+
+					continue
+				}
+
 				server.SendMsg(
 					&sspb.Session{
 						ID: sessionID.String(),
 						Info: &sspb.Session_Updated{
 							Updated: &sspb.SessionInfo{
-								//TODO Fill with metadata
+								TimeCreated: &timestamppb.Timestamp{
+									Seconds: int64(meta.StartTime.Second()),
+									Nanos:   int32(meta.StartTime.Nanosecond()),
+								},
+								TimeFinished: &timestamppb.Timestamp{
+									Seconds: int64(meta.EndTime.Second()),
+									Nanos:   int32(meta.EndTime.Nanosecond()),
+								},
+								Lifetime: &durationpb.Duration{
+									Seconds: int64(defaultLifetime.Seconds()),
+									Nanos:   int32(defaultLifetime.Nanoseconds()),
+								},
+								Name:             meta.GenericMetadata.Name,
+								AudioFileName:    "data.ogg",
+								WaveformDataFile: "waveform.dat",
+								Keep:             false,
+								State:            sspb.SessionState_SESSION_STATE_UNKNOWN,
 							},
 						},
 					},
@@ -190,7 +224,7 @@ func main() {
 			select {
 			case recorderUpdateCh <- &sspb.Recorder{
 				RecorderID:   recorderID.String(),
-				RecorderName: "TODO",
+				RecorderName: status.RecorderName,
 				Info: &sspb.Recorder_Status{
 					Status: status,
 				},
@@ -258,6 +292,38 @@ func main() {
 			}
 
 			for _, sessionID := range sessions {
+				meta, err := sessionStorage.GetSessionMetadata(ctx, recorderID, sessionID)
+				if err != nil {
+					log.Err(err).Msg("Cannot get session metadata")
+
+					continue
+				}
+
+				sessionUpdateCh <- &sspb.Session{
+					ID: sessionID.String(),
+					Info: &sspb.Session_Updated{
+						Updated: &sspb.SessionInfo{
+							TimeCreated: &timestamppb.Timestamp{
+								Seconds: int64(meta.StartTime.Second()),
+								Nanos:   int32(meta.StartTime.Nanosecond()),
+							},
+							TimeFinished: &timestamppb.Timestamp{
+								Seconds: int64(meta.EndTime.Second()),
+								Nanos:   int32(meta.EndTime.Nanosecond()),
+							},
+							Lifetime: &durationpb.Duration{
+								Seconds: int64(defaultLifetime.Seconds()),
+								Nanos:   int32(defaultLifetime.Nanoseconds()),
+							},
+							Name:             meta.GenericMetadata.Name,
+							AudioFileName:    "data.ogg",
+							WaveformDataFile: "waveform.dat",
+							Keep:             false,
+							State:            sspb.SessionState_SESSION_STATE_UNKNOWN,
+						},
+					},
+				}
+
 				fmt.Printf("    %s\n", sessionID)
 			}
 		}

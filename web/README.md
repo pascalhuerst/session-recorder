@@ -11,4 +11,3 @@ The easiest way to work on the Player app is by launching Storybook:
 ```
 npx nx storybook --project session-waveform
 ```
-

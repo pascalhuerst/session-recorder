@@ -43,6 +43,7 @@ export const installSegmentsControls = ({
         editable: permissions.update,
         startIndex,
         endIndex,
+        renders: [],
       } satisfies Segment;
 
       peaks.segments.add(segment);
@@ -83,6 +84,7 @@ export const installSegmentsControls = ({
           editable: permissions.update,
           startIndex: String(segment.startIndex),
           endIndex: String(segment.endIndex),
+          renders: [],
         });
       });
     });

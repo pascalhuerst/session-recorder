@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import SessionMenu from './SessionMenu.vue';
-import { type Session } from '@session-recorder/protocols/ts/sessionsource';
+import {
+  SegmentState,
+  type Session,
+} from '@session-recorder/protocols/ts/sessionsource';
 import { useDateFormat } from '@vueuse/core';
 import { useSessionData } from '@/useSessionData';
 import {
@@ -36,6 +39,10 @@ const { waveformUrl, audioUrls } = useSessionData({
   recorderId: props.recorderId,
 });
 
+const buildUrlPath = (segmentId: string, ext: string) => {
+  return `/session-recorder/${props.session.ID}/sessions/${props.recorderId}/segments/${segmentId}.${ext}`;
+};
+
 const ctx = createPeaksContext({
   initialState: {
     waveformUrl: waveformUrl.value,
@@ -48,6 +55,21 @@ const ctx = createPeaksContext({
     segments: props.session.updated.segments.map((s) => ({
       id: s.segmentID,
       labelText: s.updated.name,
+      startTime: s.updated.timeStart.getTime(),
+      endTime: s.updated.timeEnd.getTime(),
+      renders:
+        s.updated.state === SegmentState.SEGMENT_STATE_FINISHED
+          ? [
+              {
+                type: 'audio/mp3',
+                src: buildUrlPath(s.segmentID, 'mp3'),
+              },
+              {
+                type: 'audio/ogg',
+                src: buildUrlPath(s.segmentID, 'ogg'),
+              },
+            ]
+          : [],
     })),
   },
 });
@@ -71,7 +93,7 @@ integrateSegments(props.session, ctx);
       </div>
     </div>
 
-    <WaveformEditor :context="ctx"></WaveformEditor>
+    <WaveformEditor />
   </div>
 </template>
 

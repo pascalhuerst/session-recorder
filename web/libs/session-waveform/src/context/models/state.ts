@@ -22,6 +22,12 @@ export const segmentSchema = z.object({
   startIndex: z.string(),
   endIndex: z.string(),
   deleted: z.boolean().optional(),
+  renders: z.array(
+    z.object({
+      type: z.string(),
+      src: z.string(),
+    })
+  ),
 });
 
 export const peaksModuleSchema = z.object({

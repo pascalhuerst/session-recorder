@@ -16,6 +16,7 @@ import { faPause } from '@fortawesome/free-solid-svg-icons/faPause';
 import { faClock } from '@fortawesome/free-regular-svg-icons/faClock';
 import { faArrowsLeftRightToLine } from '@fortawesome/free-solid-svg-icons/faArrowsLeftRightToLine';
 import { faDownload } from '@fortawesome/free-solid-svg-icons/faDownload';
+import { faMusic } from '@fortawesome/free-solid-svg-icons/faMusic';
 
 export const setup = () => {
   library.add(
@@ -34,6 +35,7 @@ export const setup = () => {
     faArrowUpRightDots,
     faArrowsLeftRightToLine,
     faClock,
-    faDownload
+    faDownload,
+    faMusic
   );
 };

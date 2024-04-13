@@ -12,7 +12,10 @@ const { sessions } = storeToRefs(useSessionsStore());
 
 const sortedSessions = computed(() => {
   return Array.from(sessions.value.values()).sort((a, b) => {
-    return Number(b.timeCreated?.getTime()) - Number(a.timeCreated?.getTime());
+    return (
+      Number(b.updated.timeCreated?.getTime()) -
+      Number(a.updated.timeCreated?.getTime())
+    );
   });
 });
 </script>

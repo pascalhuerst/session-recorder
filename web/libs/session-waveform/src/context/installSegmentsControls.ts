@@ -45,7 +45,6 @@ export const installSegmentsControls = ({
         endIndex,
       } satisfies Segment;
 
-      console.log(segment);
       peaks.segments.add(segment);
     });
 

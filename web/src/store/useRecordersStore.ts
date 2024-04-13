@@ -20,7 +20,7 @@ export const useRecordersStore = defineStore('recorders', () => {
 
   streamRecorders({
     onMessage: (recorderInfo) => {
-      recorders.value.set(recorderInfo.ID, recorderInfo);
+      recorders.value.set(recorderInfo.recorderID, recorderInfo);
     },
   }).catch((err) => {
     console.error(err);

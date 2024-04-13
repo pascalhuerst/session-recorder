@@ -19,7 +19,7 @@ export const installZoomControls = ({
       'setZoomLevel',
       Math.min(
         state.select((st) => st.zoom.zoomLevel),
-        Math.floor(peaks.player.getDuration())
+        Math.floor(peaks.player.getDuration() || 256)
       )
     );
   });

@@ -24,18 +24,18 @@ export const useSessionData = ({
     return [
       {
         src: new URL(
+          buildUrlPath('data.ogg'),
+          env.VITE_FILE_SERVER_URL
+        ).toString(),
+        type: 'audio/ogg',
+      },
+      {
+        src: new URL(
           buildUrlPath('data.flac'),
           env.VITE_FILE_SERVER_URL
         ).toString(),
         type: 'audio/flac',
       },
-      // {
-      //   src: new URL(
-      //     buildUrlPath('data.ogg'),
-      //     env.VITE_FILE_SERVER_URL
-      //   ).toString(),
-      //   type: 'audio/ogg',
-      // },
     ];
   });
 

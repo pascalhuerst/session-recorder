@@ -41,8 +41,6 @@ export const setupPeaksModule = ({
     } satisfies PeaksOptions;
 
     Peaks.init(options, function (err, peaks) {
-      console.log({ err, peaks });
-
       if (err || !peaks) {
         console.error(err);
         throw err;

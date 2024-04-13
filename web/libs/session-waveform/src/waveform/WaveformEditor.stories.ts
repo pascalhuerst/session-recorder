@@ -17,34 +17,50 @@ const meta: Meta = {
 
 export default meta;
 
-export const Primary: StoryObj = {
-  render: (args: Meta['args']) => ({
-    components: { WaveformEditor },
-    setup() {
-      const segments = ref<Segment[]>([]);
-      return {
-        args: {
-          waveformUrl: args?.waveformUrl,
-          audioUrls: [
-            {
-              type: 'audio/mp3',
-              src: args?.audioUrl,
-            },
-          ],
-          permissions: {
-            create: true,
-            update: true,
-            delete: true,
+const render = (args: Meta['args']) => ({
+  components: { WaveformEditor },
+  setup() {
+    const segments = ref<Segment[]>([]);
+    return {
+      args: {
+        waveformUrl: args?.waveformUrl,
+        audioUrls: [
+          {
+            type: args?.audioFormat,
+            src: args?.audioUrl,
           },
+        ],
+        permissions: {
+          create: true,
+          update: true,
+          delete: true,
         },
-        segments,
-      };
-    },
-    template: `
-      <WaveformEditor v-bind="args" v-model:segments="segments" />
-    `,
-  }),
+      },
+      segments,
+    };
+  },
+  template: `
+    <WaveformEditor v-bind="args" v-model:segments="segments" />
+  `,
+});
+
+export const Local: StoryObj = {
+  render,
   args: {
+    audioFormat: 'audio/mp3',
     audioUrl: '/Free_Test_Data_1OMB_MP3.mp3',
+  },
+};
+
+export const Remote: StoryObj = {
+  render,
+  args: {
+    waveformUrl:
+      'http://192.168.52.154:9000/session-recorder/cdd40c26-5b62-465d-8014-e239fda909ba/sessions/07c6fa13-44f3-4cbf-8d3d-d41524a81ec4/waveform.dat',
+    audioUrl:
+      'http://192.168.52.154:9000/session-recorder/cdd40c26-5b62-465d-8014-e239fda909ba/sessions/07c6fa13-44f3-4cbf-8d3d-d41524a81ec4/data.flac',
+    audioFormat: 'audio/flac',
+    // audioUrl: '/data.flac',
+    // audioUrl: '/Free_Test_Data_1OMB_MP3.mp3',
   },
 };

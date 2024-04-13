@@ -8,9 +8,14 @@ export const useSessionData = ({
   recorderId: string;
   sessionId: string;
 }) => {
+  // @todo: get this from backend
+  const buildUrlPath = (fileName: string) => {
+    return `/session-recorder/${recorderId}/sessions/${sessionId}/${fileName}`;
+  };
+
   const waveformUrl = computed(() => {
     return new URL(
-      `${recorderId}/${sessionId}/waveform.dat`,
+      buildUrlPath('waveform.dat'),
       env.VITE_FILE_SERVER_URL
     ).toString();
   });
@@ -19,18 +24,18 @@ export const useSessionData = ({
     return [
       {
         src: new URL(
-          `${recorderId}/${sessionId}/data.ogg`,
-          env.VITE_FILE_SERVER_URL
-        ).toString(),
-        type: 'audio/ogg',
-      },
-      {
-        src: new URL(
-          `${recorderId}/${sessionId}/data.flac`,
+          buildUrlPath('data.flac'),
           env.VITE_FILE_SERVER_URL
         ).toString(),
         type: 'audio/flac',
       },
+      // {
+      //   src: new URL(
+      //     buildUrlPath('data.ogg'),
+      //     env.VITE_FILE_SERVER_URL
+      //   ).toString(),
+      //   type: 'audio/ogg',
+      // },
     ];
   });
 

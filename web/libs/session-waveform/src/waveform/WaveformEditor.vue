@@ -1,29 +1,17 @@
 <script setup lang="ts">
-import { defineModel, ref, watchEffect } from 'vue';
+import { ref, watchEffect } from 'vue';
 import VirtualizedItem from '../lib/disclosure/VirtualizedItem.vue';
-import {
-  createPeaksContext,
-  usePeaksContext,
-} from '../context/usePeaksContext';
+import { type PeaksContext, usePeaksContext } from '../context/usePeaksContext';
 import Overview from '../elements/Overview/Overview.vue';
 import Zoomview from '../elements/Zoomview/Zoomview.vue';
 import Audio from '../elements/Overview/Audio.vue';
 import Segments from '../elements/Segments/Segments.vue';
 import { onClickOutside } from '@vueuse/core';
-import type {
-  AudioSourceUrl,
-  Permissions,
-  Segment,
-} from '../context/models/state';
 import { useWaverformLayoutProvider } from './useWaverformLayoutProvider';
-
-const segments = defineModel<Segment[]>('segments', { required: true });
 
 const props = withDefaults(
   defineProps<{
-    audioUrls: [AudioSourceUrl, ...AudioSourceUrl[]];
-    waveformUrl?: string;
-    permissions: Permissions;
+    context: PeaksContext;
     height?: number;
   }>(),
   {
@@ -43,18 +31,9 @@ provide({
   audioRef,
 });
 
-const context = createPeaksContext({
-  initialState: {
-    waveformUrl: props.waveformUrl,
-    audioUrls: props.audioUrls,
-    permissions: props.permissions,
-    segments: segments.value,
-  },
-});
-
 watchEffect(() => {
   if (overviewRef.value && zoomviewRef.value && audioRef.value) {
-    context.commandEmitter.emit('mount', {
+    props.context.commandEmitter.emit('mount', {
       overview: overviewRef.value,
       zoomview: zoomviewRef.value,
       audio: audioRef.value,
@@ -81,6 +60,7 @@ onClickOutside(canvasElement.value, () => {
     <Segments />
     <Audio />
   </VirtualizedItem>
+  <slot />
 </template>
 
 <style scoped>

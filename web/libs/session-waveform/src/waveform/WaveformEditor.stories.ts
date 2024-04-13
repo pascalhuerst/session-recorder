@@ -1,7 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/vue3';
 import WaveformEditor from './WaveformEditor.vue';
-import { ref } from 'vue';
-import type { Segment } from '../context/models/state';
+import { createPeaksContext } from '../context/usePeaksContext';
 
 const meta: Meta = {
   title: 'Waveform Editor',
@@ -20,9 +19,8 @@ export default meta;
 const render = (args: Meta['args']) => ({
   components: { WaveformEditor },
   setup() {
-    const segments = ref<Segment[]>([]);
-    return {
-      args: {
+    const context = createPeaksContext({
+      initialState: {
         waveformUrl: args?.waveformUrl,
         audioUrls: [
           {
@@ -35,12 +33,14 @@ const render = (args: Meta['args']) => ({
           update: true,
           delete: true,
         },
+        segments: [],
       },
-      segments,
-    };
+    });
+
+    return { context };
   },
   template: `
-    <WaveformEditor v-bind="args" v-model:segments="segments" />
+    <WaveformEditor :context="context" />
   `,
 });
 

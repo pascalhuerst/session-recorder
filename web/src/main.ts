@@ -8,7 +8,6 @@ import RecordersIndexView from './views/recorders/views/index/RecordersIndexView
 import RecorderView from './views/recorders/views/:recorderId/RecorderView.vue';
 import SessionsView from './views/recorders/views/:recorderId/views/sessions/SessionsView.vue';
 import SessionsIndexView from './views/recorders/views/:recorderId/views/sessions/views/index/SessionsIndexView.vue';
-import SessionView from './views/recorders/views/:recorderId/views/sessions/views/:sessionId/SessionView.vue';
 import { setup } from '@session-recorder/session-waveform';
 
 const router = createRouter({
@@ -37,10 +36,6 @@ const router = createRouter({
                 {
                   path: '',
                   component: SessionsIndexView,
-                },
-                {
-                  path: ':sessionId',
-                  component: SessionView,
                 },
               ],
             },

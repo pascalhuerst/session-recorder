@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/pascalhuerst/session-recorder/protocols/go/common"
 	cmpb "github.com/pascalhuerst/session-recorder/protocols/go/common"
 	sspb "github.com/pascalhuerst/session-recorder/protocols/go/sessionsource"
 	"github.com/rs/zerolog/log"
@@ -77,6 +78,31 @@ func (s *SessionSourceServer) DeleteSession(ctx context.Context, in *sspb.Delete
 
 func (s *SessionSourceServer) SetName(ctx context.Context, in *sspb.SetNameRequest) (*cmpb.Respone, error) {
 	log.Warn().Str("session-id", in.GetSessionID()).Str("name", in.GetName()).Msg("SetName not implemented")
+
+	return nil, nil
+}
+
+// Segment API
+func (s *SessionSourceServer) CreateSegment(ctx context.Context, in *sspb.CreateSegmentRequest) (*common.Respone, error) {
+	log.Warn().Str("session-id", in.GetSessionID()).Msg("CreateSegment not implemented")
+
+	return nil, nil
+}
+
+func (s *SessionSourceServer) DeleteSegment(ctx context.Context, in *sspb.DeleteSegmentRequest) (*common.Respone, error) {
+	log.Warn().Str("session-id", in.GetSessionID()).Msg("DeleteSegment not implemented")
+
+	return nil, nil
+}
+
+func (s *SessionSourceServer) RenderSegment(ctx context.Context, in *sspb.RenderSegmentRequest) (*common.Respone, error) {
+	log.Warn().Str("session-id", in.GetSessionID()).Msg("RenderSegment not implemented")
+
+	return nil, nil
+}
+
+func (s *SessionSourceServer) UpdateSegment(ctx context.Context, in *sspb.UpdateSegmentRequest) (*common.Respone, error) {
+	log.Warn().Str("session-id", in.GetSessionID()).Msg("UpdateSegment not implemented")
 
 	return nil, nil
 }

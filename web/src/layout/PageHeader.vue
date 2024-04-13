@@ -6,8 +6,6 @@
       <img src="/assets/logo.png" alt="Logo" />
       <span class="heading">Session Recorder</span>
     </router-link>
-
-    <nav>Menu</nav>
   </div>
 </template>
 

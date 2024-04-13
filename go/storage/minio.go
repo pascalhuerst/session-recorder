@@ -258,7 +258,7 @@ func (m *Minio) renderClosedSession(recorderID, sessionID uuid.UUID) error {
 		return err
 	}
 
-	readers, writer, closer := makeReaders(3)
+	readers, writer, closer := makeReaders(4)
 	eg, _ := errgroup.WithContext(ctx)
 
 	// Writer copies from raw data to all the readers
@@ -309,7 +309,7 @@ func (m *Minio) renderClosedSession(recorderID, sessionID uuid.UUID) error {
 		return nil
 	})
 
-	// Create flac file. Reads from reader 1
+	// Create flac file. Reads from reader 2
 	eg.Go(func() error {
 		var flacBuffer *bytes.Buffer
 		if flacBuffer, err = render.Flac(readers[2]); err != nil {
@@ -321,6 +321,27 @@ func (m *Minio) renderClosedSession(recorderID, sessionID uuid.UUID) error {
 		flacObject := fmt.Sprintf("%s/sessions/%s/data.flac", recorderID, sessionID)
 		if _, err := m.client.PutObject(ctx, bucketName, flacObject, flacBuffer, int64(flacBuffer.Len()), minio.PutObjectOptions{}); err != nil {
 			log.Err(err).Str("object", flacObject).Msg("Cannot put object")
+
+			return err
+		}
+
+		return nil
+	})
+
+	// Create ogg file. Reads from reader 3
+	eg.Go(func() error {
+		ext := "ogg"
+
+		var buffer *bytes.Buffer
+		if buffer, err = render.CreateAudioFile(readers[3], ext); err != nil {
+			log.Err(err).Msg("Cannot convert to ogg")
+
+			return err
+		}
+
+		object := fmt.Sprintf("%s/sessions/%s/data.%s", recorderID, sessionID, ext)
+		if _, err := m.client.PutObject(ctx, bucketName, object, buffer, int64(buffer.Len()), minio.PutObjectOptions{}); err != nil {
+			log.Err(err).Str("object", object).Msg("Cannot put object")
 
 			return err
 		}

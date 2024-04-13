@@ -26,6 +26,32 @@ message StreamSessionRequest {
 	string recorderID = 1;
 }
 
+enum SegmentState {
+	SEGMENT_STATE_UNKNOWN = 0;
+	SEGMENT_STATE_RENDERING = 1;
+	SEGMENT_STATE_FINISHED = 2;
+	SEGMENT_STATE_ERROR = 3;
+}
+
+message SegmentInfo {
+	google.protobuf.Timestamp timeStart = 1;
+	google.protobuf.Timestamp timeEnd = 2;
+	
+	string name = 3;
+	SegmentState state = 4;
+}
+
+message SegmentRemoved {}
+
+message Segment {
+	string segmentID = 1;
+	
+	oneof info {
+		SegmentInfo updated = 2;
+		SegmentRemoved removed = 3;
+	}
+}
+
 enum SessionState {
 	SESSION_STATE_UNKNOWN = 0;
 	SESSION_STATE_RECORDING = 1;
@@ -43,6 +69,8 @@ message SessionInfo {
 	bool keep = 8;
 
 	SessionState state = 9;
+
+	repeated Segment segments = 10;
 }
 
 message SessionRemoved {}
@@ -70,6 +98,28 @@ message SetNameRequest {
 	string name = 2;
 }
 
+message CreateSegmentRequest {
+	string sessionID = 1;
+	string segmentID = 2;
+	SegmentInfo info = 3;
+}
+
+message UpdateSegmentRequest {
+	string sessionID = 1;
+	string segmentID = 2;
+	SegmentInfo info = 3;
+}
+
+message DeleteSegmentRequest {
+	string sessionID = 1;
+	string segmentID = 2;
+}
+
+message RenderSegmentRequest {
+	string sessionID = 1;
+	string segmentID = 2;
+}
+
 service SessionSource {
 	// Recorder RPC
 	rpc StreamRecorders(StreamRecordersRequest) returns (stream Recorder);
@@ -79,4 +129,9 @@ service SessionSource {
 	rpc SetKeepSession(SetKeepSessionRequest) returns (common.Respone);
 	rpc DeleteSession(DeleteSessionRequest) returns (common.Respone);
 	rpc SetName(SetNameRequest) returns (common.Respone);
+
+	rpc CreateSegment(CreateSegmentRequest) returns (common.Respone);
+	rpc DeleteSegment(DeleteSegmentRequest) returns (common.Respone);
+	rpc RenderSegment(RenderSegmentRequest) returns (common.Respone);
+	rpc UpdateSegment(UpdateSegmentRequest) returns (common.Respone);
 }

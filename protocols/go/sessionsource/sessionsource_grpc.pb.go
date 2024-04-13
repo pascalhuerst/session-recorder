@@ -26,6 +26,10 @@ type SessionSourceClient interface {
 	SetKeepSession(ctx context.Context, in *SetKeepSessionRequest, opts ...grpc.CallOption) (*common.Respone, error)
 	DeleteSession(ctx context.Context, in *DeleteSessionRequest, opts ...grpc.CallOption) (*common.Respone, error)
 	SetName(ctx context.Context, in *SetNameRequest, opts ...grpc.CallOption) (*common.Respone, error)
+	CreateSegment(ctx context.Context, in *CreateSegmentRequest, opts ...grpc.CallOption) (*common.Respone, error)
+	DeleteSegment(ctx context.Context, in *DeleteSegmentRequest, opts ...grpc.CallOption) (*common.Respone, error)
+	RenderSegment(ctx context.Context, in *RenderSegmentRequest, opts ...grpc.CallOption) (*common.Respone, error)
+	UpdateSegment(ctx context.Context, in *UpdateSegmentRequest, opts ...grpc.CallOption) (*common.Respone, error)
 }
 
 type sessionSourceClient struct {
@@ -127,6 +131,42 @@ func (c *sessionSourceClient) SetName(ctx context.Context, in *SetNameRequest, o
 	return out, nil
 }
 
+func (c *sessionSourceClient) CreateSegment(ctx context.Context, in *CreateSegmentRequest, opts ...grpc.CallOption) (*common.Respone, error) {
+	out := new(common.Respone)
+	err := c.cc.Invoke(ctx, "/sessionsource.SessionSource/CreateSegment", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sessionSourceClient) DeleteSegment(ctx context.Context, in *DeleteSegmentRequest, opts ...grpc.CallOption) (*common.Respone, error) {
+	out := new(common.Respone)
+	err := c.cc.Invoke(ctx, "/sessionsource.SessionSource/DeleteSegment", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sessionSourceClient) RenderSegment(ctx context.Context, in *RenderSegmentRequest, opts ...grpc.CallOption) (*common.Respone, error) {
+	out := new(common.Respone)
+	err := c.cc.Invoke(ctx, "/sessionsource.SessionSource/RenderSegment", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sessionSourceClient) UpdateSegment(ctx context.Context, in *UpdateSegmentRequest, opts ...grpc.CallOption) (*common.Respone, error) {
+	out := new(common.Respone)
+	err := c.cc.Invoke(ctx, "/sessionsource.SessionSource/UpdateSegment", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SessionSourceServer is the server API for SessionSource service.
 // All implementations should embed UnimplementedSessionSourceServer
 // for forward compatibility
@@ -138,6 +178,10 @@ type SessionSourceServer interface {
 	SetKeepSession(context.Context, *SetKeepSessionRequest) (*common.Respone, error)
 	DeleteSession(context.Context, *DeleteSessionRequest) (*common.Respone, error)
 	SetName(context.Context, *SetNameRequest) (*common.Respone, error)
+	CreateSegment(context.Context, *CreateSegmentRequest) (*common.Respone, error)
+	DeleteSegment(context.Context, *DeleteSegmentRequest) (*common.Respone, error)
+	RenderSegment(context.Context, *RenderSegmentRequest) (*common.Respone, error)
+	UpdateSegment(context.Context, *UpdateSegmentRequest) (*common.Respone, error)
 }
 
 // UnimplementedSessionSourceServer should be embedded to have forward compatible implementations.
@@ -158,6 +202,18 @@ func (UnimplementedSessionSourceServer) DeleteSession(context.Context, *DeleteSe
 }
 func (UnimplementedSessionSourceServer) SetName(context.Context, *SetNameRequest) (*common.Respone, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetName not implemented")
+}
+func (UnimplementedSessionSourceServer) CreateSegment(context.Context, *CreateSegmentRequest) (*common.Respone, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CreateSegment not implemented")
+}
+func (UnimplementedSessionSourceServer) DeleteSegment(context.Context, *DeleteSegmentRequest) (*common.Respone, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteSegment not implemented")
+}
+func (UnimplementedSessionSourceServer) RenderSegment(context.Context, *RenderSegmentRequest) (*common.Respone, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RenderSegment not implemented")
+}
+func (UnimplementedSessionSourceServer) UpdateSegment(context.Context, *UpdateSegmentRequest) (*common.Respone, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method UpdateSegment not implemented")
 }
 
 // UnsafeSessionSourceServer may be embedded to opt out of forward compatibility for this service.
@@ -267,6 +323,78 @@ func _SessionSource_SetName_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SessionSource_CreateSegment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateSegmentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SessionSourceServer).CreateSegment(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/sessionsource.SessionSource/CreateSegment",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SessionSourceServer).CreateSegment(ctx, req.(*CreateSegmentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SessionSource_DeleteSegment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteSegmentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SessionSourceServer).DeleteSegment(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/sessionsource.SessionSource/DeleteSegment",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SessionSourceServer).DeleteSegment(ctx, req.(*DeleteSegmentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SessionSource_RenderSegment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RenderSegmentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SessionSourceServer).RenderSegment(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/sessionsource.SessionSource/RenderSegment",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SessionSourceServer).RenderSegment(ctx, req.(*RenderSegmentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SessionSource_UpdateSegment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateSegmentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SessionSourceServer).UpdateSegment(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/sessionsource.SessionSource/UpdateSegment",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SessionSourceServer).UpdateSegment(ctx, req.(*UpdateSegmentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SessionSource_ServiceDesc is the grpc.ServiceDesc for SessionSource service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -285,6 +413,22 @@ var SessionSource_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SetName",
 			Handler:    _SessionSource_SetName_Handler,
+		},
+		{
+			MethodName: "CreateSegment",
+			Handler:    _SessionSource_CreateSegment_Handler,
+		},
+		{
+			MethodName: "DeleteSegment",
+			Handler:    _SessionSource_DeleteSegment_Handler,
+		},
+		{
+			MethodName: "RenderSegment",
+			Handler:    _SessionSource_RenderSegment_Handler,
+		},
+		{
+			MethodName: "UpdateSegment",
+			Handler:    _SessionSource_UpdateSegment_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

@@ -7,6 +7,51 @@ import { Timestamp } from "./google/protobuf/timestamp";
 
 export const protobufPackage = "sessionsource";
 
+export enum SegmentState {
+  SEGMENT_STATE_UNKNOWN = 0,
+  SEGMENT_STATE_RENDERING = 1,
+  SEGMENT_STATE_FINISHED = 2,
+  SEGMENT_STATE_ERROR = 3,
+  UNRECOGNIZED = -1,
+}
+
+export function segmentStateFromJSON(object: any): SegmentState {
+  switch (object) {
+    case 0:
+    case "SEGMENT_STATE_UNKNOWN":
+      return SegmentState.SEGMENT_STATE_UNKNOWN;
+    case 1:
+    case "SEGMENT_STATE_RENDERING":
+      return SegmentState.SEGMENT_STATE_RENDERING;
+    case 2:
+    case "SEGMENT_STATE_FINISHED":
+      return SegmentState.SEGMENT_STATE_FINISHED;
+    case 3:
+    case "SEGMENT_STATE_ERROR":
+      return SegmentState.SEGMENT_STATE_ERROR;
+    case -1:
+    case "UNRECOGNIZED":
+    default:
+      return SegmentState.UNRECOGNIZED;
+  }
+}
+
+export function segmentStateToJSON(object: SegmentState): string {
+  switch (object) {
+    case SegmentState.SEGMENT_STATE_UNKNOWN:
+      return "SEGMENT_STATE_UNKNOWN";
+    case SegmentState.SEGMENT_STATE_RENDERING:
+      return "SEGMENT_STATE_RENDERING";
+    case SegmentState.SEGMENT_STATE_FINISHED:
+      return "SEGMENT_STATE_FINISHED";
+    case SegmentState.SEGMENT_STATE_ERROR:
+      return "SEGMENT_STATE_ERROR";
+    case SegmentState.UNRECOGNIZED:
+    default:
+      return "UNRECOGNIZED";
+  }
+}
+
 export enum SessionState {
   SESSION_STATE_UNKNOWN = 0,
   SESSION_STATE_RECORDING = 1,
@@ -63,6 +108,22 @@ export interface StreamSessionRequest {
   recorderID: string;
 }
 
+export interface SegmentInfo {
+  timeStart: Date | undefined;
+  timeEnd: Date | undefined;
+  name: string;
+  state: SegmentState;
+}
+
+export interface SegmentRemoved {
+}
+
+export interface Segment {
+  segmentID: string;
+  updated?: SegmentInfo | undefined;
+  removed?: SegmentRemoved | undefined;
+}
+
 export interface SessionInfo {
   timeCreated: Date | undefined;
   timeFinished: Date | undefined;
@@ -72,6 +133,7 @@ export interface SessionInfo {
   waveformDataFile: string;
   keep: boolean;
   state: SessionState;
+  segments: Segment[];
 }
 
 export interface SessionRemoved {
@@ -95,6 +157,28 @@ export interface DeleteSessionRequest {
 export interface SetNameRequest {
   sessionID: string;
   name: string;
+}
+
+export interface CreateSegmentRequest {
+  sessionID: string;
+  segmentID: string;
+  info: SegmentInfo | undefined;
+}
+
+export interface UpdateSegmentRequest {
+  sessionID: string;
+  segmentID: string;
+  info: SegmentInfo | undefined;
+}
+
+export interface DeleteSegmentRequest {
+  sessionID: string;
+  segmentID: string;
+}
+
+export interface RenderSegmentRequest {
+  sessionID: string;
+  segmentID: string;
 }
 
 function createBaseStreamRecordersRequest(): StreamRecordersRequest {
@@ -348,6 +432,246 @@ export const StreamSessionRequest = {
   },
 };
 
+function createBaseSegmentInfo(): SegmentInfo {
+  return { timeStart: undefined, timeEnd: undefined, name: "", state: 0 };
+}
+
+export const SegmentInfo = {
+  encode(message: SegmentInfo, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.timeStart !== undefined) {
+      Timestamp.encode(toTimestamp(message.timeStart), writer.uint32(10).fork()).ldelim();
+    }
+    if (message.timeEnd !== undefined) {
+      Timestamp.encode(toTimestamp(message.timeEnd), writer.uint32(18).fork()).ldelim();
+    }
+    if (message.name !== "") {
+      writer.uint32(26).string(message.name);
+    }
+    if (message.state !== 0) {
+      writer.uint32(32).int32(message.state);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): SegmentInfo {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSegmentInfo();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.timeStart = fromTimestamp(Timestamp.decode(reader, reader.uint32()));
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.timeEnd = fromTimestamp(Timestamp.decode(reader, reader.uint32()));
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.name = reader.string();
+          continue;
+        case 4:
+          if (tag !== 32) {
+            break;
+          }
+
+          message.state = reader.int32() as any;
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): SegmentInfo {
+    return {
+      timeStart: isSet(object.timeStart) ? fromJsonTimestamp(object.timeStart) : undefined,
+      timeEnd: isSet(object.timeEnd) ? fromJsonTimestamp(object.timeEnd) : undefined,
+      name: isSet(object.name) ? globalThis.String(object.name) : "",
+      state: isSet(object.state) ? segmentStateFromJSON(object.state) : 0,
+    };
+  },
+
+  toJSON(message: SegmentInfo): unknown {
+    const obj: any = {};
+    if (message.timeStart !== undefined) {
+      obj.timeStart = message.timeStart.toISOString();
+    }
+    if (message.timeEnd !== undefined) {
+      obj.timeEnd = message.timeEnd.toISOString();
+    }
+    if (message.name !== "") {
+      obj.name = message.name;
+    }
+    if (message.state !== 0) {
+      obj.state = segmentStateToJSON(message.state);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<SegmentInfo>): SegmentInfo {
+    return SegmentInfo.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<SegmentInfo>): SegmentInfo {
+    const message = createBaseSegmentInfo();
+    message.timeStart = object.timeStart ?? undefined;
+    message.timeEnd = object.timeEnd ?? undefined;
+    message.name = object.name ?? "";
+    message.state = object.state ?? 0;
+    return message;
+  },
+};
+
+function createBaseSegmentRemoved(): SegmentRemoved {
+  return {};
+}
+
+export const SegmentRemoved = {
+  encode(_: SegmentRemoved, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): SegmentRemoved {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSegmentRemoved();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(_: any): SegmentRemoved {
+    return {};
+  },
+
+  toJSON(_: SegmentRemoved): unknown {
+    const obj: any = {};
+    return obj;
+  },
+
+  create(base?: DeepPartial<SegmentRemoved>): SegmentRemoved {
+    return SegmentRemoved.fromPartial(base ?? {});
+  },
+  fromPartial(_: DeepPartial<SegmentRemoved>): SegmentRemoved {
+    const message = createBaseSegmentRemoved();
+    return message;
+  },
+};
+
+function createBaseSegment(): Segment {
+  return { segmentID: "", updated: undefined, removed: undefined };
+}
+
+export const Segment = {
+  encode(message: Segment, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.segmentID !== "") {
+      writer.uint32(10).string(message.segmentID);
+    }
+    if (message.updated !== undefined) {
+      SegmentInfo.encode(message.updated, writer.uint32(18).fork()).ldelim();
+    }
+    if (message.removed !== undefined) {
+      SegmentRemoved.encode(message.removed, writer.uint32(26).fork()).ldelim();
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): Segment {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseSegment();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.segmentID = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.updated = SegmentInfo.decode(reader, reader.uint32());
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.removed = SegmentRemoved.decode(reader, reader.uint32());
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): Segment {
+    return {
+      segmentID: isSet(object.segmentID) ? globalThis.String(object.segmentID) : "",
+      updated: isSet(object.updated) ? SegmentInfo.fromJSON(object.updated) : undefined,
+      removed: isSet(object.removed) ? SegmentRemoved.fromJSON(object.removed) : undefined,
+    };
+  },
+
+  toJSON(message: Segment): unknown {
+    const obj: any = {};
+    if (message.segmentID !== "") {
+      obj.segmentID = message.segmentID;
+    }
+    if (message.updated !== undefined) {
+      obj.updated = SegmentInfo.toJSON(message.updated);
+    }
+    if (message.removed !== undefined) {
+      obj.removed = SegmentRemoved.toJSON(message.removed);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<Segment>): Segment {
+    return Segment.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<Segment>): Segment {
+    const message = createBaseSegment();
+    message.segmentID = object.segmentID ?? "";
+    message.updated = (object.updated !== undefined && object.updated !== null)
+      ? SegmentInfo.fromPartial(object.updated)
+      : undefined;
+    message.removed = (object.removed !== undefined && object.removed !== null)
+      ? SegmentRemoved.fromPartial(object.removed)
+      : undefined;
+    return message;
+  },
+};
+
 function createBaseSessionInfo(): SessionInfo {
   return {
     timeCreated: undefined,
@@ -358,6 +682,7 @@ function createBaseSessionInfo(): SessionInfo {
     waveformDataFile: "",
     keep: false,
     state: 0,
+    segments: [],
   };
 }
 
@@ -386,6 +711,9 @@ export const SessionInfo = {
     }
     if (message.state !== 0) {
       writer.uint32(72).int32(message.state);
+    }
+    for (const v of message.segments) {
+      Segment.encode(v!, writer.uint32(82).fork()).ldelim();
     }
     return writer;
   },
@@ -453,6 +781,13 @@ export const SessionInfo = {
 
           message.state = reader.int32() as any;
           continue;
+        case 10:
+          if (tag !== 82) {
+            break;
+          }
+
+          message.segments.push(Segment.decode(reader, reader.uint32()));
+          continue;
       }
       if ((tag & 7) === 4 || tag === 0) {
         break;
@@ -472,6 +807,7 @@ export const SessionInfo = {
       waveformDataFile: isSet(object.waveformDataFile) ? globalThis.String(object.waveformDataFile) : "",
       keep: isSet(object.keep) ? globalThis.Boolean(object.keep) : false,
       state: isSet(object.state) ? sessionStateFromJSON(object.state) : 0,
+      segments: globalThis.Array.isArray(object?.segments) ? object.segments.map((e: any) => Segment.fromJSON(e)) : [],
     };
   },
 
@@ -501,6 +837,9 @@ export const SessionInfo = {
     if (message.state !== 0) {
       obj.state = sessionStateToJSON(message.state);
     }
+    if (message.segments?.length) {
+      obj.segments = message.segments.map((e) => Segment.toJSON(e));
+    }
     return obj;
   },
 
@@ -519,6 +858,7 @@ export const SessionInfo = {
     message.waveformDataFile = object.waveformDataFile ?? "";
     message.keep = object.keep ?? false;
     message.state = object.state ?? 0;
+    message.segments = object.segments?.map((e) => Segment.fromPartial(e)) || [];
     return message;
   },
 };
@@ -864,6 +1204,336 @@ export const SetNameRequest = {
   },
 };
 
+function createBaseCreateSegmentRequest(): CreateSegmentRequest {
+  return { sessionID: "", segmentID: "", info: undefined };
+}
+
+export const CreateSegmentRequest = {
+  encode(message: CreateSegmentRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.sessionID !== "") {
+      writer.uint32(10).string(message.sessionID);
+    }
+    if (message.segmentID !== "") {
+      writer.uint32(18).string(message.segmentID);
+    }
+    if (message.info !== undefined) {
+      SegmentInfo.encode(message.info, writer.uint32(26).fork()).ldelim();
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): CreateSegmentRequest {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCreateSegmentRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.sessionID = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.segmentID = reader.string();
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.info = SegmentInfo.decode(reader, reader.uint32());
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): CreateSegmentRequest {
+    return {
+      sessionID: isSet(object.sessionID) ? globalThis.String(object.sessionID) : "",
+      segmentID: isSet(object.segmentID) ? globalThis.String(object.segmentID) : "",
+      info: isSet(object.info) ? SegmentInfo.fromJSON(object.info) : undefined,
+    };
+  },
+
+  toJSON(message: CreateSegmentRequest): unknown {
+    const obj: any = {};
+    if (message.sessionID !== "") {
+      obj.sessionID = message.sessionID;
+    }
+    if (message.segmentID !== "") {
+      obj.segmentID = message.segmentID;
+    }
+    if (message.info !== undefined) {
+      obj.info = SegmentInfo.toJSON(message.info);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<CreateSegmentRequest>): CreateSegmentRequest {
+    return CreateSegmentRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<CreateSegmentRequest>): CreateSegmentRequest {
+    const message = createBaseCreateSegmentRequest();
+    message.sessionID = object.sessionID ?? "";
+    message.segmentID = object.segmentID ?? "";
+    message.info = (object.info !== undefined && object.info !== null)
+      ? SegmentInfo.fromPartial(object.info)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseUpdateSegmentRequest(): UpdateSegmentRequest {
+  return { sessionID: "", segmentID: "", info: undefined };
+}
+
+export const UpdateSegmentRequest = {
+  encode(message: UpdateSegmentRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.sessionID !== "") {
+      writer.uint32(10).string(message.sessionID);
+    }
+    if (message.segmentID !== "") {
+      writer.uint32(18).string(message.segmentID);
+    }
+    if (message.info !== undefined) {
+      SegmentInfo.encode(message.info, writer.uint32(26).fork()).ldelim();
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): UpdateSegmentRequest {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseUpdateSegmentRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.sessionID = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.segmentID = reader.string();
+          continue;
+        case 3:
+          if (tag !== 26) {
+            break;
+          }
+
+          message.info = SegmentInfo.decode(reader, reader.uint32());
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): UpdateSegmentRequest {
+    return {
+      sessionID: isSet(object.sessionID) ? globalThis.String(object.sessionID) : "",
+      segmentID: isSet(object.segmentID) ? globalThis.String(object.segmentID) : "",
+      info: isSet(object.info) ? SegmentInfo.fromJSON(object.info) : undefined,
+    };
+  },
+
+  toJSON(message: UpdateSegmentRequest): unknown {
+    const obj: any = {};
+    if (message.sessionID !== "") {
+      obj.sessionID = message.sessionID;
+    }
+    if (message.segmentID !== "") {
+      obj.segmentID = message.segmentID;
+    }
+    if (message.info !== undefined) {
+      obj.info = SegmentInfo.toJSON(message.info);
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<UpdateSegmentRequest>): UpdateSegmentRequest {
+    return UpdateSegmentRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<UpdateSegmentRequest>): UpdateSegmentRequest {
+    const message = createBaseUpdateSegmentRequest();
+    message.sessionID = object.sessionID ?? "";
+    message.segmentID = object.segmentID ?? "";
+    message.info = (object.info !== undefined && object.info !== null)
+      ? SegmentInfo.fromPartial(object.info)
+      : undefined;
+    return message;
+  },
+};
+
+function createBaseDeleteSegmentRequest(): DeleteSegmentRequest {
+  return { sessionID: "", segmentID: "" };
+}
+
+export const DeleteSegmentRequest = {
+  encode(message: DeleteSegmentRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.sessionID !== "") {
+      writer.uint32(10).string(message.sessionID);
+    }
+    if (message.segmentID !== "") {
+      writer.uint32(18).string(message.segmentID);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): DeleteSegmentRequest {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseDeleteSegmentRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.sessionID = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.segmentID = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): DeleteSegmentRequest {
+    return {
+      sessionID: isSet(object.sessionID) ? globalThis.String(object.sessionID) : "",
+      segmentID: isSet(object.segmentID) ? globalThis.String(object.segmentID) : "",
+    };
+  },
+
+  toJSON(message: DeleteSegmentRequest): unknown {
+    const obj: any = {};
+    if (message.sessionID !== "") {
+      obj.sessionID = message.sessionID;
+    }
+    if (message.segmentID !== "") {
+      obj.segmentID = message.segmentID;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<DeleteSegmentRequest>): DeleteSegmentRequest {
+    return DeleteSegmentRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<DeleteSegmentRequest>): DeleteSegmentRequest {
+    const message = createBaseDeleteSegmentRequest();
+    message.sessionID = object.sessionID ?? "";
+    message.segmentID = object.segmentID ?? "";
+    return message;
+  },
+};
+
+function createBaseRenderSegmentRequest(): RenderSegmentRequest {
+  return { sessionID: "", segmentID: "" };
+}
+
+export const RenderSegmentRequest = {
+  encode(message: RenderSegmentRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.sessionID !== "") {
+      writer.uint32(10).string(message.sessionID);
+    }
+    if (message.segmentID !== "") {
+      writer.uint32(18).string(message.segmentID);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): RenderSegmentRequest {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseRenderSegmentRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.sessionID = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
+          message.segmentID = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): RenderSegmentRequest {
+    return {
+      sessionID: isSet(object.sessionID) ? globalThis.String(object.sessionID) : "",
+      segmentID: isSet(object.segmentID) ? globalThis.String(object.segmentID) : "",
+    };
+  },
+
+  toJSON(message: RenderSegmentRequest): unknown {
+    const obj: any = {};
+    if (message.sessionID !== "") {
+      obj.sessionID = message.sessionID;
+    }
+    if (message.segmentID !== "") {
+      obj.segmentID = message.segmentID;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<RenderSegmentRequest>): RenderSegmentRequest {
+    return RenderSegmentRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<RenderSegmentRequest>): RenderSegmentRequest {
+    const message = createBaseRenderSegmentRequest();
+    message.sessionID = object.sessionID ?? "";
+    message.segmentID = object.segmentID ?? "";
+    return message;
+  },
+};
+
 export type SessionSourceDefinition = typeof SessionSourceDefinition;
 export const SessionSourceDefinition = {
   name: "SessionSource",
@@ -911,6 +1581,38 @@ export const SessionSourceDefinition = {
       responseStream: false,
       options: {},
     },
+    createSegment: {
+      name: "CreateSegment",
+      requestType: CreateSegmentRequest,
+      requestStream: false,
+      responseType: Respone,
+      responseStream: false,
+      options: {},
+    },
+    deleteSegment: {
+      name: "DeleteSegment",
+      requestType: DeleteSegmentRequest,
+      requestStream: false,
+      responseType: Respone,
+      responseStream: false,
+      options: {},
+    },
+    renderSegment: {
+      name: "RenderSegment",
+      requestType: RenderSegmentRequest,
+      requestStream: false,
+      responseType: Respone,
+      responseStream: false,
+      options: {},
+    },
+    updateSegment: {
+      name: "UpdateSegment",
+      requestType: UpdateSegmentRequest,
+      requestStream: false,
+      responseType: Respone,
+      responseStream: false,
+      options: {},
+    },
   },
 } as const;
 
@@ -928,6 +1630,10 @@ export interface SessionSourceServiceImplementation<CallContextExt = {}> {
   setKeepSession(request: SetKeepSessionRequest, context: CallContext & CallContextExt): Promise<DeepPartial<Respone>>;
   deleteSession(request: DeleteSessionRequest, context: CallContext & CallContextExt): Promise<DeepPartial<Respone>>;
   setName(request: SetNameRequest, context: CallContext & CallContextExt): Promise<DeepPartial<Respone>>;
+  createSegment(request: CreateSegmentRequest, context: CallContext & CallContextExt): Promise<DeepPartial<Respone>>;
+  deleteSegment(request: DeleteSegmentRequest, context: CallContext & CallContextExt): Promise<DeepPartial<Respone>>;
+  renderSegment(request: RenderSegmentRequest, context: CallContext & CallContextExt): Promise<DeepPartial<Respone>>;
+  updateSegment(request: UpdateSegmentRequest, context: CallContext & CallContextExt): Promise<DeepPartial<Respone>>;
 }
 
 export interface SessionSourceClient<CallOptionsExt = {}> {
@@ -944,6 +1650,10 @@ export interface SessionSourceClient<CallOptionsExt = {}> {
   setKeepSession(request: DeepPartial<SetKeepSessionRequest>, options?: CallOptions & CallOptionsExt): Promise<Respone>;
   deleteSession(request: DeepPartial<DeleteSessionRequest>, options?: CallOptions & CallOptionsExt): Promise<Respone>;
   setName(request: DeepPartial<SetNameRequest>, options?: CallOptions & CallOptionsExt): Promise<Respone>;
+  createSegment(request: DeepPartial<CreateSegmentRequest>, options?: CallOptions & CallOptionsExt): Promise<Respone>;
+  deleteSegment(request: DeepPartial<DeleteSegmentRequest>, options?: CallOptions & CallOptionsExt): Promise<Respone>;
+  renderSegment(request: DeepPartial<RenderSegmentRequest>, options?: CallOptions & CallOptionsExt): Promise<Respone>;
+  updateSegment(request: DeepPartial<UpdateSegmentRequest>, options?: CallOptions & CallOptionsExt): Promise<Respone>;
 }
 
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;

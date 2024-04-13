@@ -18,7 +18,7 @@ require (
 	github.com/mewkiz/flac v1.0.10
 	github.com/minio/minio-go/v7 v7.0.66
 	github.com/mum4k/termdash v0.19.0
-	github.com/pascalhuerst/session-recorder/protocols/go v0.0.0-20231224222119-4c95a5ded8d9
+	github.com/pascalhuerst/session-recorder/protocols/go v0.0.0-20240413161143-5bdb48b9f3d3
 	github.com/pkg/errors v0.9.1
 	github.com/rs/zerolog v1.31.0
 	github.com/yobert/alsa v0.0.0-20230126204319-85bb7ee02e5b

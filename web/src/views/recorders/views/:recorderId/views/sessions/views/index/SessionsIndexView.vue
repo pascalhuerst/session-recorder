@@ -22,7 +22,7 @@ const sortedSessions = computed(() => {
 
 <template>
   <div v-if="sortedSessions.length" class="list">
-    <template v-for="(session, index) in sortedSessions" :key="session.id">
+    <template v-for="(session, index) in sortedSessions" :key="session.ID">
       <SessionCard
         :session="session"
         :recorder-id="selectedRecorderId"

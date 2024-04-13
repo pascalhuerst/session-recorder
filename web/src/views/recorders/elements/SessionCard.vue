@@ -4,8 +4,11 @@ import SessionMenu from './SessionMenu.vue';
 import { type Session } from '@session-recorder/protocols/ts/sessionsource';
 import { useDateFormat } from '@vueuse/core';
 import { useSessionData } from '@/useSessionData';
-import { WaveformEditor } from '@session-recorder/session-waveform';
-import { createPeaksContext } from '../../../../libs/session-waveform/src/context/usePeaksContext';
+import {
+  createPeaksContext,
+  providePeaksContext,
+  WaveformEditor,
+} from '@session-recorder/session-waveform';
 import { integrateSegments } from '../../../grpc/integrateSegments';
 
 const props = defineProps<{
@@ -33,27 +36,24 @@ const { waveformUrl, audioUrls } = useSessionData({
   recorderId: props.recorderId,
 });
 
-const context = computed(() => {
-  const ctx = createPeaksContext({
-    initialState: {
-      waveformUrl: waveformUrl.value,
-      audioUrls: audioUrls.value as any,
-      permissions: {
-        create: true,
-        update: true,
-        delete: true,
-      },
-      segments: props.session.updated.segments.map((s) => ({
-        id: s.segmentID,
-        labelText: s.updated.name,
-      })),
+const ctx = createPeaksContext({
+  initialState: {
+    waveformUrl: waveformUrl.value,
+    audioUrls: audioUrls.value as any,
+    permissions: {
+      create: true,
+      update: true,
+      delete: true,
     },
-  });
-
-  integrateSegments(ctx);
-
-  return ctx;
+    segments: props.session.updated.segments.map((s) => ({
+      id: s.segmentID,
+      labelText: s.updated.name,
+    })),
+  },
 });
+
+providePeaksContext(ctx);
+integrateSegments(props.session, ctx);
 </script>
 
 <template>
@@ -71,7 +71,7 @@ const context = computed(() => {
       </div>
     </div>
 
-    <WaveformEditor :context="context"></WaveformEditor>
+    <WaveformEditor :context="ctx"></WaveformEditor>
   </div>
 </template>
 

@@ -24,9 +24,11 @@ export const createPeaksContext = (props: {
   installPlayerControls(module);
   installSegmentsControls(module);
 
-  provide(PeaksInjectionKey, module);
-
   return module;
+};
+
+export const providePeaksContext = (ctx: PeaksContext) => {
+  provide(PeaksInjectionKey, ctx);
 };
 
 export const usePeaksContext = () => {

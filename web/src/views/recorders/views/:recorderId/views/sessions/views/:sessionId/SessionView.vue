@@ -14,7 +14,6 @@ const { selectedRecorderId } = storeToRefs(useRecordersStore());
 const { sessions } = storeToRefs(useSessionsStore());
 
 const session = computed(() => {
-  console.log(sessions.value);
   return sessions.value.get(sessionId.value);
 });
 </script>

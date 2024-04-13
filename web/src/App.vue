@@ -2,6 +2,7 @@
 
 <template>
   <router-view />
+  <div id="modals" />
 </template>
 
 <style>

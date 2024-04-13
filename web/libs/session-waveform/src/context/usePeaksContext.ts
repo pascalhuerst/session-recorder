@@ -17,7 +17,6 @@ export const createPeaksContext = (props: {
 }) => {
   const module = createPeaksModule(props);
 
-  console.log(module.state.$store.get());
   setupPeaksModule(module);
 
   installZoomControls(module);

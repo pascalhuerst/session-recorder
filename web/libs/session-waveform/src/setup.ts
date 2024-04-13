@@ -15,6 +15,7 @@ import { faPlay } from '@fortawesome/free-solid-svg-icons/faPlay';
 import { faPause } from '@fortawesome/free-solid-svg-icons/faPause';
 import { faClock } from '@fortawesome/free-regular-svg-icons/faClock';
 import { faArrowsLeftRightToLine } from '@fortawesome/free-solid-svg-icons/faArrowsLeftRightToLine';
+import { faDownload } from '@fortawesome/free-solid-svg-icons/faDownload';
 
 export const setup = () => {
   library.add(
@@ -32,6 +33,7 @@ export const setup = () => {
     faMagnifyingGlassChart,
     faArrowUpRightDots,
     faArrowsLeftRightToLine,
-    faClock
+    faClock,
+    faDownload
   );
 };

@@ -17,6 +17,7 @@ export const installPlayerControls = ({
         ...prev,
         player: {
           ...peaks.player,
+          currentTime: peaks.player.getCurrentTime(),
           duration: peaks.player.getDuration(),
         },
       }));

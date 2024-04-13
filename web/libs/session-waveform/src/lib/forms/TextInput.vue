@@ -6,7 +6,7 @@
     <div v-if="$slots.prepend" class="prepend">
       <slot name="prepend" v-bind="{ inputProps, resetProps, inputRef }" />
     </div>
-    <input v-model="value" v-bind="inputProps" ref="inputRef" />
+    <input v-model="model" v-bind="inputProps" ref="inputRef" />
     <div v-if="$slots.actions" class="actions">
       <slot name="actions" v-bind="{ inputProps, resetProps, inputRef }" />
     </div>
@@ -19,9 +19,8 @@
 <script setup lang="ts" generic="T extends string | number">
 import { computed, ref, useAttrs } from 'vue';
 
-const props = withDefaults(
+withDefaults(
   defineProps<{
-    modelValue?: T;
     disableReset?: boolean;
     size?: 'xs' | 'sm' | 'md' | 'lg';
     variant?: 'ghost' | 'outlined';
@@ -33,10 +32,7 @@ const props = withDefaults(
   }
 );
 
-const emit = defineEmits<{
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  (e: 'update:modelValue', value?: any): void;
-}>();
+const model = defineModel();
 
 defineOptions({
   inheritAttrs: false,
@@ -58,16 +54,11 @@ const inputProps = computed(() => {
   return inheritedAttrs.value.input;
 });
 
-const value = computed({
-  get: () => props.modelValue,
-  set: (value) => emit('update:modelValue', value),
-});
-
 const resetProps = computed(() => {
   return {
-    disabled: !value.value,
+    disabled: !model.value,
     reset: () => {
-      value.value = undefined;
+      model.value = undefined;
     },
   };
 });

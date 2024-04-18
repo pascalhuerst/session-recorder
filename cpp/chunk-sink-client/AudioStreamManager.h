@@ -71,11 +71,8 @@ public:
     };
 
     using CallbackDetector = std::function<void(DetectorState s)>;
-    using CallbackStorage = std::function<void(StorageState s)>;
 
-    AudioStreamManager(const po::variables_map &vmCombined,
-                       CallbackDetector onDetectorStateChangedCB,
-                       CallbackStorage onStorageChangedCB);
+    AudioStreamManager(const po::variables_map &vmCombined, CallbackDetector onDetectorStateChangedCB);
 
     ~AudioStreamManager();
 
@@ -91,7 +88,6 @@ private:
 
     po::variables_map m_vmCombined;
 
-    std::unique_ptr<BlockingReaderWriterQueue<SampleFrame>> m_streamBuffer;
     std::unique_ptr<BlockingReaderWriterQueue<SampleFrame>> m_detectorBuffer;
     std::unique_ptr<BlockingReaderWriterQueue<SampleFrame>> m_storageBuffer;
 
@@ -104,21 +100,11 @@ private:
     unsigned int m_detectorSuccession;
     double m_detectorThreshold;
 
-    std::string m_streamFifo;
-    std::string m_storageOutDir;
     unsigned long m_streamStorageChunkSize;
 
     CallbackDetector m_detectorStateChangedCB;
-    CallbackStorage m_storageChangedCB;
 
-    size_t fifoSize(int fd);
-    int fifoBytesAvailable(int fd);
-
-    bool isFifo(int fd);
     bool isValidPath(const std::string& path);
-    void createFifo(const std::string& path);
-    size_t setFifoSize(int fd, size_t s);
-    bool fifoHasReader(const std::string &path);
 
     std::unique_ptr<ServiceTracker> m_serviceTracker;
 };

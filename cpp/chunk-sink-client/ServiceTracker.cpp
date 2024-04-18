@@ -16,7 +16,6 @@
 
 static AvahiSimplePoll *simple_poll = NULL;
 
-
 std::string makeKey(const std::string &name, const std::string &type, const std::string &domain, int interface, int protocol)
 {
     char keyBuf[64];
@@ -77,7 +76,7 @@ void ServiceTracker::removeEntry(const std::string &key)
     }
 }
 
-std::map<std::string, std::map<std::string,ServiceEntry>> ServiceTracker::GetServiceMap()
+ServiceTracker::ServiceMap ServiceTracker::GetServiceMap()
 {
     std::lock_guard<std::mutex> guard(this->m_lock);
     return m_serviceMap;

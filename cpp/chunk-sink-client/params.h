@@ -21,8 +21,6 @@
 
 // ########## General Options ##########
 const std::string strOptGenericHelp = "help";
-const std::string strOptGenericDaemon = "daemon";
-const std::string strOptGenericKillDaemon = "kill";
 const std::string strOptRecorderID = "recorder-id";
 const std::string strOptRecorderName = "recorder-name";
 
@@ -33,13 +31,6 @@ const std::string strOptAudioFormat = "format";
 const std::string strOptAudioRate = "rate";
 const std::string strOptAudioLatency = "latency";
 
-
-// ########## StreamManager Options ##########
-const std::string strOptStreamManagerFifo = "fifo";
-const std::string strOptStreamManagerStreamBufferSize = "stream-buffer-size";
-
-const std::string strOptStreamManagerStorageOutputDir = "pcm-out-dir";
-const std::string strOptStreamManagerPcmOutChunkSize = "pcm-out-chunks-size";
 
 // ########## Detector Options ##########
 const std::string strOptDetectorTotalTime = "rest-time";

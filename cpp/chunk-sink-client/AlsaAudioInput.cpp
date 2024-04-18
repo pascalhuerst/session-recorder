@@ -128,7 +128,7 @@ void AlsaAudioInput::start()
 {
     if (!m_isRunning) {
         m_isRunning = true;
-        m_workerThread = std::thread([=]() { workerThread(); });
+        m_workerThread = std::thread([this]() { workerThread(); });
     }
 }
 

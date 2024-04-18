@@ -61,8 +61,6 @@ int main(int argc, char **argv)
         po::options_description odGeneric("Generic");
         odGeneric.add_options()
                 (strOptGenericHelp.c_str(), "Print help message")
-                (strOptGenericDaemon.c_str(), "Daemonize after startup")
-                (strOptGenericKillDaemon.c_str(), "Kill a running daemon")
                 (strOptRecorderID.c_str(), po::value<std::string>(), "Unique ID of this recorder")
                 (strOptRecorderName.c_str(), po::value<std::string>(), "Name of this recorder");
 
@@ -70,19 +68,11 @@ int main(int argc, char **argv)
         // ########## Audio Options ##########
         po::options_description odAudio("Audio");
         odAudio.add_options()
-                (strOptAudioDevice.c_str(), po::value<std::string>()->default_value("pulse"), "Alsa device to read from")
+                (strOptAudioDevice.c_str(), po::value<std::string>()->default_value("pipewire"), "Alsa device to read from")
                 (strOptAudioRate.c_str(), po::value<unsigned int>()->default_value(48000), "Sample rate")
                 (strOptAudioChannels.c_str(), po::value<unsigned int>()->default_value(2), "Channels")
-                (strOptAudioLatency.c_str(), po::value<double>()->default_value(100.0), "Input latency in ms")
+                (strOptAudioLatency.c_str(), po::value<double>()->default_value(1024.0), "Input latency in ms")
                 (strOptAudioFormat.c_str(), po::value<std::string>()->default_value("S16_LE"), "Sample format");
-
-        // ########## StreamManager Options ##########
-        po::options_description odStreamManager("StreamManager");
-        odStreamManager.add_options()
-                (strOptStreamManagerFifo.c_str(), po::value<std::string>()->default_value("/tmp/stream_pipe"), "Named pipe to write raw samples to")
-                (strOptStreamManagerStreamBufferSize.c_str(), po::value<unsigned int>()->default_value(4096), "Ring buffer size in frames for pipe stream")
-                (strOptStreamManagerStorageOutputDir.c_str(), po::value<std::string>(), "Directory to store raw pcm data chunks to")
-                (strOptStreamManagerPcmOutChunkSize.c_str(), po::value<unsigned long>()->default_value(1024*64), "Chunk size for raw pcm files");
 
         // ########## Detector Options ##########
         po::options_description odDetector("Detector");
@@ -99,7 +89,7 @@ int main(int argc, char **argv)
 
 
         // ########## Combined ##########
-        odCombined.add(odGeneric).add(odAudio).add(odStreamManager).add(odDetector).add(odLed);
+        odCombined.add(odGeneric).add(odAudio).add(odDetector).add(odLed);
         po::variables_map vmCombined;
         po::store(po::parse_command_line(argc, argv, odCombined), vmCombined);
         po::notify(vmCombined);
@@ -134,10 +124,10 @@ int main(int argc, char **argv)
 
 
         AudioStreamManager streamManager(vmCombined,
-        
             [&](AudioStreamManager::DetectorState s) {
-                std::cout << "detector:   " << s.rmsPercent << "  " 
-                          << (s.state == AudioStreamManager::STATE_SIGNAL ? "Signal" : "Silence") << std::endl;
+                std::cout << "detector:   " << s.rmsPercent << "%%  " 
+                          << (s.state == AudioStreamManager::STATE_SIGNAL ? "[SIGNAL]" : "[SILENCE]") << std::endl;
+                
                 if (detectorLed) {
                     if (s.state == AudioStreamManager::STATE_SIGNAL) {
                         detectorLed->on();
@@ -146,24 +136,6 @@ int main(int argc, char **argv)
                         if (indexerLed) {
                             indexerLed->off();
                         }
-                    }
-                }
-            },
-
-            [&](AudioStreamManager::StorageState s){
-
-                static bool toggle = false;
-                toggle = !toggle;
-
-                std::cout << "storage: totalBytes=" << s.totalBytes << std::endl
-                          << "            totalChunks=" << s.totalChunks << std::endl
-                          << "            sessionCount=" << s.sessionID << std::endl;
-
-                if (indexerLed) {
-                    if (toggle) {
-                        indexerLed->on();
-                    } else {
-                        indexerLed->off();
                     }
                 }
             }

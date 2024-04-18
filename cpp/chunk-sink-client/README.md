@@ -8,9 +8,10 @@ This opens an alsa device and detects whether there is something to record or no
 
 ## Building
 
-### Raspberry
+### Fedora
 
-Build on RPi:
+Dependencies:
 
 ```
-sudo apt-get install git cmake git g++ libboost-program-options-dev libavahi-client-dev libavahi-core-dev libgrpc++-dev libprotobuf-dev libasound2-dev
+dnf install alsa-lib-devel avahi-devel grpc-data grpc grpc-cpp grpc-plugins grpc-devel
+```

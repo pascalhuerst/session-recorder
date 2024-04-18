@@ -42,15 +42,12 @@
 #include <boost/uuid/uuid_io.hpp>
 
 
-AudioStreamManager::AudioStreamManager(const po::variables_map &vmCombined,
-                                       CallbackDetector onDetectorStateChangedCB,
-                                       CallbackStorage onStorageChangedCB) :
+AudioStreamManager::AudioStreamManager(const po::variables_map &vmCombined, CallbackDetector onDetectorStateChangedCB) :
     m_recorderID(""),
     m_recorderName(""),
     m_terminateRequest(true),
     m_writeRawPcm(false),
     m_vmCombined(vmCombined),
-    m_streamBuffer(nullptr),
     m_detectorBuffer(nullptr),
     m_storageBuffer(nullptr),
     m_alsaAudioInput(nullptr),
@@ -60,11 +57,8 @@ AudioStreamManager::AudioStreamManager(const po::variables_map &vmCombined,
     m_detectorBufferSize(0),
     m_detectorSuccession(0),
     m_detectorThreshold(0.0),
-    m_streamFifo(""),
-    m_storageOutDir(""),
     m_streamStorageChunkSize(0),
     m_detectorStateChangedCB(onDetectorStateChangedCB),
-    m_storageChangedCB(onStorageChangedCB),
     m_serviceTracker(nullptr)
 {
 }
@@ -73,72 +67,75 @@ AudioStreamManager::~AudioStreamManager()
 {
 }
 
-bool sendChunks(const std::string &url, chunksink::Chunks &chunks) {
-    auto channel = grpc::CreateChannel(url, grpc::InsecureChannelCredentials());
+void sendChunks(ServiceTracker::ServiceMap &services, chunksink::Chunks &chunks) {
+    for (const auto &service : services) {
+        for (const auto &se : service.second) {
+            std::string url = se.second.address + ":" + std::to_string(se.second.port);
 
-    auto stub_ = chunksink::ChunkSink::NewStub(channel);
+            auto channel = grpc::CreateChannel(url, grpc::InsecureChannelCredentials());
+            auto stub_ = chunksink::ChunkSink::NewStub(channel);
 
-    grpc::ClientContext context;
-    common::Respone response;
-    
-    grpc::Status status = stub_->SetChunks(&context, chunks, &response);
+            grpc::ClientContext context;
+            common::Respone response;
 
-    if (!status.ok()) {
-        return false;
-    }
+            grpc::Status status = stub_->SetChunks(&context, chunks, &response);
 
-    if (response.success() != true) {
-        std::cerr << "Error sending chunks to: " << url << " -- " <<  response.errormessage() << std::endl;
+            if (!status.ok()) {
+                std::cout << "[ERROR] SetChunks: " << url << std::endl;
+
+                continue;
+            }
+
+            if (response.success() != true) {
+                std::cout << "[ERROR] SetChunks: " << url << " -- " <<  response.errormessage() << std::endl;
         
-        return false;
-    }
+                continue;
+            }
 
-    return true;
+            std::cout << "[OK    ] SetChunks: " << url << std::endl;
+
+            return;
+        }
+    }
 }
 
-bool sendDetectorStatus(const std::string &url, common::RecorderStatus &recorderStatus) {
-    auto channel = grpc::CreateChannel(url, grpc::InsecureChannelCredentials());
+void sendDetectorStatus(ServiceTracker::ServiceMap &services, common::RecorderStatus &recorderStatus) {
+    for (const auto &service : services) {
+        for (const auto &se : service.second) {
+            //TODO: This is broken with IPv6
+            std::string url = se.second.address + ":" + std::to_string(se.second.port);
 
-    auto stub_ = chunksink::ChunkSink::NewStub(channel);
+            auto channel = grpc::CreateChannel(url, grpc::InsecureChannelCredentials());
+            auto stub_ = chunksink::ChunkSink::NewStub(channel);
 
-    grpc::ClientContext context;
-    common::Respone response;
+            grpc::ClientContext context;
+            common::Respone response;
     
-    grpc::Status status = stub_->SetRecorderStatus(&context, recorderStatus, &response);
+            grpc::Status status = stub_->SetRecorderStatus(&context, recorderStatus, &response);
 
-    if (!status.ok()) {
-        return false;
+            if (!status.ok()) {
+                std::cout << "[ERROR] DetectorStatus: " << url << std::endl;
+
+                continue;
+            }
+
+            if (response.success() != true) {
+                std::cout << "[ERROR] DetectorStatus: " << url << "  - " << response.errormessage() << std::endl;
+
+                continue;
+            }
+
+            std::cout << "[OK    ] DetectorStatus: " << url << std::endl;
+
+            return;
+        }
     }
-
-    if (response.success() != true) {
-        std::cerr << "Error sending detector status to: " << url << " -- " <<  response.errormessage() << std::endl;
-        
-        return false;
-    }
-
-    return true;
 }
-
 
 void AudioStreamManager::start()
 {
     if (m_terminateRequest) {
         m_terminateRequest = false;
-
-        if (m_vmCombined.count(strOptStreamManagerFifo)) {
-            m_streamFifo = m_vmCombined[strOptStreamManagerFifo].as<std::string>();
-
-            if (!isValidPath(m_streamFifo)) {
-                std::cout << "Fifo: " + m_streamFifo + " does not exist. Creating." << std::endl;
-                createFifo(m_streamFifo);
-                std::cout << "Pipe created at: " << m_streamFifo << " with size: " << static_cast<float>(fifoSize(File(m_streamFifo.c_str(), O_RDWR)) / 1024.0) << "kb" << std::endl;
-            } else {
-                if (!isFifo(File(m_streamFifo.c_str(), O_RDWR)))
-                    throw std::invalid_argument(m_streamFifo + " is not a fifo.");
-            }
-        } else {
-            throw std::invalid_argument(strOptStreamManagerFifo + " must be set!");
-        }
 
         if (m_vmCombined.count(strOptRecorderID)) {
             m_recorderID = m_vmCombined[strOptRecorderID].as<std::string>();
@@ -151,29 +148,6 @@ void AudioStreamManager::start()
         } else {
             throw std::invalid_argument(strOptRecorderName + " must be set!");
         }
-
-        if (m_vmCombined.count(strOptStreamManagerStorageOutputDir)) {
-            m_storageOutDir = m_vmCombined[strOptStreamManagerStorageOutputDir].as<std::string>();
-        } else {
-            throw std::invalid_argument(strOptStreamManagerStorageOutputDir + " must be set!");
-        }
-
-        if (m_vmCombined.count(strOptStreamManagerPcmOutChunkSize)) {
-            m_streamStorageChunkSize = m_vmCombined[strOptStreamManagerPcmOutChunkSize].as<unsigned long>();
-        } else {
-            throw std::invalid_argument(strOptStreamManagerPcmOutChunkSize + " must be set!");
-        }
-
-        m_storageBuffer.reset(new BlockingReaderWriterQueue<SampleFrame>(m_streamStorageChunkSize));
-
-        unsigned int streamBufferSize = 0;
-        if (m_vmCombined.count(strOptStreamManagerStreamBufferSize)) {
-            streamBufferSize = m_vmCombined[strOptStreamManagerStreamBufferSize].as<unsigned int>();
-        } else {
-            throw std::invalid_argument(strOptStreamManagerStreamBufferSize + "must be set!");
-        }
-
-        m_streamBuffer.reset(new BlockingReaderWriterQueue<SampleFrame>(streamBufferSize));
 
         double detectorTotalTime = 0.0;
         if (m_vmCombined.count(strOptDetectorTotalTime)) {
@@ -213,7 +187,6 @@ void AudioStreamManager::start()
         // Instatiation and lambda callback from alsa. Just fill out ringbuffers
         m_alsaAudioInput.reset(new AlsaAudioInput(m_vmCombined, [&] (SampleFrame *frames, size_t numFrames) {
                                    for (size_t i=0; i<numFrames; ++i) {
-                                       m_streamBuffer->enqueue(frames[i]);
                                        m_detectorBuffer->enqueue(frames[i]);
                                        m_storageBuffer->enqueue(frames[i]);
                                    }
@@ -221,13 +194,11 @@ void AudioStreamManager::start()
 
         // Detector lambda in a thread
         m_detectorWorker.reset(new std::thread([&] {
-
             SampleFrame buffer[m_detectorBufferSize];
             DetectorState currentState = {0.0, STATE_SILENT};
             unsigned int rmsCounter = 0;
 
             while (!m_terminateRequest) {
-
                 size_t i=0;
                 while (i<m_detectorBufferSize && !m_terminateRequest) {
                     auto ret = m_detectorBuffer->wait_dequeue_timed(buffer[i], std::chrono::milliseconds(500));
@@ -286,24 +257,15 @@ void AudioStreamManager::start()
                 recorderStatus.set_clipping(clipping);
 
                 auto services = m_serviceTracker->GetServiceMap();
-                for (const auto &service : services) {
-                    for (const auto &se : service.second) {
-                        std::string url = se.second.address + ":" + std::to_string(se.second.port);
-                        std::cout << "Send detector using: " << url; 
-                        if (sendDetectorStatus(url, recorderStatus)) {
-                            std::cout << "  OK" << std::endl;
-
-                            break;
-                        }
-
-                        std::cout << "  Failed" << std::endl;
-                    }
-                }
+                sendDetectorStatus(services, recorderStatus);
 
                 if (m_detectorStateChangedCB)
                     m_detectorStateChangedCB(currentState);
             }
         }));
+
+        m_streamStorageChunkSize = m_detectorBufferSize;
+        m_storageBuffer.reset(new BlockingReaderWriterQueue<SampleFrame>(m_streamStorageChunkSize));
 
         // Storage lambda in a thread
         m_storageWorker.reset(new std::thread([&] {
@@ -348,20 +310,7 @@ void AudioStreamManager::start()
                     }
 
                     auto services = m_serviceTracker->GetServiceMap();
-                    for (const auto &service : services) {
-                        for (const auto &se : service.second) {
-                            std::string url = se.second.address + ":" + std::to_string(se.second.port);
-                            std::cout << "Send chunks using: " << url;
-                              
-                            if (sendChunks(url, chunks)) {
-                                 std::cout << "  OK" << std::endl;
-
-                                break;
-                            }
-
-                            std::cout << "  Failed" << std::endl;
-                        }
-                    }
+                    sendChunks(services, chunks);
                 } else {
                     if (lastWriteRawPcmState)
                       lastWriteRawPcmState = false;
@@ -396,43 +345,9 @@ void AudioStreamManager::stop()
         }
 
         m_alsaAudioInput.reset();
-        m_streamBuffer.reset();
         m_detectorBuffer.reset();
         m_storageBuffer.reset();
     }
-}
-
-size_t AudioStreamManager::fifoSize(int fd)
-{
-    int ret = fcntl(fd, F_GETPIPE_SZ);
-    if (ret < 0)
-        throw std::invalid_argument(std::string("Can not get fifo size. ") + m_streamFifo + ": " + strerror(errno));
-
-    return static_cast<size_t>(ret);
-}
-
-int AudioStreamManager::fifoBytesAvailable(int fd)
-{
-    int nbytes = 0;
-    int ret = ::ioctl(fd, FIONREAD, &nbytes);
-    if (ret < 0)
-        throw std::invalid_argument(std::string("Can not determin available bytes to read. ") + m_streamFifo + ": " + strerror(errno));
-
-    return ret;
-}
-
-bool AudioStreamManager::isFifo(int fd)
-{
-    bool ret = true;
-    struct stat st;
-
-    if (fstat(fd, &st) < 0)
-        throw std::invalid_argument(strOptStreamManagerFifo + ": " + strerror(errno));
-
-    if (!S_ISFIFO(st.st_mode))
-        ret = false;
-
-    return ret;
 }
 
 bool AudioStreamManager::isValidPath(const std::string &path)
@@ -446,30 +361,4 @@ bool AudioStreamManager::isValidPath(const std::string &path)
         close(fd);
 
     return ret;
-}
-    
-void AudioStreamManager::createFifo(const std::string &path)
-{
-    int ret = ::mkfifo(path.c_str(), 0777);
-    if (ret < 0)
-        throw std::invalid_argument("Can not create fifo " + path + ": " + strerror(errno));
-}
-
-size_t AudioStreamManager::setFifoSize(int fd, size_t s)
-{
-    int ret = fcntl(fd, F_SETPIPE_SZ, s);
-    if (ret < 0)
-        throw std::invalid_argument(std::string("Can not set fifo size. ") + m_streamFifo + ": " + strerror(errno));
-
-    return fifoSize(fd);
-}
-
-bool AudioStreamManager::fifoHasReader(const std::string &path)
-{
-    int fd = ::open(path.c_str(), O_WRONLY | O_NONBLOCK);
-    if (fd < 0)
-        return false;
-
-    close(fd);
-    return true;
 }

@@ -22,11 +22,13 @@ struct ServiceEntry {
 class ServiceTracker
 {
 public:
+    using ServiceMap = std::map<std::string, std::map<std::string,ServiceEntry>>;
+
     ServiceTracker(const ServiceTracker&) = delete;
     ServiceTracker& operator=(const ServiceTracker&) = delete;
     ServiceTracker(const std::string &service);
 
-    std::map<std::string, std::map<std::string,ServiceEntry>> GetServiceMap();
+    ServiceMap GetServiceMap();
 
 private:
     static void resolveCB(AvahiServiceResolver *r, AvahiIfIndex interface, AvahiProtocol protocol, AvahiResolverEvent event,

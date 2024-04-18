@@ -4,9 +4,11 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	cspb "github.com/pascalhuerst/session-recorder/protocols/go/chunksink"
 	cmpb "github.com/pascalhuerst/session-recorder/protocols/go/common"
+	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
 )
 
@@ -81,4 +83,19 @@ func (s *ChunkSinkServer) SetChunks(ctx context.Context, in *cspb.Chunks) (*cmpb
 	return &cmpb.Respone{
 		Success: true,
 	}, nil
+}
+
+func (s *ChunkSinkServer) GetCommands(request *cspb.GetCommandRequest, server cspb.ChunkSink_GetCommandsServer) error {
+	for {
+		select {
+		case <-server.Context().Done():
+			return server.Context().Err()
+		case <-time.Tick(2 * time.Minute):
+			log.Info().Msg("Sending cut session command")
+
+			server.Send(&cspb.Command{
+				Command: &cspb.Command_CmdCutSession{CmdCutSession: &cspb.CmdCutSession{}},
+			})
+		}
+	}
 }

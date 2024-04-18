@@ -125,7 +125,7 @@ func (m *Minio) Start(ctx context.Context) error {
 
 		policy := fmt.Sprintf(publicAccessFormula, bucketName, bucketName)
 		if err := m.client.SetBucketPolicy(ctx, bucketName, policy); err != nil {
-			log.Error().Err(err).Str("bucket", bucketName).Msg("Cannot set bucket policy")
+			log.Err(err).Str("bucket", bucketName).Msg("Cannot set bucket policy")
 
 			return err
 		}
@@ -143,7 +143,7 @@ func (m *Minio) Start(ctx context.Context) error {
 		}
 
 		if err := m.putSystemMetadata(ctx, system); err != nil {
-			log.Error().Err(err).Msg("Cannot put system metadata")
+			log.Err(err).Msg("Cannot put system metadata")
 
 			return err
 		}
@@ -151,7 +151,7 @@ func (m *Minio) Start(ctx context.Context) error {
 
 	recorderIDs, err := m.readRecorderIDs(ctx)
 	if err != nil {
-		log.Error().Err(err).Msg("Cannot read recorder IDs")
+		log.Err(err).Msg("Cannot read recorder IDs")
 
 		return nil
 	}
@@ -179,8 +179,7 @@ func (m *Minio) Start(ctx context.Context) error {
 
 		sessions, err := m.readSessionIDs(ctx, recorderID)
 		if err != nil {
-			log.Error().
-				Err(err).
+			log.Err(err).
 				Stringer("recorder-id", recorderID).
 				Msg("Cannot read session IDs")
 
@@ -533,7 +532,7 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 	}
 
 	readers, writer, closer := makeReaders(4)
-	eg, ctx := errgroup.WithContext(ctx)
+	eg, _ := errgroup.WithContext(ctx)
 
 	// Writer copies from raw data to all the readers
 	eg.Go(func() error {
@@ -553,6 +552,8 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 	eg.Go(func() error {
 		waveformData, err := render.CreateWaveform(readers[0], 300, 10000, 200)
 		if err != nil {
+			log.Err(err).Msg("Cannot create waveform")
+
 			return fmt.Errorf("cannot create waveform: %w", err)
 		}
 
@@ -570,6 +571,8 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 	eg.Go(func() error {
 		overviewData, err := render.CreateOverview(readers[1], 300, 1000, 200)
 		if err != nil {
+			log.Err(err).Msg("Cannot create waveform overview")
+
 			return fmt.Errorf("cannot create waveform overview: %w", err)
 		}
 

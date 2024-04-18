@@ -23,6 +23,10 @@
 #include <boost/program_options.hpp>
 namespace po = boost::program_options;
 
+#include <boost/uuid/uuid.hpp>
+#include <boost/uuid/uuid_generators.hpp>
+#include <boost/uuid/uuid_io.hpp>
+
 #include <google/protobuf/util/time_util.h>
 
 #include "AlsaAudioInput.h"
@@ -58,11 +62,16 @@ public:
     };
 
     struct StorageState {
-        long totalBytes;
         long totalChunks;
         std::string sessionID;
         google::protobuf::Timestamp startTime;
 
+        void reset() {
+            boost::uuids::uuid uuid = boost::uuids::random_generator()();
+            sessionID = boost::uuids::to_string(uuid);
+            startTime = google::protobuf::util::TimeUtil::GetCurrentTime();
+            totalChunks = 0;
+        };
     };
 
     struct DetectorState {
@@ -85,6 +94,7 @@ private:
     
     std::atomic<bool> m_terminateRequest;
     std::atomic<bool> m_writeRawPcm;
+    std::atomic<bool> m_cutSession;
 
     po::variables_map m_vmCombined;
 
@@ -92,9 +102,9 @@ private:
     std::unique_ptr<BlockingReaderWriterQueue<SampleFrame>> m_storageBuffer;
 
     std::unique_ptr<AlsaAudioInput> m_alsaAudioInput;
-    std::unique_ptr<std::thread> m_streamWorker;
     std::unique_ptr<std::thread> m_detectorWorker;
     std::unique_ptr<std::thread> m_storageWorker;
+    std::unique_ptr<std::thread> m_grpcStreamWorker;
 
     size_t m_detectorBufferSize;
     unsigned int m_detectorSuccession;

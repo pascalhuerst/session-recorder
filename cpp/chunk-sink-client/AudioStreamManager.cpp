@@ -25,6 +25,7 @@
 #include <grpcpp/create_channel.h>
 #include "chunksink.pb.h"
 #include "chunksink.grpc.pb.h"
+
 #include "common.pb.h"
 
 #include <sys/ioctl.h>
@@ -37,23 +38,19 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
-#include <boost/uuid/uuid.hpp>
-#include <boost/uuid/uuid_generators.hpp>
-#include <boost/uuid/uuid_io.hpp>
-
-
 AudioStreamManager::AudioStreamManager(const po::variables_map &vmCombined, CallbackDetector onDetectorStateChangedCB) :
     m_recorderID(""),
     m_recorderName(""),
     m_terminateRequest(true),
     m_writeRawPcm(false),
+    m_cutSession(false),
     m_vmCombined(vmCombined),
     m_detectorBuffer(nullptr),
     m_storageBuffer(nullptr),
     m_alsaAudioInput(nullptr),
-    m_streamWorker(nullptr),
     m_detectorWorker(nullptr),
     m_storageWorker(nullptr),
+    m_grpcStreamWorker(nullptr),
     m_detectorBufferSize(0),
     m_detectorSuccession(0),
     m_detectorThreshold(0.0),
@@ -67,7 +64,8 @@ AudioStreamManager::~AudioStreamManager()
 {
 }
 
-void sendChunks(ServiceTracker::ServiceMap &services, chunksink::Chunks &chunks) {
+void sendChunks(ServiceTracker::ServiceMap &services, chunksink::Chunks &chunks)
+{
     for (const auto &service : services) {
         for (const auto &se : service.second) {
             std::string url = se.second.address + ":" + std::to_string(se.second.port);
@@ -99,7 +97,8 @@ void sendChunks(ServiceTracker::ServiceMap &services, chunksink::Chunks &chunks)
     }
 }
 
-void sendDetectorStatus(ServiceTracker::ServiceMap &services, common::RecorderStatus &recorderStatus) {
+void sendDetectorStatus(ServiceTracker::ServiceMap &services, common::RecorderStatus &recorderStatus)
+{
     for (const auto &service : services) {
         for (const auto &se : service.second) {
             //TODO: This is broken with IPv6
@@ -291,12 +290,9 @@ void AudioStreamManager::start()
                     if (!lastWriteRawPcmState) {
                         lastWriteRawPcmState = true;
 
-                        boost::uuids::uuid uuid = boost::uuids::random_generator()();
-                        state.sessionID = boost::uuids::to_string(uuid);
-                        state.startTime = google::protobuf::util::TimeUtil::GetCurrentTime();
-                        state.totalChunks = 0;
+                        state.reset();
                     }
-          
+
                     chunksink::Chunks chunks;
                     chunks.set_recorderid(m_recorderID);
                     chunks.set_sessionid(state.sessionID);
@@ -311,17 +307,60 @@ void AudioStreamManager::start()
 
                     auto services = m_serviceTracker->GetServiceMap();
                     sendChunks(services, chunks);
+
+                    if (m_cutSession) {
+                        state.reset();
+
+                        m_cutSession = false;
+                    }
                 } else {
                     if (lastWriteRawPcmState)
                       lastWriteRawPcmState = false;
                 }
             }
         }));
+ 
+        m_grpcStreamWorker.reset(new std::thread([&] {
+            while (!m_terminateRequest) {
+
+                auto services = m_serviceTracker->GetServiceMap();
+
+                for (const auto &service : services) {
+                    for (const auto &se : service.second) {
+                        //TODO: This is broken with IPv6
+                        std::string url = se.second.address + ":" + std::to_string(se.second.port);
+
+                        auto channel = grpc::CreateChannel(url, grpc::InsecureChannelCredentials());
+                        auto stub_ = chunksink::ChunkSink::NewStub(channel);
+
+                        grpc::ClientContext context;
+
+                        auto request = chunksink::GetCommandRequest();
+                        request.set_recorderid(m_recorderID);
+
+
+                        auto clientReader = stub_->GetCommands(&context, request);
+
+                        chunksink::Command command;
+
+                        while (clientReader->Read(&command) && !m_terminateRequest) {
+                            std::cout << "Command: ";
+                            if (command.has_cmdcutsession()) {
+                                std::cout << "CutSession ";
+
+                                m_cutSession = true;
+                            } else if (command.has_reboot()) {
+                                std::cout << "Reboot ";
+                            }
+
+                            std::cout << std::endl;
+                        }
+                    }
+                }    
+            }
+        }));
     }
 }
-
-
-
 
 void AudioStreamManager::stop()
 {
@@ -329,9 +368,9 @@ void AudioStreamManager::stop()
 
         m_terminateRequest.store(true);
 
-        if (m_streamWorker && m_streamWorker->joinable()) {
-            m_streamWorker->join();
-            m_streamWorker.reset();
+        if (m_grpcStreamWorker && m_grpcStreamWorker->joinable()) {
+            m_grpcStreamWorker->join();
+            m_grpcStreamWorker.reset();
         }
 
         if (m_detectorWorker && m_detectorWorker->joinable()) {

@@ -77,8 +77,8 @@ github.com/modern-go/reflect2 v1.0.2 h1:xBagoLtFs94CBntxluKeaWgTMpvLxC4ur3nMaC9G
 github.com/modern-go/reflect2 v1.0.2/go.mod h1:yWuevngMOJpCy52FWWMvUC8ws7m/LJsjYzDa0/r8luk=
 github.com/mum4k/termdash v0.19.0 h1:6DoievV1SODS7n5rpQfoDjVxWOFZoQQq3IeajM1tlvM=
 github.com/mum4k/termdash v0.19.0/go.mod h1:IsoNkQUqlM6UDq5wD4e3y6AtY/gyIv+pPssAl6szFmY=
-github.com/pascalhuerst/session-recorder/protocols/go v0.0.0-20240413161143-5bdb48b9f3d3 h1:TAX09doQrjLaoa9jAD7KbbVM/tL5AqGrOPyYL2NNNNA=
-github.com/pascalhuerst/session-recorder/protocols/go v0.0.0-20240413161143-5bdb48b9f3d3/go.mod h1:EBYwOVpcQ3gkFSXRhe4oLYFI0vD3aFtmZb1Ii5RX76Y=
+github.com/pascalhuerst/session-recorder/protocols/go v0.0.0-20240418194312-1c1f2f8bff10 h1:GX4rSB/M4NLtgSSSQhZI4E7cmkE6WOGxFWt79pP+mEQ=
+github.com/pascalhuerst/session-recorder/protocols/go v0.0.0-20240418194312-1c1f2f8bff10/go.mod h1:E91dCNYzzXKyYZOvSz1Bgb+csofFI27c8TbP0pait4Y=
 github.com/pkg/errors v0.8.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pkg/errors v0.9.1 h1:FEBLx1zS214owpjy7qsBeixbURkuhQAwrK5UwLGTwt4=
 github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=

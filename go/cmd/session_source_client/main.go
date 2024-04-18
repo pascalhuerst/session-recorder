@@ -11,7 +11,6 @@ import (
 )
 
 func main() {
-
 	opts := []grpc.DialOption{
 		grpc.WithInsecure(),
 	}
@@ -36,27 +35,28 @@ func main() {
 				log.Fatal().Err(err).Msg("Cannot receive recorder. Giving up")
 			}
 
-			fmt.Printf("Received recorder: %v\n", recorder)
+			go streamSessions(client, recorder)
 
-			go func() {
-				ss, err := client.StreamSessions(context.Background(), &sspb.StreamSessionRequest{RecorderID: recorder.RecorderID}, grpc.EmptyCallOption{})
-				if err != nil {
-					log.Fatal().Err(err).Msg("Cannot stream sessions. Giving up")
-				}
-
-				for {
-					session, err := ss.Recv()
-					if err != nil {
-						log.Fatal().Err(err).Msg("Cannot receive session. Giving up")
-					}
-
-					fmt.Printf("Received session: %v\n", session)
-
-				}
-			}()
 		}
 	}()
 
 	select {}
+}
 
+func streamSessions(client sspb.SessionSourceClient, recorder *sspb.Recorder) {
+	ss, err := client.StreamSessions(context.Background(), &sspb.StreamSessionRequest{RecorderID: recorder.RecorderID}, grpc.EmptyCallOption{})
+	if err != nil {
+		log.Fatal().Err(err).Msg("Cannot stream sessions. Giving up")
+	}
+
+	fmt.Printf("Recorder: %v\n", recorder)
+
+	for {
+		session, err := ss.Recv()
+		if err != nil {
+			log.Fatal().Err(err).Msg("Cannot receive session. Giving up")
+		}
+
+		fmt.Printf("  Session: %v\n", session)
+	}
 }

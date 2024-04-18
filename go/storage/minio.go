@@ -9,9 +9,10 @@ import (
 	"io"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
-	"github.com/pascalhuerst/session-recorder/model"
+
 	"github.com/pascalhuerst/session-recorder/render"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/errgroup"
@@ -74,6 +75,8 @@ type minioChunk struct {
 }
 
 type Minio struct {
+	system *System
+
 	endpoint  string
 	accessKey string
 	secretLey string
@@ -81,40 +84,20 @@ type Minio struct {
 	client *minio.Client
 
 	// Key is recorder ID
-	chunks     map[uuid.UUID]*minioChunk
-	chunksLock sync.Mutex
+	chunks   map[uuid.UUID]*minioChunk
+	dataLock sync.Mutex
+
+	onSessionClosedCb OnSessionClosedCb
+	cbLock            sync.Mutex
 }
 
 func NewMinioStorage(endpoint, accessKey, secretKey string) (*Minio, error) {
-	ctx := context.Background()
-
 	c, err := minio.New(endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(accessKey, secretKey, ""),
 		Secure: false,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("cannot create minio client: %w", err)
-	}
-
-	exists, err := c.BucketExists(ctx, bucketName)
-	if err != nil {
-		return nil, fmt.Errorf("cannot check if bucket exists: %w", err)
-	}
-
-	if !exists {
-		err = c.MakeBucket(ctx, bucketName, minio.MakeBucketOptions{})
-		if err != nil {
-			return nil, fmt.Errorf("cannot create bucket: %w", err)
-		}
-
-		policy := fmt.Sprintf(publicAccessFormula, bucketName, bucketName)
-		if err := c.SetBucketPolicy(ctx, bucketName, policy); err != nil {
-			log.Error().Err(err).Str("bucket", bucketName).Msg("Cannot set bucket policy")
-		}
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("cannot connect to minio: %w", err)
 	}
 
 	return &Minio{
@@ -126,43 +109,279 @@ func NewMinioStorage(endpoint, accessKey, secretKey string) (*Minio, error) {
 	}, nil
 }
 
-func (m *Minio) initSession(recorderID, sessionID uuid.UUID) {
-	log.Info().Str("recorder-id", recorderID.String()).Str("session-id", sessionID.String()).Msg("Starting new session")
+func (m *Minio) Start(ctx context.Context) error {
+	exists, err := m.client.BucketExists(ctx, bucketName)
+	if err != nil {
+		return fmt.Errorf("cannot check if bucket exists: %w", err)
+	}
+
+	if !exists {
+		log.Debug().Msg("Bucket does not exist, creating...")
+
+		err = m.client.MakeBucket(ctx, bucketName, minio.MakeBucketOptions{})
+		if err != nil {
+			return fmt.Errorf("cannot create bucket: %w", err)
+		}
+
+		policy := fmt.Sprintf(publicAccessFormula, bucketName, bucketName)
+		if err := m.client.SetBucketPolicy(ctx, bucketName, policy); err != nil {
+			log.Error().Err(err).Str("bucket", bucketName).Msg("Cannot set bucket policy")
+
+			return err
+		}
+	}
+
+	m.system, err = m.getSystemMetadata(ctx)
+	if err != nil {
+		log.Warn().Msg("Cannot get system metadata, creating...")
+
+		system := &System{
+			Recorders: make(map[uuid.UUID]Recorder),
+
+			ID:   uuid.New(),
+			Name: "Session Recorder",
+		}
+
+		if err := m.putSystemMetadata(ctx, system); err != nil {
+			log.Error().Err(err).Msg("Cannot put system metadata")
+
+			return err
+		}
+	}
+
+	recorderIDs, err := m.readRecorderIDs(ctx)
+	if err != nil {
+		log.Error().Err(err).Msg("Cannot read recorder IDs")
+
+		return nil
+	}
+
+	if m.system.Recorders == nil {
+		m.system.Recorders = make(map[uuid.UUID]Recorder)
+	}
+
+	for _, recorderID := range recorderIDs {
+		recorderMetadata, err := m.getRecorderMetadata(ctx, recorderID)
+		if err != nil {
+			log.Warn().
+				Err(err).
+				Stringer("recorder-id", recorderID).
+				Msg("Cannot get metadata, ignoring recorder")
+
+			continue
+		}
+
+		if recorderMetadata.Sessions == nil {
+			recorderMetadata.Sessions = make(map[uuid.UUID]Session)
+		}
+
+		m.system.Recorders[recorderID] = *recorderMetadata
+
+		sessions, err := m.readSessionIDs(ctx, recorderID)
+		if err != nil {
+			log.Error().
+				Err(err).
+				Stringer("recorder-id", recorderID).
+				Msg("Cannot read session IDs")
+
+			continue
+		}
+
+		for _, sessionID := range sessions {
+			sessionMetadata, err := m.getSessionMetadata(ctx, recorderID, sessionID)
+			if err != nil {
+				log.Warn().
+					Err(err).
+					Stringer("session-id", sessionID).
+					Msg("Cannot get metadata, ignoring session")
+
+				continue
+			}
+
+			m.system.Recorders[recorderID].Sessions[sessionID] = *sessionMetadata
+		}
+
+		if err := m.closeSessions(ctx, recorderID); err != nil {
+			log.Err(err).Msg("Cannot close sessions")
+
+			continue
+		}
+	}
+
+	fmt.Printf("%s", m.system)
+
+	return nil
+}
+
+func (m *Minio) RegisterOnSessionClosedCallback(cb OnSessionClosedCb) error {
+	m.cbLock.Lock()
+	defer m.cbLock.Unlock()
+
+	m.onSessionClosedCb = cb
+
+	return nil
+}
+
+func (m *Minio) initSession(ctx context.Context, recorderID, sessionID uuid.UUID, timeCreated time.Time) {
+	log.Info().
+		Stringer("recorder-id", recorderID).
+		Stringer("session-id", sessionID).
+		Msg("Creating new session")
 
 	m.chunks[recorderID] = &minioChunk{
 		number:    0,
 		sessionID: sessionID,
 		buffer:    new(bytes.Buffer),
 	}
+
+	session := Session{
+		ID:        sessionID,
+		StartTime: timeCreated,
+		EndTime:   time.Time{},
+		Duration:  0,
+		IsClosed:  false,
+		Keep:      false,
+		Segments:  make(map[uuid.UUID]Segment),
+	}
+
+	if err := m.putSessionMetadata(ctx, recorderID, sessionID, &session); err != nil {
+		log.Err(err).
+			Stringer("recorder-id", recorderID).
+			Stringer("session-id", sessionID).
+			Msg("Cannot put session metadata")
+	}
 }
 
-func (m *Minio) SafeChunks(ctx context.Context, recorderID, sessionID uuid.UUID, _ string, samples []int16) error {
+func (m *Minio) initRecorder(ctx context.Context, recorderID uuid.UUID, recorderName string) {
+	log.Info().
+		Stringer("recorder-id", recorderID).
+		Msg("Creating new recorder")
+
+	recorder := Recorder{
+		ID:       recorderID,
+		Name:     recorderName,
+		Sessions: make(map[uuid.UUID]Session),
+	}
+
+	if err := m.putRecorderMetadata(ctx, recorderID,
+		&Recorder{
+			ID:       recorder.ID,
+			Name:     recorder.Name,
+			Sessions: make(map[uuid.UUID]Session),
+		},
+	); err != nil {
+		log.Err(err).
+			Stringer("recorder-id", recorderID).
+			Msg("Cannot put recorder metadata")
+	}
+}
+
+func (m *Minio) DeleteSession(ctx context.Context, recorderID, sessionID uuid.UUID) error {
+	m.dataLock.Lock()
+	defer m.dataLock.Unlock()
+
+	return m.deleteSession(ctx, recorderID, sessionID)
+}
+
+func (m *Minio) deleteSession(ctx context.Context, recorderID, sessionID uuid.UUID) error {
+	chunksPrefix := fmt.Sprintf("%s/sessions/%s", recorderID, sessionID)
+
+	err := m.client.RemoveObject(ctx, bucketName, chunksPrefix, minio.RemoveObjectOptions{ForceDelete: true})
+	if err != nil {
+		log.Err(err).Str("object", chunksPrefix).Msg("Cannot remove object")
+	}
+
+	if _, ok := m.system.Recorders[recorderID]; ok {
+		delete(m.system.Recorders[recorderID].Sessions, sessionID)
+	}
+
+	return err
+}
+
+func (m *Minio) SetKeepSession(ctx context.Context, recorderID, sessionID uuid.UUID, keep bool) error {
+	m.dataLock.Lock()
+	defer m.dataLock.Unlock()
+
+	if _, ok := m.system.Recorders[recorderID]; !ok {
+		log.Warn().
+			Stringer("recorder-id", recorderID).
+			Msg("No recorder with this id")
+
+		return fmt.Errorf("no recorder with this id")
+	}
+
+	if _, ok := m.system.Recorders[recorderID].Sessions[sessionID]; !ok {
+		log.Warn().
+			Stringer("recorder-id", recorderID).
+			Stringer("session-id", sessionID).
+			Msg("No session with this id")
+
+		return fmt.Errorf("no session with this id")
+	}
+
+	session := m.system.Recorders[recorderID].Sessions[sessionID]
+	session.Keep = keep
+
+	if err := m.putSessionMetadata(ctx, recorderID, sessionID, &session); err != nil {
+		log.Err(err).
+			Stringer("recorder-id", recorderID).
+			Stringer("session-id", sessionID).
+			Msg("Cannot put session metadata")
+
+		return err
+	}
+
+	return nil
+}
+
+func (m *Minio) SafeChunks(ctx context.Context, recorderID, sessionID uuid.UUID, _ string, timeCreated time.Time, samples []int16) error {
+	m.dataLock.Lock()
+	defer m.dataLock.Unlock()
+
+	if _, ok := m.system.Recorders[recorderID]; !ok {
+		log.Warn().Stringer("recorder-id", recorderID).Msg("No recorder with this id")
+
+		return fmt.Errorf("no recorder with this id")
+	}
+
 	if _, ok := m.chunks[recorderID]; !ok {
-		m.initSession(recorderID, sessionID)
+		m.initSession(ctx, recorderID, sessionID, timeCreated)
 	}
 
 	chunk := m.chunks[recorderID]
+
+	// If we have a new sessionID, we need to close the old one
+	// This creates a copy of the last chunk, initSession below resets the chunks
 	if chunk.sessionID != sessionID {
-		if err := m.CloseSession(ctx, recorderID, chunk.sessionID); err != nil {
-			log.Fatal().Err(err).Msg("Cannot close session")
-		}
+		go func(recorderID uuid.UUID, lastChunk minioChunk) {
+			sessionID := lastChunk.sessionID
 
-		go func(recorderID, sessionID uuid.UUID) {
-			if err := m.renderClosedSession(recorderID, chunk.sessionID); err != nil {
-				log.Err(err).Msg("Cannot render session")
+			if err := m.closeSession(context.Background(), recorderID, sessionID, &lastChunk); err != nil {
+				log.Err(err).Stringer("recorder-id", recorderID).Stringer("session-id", sessionID).Msg("Cannot close session")
+
+				return
 			}
-		}(recorderID, chunk.sessionID)
 
-		m.initSession(recorderID, sessionID)
+			log.Debug().Stringer("recorder-id", recorderID).Stringer("session-id", sessionID).Msg("Session closed")
+		}(recorderID, *chunk)
+
+		m.initSession(ctx, recorderID, sessionID, timeCreated)
+		chunk = m.chunks[recorderID]
 	}
 
 	binary.Write(chunk.buffer, binary.LittleEndian, samples)
 
-	log.Info().Str("recorder-id", recorderID.String()).Str("session-id", sessionID.String()).Msgf("Added %d|%d (%.1f %%) samples", chunk.buffer.Len(), minChunkSize, float64(chunk.buffer.Len())/float64(minChunkSize)*100.0)
+	log.Debug().
+		Stringer("recorder-id", recorderID).
+		Stringer("session-id", sessionID).
+		Msgf("Added %d|%d (%.1f %%) samples", chunk.buffer.Len(), minChunkSize, float64(chunk.buffer.Len())/float64(minChunkSize)*100.0)
 
 	// To be able to concatinate the chunks, we need to make sure that the chunk size is at least 5MB
 	if chunk.buffer.Len() >= minChunkSize {
-		log.Debug().Str("recorder-id", recorderID.String()).Str("session-id", sessionID.String()).Msg("Chunk is full")
+		log.Debug().
+			Stringer("recorder-id", recorderID).
+			Stringer("session-id", sessionID).
+			Msg("Chunk is full")
 
 		objectName := fmt.Sprintf("%s/sessions/%s/chunks/%s", recorderID, sessionID, fmt.Sprintf("%016d", chunk.number))
 		chunk.number++
@@ -176,55 +395,90 @@ func (m *Minio) SafeChunks(ctx context.Context, recorderID, sessionID uuid.UUID,
 	return nil
 }
 
-func (m *Minio) IsSessionClosed(ctx context.Context, recorderID, sessionID uuid.UUID) bool {
+func (m *Minio) isSessionClosed(ctx context.Context, recorderID, sessionID uuid.UUID) bool {
 	chunksPrefix := fmt.Sprintf("%s/sessions/%s/chunks/", recorderID, sessionID)
 
 	objectCh := m.client.ListObjects(ctx, bucketName, minio.ListObjectsOptions{Prefix: chunksPrefix, Recursive: false})
 
+	// If chunks folder exists, the session is not closed
 	for range objectCh {
-		return true
+		return false
 	}
 
-	return false
+	return true
 }
 
-func (m *Minio) CloseSession(ctx context.Context, recorderID, sessionID uuid.UUID) error {
+func (m *Minio) flushChunks(ctx context.Context, recorderID, sessionID uuid.UUID, chunk *minioChunk) error {
 	// If we have samples left for this session, let's push those first
-	if chunk, ok := m.chunks[recorderID]; ok {
-		objectName := fmt.Sprintf("%s/sessions/%s/chunks/%s", recorderID, sessionID, fmt.Sprintf("%016d", chunk.number))
+	objectName := fmt.Sprintf("%s/sessions/%s/chunks/%s", recorderID, sessionID, fmt.Sprintf("%016d", chunk.number))
 
-		if chunk.buffer.Len() > 0 {
-			if chunk.buffer.Len() < minChunkSize {
-				// If the last chunk is smaller than 5MB, we need to pad it with zeros
-				chunk.buffer.Write(make([]byte, minChunkSize-chunk.buffer.Len()))
-			}
+	if chunk.buffer.Len() > 0 {
+		if chunk.buffer.Len() < minChunkSize {
+			// If the last chunk is smaller than 5MB, we need to pad it with zeros
+			chunk.buffer.Write(make([]byte, minChunkSize-chunk.buffer.Len()))
+		}
 
-			_, err := m.client.PutObject(ctx, bucketName, objectName, chunk.buffer, int64(chunk.buffer.Len()), minio.PutObjectOptions{})
-			if err != nil {
-				return fmt.Errorf("cannot put object: %w", err)
-			}
+		_, err := m.client.PutObject(ctx, bucketName, objectName, chunk.buffer, int64(chunk.buffer.Len()), minio.PutObjectOptions{})
+		if err != nil {
+			return fmt.Errorf("cannot put object: %w", err)
 		}
 	}
-
-	delete(m.chunks, recorderID)
-
-	log.Info().Str("recorder-id", recorderID.String()).Str("session-id", sessionID.String()).Msg("Session closed")
 
 	return nil
 }
 
-func (m *Minio) renderClosedSession(recorderID, sessionID uuid.UUID) error {
-	ctx := context.Background()
-
-	// Do the ComposeObject dance
+func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UUID) error {
 	chunksPrefix := fmt.Sprintf("%s/sessions/%s/chunks", recorderID, sessionID)
+	rawDataObjectName := fmt.Sprintf("%s/sessions/%s/data.raw", recorderID, sessionID)
 
-	if !m.IsSessionClosed(ctx, recorderID, sessionID) {
-		return nil
-	}
+	// I need to double check this, but this dance does not seem to be necessary...
+	//rawPreRenderedObjectName := fmt.Sprintf("%s/sessions/%s/pre_rendered_data.raw", recorderID, sessionID)
+	//
+	//havePreRenderedData := false
+	//
+	//// There is an edge case. If the chunk-sink-server crashed, the current session is closed on m.Start()
+	//// If the chunk-source still sends data for the same session, we just create a chunks folder again and drop
+	//// the data. We can however check, if there is a chunks folder AND a data.raw. If that's the case, we can just append
+	//// the data and regenerate the ogg and the flac file
+	//_, err := m.client.StatObject(ctx, bucketName, rawDataObjectName, minio.StatObjectOptions{})
+	//if minio.ToErrorResponse(err).Code != "NoSuchKey" {
+	//	havePreRenderedData = true
+	//
+	//	log.Info().
+	//		Stringer("recorder-id", recorderID).
+	//		Stringer("session-id", sessionID).
+	//		Msg("Session already rendered, but more chunks found. Will re-render.")
+	//
+	//	dst := minio.CopyDestOptions{
+	//		Bucket: bucketName,
+	//		Object: rawPreRenderedObjectName,
+	//	}
+	//
+	//	src := minio.CopySrcOptions{
+	//		Bucket: bucketName,
+	//		Object: rawDataObjectName,
+	//	}
+	//
+	//	_, err = m.client.CopyObject(ctx, dst, src)
+	//	if err != nil {
+	//		log.Err(err).Msg("Could not extend pre-rendered data")
+	//	}
+	//}
+
+	// Check result of:
+	// session-recorder/9ea55551-5b65-4c0c-9d91-531053677a79/sessions/22b83fea-c40e-4af9-b587-e586e74d691d
 
 	objectCh := m.client.ListObjects(ctx, bucketName, minio.ListObjectsOptions{Prefix: chunksPrefix, Recursive: true})
 	srcs := make([]minio.CopySrcOptions, 0)
+
+	// Just add the pre-rendered data to the list of sources first
+	// that way, the new chunks should be appended
+	//if havePreRenderedData {
+	//	srcs = append(srcs, minio.CopySrcOptions{
+	//		Bucket: bucketName,
+	//		Object: rawPreRenderedObjectName,
+	//	})
+	//}
 
 	for objectInfo := range objectCh {
 		if objectInfo.Err != nil {
@@ -241,14 +495,34 @@ func (m *Minio) renderClosedSession(recorderID, sessionID uuid.UUID) error {
 
 	dst := minio.CopyDestOptions{
 		Bucket: bucketName,
-		Object: fmt.Sprintf("%s/sessions/%s/data.raw", recorderID, sessionID),
+		Object: rawDataObjectName,
 	}
 
-	_, err := m.client.ComposeObject(ctx, dst, srcs...)
+	ui, err := m.client.ComposeObject(ctx, dst, srcs...)
 	if err != nil {
-		log.Err(err).Msg("Cannot compose object")
+		log.Err(err).Msg("Cannot compose object, too small. Will delete session.")
 
-		return err
+		return m.deleteSession(ctx, recorderID, sessionID)
+	}
+
+	// We need to make this generic and nicer, hack for now to get teh exact end time for the session
+	// raw samples for 48000hz, 2 Bytes (16bit), 2 channels
+	const bytesPerSecond float64 = 48000.0 * 2.0 * 2.0
+	durationSeconds := float64(ui.Size) / bytesPerSecond
+
+	sm, err := m.getSessionMetadata(ctx, recorderID, sessionID)
+	if err != nil {
+		log.Err(err).Msg("Cannot get session metadata")
+	} else {
+		sm.Duration = time.Duration(durationSeconds) * time.Second
+		sm.EndTime = sm.StartTime.Add(sm.Duration)
+		sm.IsClosed = true
+
+		m.dataLock.Lock()
+		if err = m.putSessionMetadata(ctx, recorderID, sessionID, sm); err != nil {
+			log.Err(err).Msg("Cannot put session metadata")
+		}
+		m.dataLock.Unlock()
 	}
 
 	var rawData *minio.Object
@@ -259,7 +533,7 @@ func (m *Minio) renderClosedSession(recorderID, sessionID uuid.UUID) error {
 	}
 
 	readers, writer, closer := makeReaders(4)
-	eg, _ := errgroup.WithContext(ctx)
+	eg, ctx := errgroup.WithContext(ctx)
 
 	// Writer copies from raw data to all the readers
 	eg.Go(func() error {
@@ -350,21 +624,30 @@ func (m *Minio) renderClosedSession(recorderID, sessionID uuid.UUID) error {
 	})
 
 	if err := eg.Wait(); err != nil {
-		log.Err(err).Msg("An error occured while rendering")
+		log.Err(err).Msg("Cannot render session")
 
 		return err
 	}
 
-	if err = m.client.RemoveObject(ctx, bucketName, chunksPrefix, minio.RemoveObjectOptions{ForceDelete: true}); err != nil {
+	if err := m.client.RemoveObject(ctx, bucketName, chunksPrefix, minio.RemoveObjectOptions{ForceDelete: true}); err != nil {
 		log.Err(err).Str("object", chunksPrefix).Msg("Cannot remove object")
 	}
 
-	log.Info().Str("recorder-id", recorderID.String()).Str("session-id", sessionID.String()).Msg("Session rendered")
+	if m.onSessionClosedCb != nil {
+		m.cbLock.Lock()
+		m.onSessionClosedCb(sm)
+		m.cbLock.Unlock()
+	}
+
+	log.Info().
+		Stringer("recorder-id", recorderID).
+		Stringer("session-id", sessionID).
+		Msg("Session rendered")
 
 	return nil
 }
 
-func (m *Minio) GetRecorderIDs(ctx context.Context) ([]uuid.UUID, error) {
+func (m *Minio) readRecorderIDs(ctx context.Context) ([]uuid.UUID, error) {
 	recorders := make([]uuid.UUID, 0)
 
 	objectCh := m.client.ListObjects(ctx, bucketName, minio.ListObjectsOptions{Prefix: "", Recursive: false})
@@ -374,6 +657,10 @@ func (m *Minio) GetRecorderIDs(ctx context.Context) ([]uuid.UUID, error) {
 			log.Err(object.Err).Msg("Cannot list objects")
 
 			return nil, object.Err
+		}
+
+		if strings.Contains(object.Key, "metadata.json") {
+			continue
 		}
 
 		idString, _ := strings.CutSuffix(object.Key, "/")
@@ -390,10 +677,39 @@ func (m *Minio) GetRecorderIDs(ctx context.Context) ([]uuid.UUID, error) {
 	return recorders, nil
 }
 
-func (m *Minio) GetSessionIDs(ctx context.Context, recorderID uuid.UUID) ([]uuid.UUID, error) {
+func (m *Minio) GetRecorders() map[uuid.UUID]Recorder {
+	m.dataLock.Lock()
+	defer m.dataLock.Unlock()
+
+	return m.system.Recorders
+}
+
+func (m *Minio) GetSessions(recorderID uuid.UUID) map[uuid.UUID]Session {
+	m.dataLock.Lock()
+	defer m.dataLock.Unlock()
+
+	return m.system.Recorders[recorderID].Sessions
+}
+
+func (m *Minio) GetSession(recorderID, sessionID uuid.UUID) (Session, error) {
+	m.dataLock.Lock()
+	defer m.dataLock.Unlock()
+
+	if _, ok := m.system.Recorders[recorderID]; !ok {
+		return Session{}, fmt.Errorf("no recorder with this id")
+	}
+
+	if _, ok := m.system.Recorders[recorderID].Sessions[sessionID]; !ok {
+		return Session{}, fmt.Errorf("no session with this id")
+	}
+
+	return m.system.Recorders[recorderID].Sessions[sessionID], nil
+}
+
+func (m *Minio) readSessionIDs(ctx context.Context, recorderID uuid.UUID) ([]uuid.UUID, error) {
 	sessions := map[uuid.UUID]struct{}{}
 
-	prefix := fmt.Sprintf("%s/sessions", recorderID.String())
+	prefix := fmt.Sprintf("%s/sessions", recorderID)
 
 	objectCh := m.client.ListObjects(ctx, bucketName, minio.ListObjectsOptions{Prefix: prefix, Recursive: true})
 
@@ -402,6 +718,10 @@ func (m *Minio) GetSessionIDs(ctx context.Context, recorderID uuid.UUID) ([]uuid
 			log.Err(object.Err).Msg("Cannot list objects")
 
 			return nil, object.Err
+		}
+
+		if strings.Contains(object.Key, "metadata.json") {
+			continue
 		}
 
 		tokens := strings.Split(object.Key, "/")
@@ -425,7 +745,49 @@ func (m *Minio) GetSessionIDs(ctx context.Context, recorderID uuid.UUID) ([]uuid
 	return ret, nil
 }
 
-func (m *Minio) GetSessionMetadata(ctx context.Context, recorderID, sessionID uuid.UUID) (*model.SessionMetadata, error) {
+func (m *Minio) getSystemMetadata(ctx context.Context) (*System, error) {
+	objectName := "metadata.json"
+
+	obj, err := m.client.GetObject(ctx, bucketName, objectName, minio.GetObjectOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("cannot get object: %w", err)
+	}
+
+	buffer := new(bytes.Buffer)
+	if _, err := buffer.ReadFrom(obj); err != nil {
+		return nil, fmt.Errorf("cannot read object: %w", err)
+	}
+
+	metadata := &System{}
+	err = json.Unmarshal(buffer.Bytes(), metadata)
+	if err != nil {
+		return nil, fmt.Errorf("cannot unmarshal metadata: %w", err)
+	}
+
+	return metadata, nil
+
+}
+
+func (m *Minio) putSystemMetadata(ctx context.Context, system *System) error {
+	objectName := "metadata.json"
+
+	buffer := new(bytes.Buffer)
+	err := json.NewEncoder(buffer).Encode(system)
+	if err != nil {
+		return fmt.Errorf("cannot marshal metadata: %w", err)
+	}
+
+	_, err = m.client.PutObject(ctx, bucketName, objectName, buffer, int64(buffer.Len()), minio.PutObjectOptions{})
+	if err != nil {
+		return fmt.Errorf("cannot put object: %w", err)
+	}
+
+	m.system = system
+
+	return nil
+}
+
+func (m *Minio) getSessionMetadata(ctx context.Context, recorderID, sessionID uuid.UUID) (*Session, error) {
 	objectName := fmt.Sprintf("%s/sessions/%s/metadata.json", recorderID, sessionID)
 
 	obj, err := m.client.GetObject(ctx, bucketName, objectName, minio.GetObjectOptions{})
@@ -440,7 +802,7 @@ func (m *Minio) GetSessionMetadata(ctx context.Context, recorderID, sessionID uu
 		return nil, fmt.Errorf("cannot read object: %w", err)
 	}
 
-	metadata := &model.SessionMetadata{}
+	metadata := &Session{}
 	err = json.Unmarshal(buffer.Bytes(), metadata)
 	if err != nil {
 		return nil, fmt.Errorf("cannot unmarshal metadata: %w", err)
@@ -449,7 +811,7 @@ func (m *Minio) GetSessionMetadata(ctx context.Context, recorderID, sessionID uu
 	return metadata, nil
 }
 
-func (m *Minio) PutSessionMetadata(ctx context.Context, recorderID, sessionID uuid.UUID, session *model.SessionMetadata) error {
+func (m *Minio) putSessionMetadata(ctx context.Context, recorderID, sessionID uuid.UUID, session *Session) error {
 	objectName := fmt.Sprintf("%s/sessions/%s/metadata.json", recorderID, sessionID)
 
 	buffer := new(bytes.Buffer)
@@ -463,11 +825,13 @@ func (m *Minio) PutSessionMetadata(ctx context.Context, recorderID, sessionID uu
 		return fmt.Errorf("cannot put object: %w", err)
 	}
 
+	m.system.Recorders[recorderID].Sessions[sessionID] = *session
+
 	return nil
 }
 
-func (m *Minio) PutRecorderMetadata(ctx context.Context, recorderID uuid.UUID, recorder *model.RecorderMetadata) error {
-	onjectName := fmt.Sprintf("%s/metadata.json", recorderID)
+func (m *Minio) putRecorderMetadata(ctx context.Context, recorderID uuid.UUID, recorder *Recorder) error {
+	objectName := fmt.Sprintf("%s/metadata.json", recorderID)
 
 	buffer := new(bytes.Buffer)
 	err := json.NewEncoder(buffer).Encode(recorder)
@@ -475,15 +839,17 @@ func (m *Minio) PutRecorderMetadata(ctx context.Context, recorderID uuid.UUID, r
 		return fmt.Errorf("cannot marshal metadata: %w", err)
 	}
 
-	_, err = m.client.PutObject(ctx, bucketName, onjectName, buffer, int64(buffer.Len()), minio.PutObjectOptions{})
+	_, err = m.client.PutObject(ctx, bucketName, objectName, buffer, int64(buffer.Len()), minio.PutObjectOptions{})
 	if err != nil {
 		return fmt.Errorf("cannot put object: %w", err)
 	}
 
+	m.system.Recorders[recorderID] = *recorder
+
 	return nil
 }
 
-func (m *Minio) GetRecorderMetadata(ctx context.Context, recorderID uuid.UUID) (*model.RecorderMetadata, error) {
+func (m *Minio) getRecorderMetadata(ctx context.Context, recorderID uuid.UUID) (*Recorder, error) {
 	objectName := fmt.Sprintf("%s/metadata.json", recorderID)
 
 	obj, err := m.client.GetObject(ctx, bucketName, objectName, minio.GetObjectOptions{})
@@ -498,7 +864,7 @@ func (m *Minio) GetRecorderMetadata(ctx context.Context, recorderID uuid.UUID) (
 		return nil, fmt.Errorf("cannot read object: %w", err)
 	}
 
-	metadata := &model.RecorderMetadata{}
+	metadata := &Recorder{}
 	err = json.Unmarshal(buffer.Bytes(), metadata)
 	if err != nil {
 		return nil, fmt.Errorf("cannot unmarshal metadata: %w", err)
@@ -507,25 +873,52 @@ func (m *Minio) GetRecorderMetadata(ctx context.Context, recorderID uuid.UUID) (
 	return metadata, nil
 }
 
-func (m *Minio) CloseOpenSessions(ctx context.Context, recorderID uuid.UUID) error {
-	sessionIDs, err := m.GetSessionIDs(ctx, recorderID)
+func (m *Minio) EnsureRecorderExists(ctx context.Context, recorderID uuid.UUID, recorderName string) {
+	m.dataLock.Lock()
+	defer m.dataLock.Unlock()
+
+	if _, ok := m.system.Recorders[recorderID]; !ok {
+		m.initRecorder(ctx, recorderID, recorderName)
+	}
+}
+
+func (m *Minio) closeSessions(ctx context.Context, recorderID uuid.UUID) error {
+	log.Debug().Stringer("recorder-id", recorderID).Msg("Closing open sessions")
+
+	sessionIDs, err := m.readSessionIDs(ctx, recorderID)
 	if err != nil {
-		return fmt.Errorf("cannot get session IDs: %w", err)
+		return fmt.Errorf("cannot read session IDs: %w", err)
 	}
 
 	for _, sessionID := range sessionIDs {
-		err = m.CloseSession(ctx, recorderID, sessionID)
-		if err != nil {
+		if err := m.closeSession(ctx, recorderID, sessionID, nil); err != nil {
 			return fmt.Errorf("cannot close session: %w", err)
 		}
-
-		// Render the session assynchonously
-		go func(recorderID, sessionID uuid.UUID) {
-			if err := m.renderClosedSession(recorderID, sessionID); err != nil {
-				log.Err(err).Msg("Cannot render session")
-			}
-		}(recorderID, sessionID)
 	}
+
+	log.Debug().Stringer("recorder-id", recorderID).Msg("Open sessions closed")
+
+	return nil
+}
+
+func (m *Minio) closeSession(ctx context.Context, recorderID, sessionID uuid.UUID, chunk *minioChunk) error {
+	if m.isSessionClosed(ctx, recorderID, sessionID) {
+		return nil
+	}
+
+	log.Debug().Stringer("recorder-id", recorderID).Stringer("session-id", sessionID).Msg("Closing session")
+
+	if chunk != nil {
+		if err := m.flushChunks(ctx, recorderID, sessionID, chunk); err != nil {
+			return fmt.Errorf("cannot flush session: %w", err)
+		}
+	}
+
+	if err := m.renderSession(ctx, recorderID, sessionID); err != nil {
+		return fmt.Errorf("cannot render session: %w", err)
+	}
+
+	log.Debug().Stringer("recorder-id", recorderID).Stringer("session-id", sessionID).Msg("Session closed")
 
 	return nil
 }

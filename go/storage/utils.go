@@ -27,15 +27,15 @@ func (m *MultiCloser) Close() error {
 }
 
 func makeReaders(count int) ([]io.Reader, io.Writer, io.Closer) {
-	readers := make([]io.Reader, 0, count)
-	pipeWriters := make([]io.Writer, 0, count)
-	pipeClosers := make([]io.Closer, 0, count)
+	readers := make([]io.Reader, count)
+	pipeWriters := make([]io.Writer, count)
+	pipeClosers := make([]io.Closer, count)
 
 	for i := 0; i < count; i++ {
 		pr, pw := io.Pipe()
-		readers = append(readers, pr)
-		pipeWriters = append(pipeWriters, pw)
-		pipeClosers = append(pipeClosers, pw)
+		readers[i] = pr
+		pipeWriters[i] = pw
+		pipeClosers[i] = pw
 	}
 
 	return readers, io.MultiWriter(pipeWriters...), newMultiCloser(pipeClosers)

@@ -13,21 +13,22 @@ import (
 type OnRecorderStatusCB func(ctx context.Context, status *cmpb.RecorderStatus) error
 type OnChunksCB func(ctx context.Context, chunks *cspb.Chunks) error
 
-type ChunkSinkServer struct {
-	mutex   sync.Mutex
-	version string
-	name    string
+type ChunkSinkServerConfig struct {
+	Name    string
+	Version string
 
-	onRecorderStatusCB OnRecorderStatusCB
-	onChunksCB         OnChunksCB
+	OnRecorderStatusCB OnRecorderStatusCB
+	OnChunksCB         OnChunksCB
 }
 
-func NewChunkSinkServer(name, version string, onRecorderStatusCB OnRecorderStatusCB, onChunkCB OnChunksCB) *ChunkSinkServer {
+type ChunkSinkServer struct {
+	mutex  sync.Mutex
+	config *ChunkSinkServerConfig
+}
+
+func NewChunkSinkServer(config *ChunkSinkServerConfig) *ChunkSinkServer {
 	return &ChunkSinkServer{
-		name:               name,
-		version:            version,
-		onRecorderStatusCB: onRecorderStatusCB,
-		onChunksCB:         onChunkCB,
+		config: config,
 	}
 }
 
@@ -41,14 +42,14 @@ func (s *ChunkSinkServer) serverOptions() []grpc.ServerOption {
 
 func (s *ChunkSinkServer) announcement() [][]byte {
 	return [][]byte{
-		[]byte(fmt.Sprintf("Chunk Sink Server: %s", s.name)),
-		[]byte(fmt.Sprintf("Software Version: %s", s.version)),
+		[]byte(fmt.Sprintf("Chunk Sink Server: %s", s.config.Name)),
+		[]byte(fmt.Sprintf("Software Version: %s", s.config.Version)),
 	}
 }
 
 func (s *ChunkSinkServer) SetRecorderStatus(ctx context.Context, in *cmpb.RecorderStatus) (*cmpb.Respone, error) {
-	if s.onRecorderStatusCB != nil {
-		err := s.onRecorderStatusCB(ctx, in)
+	if s.config.OnRecorderStatusCB != nil {
+		err := s.config.OnRecorderStatusCB(ctx, in)
 		if err != nil {
 			response := &cmpb.Respone{
 				Success:      false,
@@ -65,8 +66,8 @@ func (s *ChunkSinkServer) SetRecorderStatus(ctx context.Context, in *cmpb.Record
 }
 
 func (s *ChunkSinkServer) SetChunks(ctx context.Context, in *cspb.Chunks) (*cmpb.Respone, error) {
-	if s.onChunksCB != nil {
-		err := s.onChunksCB(ctx, in)
+	if s.config.OnChunksCB != nil {
+		err := s.config.OnChunksCB(ctx, in)
 		if err != nil {
 			response := &cmpb.Respone{
 				Success:      false,

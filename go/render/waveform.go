@@ -20,7 +20,7 @@ func CreateWaveform(raw io.Reader, zoom, width, height int) (*bytes.Buffer, erro
 		"--zoom", "256",
 		"-b", "8")
 
-	return run(cmd, raw, width, height)
+	return run(cmd, raw)
 }
 
 func CreateOverview(rawAudio io.Reader, zoom, width, height int) (*bytes.Buffer, error) {
@@ -45,10 +45,10 @@ func CreateOverview(rawAudio io.Reader, zoom, width, height int) (*bytes.Buffer,
 		"--axis-label-color", fontColor,
 		"--border-color", borderColor)
 
-	return run(cmd, rawAudio, width, height)
+	return run(cmd, rawAudio)
 }
 
-func run(cmd *exec.Cmd, rawAudio io.Reader, width, height int) (*bytes.Buffer, error) {
+func run(cmd *exec.Cmd, rawAudio io.Reader) (*bytes.Buffer, error) {
 	eg := errgroup.Group{}
 
 	stdin, err := cmd.StdinPipe()
@@ -79,7 +79,7 @@ func run(cmd *exec.Cmd, rawAudio io.Reader, width, height int) (*bytes.Buffer, e
 	stdoutBuffer := new(bytes.Buffer)
 
 	eg.Go(func() error {
-		defer stdin.Close()
+		defer stdout.Close()
 
 		_, err := io.Copy(stdoutBuffer, stdout)
 		if errors.Is(err, io.EOF) {
@@ -87,7 +87,7 @@ func run(cmd *exec.Cmd, rawAudio io.Reader, width, height int) (*bytes.Buffer, e
 		}
 
 		if err != nil {
-			return fmt.Errorf("Cannot read from stdin: %w", err)
+			return fmt.Errorf("Cannot read from stdout: %w", err)
 		}
 
 		return nil

@@ -13,7 +13,7 @@ npm install --save-dev grpc-tools ts-proto
 ## For go and cpp
 
 ```
-dnf install grpc-plugins
+dnf install grpc-plugins golang-google-protobuf golang-google-grpc
 ```
 
 ## To use a specific version of `protoc`, go to the github page, download a release and set the variables accordingly:

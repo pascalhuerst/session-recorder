@@ -19,8 +19,11 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ChunkSinkClient interface {
+	// Unary
 	SetRecorderStatus(ctx context.Context, in *common.RecorderStatus, opts ...grpc.CallOption) (*common.Respone, error)
 	SetChunks(ctx context.Context, in *Chunks, opts ...grpc.CallOption) (*common.Respone, error)
+	// Server streaming
+	GetCommands(ctx context.Context, in *GetCommandRequest, opts ...grpc.CallOption) (ChunkSink_GetCommandsClient, error)
 }
 
 type chunkSinkClient struct {
@@ -49,12 +52,47 @@ func (c *chunkSinkClient) SetChunks(ctx context.Context, in *Chunks, opts ...grp
 	return out, nil
 }
 
+func (c *chunkSinkClient) GetCommands(ctx context.Context, in *GetCommandRequest, opts ...grpc.CallOption) (ChunkSink_GetCommandsClient, error) {
+	stream, err := c.cc.NewStream(ctx, &ChunkSink_ServiceDesc.Streams[0], "/chunksink.ChunkSink/GetCommands", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &chunkSinkGetCommandsClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type ChunkSink_GetCommandsClient interface {
+	Recv() (*Command, error)
+	grpc.ClientStream
+}
+
+type chunkSinkGetCommandsClient struct {
+	grpc.ClientStream
+}
+
+func (x *chunkSinkGetCommandsClient) Recv() (*Command, error) {
+	m := new(Command)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // ChunkSinkServer is the server API for ChunkSink service.
 // All implementations should embed UnimplementedChunkSinkServer
 // for forward compatibility
 type ChunkSinkServer interface {
+	// Unary
 	SetRecorderStatus(context.Context, *common.RecorderStatus) (*common.Respone, error)
 	SetChunks(context.Context, *Chunks) (*common.Respone, error)
+	// Server streaming
+	GetCommands(*GetCommandRequest, ChunkSink_GetCommandsServer) error
 }
 
 // UnimplementedChunkSinkServer should be embedded to have forward compatible implementations.
@@ -66,6 +104,9 @@ func (UnimplementedChunkSinkServer) SetRecorderStatus(context.Context, *common.R
 }
 func (UnimplementedChunkSinkServer) SetChunks(context.Context, *Chunks) (*common.Respone, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SetChunks not implemented")
+}
+func (UnimplementedChunkSinkServer) GetCommands(*GetCommandRequest, ChunkSink_GetCommandsServer) error {
+	return status.Errorf(codes.Unimplemented, "method GetCommands not implemented")
 }
 
 // UnsafeChunkSinkServer may be embedded to opt out of forward compatibility for this service.
@@ -115,6 +156,27 @@ func _ChunkSink_SetChunks_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ChunkSink_GetCommands_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(GetCommandRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(ChunkSinkServer).GetCommands(m, &chunkSinkGetCommandsServer{stream})
+}
+
+type ChunkSink_GetCommandsServer interface {
+	Send(*Command) error
+	grpc.ServerStream
+}
+
+type chunkSinkGetCommandsServer struct {
+	grpc.ServerStream
+}
+
+func (x *chunkSinkGetCommandsServer) Send(m *Command) error {
+	return x.ServerStream.SendMsg(m)
+}
+
 // ChunkSink_ServiceDesc is the grpc.ServiceDesc for ChunkSink service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -131,6 +193,12 @@ var ChunkSink_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _ChunkSink_SetChunks_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "GetCommands",
+			Handler:       _ChunkSink_GetCommands_Handler,
+			ServerStreams: true,
+		},
+	},
 	Metadata: "chunksink.proto",
 }

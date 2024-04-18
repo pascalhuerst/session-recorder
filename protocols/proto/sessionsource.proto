@@ -128,12 +128,11 @@ message RenderSegmentRequest {
 }
 
 service SessionSource {
-	// Recorder RPC
+	// Stream
 	rpc StreamRecorders(StreamRecordersRequest) returns (stream Recorder);
-	
-	// ## Session RPC
 	rpc StreamSessions(StreamSessionRequest) returns (stream Session);
 	
+	// Unary
 	rpc SetKeepSession(SetKeepSessionRequest) returns (common.Respone);
 	rpc DeleteSession(DeleteSessionRequest) returns (common.Respone);
 	rpc SetName(SetNameRequest) returns (common.Respone);

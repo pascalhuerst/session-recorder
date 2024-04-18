@@ -1653,7 +1653,7 @@ export const SessionSourceDefinition = {
   name: "SessionSource",
   fullName: "sessionsource.SessionSource",
   methods: {
-    /** Recorder RPC */
+    /** Stream */
     streamRecorders: {
       name: "StreamRecorders",
       requestType: StreamRecordersRequest,
@@ -1662,7 +1662,6 @@ export const SessionSourceDefinition = {
       responseStream: true,
       options: {},
     },
-    /** ## Session RPC */
     streamSessions: {
       name: "StreamSessions",
       requestType: StreamSessionRequest,
@@ -1671,6 +1670,7 @@ export const SessionSourceDefinition = {
       responseStream: true,
       options: {},
     },
+    /** Unary */
     setKeepSession: {
       name: "SetKeepSession",
       requestType: SetKeepSessionRequest,
@@ -1731,16 +1731,16 @@ export const SessionSourceDefinition = {
 } as const;
 
 export interface SessionSourceServiceImplementation<CallContextExt = {}> {
-  /** Recorder RPC */
+  /** Stream */
   streamRecorders(
     request: StreamRecordersRequest,
     context: CallContext & CallContextExt,
   ): ServerStreamingMethodResult<DeepPartial<Recorder>>;
-  /** ## Session RPC */
   streamSessions(
     request: StreamSessionRequest,
     context: CallContext & CallContextExt,
   ): ServerStreamingMethodResult<DeepPartial<Session>>;
+  /** Unary */
   setKeepSession(request: SetKeepSessionRequest, context: CallContext & CallContextExt): Promise<DeepPartial<Respone>>;
   deleteSession(request: DeleteSessionRequest, context: CallContext & CallContextExt): Promise<DeepPartial<Respone>>;
   setName(request: SetNameRequest, context: CallContext & CallContextExt): Promise<DeepPartial<Respone>>;
@@ -1751,16 +1751,16 @@ export interface SessionSourceServiceImplementation<CallContextExt = {}> {
 }
 
 export interface SessionSourceClient<CallOptionsExt = {}> {
-  /** Recorder RPC */
+  /** Stream */
   streamRecorders(
     request: DeepPartial<StreamRecordersRequest>,
     options?: CallOptions & CallOptionsExt,
   ): AsyncIterable<Recorder>;
-  /** ## Session RPC */
   streamSessions(
     request: DeepPartial<StreamSessionRequest>,
     options?: CallOptions & CallOptionsExt,
   ): AsyncIterable<Session>;
+  /** Unary */
   setKeepSession(request: DeepPartial<SetKeepSessionRequest>, options?: CallOptions & CallOptionsExt): Promise<Respone>;
   deleteSession(request: DeepPartial<DeleteSessionRequest>, options?: CallOptions & CallOptionsExt): Promise<Respone>;
   setName(request: DeepPartial<SetNameRequest>, options?: CallOptions & CallOptionsExt): Promise<Respone>;

@@ -23,6 +23,7 @@
 #include <google/protobuf/io/coded_stream.h>
 #include <google/protobuf/arena.h>
 #include <google/protobuf/arenastring.h>
+#include <google/protobuf/generated_message_bases.h>
 #include <google/protobuf/generated_message_table_driven.h>
 #include <google/protobuf/generated_message_util.h>
 #include <google/protobuf/metadata_lite.h>
@@ -48,7 +49,7 @@ struct TableStruct_chunksink_2eproto {
     PROTOBUF_SECTION_VARIABLE(protodesc_cold);
   static const ::PROTOBUF_NAMESPACE_ID::internal::AuxiliaryParseTableField aux[]
     PROTOBUF_SECTION_VARIABLE(protodesc_cold);
-  static const ::PROTOBUF_NAMESPACE_ID::internal::ParseTable schema[1]
+  static const ::PROTOBUF_NAMESPACE_ID::internal::ParseTable schema[5]
     PROTOBUF_SECTION_VARIABLE(protodesc_cold);
   static const ::PROTOBUF_NAMESPACE_ID::internal::FieldMetadata field_metadata[];
   static const ::PROTOBUF_NAMESPACE_ID::internal::SerializationTable serialization_table[];
@@ -59,9 +60,25 @@ namespace chunksink {
 class Chunks;
 struct ChunksDefaultTypeInternal;
 extern ChunksDefaultTypeInternal _Chunks_default_instance_;
+class CmdCutSession;
+struct CmdCutSessionDefaultTypeInternal;
+extern CmdCutSessionDefaultTypeInternal _CmdCutSession_default_instance_;
+class Command;
+struct CommandDefaultTypeInternal;
+extern CommandDefaultTypeInternal _Command_default_instance_;
+class GetCommandRequest;
+struct GetCommandRequestDefaultTypeInternal;
+extern GetCommandRequestDefaultTypeInternal _GetCommandRequest_default_instance_;
+class Reboot;
+struct RebootDefaultTypeInternal;
+extern RebootDefaultTypeInternal _Reboot_default_instance_;
 }  // namespace chunksink
 PROTOBUF_NAMESPACE_OPEN
 template<> ::chunksink::Chunks* Arena::CreateMaybeMessage<::chunksink::Chunks>(Arena*);
+template<> ::chunksink::CmdCutSession* Arena::CreateMaybeMessage<::chunksink::CmdCutSession>(Arena*);
+template<> ::chunksink::Command* Arena::CreateMaybeMessage<::chunksink::Command>(Arena*);
+template<> ::chunksink::GetCommandRequest* Arena::CreateMaybeMessage<::chunksink::GetCommandRequest>(Arena*);
+template<> ::chunksink::Reboot* Arena::CreateMaybeMessage<::chunksink::Reboot>(Arena*);
 PROTOBUF_NAMESPACE_CLOSE
 namespace chunksink {
 
@@ -286,6 +303,587 @@ class Chunks final :
   ::PROTOBUF_NAMESPACE_ID::Timestamp* timecreated_;
   uint32_t chunkcount_;
   mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
+  friend struct ::TableStruct_chunksink_2eproto;
+};
+// -------------------------------------------------------------------
+
+class GetCommandRequest final :
+    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:chunksink.GetCommandRequest) */ {
+ public:
+  inline GetCommandRequest() : GetCommandRequest(nullptr) {}
+  ~GetCommandRequest() override;
+  explicit constexpr GetCommandRequest(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
+
+  GetCommandRequest(const GetCommandRequest& from);
+  GetCommandRequest(GetCommandRequest&& from) noexcept
+    : GetCommandRequest() {
+    *this = ::std::move(from);
+  }
+
+  inline GetCommandRequest& operator=(const GetCommandRequest& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline GetCommandRequest& operator=(GetCommandRequest&& from) noexcept {
+    if (this == &from) return *this;
+    if (GetOwningArena() == from.GetOwningArena()
+  #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
+        && GetOwningArena() != nullptr
+  #endif  // !PROTOBUF_FORCE_COPY_IN_MOVE
+    ) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* descriptor() {
+    return GetDescriptor();
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  static const GetCommandRequest& default_instance() {
+    return *internal_default_instance();
+  }
+  static inline const GetCommandRequest* internal_default_instance() {
+    return reinterpret_cast<const GetCommandRequest*>(
+               &_GetCommandRequest_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages =
+    1;
+
+  friend void swap(GetCommandRequest& a, GetCommandRequest& b) {
+    a.Swap(&b);
+  }
+  inline void Swap(GetCommandRequest* other) {
+    if (other == this) return;
+  #ifdef PROTOBUF_FORCE_COPY_IN_SWAP
+    if (GetOwningArena() != nullptr &&
+        GetOwningArena() == other->GetOwningArena()) {
+   #else  // PROTOBUF_FORCE_COPY_IN_SWAP
+    if (GetOwningArena() == other->GetOwningArena()) {
+  #endif  // !PROTOBUF_FORCE_COPY_IN_SWAP
+      InternalSwap(other);
+    } else {
+      ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(GetCommandRequest* other) {
+    if (other == this) return;
+    GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  GetCommandRequest* New(::PROTOBUF_NAMESPACE_ID::Arena* arena = nullptr) const final {
+    return CreateMaybeMessage<GetCommandRequest>(arena);
+  }
+  using ::PROTOBUF_NAMESPACE_ID::Message::CopyFrom;
+  void CopyFrom(const GetCommandRequest& from);
+  using ::PROTOBUF_NAMESPACE_ID::Message::MergeFrom;
+  void MergeFrom(const GetCommandRequest& from);
+  private:
+  static void MergeImpl(::PROTOBUF_NAMESPACE_ID::Message* to, const ::PROTOBUF_NAMESPACE_ID::Message& from);
+  public:
+  PROTOBUF_ATTRIBUTE_REINITIALIZES void Clear() final;
+  bool IsInitialized() const final;
+
+  size_t ByteSizeLong() const final;
+  const char* _InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID::internal::ParseContext* ctx) final;
+  uint8_t* _InternalSerialize(
+      uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const final;
+  int GetCachedSize() const final { return _cached_size_.Get(); }
+
+  private:
+  void SharedCtor();
+  void SharedDtor();
+  void SetCachedSize(int size) const final;
+  void InternalSwap(GetCommandRequest* other);
+
+  private:
+  friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
+  static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
+    return "chunksink.GetCommandRequest";
+  }
+  protected:
+  explicit GetCommandRequest(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                       bool is_message_owned = false);
+  private:
+  static void ArenaDtor(void* object);
+  inline void RegisterArenaDtor(::PROTOBUF_NAMESPACE_ID::Arena* arena);
+  public:
+
+  static const ClassData _class_data_;
+  const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*GetClassData() const final;
+
+  ::PROTOBUF_NAMESPACE_ID::Metadata GetMetadata() const final;
+
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+
+  enum : int {
+    kRecorderIDFieldNumber = 1,
+  };
+  // string recorderID = 1;
+  void clear_recorderid();
+  const std::string& recorderid() const;
+  template <typename ArgT0 = const std::string&, typename... ArgT>
+  void set_recorderid(ArgT0&& arg0, ArgT... args);
+  std::string* mutable_recorderid();
+  PROTOBUF_NODISCARD std::string* release_recorderid();
+  void set_allocated_recorderid(std::string* recorderid);
+  private:
+  const std::string& _internal_recorderid() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_recorderid(const std::string& value);
+  std::string* _internal_mutable_recorderid();
+  public:
+
+  // @@protoc_insertion_point(class_scope:chunksink.GetCommandRequest)
+ private:
+  class _Internal;
+
+  template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
+  typedef void InternalArenaConstructable_;
+  typedef void DestructorSkippable_;
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr recorderid_;
+  mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
+  friend struct ::TableStruct_chunksink_2eproto;
+};
+// -------------------------------------------------------------------
+
+class CmdCutSession final :
+    public ::PROTOBUF_NAMESPACE_ID::internal::ZeroFieldsBase /* @@protoc_insertion_point(class_definition:chunksink.CmdCutSession) */ {
+ public:
+  inline CmdCutSession() : CmdCutSession(nullptr) {}
+  explicit constexpr CmdCutSession(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
+
+  CmdCutSession(const CmdCutSession& from);
+  CmdCutSession(CmdCutSession&& from) noexcept
+    : CmdCutSession() {
+    *this = ::std::move(from);
+  }
+
+  inline CmdCutSession& operator=(const CmdCutSession& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline CmdCutSession& operator=(CmdCutSession&& from) noexcept {
+    if (this == &from) return *this;
+    if (GetOwningArena() == from.GetOwningArena()
+  #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
+        && GetOwningArena() != nullptr
+  #endif  // !PROTOBUF_FORCE_COPY_IN_MOVE
+    ) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* descriptor() {
+    return GetDescriptor();
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  static const CmdCutSession& default_instance() {
+    return *internal_default_instance();
+  }
+  static inline const CmdCutSession* internal_default_instance() {
+    return reinterpret_cast<const CmdCutSession*>(
+               &_CmdCutSession_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages =
+    2;
+
+  friend void swap(CmdCutSession& a, CmdCutSession& b) {
+    a.Swap(&b);
+  }
+  inline void Swap(CmdCutSession* other) {
+    if (other == this) return;
+  #ifdef PROTOBUF_FORCE_COPY_IN_SWAP
+    if (GetOwningArena() != nullptr &&
+        GetOwningArena() == other->GetOwningArena()) {
+   #else  // PROTOBUF_FORCE_COPY_IN_SWAP
+    if (GetOwningArena() == other->GetOwningArena()) {
+  #endif  // !PROTOBUF_FORCE_COPY_IN_SWAP
+      InternalSwap(other);
+    } else {
+      ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(CmdCutSession* other) {
+    if (other == this) return;
+    GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  CmdCutSession* New(::PROTOBUF_NAMESPACE_ID::Arena* arena = nullptr) const final {
+    return CreateMaybeMessage<CmdCutSession>(arena);
+  }
+  using ::PROTOBUF_NAMESPACE_ID::internal::ZeroFieldsBase::CopyFrom;
+  inline void CopyFrom(const CmdCutSession& from) {
+    ::PROTOBUF_NAMESPACE_ID::internal::ZeroFieldsBase::CopyImpl(this, from);
+  }
+  using ::PROTOBUF_NAMESPACE_ID::internal::ZeroFieldsBase::MergeFrom;
+  void MergeFrom(const CmdCutSession& from) {
+    ::PROTOBUF_NAMESPACE_ID::internal::ZeroFieldsBase::MergeImpl(this, from);
+  }
+  public:
+
+  private:
+  friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
+  static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
+    return "chunksink.CmdCutSession";
+  }
+  protected:
+  explicit CmdCutSession(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                       bool is_message_owned = false);
+  private:
+  public:
+
+  static const ClassData _class_data_;
+  const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*GetClassData() const final;
+
+  ::PROTOBUF_NAMESPACE_ID::Metadata GetMetadata() const final;
+
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+
+  // @@protoc_insertion_point(class_scope:chunksink.CmdCutSession)
+ private:
+  class _Internal;
+
+  template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
+  typedef void InternalArenaConstructable_;
+  typedef void DestructorSkippable_;
+  mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
+  friend struct ::TableStruct_chunksink_2eproto;
+};
+// -------------------------------------------------------------------
+
+class Reboot final :
+    public ::PROTOBUF_NAMESPACE_ID::internal::ZeroFieldsBase /* @@protoc_insertion_point(class_definition:chunksink.Reboot) */ {
+ public:
+  inline Reboot() : Reboot(nullptr) {}
+  explicit constexpr Reboot(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
+
+  Reboot(const Reboot& from);
+  Reboot(Reboot&& from) noexcept
+    : Reboot() {
+    *this = ::std::move(from);
+  }
+
+  inline Reboot& operator=(const Reboot& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline Reboot& operator=(Reboot&& from) noexcept {
+    if (this == &from) return *this;
+    if (GetOwningArena() == from.GetOwningArena()
+  #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
+        && GetOwningArena() != nullptr
+  #endif  // !PROTOBUF_FORCE_COPY_IN_MOVE
+    ) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* descriptor() {
+    return GetDescriptor();
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  static const Reboot& default_instance() {
+    return *internal_default_instance();
+  }
+  static inline const Reboot* internal_default_instance() {
+    return reinterpret_cast<const Reboot*>(
+               &_Reboot_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages =
+    3;
+
+  friend void swap(Reboot& a, Reboot& b) {
+    a.Swap(&b);
+  }
+  inline void Swap(Reboot* other) {
+    if (other == this) return;
+  #ifdef PROTOBUF_FORCE_COPY_IN_SWAP
+    if (GetOwningArena() != nullptr &&
+        GetOwningArena() == other->GetOwningArena()) {
+   #else  // PROTOBUF_FORCE_COPY_IN_SWAP
+    if (GetOwningArena() == other->GetOwningArena()) {
+  #endif  // !PROTOBUF_FORCE_COPY_IN_SWAP
+      InternalSwap(other);
+    } else {
+      ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(Reboot* other) {
+    if (other == this) return;
+    GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  Reboot* New(::PROTOBUF_NAMESPACE_ID::Arena* arena = nullptr) const final {
+    return CreateMaybeMessage<Reboot>(arena);
+  }
+  using ::PROTOBUF_NAMESPACE_ID::internal::ZeroFieldsBase::CopyFrom;
+  inline void CopyFrom(const Reboot& from) {
+    ::PROTOBUF_NAMESPACE_ID::internal::ZeroFieldsBase::CopyImpl(this, from);
+  }
+  using ::PROTOBUF_NAMESPACE_ID::internal::ZeroFieldsBase::MergeFrom;
+  void MergeFrom(const Reboot& from) {
+    ::PROTOBUF_NAMESPACE_ID::internal::ZeroFieldsBase::MergeImpl(this, from);
+  }
+  public:
+
+  private:
+  friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
+  static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
+    return "chunksink.Reboot";
+  }
+  protected:
+  explicit Reboot(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                       bool is_message_owned = false);
+  private:
+  public:
+
+  static const ClassData _class_data_;
+  const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*GetClassData() const final;
+
+  ::PROTOBUF_NAMESPACE_ID::Metadata GetMetadata() const final;
+
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+
+  // @@protoc_insertion_point(class_scope:chunksink.Reboot)
+ private:
+  class _Internal;
+
+  template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
+  typedef void InternalArenaConstructable_;
+  typedef void DestructorSkippable_;
+  mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
+  friend struct ::TableStruct_chunksink_2eproto;
+};
+// -------------------------------------------------------------------
+
+class Command final :
+    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:chunksink.Command) */ {
+ public:
+  inline Command() : Command(nullptr) {}
+  ~Command() override;
+  explicit constexpr Command(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
+
+  Command(const Command& from);
+  Command(Command&& from) noexcept
+    : Command() {
+    *this = ::std::move(from);
+  }
+
+  inline Command& operator=(const Command& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline Command& operator=(Command&& from) noexcept {
+    if (this == &from) return *this;
+    if (GetOwningArena() == from.GetOwningArena()
+  #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
+        && GetOwningArena() != nullptr
+  #endif  // !PROTOBUF_FORCE_COPY_IN_MOVE
+    ) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* descriptor() {
+    return GetDescriptor();
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  static const Command& default_instance() {
+    return *internal_default_instance();
+  }
+  enum CommandCase {
+    kReboot = 1,
+    kCmdCutSession = 2,
+    COMMAND_NOT_SET = 0,
+  };
+
+  static inline const Command* internal_default_instance() {
+    return reinterpret_cast<const Command*>(
+               &_Command_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages =
+    4;
+
+  friend void swap(Command& a, Command& b) {
+    a.Swap(&b);
+  }
+  inline void Swap(Command* other) {
+    if (other == this) return;
+  #ifdef PROTOBUF_FORCE_COPY_IN_SWAP
+    if (GetOwningArena() != nullptr &&
+        GetOwningArena() == other->GetOwningArena()) {
+   #else  // PROTOBUF_FORCE_COPY_IN_SWAP
+    if (GetOwningArena() == other->GetOwningArena()) {
+  #endif  // !PROTOBUF_FORCE_COPY_IN_SWAP
+      InternalSwap(other);
+    } else {
+      ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(Command* other) {
+    if (other == this) return;
+    GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  Command* New(::PROTOBUF_NAMESPACE_ID::Arena* arena = nullptr) const final {
+    return CreateMaybeMessage<Command>(arena);
+  }
+  using ::PROTOBUF_NAMESPACE_ID::Message::CopyFrom;
+  void CopyFrom(const Command& from);
+  using ::PROTOBUF_NAMESPACE_ID::Message::MergeFrom;
+  void MergeFrom(const Command& from);
+  private:
+  static void MergeImpl(::PROTOBUF_NAMESPACE_ID::Message* to, const ::PROTOBUF_NAMESPACE_ID::Message& from);
+  public:
+  PROTOBUF_ATTRIBUTE_REINITIALIZES void Clear() final;
+  bool IsInitialized() const final;
+
+  size_t ByteSizeLong() const final;
+  const char* _InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID::internal::ParseContext* ctx) final;
+  uint8_t* _InternalSerialize(
+      uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const final;
+  int GetCachedSize() const final { return _cached_size_.Get(); }
+
+  private:
+  void SharedCtor();
+  void SharedDtor();
+  void SetCachedSize(int size) const final;
+  void InternalSwap(Command* other);
+
+  private:
+  friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
+  static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
+    return "chunksink.Command";
+  }
+  protected:
+  explicit Command(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                       bool is_message_owned = false);
+  private:
+  static void ArenaDtor(void* object);
+  inline void RegisterArenaDtor(::PROTOBUF_NAMESPACE_ID::Arena* arena);
+  public:
+
+  static const ClassData _class_data_;
+  const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*GetClassData() const final;
+
+  ::PROTOBUF_NAMESPACE_ID::Metadata GetMetadata() const final;
+
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+
+  enum : int {
+    kRebootFieldNumber = 1,
+    kCmdCutSessionFieldNumber = 2,
+  };
+  // .chunksink.Reboot reboot = 1;
+  bool has_reboot() const;
+  private:
+  bool _internal_has_reboot() const;
+  public:
+  void clear_reboot();
+  const ::chunksink::Reboot& reboot() const;
+  PROTOBUF_NODISCARD ::chunksink::Reboot* release_reboot();
+  ::chunksink::Reboot* mutable_reboot();
+  void set_allocated_reboot(::chunksink::Reboot* reboot);
+  private:
+  const ::chunksink::Reboot& _internal_reboot() const;
+  ::chunksink::Reboot* _internal_mutable_reboot();
+  public:
+  void unsafe_arena_set_allocated_reboot(
+      ::chunksink::Reboot* reboot);
+  ::chunksink::Reboot* unsafe_arena_release_reboot();
+
+  // .chunksink.CmdCutSession cmdCutSession = 2;
+  bool has_cmdcutsession() const;
+  private:
+  bool _internal_has_cmdcutsession() const;
+  public:
+  void clear_cmdcutsession();
+  const ::chunksink::CmdCutSession& cmdcutsession() const;
+  PROTOBUF_NODISCARD ::chunksink::CmdCutSession* release_cmdcutsession();
+  ::chunksink::CmdCutSession* mutable_cmdcutsession();
+  void set_allocated_cmdcutsession(::chunksink::CmdCutSession* cmdcutsession);
+  private:
+  const ::chunksink::CmdCutSession& _internal_cmdcutsession() const;
+  ::chunksink::CmdCutSession* _internal_mutable_cmdcutsession();
+  public:
+  void unsafe_arena_set_allocated_cmdcutsession(
+      ::chunksink::CmdCutSession* cmdcutsession);
+  ::chunksink::CmdCutSession* unsafe_arena_release_cmdcutsession();
+
+  void clear_command();
+  CommandCase command_case() const;
+  // @@protoc_insertion_point(class_scope:chunksink.Command)
+ private:
+  class _Internal;
+  void set_has_reboot();
+  void set_has_cmdcutsession();
+
+  inline bool has_command() const;
+  inline void clear_has_command();
+
+  template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
+  typedef void InternalArenaConstructable_;
+  typedef void DestructorSkippable_;
+  union CommandUnion {
+    constexpr CommandUnion() : _constinit_{} {}
+      ::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized _constinit_;
+    ::chunksink::Reboot* reboot_;
+    ::chunksink::CmdCutSession* cmdcutsession_;
+  } command_;
+  mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
+  uint32_t _oneof_case_[1];
+
   friend struct ::TableStruct_chunksink_2eproto;
 };
 // ===================================================================
@@ -554,9 +1152,241 @@ Chunks::mutable_data() {
   return _internal_mutable_data();
 }
 
+// -------------------------------------------------------------------
+
+// GetCommandRequest
+
+// string recorderID = 1;
+inline void GetCommandRequest::clear_recorderid() {
+  recorderid_.ClearToEmpty();
+}
+inline const std::string& GetCommandRequest::recorderid() const {
+  // @@protoc_insertion_point(field_get:chunksink.GetCommandRequest.recorderID)
+  return _internal_recorderid();
+}
+template <typename ArgT0, typename... ArgT>
+inline PROTOBUF_ALWAYS_INLINE
+void GetCommandRequest::set_recorderid(ArgT0&& arg0, ArgT... args) {
+ 
+ recorderid_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set:chunksink.GetCommandRequest.recorderID)
+}
+inline std::string* GetCommandRequest::mutable_recorderid() {
+  std::string* _s = _internal_mutable_recorderid();
+  // @@protoc_insertion_point(field_mutable:chunksink.GetCommandRequest.recorderID)
+  return _s;
+}
+inline const std::string& GetCommandRequest::_internal_recorderid() const {
+  return recorderid_.Get();
+}
+inline void GetCommandRequest::_internal_set_recorderid(const std::string& value) {
+  
+  recorderid_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, value, GetArenaForAllocation());
+}
+inline std::string* GetCommandRequest::_internal_mutable_recorderid() {
+  
+  return recorderid_.Mutable(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, GetArenaForAllocation());
+}
+inline std::string* GetCommandRequest::release_recorderid() {
+  // @@protoc_insertion_point(field_release:chunksink.GetCommandRequest.recorderID)
+  return recorderid_.Release(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), GetArenaForAllocation());
+}
+inline void GetCommandRequest::set_allocated_recorderid(std::string* recorderid) {
+  if (recorderid != nullptr) {
+    
+  } else {
+    
+  }
+  recorderid_.SetAllocated(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), recorderid,
+      GetArenaForAllocation());
+#ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (recorderid_.IsDefault(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited())) {
+    recorderid_.Set(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), "", GetArenaForAllocation());
+  }
+#endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  // @@protoc_insertion_point(field_set_allocated:chunksink.GetCommandRequest.recorderID)
+}
+
+// -------------------------------------------------------------------
+
+// CmdCutSession
+
+// -------------------------------------------------------------------
+
+// Reboot
+
+// -------------------------------------------------------------------
+
+// Command
+
+// .chunksink.Reboot reboot = 1;
+inline bool Command::_internal_has_reboot() const {
+  return command_case() == kReboot;
+}
+inline bool Command::has_reboot() const {
+  return _internal_has_reboot();
+}
+inline void Command::set_has_reboot() {
+  _oneof_case_[0] = kReboot;
+}
+inline void Command::clear_reboot() {
+  if (_internal_has_reboot()) {
+    if (GetArenaForAllocation() == nullptr) {
+      delete command_.reboot_;
+    }
+    clear_has_command();
+  }
+}
+inline ::chunksink::Reboot* Command::release_reboot() {
+  // @@protoc_insertion_point(field_release:chunksink.Command.reboot)
+  if (_internal_has_reboot()) {
+    clear_has_command();
+      ::chunksink::Reboot* temp = command_.reboot_;
+    if (GetArenaForAllocation() != nullptr) {
+      temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
+    }
+    command_.reboot_ = nullptr;
+    return temp;
+  } else {
+    return nullptr;
+  }
+}
+inline const ::chunksink::Reboot& Command::_internal_reboot() const {
+  return _internal_has_reboot()
+      ? *command_.reboot_
+      : reinterpret_cast< ::chunksink::Reboot&>(::chunksink::_Reboot_default_instance_);
+}
+inline const ::chunksink::Reboot& Command::reboot() const {
+  // @@protoc_insertion_point(field_get:chunksink.Command.reboot)
+  return _internal_reboot();
+}
+inline ::chunksink::Reboot* Command::unsafe_arena_release_reboot() {
+  // @@protoc_insertion_point(field_unsafe_arena_release:chunksink.Command.reboot)
+  if (_internal_has_reboot()) {
+    clear_has_command();
+    ::chunksink::Reboot* temp = command_.reboot_;
+    command_.reboot_ = nullptr;
+    return temp;
+  } else {
+    return nullptr;
+  }
+}
+inline void Command::unsafe_arena_set_allocated_reboot(::chunksink::Reboot* reboot) {
+  clear_command();
+  if (reboot) {
+    set_has_reboot();
+    command_.reboot_ = reboot;
+  }
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:chunksink.Command.reboot)
+}
+inline ::chunksink::Reboot* Command::_internal_mutable_reboot() {
+  if (!_internal_has_reboot()) {
+    clear_command();
+    set_has_reboot();
+    command_.reboot_ = CreateMaybeMessage< ::chunksink::Reboot >(GetArenaForAllocation());
+  }
+  return command_.reboot_;
+}
+inline ::chunksink::Reboot* Command::mutable_reboot() {
+  ::chunksink::Reboot* _msg = _internal_mutable_reboot();
+  // @@protoc_insertion_point(field_mutable:chunksink.Command.reboot)
+  return _msg;
+}
+
+// .chunksink.CmdCutSession cmdCutSession = 2;
+inline bool Command::_internal_has_cmdcutsession() const {
+  return command_case() == kCmdCutSession;
+}
+inline bool Command::has_cmdcutsession() const {
+  return _internal_has_cmdcutsession();
+}
+inline void Command::set_has_cmdcutsession() {
+  _oneof_case_[0] = kCmdCutSession;
+}
+inline void Command::clear_cmdcutsession() {
+  if (_internal_has_cmdcutsession()) {
+    if (GetArenaForAllocation() == nullptr) {
+      delete command_.cmdcutsession_;
+    }
+    clear_has_command();
+  }
+}
+inline ::chunksink::CmdCutSession* Command::release_cmdcutsession() {
+  // @@protoc_insertion_point(field_release:chunksink.Command.cmdCutSession)
+  if (_internal_has_cmdcutsession()) {
+    clear_has_command();
+      ::chunksink::CmdCutSession* temp = command_.cmdcutsession_;
+    if (GetArenaForAllocation() != nullptr) {
+      temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
+    }
+    command_.cmdcutsession_ = nullptr;
+    return temp;
+  } else {
+    return nullptr;
+  }
+}
+inline const ::chunksink::CmdCutSession& Command::_internal_cmdcutsession() const {
+  return _internal_has_cmdcutsession()
+      ? *command_.cmdcutsession_
+      : reinterpret_cast< ::chunksink::CmdCutSession&>(::chunksink::_CmdCutSession_default_instance_);
+}
+inline const ::chunksink::CmdCutSession& Command::cmdcutsession() const {
+  // @@protoc_insertion_point(field_get:chunksink.Command.cmdCutSession)
+  return _internal_cmdcutsession();
+}
+inline ::chunksink::CmdCutSession* Command::unsafe_arena_release_cmdcutsession() {
+  // @@protoc_insertion_point(field_unsafe_arena_release:chunksink.Command.cmdCutSession)
+  if (_internal_has_cmdcutsession()) {
+    clear_has_command();
+    ::chunksink::CmdCutSession* temp = command_.cmdcutsession_;
+    command_.cmdcutsession_ = nullptr;
+    return temp;
+  } else {
+    return nullptr;
+  }
+}
+inline void Command::unsafe_arena_set_allocated_cmdcutsession(::chunksink::CmdCutSession* cmdcutsession) {
+  clear_command();
+  if (cmdcutsession) {
+    set_has_cmdcutsession();
+    command_.cmdcutsession_ = cmdcutsession;
+  }
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:chunksink.Command.cmdCutSession)
+}
+inline ::chunksink::CmdCutSession* Command::_internal_mutable_cmdcutsession() {
+  if (!_internal_has_cmdcutsession()) {
+    clear_command();
+    set_has_cmdcutsession();
+    command_.cmdcutsession_ = CreateMaybeMessage< ::chunksink::CmdCutSession >(GetArenaForAllocation());
+  }
+  return command_.cmdcutsession_;
+}
+inline ::chunksink::CmdCutSession* Command::mutable_cmdcutsession() {
+  ::chunksink::CmdCutSession* _msg = _internal_mutable_cmdcutsession();
+  // @@protoc_insertion_point(field_mutable:chunksink.Command.cmdCutSession)
+  return _msg;
+}
+
+inline bool Command::has_command() const {
+  return command_case() != COMMAND_NOT_SET;
+}
+inline void Command::clear_has_command() {
+  _oneof_case_[0] = COMMAND_NOT_SET;
+}
+inline Command::CommandCase Command::command_case() const {
+  return Command::CommandCase(_oneof_case_[0]);
+}
 #ifdef __GNUC__
   #pragma GCC diagnostic pop
 #endif  // __GNUC__
+// -------------------------------------------------------------------
+
+// -------------------------------------------------------------------
+
+// -------------------------------------------------------------------
+
+// -------------------------------------------------------------------
+
 
 // @@protoc_insertion_point(namespace_scope)
 

@@ -19,10 +19,10 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type SessionSourceClient interface {
-	// Recorder RPC
+	// Stream
 	StreamRecorders(ctx context.Context, in *StreamRecordersRequest, opts ...grpc.CallOption) (SessionSource_StreamRecordersClient, error)
-	// ## Session RPC
 	StreamSessions(ctx context.Context, in *StreamSessionRequest, opts ...grpc.CallOption) (SessionSource_StreamSessionsClient, error)
+	// Unary
 	SetKeepSession(ctx context.Context, in *SetKeepSessionRequest, opts ...grpc.CallOption) (*common.Respone, error)
 	DeleteSession(ctx context.Context, in *DeleteSessionRequest, opts ...grpc.CallOption) (*common.Respone, error)
 	SetName(ctx context.Context, in *SetNameRequest, opts ...grpc.CallOption) (*common.Respone, error)
@@ -171,10 +171,10 @@ func (c *sessionSourceClient) UpdateSegment(ctx context.Context, in *UpdateSegme
 // All implementations should embed UnimplementedSessionSourceServer
 // for forward compatibility
 type SessionSourceServer interface {
-	// Recorder RPC
+	// Stream
 	StreamRecorders(*StreamRecordersRequest, SessionSource_StreamRecordersServer) error
-	// ## Session RPC
 	StreamSessions(*StreamSessionRequest, SessionSource_StreamSessionsServer) error
+	// Unary
 	SetKeepSession(context.Context, *SetKeepSessionRequest) (*common.Respone, error)
 	DeleteSession(context.Context, *DeleteSessionRequest) (*common.Respone, error)
 	SetName(context.Context, *SetNameRequest) (*common.Respone, error)

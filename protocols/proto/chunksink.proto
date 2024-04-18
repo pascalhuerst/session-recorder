@@ -16,8 +16,25 @@ message Chunks {
     repeated uint32 data = 5;
 }
 
+message GetCommandRequest {
+    string recorderID = 1;
+}
+
+message CmdCutSession {}
+message Reboot{}
+
+message Command {
+    oneof command {
+        Reboot reboot = 1;
+        CmdCutSession cmdCutSession = 2;
+    }
+}
 
 service ChunkSink {
+    // Unary
     rpc SetRecorderStatus(common.RecorderStatus) returns (common.Respone);
     rpc SetChunks(Chunks) returns (common.Respone);
+
+    // Server streaming
+    rpc GetCommands(GetCommandRequest) returns (stream Command);
 }

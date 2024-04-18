@@ -24,6 +24,7 @@ namespace chunksink {
 static const char* ChunkSink_method_names[] = {
   "/chunksink.ChunkSink/SetRecorderStatus",
   "/chunksink.ChunkSink/SetChunks",
+  "/chunksink.ChunkSink/GetCommands",
 };
 
 std::unique_ptr< ChunkSink::Stub> ChunkSink::NewStub(const std::shared_ptr< ::grpc::ChannelInterface>& channel, const ::grpc::StubOptions& options) {
@@ -35,6 +36,7 @@ std::unique_ptr< ChunkSink::Stub> ChunkSink::NewStub(const std::shared_ptr< ::gr
 ChunkSink::Stub::Stub(const std::shared_ptr< ::grpc::ChannelInterface>& channel, const ::grpc::StubOptions& options)
   : channel_(channel), rpcmethod_SetRecorderStatus_(ChunkSink_method_names[0], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
   , rpcmethod_SetChunks_(ChunkSink_method_names[1], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
+  , rpcmethod_GetCommands_(ChunkSink_method_names[2], options.suffix_for_stats(),::grpc::internal::RpcMethod::SERVER_STREAMING, channel)
   {}
 
 ::grpc::Status ChunkSink::Stub::SetRecorderStatus(::grpc::ClientContext* context, const ::common::RecorderStatus& request, ::common::Respone* response) {
@@ -83,6 +85,22 @@ void ChunkSink::Stub::async::SetChunks(::grpc::ClientContext* context, const ::c
   return result;
 }
 
+::grpc::ClientReader< ::chunksink::Command>* ChunkSink::Stub::GetCommandsRaw(::grpc::ClientContext* context, const ::chunksink::GetCommandRequest& request) {
+  return ::grpc::internal::ClientReaderFactory< ::chunksink::Command>::Create(channel_.get(), rpcmethod_GetCommands_, context, request);
+}
+
+void ChunkSink::Stub::async::GetCommands(::grpc::ClientContext* context, const ::chunksink::GetCommandRequest* request, ::grpc::ClientReadReactor< ::chunksink::Command>* reactor) {
+  ::grpc::internal::ClientCallbackReaderFactory< ::chunksink::Command>::Create(stub_->channel_.get(), stub_->rpcmethod_GetCommands_, context, request, reactor);
+}
+
+::grpc::ClientAsyncReader< ::chunksink::Command>* ChunkSink::Stub::AsyncGetCommandsRaw(::grpc::ClientContext* context, const ::chunksink::GetCommandRequest& request, ::grpc::CompletionQueue* cq, void* tag) {
+  return ::grpc::internal::ClientAsyncReaderFactory< ::chunksink::Command>::Create(channel_.get(), cq, rpcmethod_GetCommands_, context, request, true, tag);
+}
+
+::grpc::ClientAsyncReader< ::chunksink::Command>* ChunkSink::Stub::PrepareAsyncGetCommandsRaw(::grpc::ClientContext* context, const ::chunksink::GetCommandRequest& request, ::grpc::CompletionQueue* cq) {
+  return ::grpc::internal::ClientAsyncReaderFactory< ::chunksink::Command>::Create(channel_.get(), cq, rpcmethod_GetCommands_, context, request, false, nullptr);
+}
+
 ChunkSink::Service::Service() {
   AddMethod(new ::grpc::internal::RpcServiceMethod(
       ChunkSink_method_names[0],
@@ -104,6 +122,16 @@ ChunkSink::Service::Service() {
              ::common::Respone* resp) {
                return service->SetChunks(ctx, req, resp);
              }, this)));
+  AddMethod(new ::grpc::internal::RpcServiceMethod(
+      ChunkSink_method_names[2],
+      ::grpc::internal::RpcMethod::SERVER_STREAMING,
+      new ::grpc::internal::ServerStreamingHandler< ChunkSink::Service, ::chunksink::GetCommandRequest, ::chunksink::Command>(
+          [](ChunkSink::Service* service,
+             ::grpc::ServerContext* ctx,
+             const ::chunksink::GetCommandRequest* req,
+             ::grpc::ServerWriter<::chunksink::Command>* writer) {
+               return service->GetCommands(ctx, req, writer);
+             }, this)));
 }
 
 ChunkSink::Service::~Service() {
@@ -120,6 +148,13 @@ ChunkSink::Service::~Service() {
   (void) context;
   (void) request;
   (void) response;
+  return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+}
+
+::grpc::Status ChunkSink::Service::GetCommands(::grpc::ServerContext* context, const ::chunksink::GetCommandRequest* request, ::grpc::ServerWriter< ::chunksink::Command>* writer) {
+  (void) context;
+  (void) request;
+  (void) writer;
   return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
 }
 

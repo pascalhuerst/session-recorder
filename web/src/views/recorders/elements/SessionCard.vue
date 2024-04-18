@@ -48,7 +48,7 @@ const ctx = createPeaksContext({
     waveformUrl: waveformUrl.value,
     audioUrls: audioUrls.value as any,
     permissions: {
-      create: true,
+      create: false,
       update: true,
       delete: true,
     },

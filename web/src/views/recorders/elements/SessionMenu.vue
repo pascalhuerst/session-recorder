@@ -42,11 +42,11 @@ const ttl = computed(() => {
   return `${minutes} minutes`;
 });
 
-const onKeep = () => setKeepSession({ sessionId: props.session.ID });
+const onKeep = () => setKeepSession({ recorderId: props.recorderId, sessionId: props.session.ID, keep: !props.session.updated.keep });
 const onDelete = () => {
   awaitConfirmation().then(({ isConfirmed }) => {
     if (isConfirmed) {
-      deleteSession({ sessionId: props.session.ID });
+      deleteSession({ recorderId: props.recorderId, sessionId: props.session.ID });
     }
   });
 };

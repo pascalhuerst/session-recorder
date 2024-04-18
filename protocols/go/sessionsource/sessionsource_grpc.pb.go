@@ -21,7 +21,7 @@ const _ = grpc.SupportPackageIsVersion7
 type SessionSourceClient interface {
 	// Recorder RPC
 	StreamRecorders(ctx context.Context, in *StreamRecordersRequest, opts ...grpc.CallOption) (SessionSource_StreamRecordersClient, error)
-	// Session RPC
+	// ## Session RPC
 	StreamSessions(ctx context.Context, in *StreamSessionRequest, opts ...grpc.CallOption) (SessionSource_StreamSessionsClient, error)
 	SetKeepSession(ctx context.Context, in *SetKeepSessionRequest, opts ...grpc.CallOption) (*common.Respone, error)
 	DeleteSession(ctx context.Context, in *DeleteSessionRequest, opts ...grpc.CallOption) (*common.Respone, error)
@@ -173,7 +173,7 @@ func (c *sessionSourceClient) UpdateSegment(ctx context.Context, in *UpdateSegme
 type SessionSourceServer interface {
 	// Recorder RPC
 	StreamRecorders(*StreamRecordersRequest, SessionSource_StreamRecordersServer) error
-	// Session RPC
+	// ## Session RPC
 	StreamSessions(*StreamSessionRequest, SessionSource_StreamSessionsServer) error
 	SetKeepSession(context.Context, *SetKeepSessionRequest) (*common.Respone, error)
 	DeleteSession(context.Context, *DeleteSessionRequest) (*common.Respone, error)

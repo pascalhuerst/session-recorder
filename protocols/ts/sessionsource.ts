@@ -146,37 +146,44 @@ export interface Session {
 }
 
 export interface SetKeepSessionRequest {
+  recorderID: string;
   sessionID: string;
   keep: boolean;
 }
 
 export interface DeleteSessionRequest {
+  recorderID: string;
   sessionID: string;
 }
 
 export interface SetNameRequest {
+  recorderID: string;
   sessionID: string;
   name: string;
 }
 
 export interface CreateSegmentRequest {
+  recorderID: string;
   sessionID: string;
   segmentID: string;
   info: SegmentInfo | undefined;
 }
 
 export interface UpdateSegmentRequest {
+  recorderID: string;
   sessionID: string;
   segmentID: string;
   info: SegmentInfo | undefined;
 }
 
 export interface DeleteSegmentRequest {
+  recorderID: string;
   sessionID: string;
   segmentID: string;
 }
 
 export interface RenderSegmentRequest {
+  recorderID: string;
   sessionID: string;
   segmentID: string;
 }
@@ -1000,16 +1007,19 @@ export const Session = {
 };
 
 function createBaseSetKeepSessionRequest(): SetKeepSessionRequest {
-  return { sessionID: "", keep: false };
+  return { recorderID: "", sessionID: "", keep: false };
 }
 
 export const SetKeepSessionRequest = {
   encode(message: SetKeepSessionRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.recorderID !== "") {
+      writer.uint32(10).string(message.recorderID);
+    }
     if (message.sessionID !== "") {
-      writer.uint32(10).string(message.sessionID);
+      writer.uint32(18).string(message.sessionID);
     }
     if (message.keep === true) {
-      writer.uint32(16).bool(message.keep);
+      writer.uint32(24).bool(message.keep);
     }
     return writer;
   },
@@ -1026,10 +1036,17 @@ export const SetKeepSessionRequest = {
             break;
           }
 
-          message.sessionID = reader.string();
+          message.recorderID = reader.string();
           continue;
         case 2:
-          if (tag !== 16) {
+          if (tag !== 18) {
+            break;
+          }
+
+          message.sessionID = reader.string();
+          continue;
+        case 3:
+          if (tag !== 24) {
             break;
           }
 
@@ -1046,6 +1063,7 @@ export const SetKeepSessionRequest = {
 
   fromJSON(object: any): SetKeepSessionRequest {
     return {
+      recorderID: isSet(object.recorderID) ? globalThis.String(object.recorderID) : "",
       sessionID: isSet(object.sessionID) ? globalThis.String(object.sessionID) : "",
       keep: isSet(object.keep) ? globalThis.Boolean(object.keep) : false,
     };
@@ -1053,6 +1071,9 @@ export const SetKeepSessionRequest = {
 
   toJSON(message: SetKeepSessionRequest): unknown {
     const obj: any = {};
+    if (message.recorderID !== "") {
+      obj.recorderID = message.recorderID;
+    }
     if (message.sessionID !== "") {
       obj.sessionID = message.sessionID;
     }
@@ -1067,6 +1088,7 @@ export const SetKeepSessionRequest = {
   },
   fromPartial(object: DeepPartial<SetKeepSessionRequest>): SetKeepSessionRequest {
     const message = createBaseSetKeepSessionRequest();
+    message.recorderID = object.recorderID ?? "";
     message.sessionID = object.sessionID ?? "";
     message.keep = object.keep ?? false;
     return message;
@@ -1074,13 +1096,16 @@ export const SetKeepSessionRequest = {
 };
 
 function createBaseDeleteSessionRequest(): DeleteSessionRequest {
-  return { sessionID: "" };
+  return { recorderID: "", sessionID: "" };
 }
 
 export const DeleteSessionRequest = {
   encode(message: DeleteSessionRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.recorderID !== "") {
+      writer.uint32(10).string(message.recorderID);
+    }
     if (message.sessionID !== "") {
-      writer.uint32(10).string(message.sessionID);
+      writer.uint32(18).string(message.sessionID);
     }
     return writer;
   },
@@ -1097,6 +1122,13 @@ export const DeleteSessionRequest = {
             break;
           }
 
+          message.recorderID = reader.string();
+          continue;
+        case 2:
+          if (tag !== 18) {
+            break;
+          }
+
           message.sessionID = reader.string();
           continue;
       }
@@ -1109,11 +1141,17 @@ export const DeleteSessionRequest = {
   },
 
   fromJSON(object: any): DeleteSessionRequest {
-    return { sessionID: isSet(object.sessionID) ? globalThis.String(object.sessionID) : "" };
+    return {
+      recorderID: isSet(object.recorderID) ? globalThis.String(object.recorderID) : "",
+      sessionID: isSet(object.sessionID) ? globalThis.String(object.sessionID) : "",
+    };
   },
 
   toJSON(message: DeleteSessionRequest): unknown {
     const obj: any = {};
+    if (message.recorderID !== "") {
+      obj.recorderID = message.recorderID;
+    }
     if (message.sessionID !== "") {
       obj.sessionID = message.sessionID;
     }
@@ -1125,22 +1163,26 @@ export const DeleteSessionRequest = {
   },
   fromPartial(object: DeepPartial<DeleteSessionRequest>): DeleteSessionRequest {
     const message = createBaseDeleteSessionRequest();
+    message.recorderID = object.recorderID ?? "";
     message.sessionID = object.sessionID ?? "";
     return message;
   },
 };
 
 function createBaseSetNameRequest(): SetNameRequest {
-  return { sessionID: "", name: "" };
+  return { recorderID: "", sessionID: "", name: "" };
 }
 
 export const SetNameRequest = {
   encode(message: SetNameRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.recorderID !== "") {
+      writer.uint32(10).string(message.recorderID);
+    }
     if (message.sessionID !== "") {
-      writer.uint32(10).string(message.sessionID);
+      writer.uint32(18).string(message.sessionID);
     }
     if (message.name !== "") {
-      writer.uint32(18).string(message.name);
+      writer.uint32(26).string(message.name);
     }
     return writer;
   },
@@ -1157,10 +1199,17 @@ export const SetNameRequest = {
             break;
           }
 
-          message.sessionID = reader.string();
+          message.recorderID = reader.string();
           continue;
         case 2:
           if (tag !== 18) {
+            break;
+          }
+
+          message.sessionID = reader.string();
+          continue;
+        case 3:
+          if (tag !== 26) {
             break;
           }
 
@@ -1177,6 +1226,7 @@ export const SetNameRequest = {
 
   fromJSON(object: any): SetNameRequest {
     return {
+      recorderID: isSet(object.recorderID) ? globalThis.String(object.recorderID) : "",
       sessionID: isSet(object.sessionID) ? globalThis.String(object.sessionID) : "",
       name: isSet(object.name) ? globalThis.String(object.name) : "",
     };
@@ -1184,6 +1234,9 @@ export const SetNameRequest = {
 
   toJSON(message: SetNameRequest): unknown {
     const obj: any = {};
+    if (message.recorderID !== "") {
+      obj.recorderID = message.recorderID;
+    }
     if (message.sessionID !== "") {
       obj.sessionID = message.sessionID;
     }
@@ -1198,6 +1251,7 @@ export const SetNameRequest = {
   },
   fromPartial(object: DeepPartial<SetNameRequest>): SetNameRequest {
     const message = createBaseSetNameRequest();
+    message.recorderID = object.recorderID ?? "";
     message.sessionID = object.sessionID ?? "";
     message.name = object.name ?? "";
     return message;
@@ -1205,19 +1259,22 @@ export const SetNameRequest = {
 };
 
 function createBaseCreateSegmentRequest(): CreateSegmentRequest {
-  return { sessionID: "", segmentID: "", info: undefined };
+  return { recorderID: "", sessionID: "", segmentID: "", info: undefined };
 }
 
 export const CreateSegmentRequest = {
   encode(message: CreateSegmentRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.recorderID !== "") {
+      writer.uint32(10).string(message.recorderID);
+    }
     if (message.sessionID !== "") {
-      writer.uint32(10).string(message.sessionID);
+      writer.uint32(18).string(message.sessionID);
     }
     if (message.segmentID !== "") {
-      writer.uint32(18).string(message.segmentID);
+      writer.uint32(26).string(message.segmentID);
     }
     if (message.info !== undefined) {
-      SegmentInfo.encode(message.info, writer.uint32(26).fork()).ldelim();
+      SegmentInfo.encode(message.info, writer.uint32(34).fork()).ldelim();
     }
     return writer;
   },
@@ -1234,17 +1291,24 @@ export const CreateSegmentRequest = {
             break;
           }
 
-          message.sessionID = reader.string();
+          message.recorderID = reader.string();
           continue;
         case 2:
           if (tag !== 18) {
             break;
           }
 
-          message.segmentID = reader.string();
+          message.sessionID = reader.string();
           continue;
         case 3:
           if (tag !== 26) {
+            break;
+          }
+
+          message.segmentID = reader.string();
+          continue;
+        case 4:
+          if (tag !== 34) {
             break;
           }
 
@@ -1261,6 +1325,7 @@ export const CreateSegmentRequest = {
 
   fromJSON(object: any): CreateSegmentRequest {
     return {
+      recorderID: isSet(object.recorderID) ? globalThis.String(object.recorderID) : "",
       sessionID: isSet(object.sessionID) ? globalThis.String(object.sessionID) : "",
       segmentID: isSet(object.segmentID) ? globalThis.String(object.segmentID) : "",
       info: isSet(object.info) ? SegmentInfo.fromJSON(object.info) : undefined,
@@ -1269,6 +1334,9 @@ export const CreateSegmentRequest = {
 
   toJSON(message: CreateSegmentRequest): unknown {
     const obj: any = {};
+    if (message.recorderID !== "") {
+      obj.recorderID = message.recorderID;
+    }
     if (message.sessionID !== "") {
       obj.sessionID = message.sessionID;
     }
@@ -1286,6 +1354,7 @@ export const CreateSegmentRequest = {
   },
   fromPartial(object: DeepPartial<CreateSegmentRequest>): CreateSegmentRequest {
     const message = createBaseCreateSegmentRequest();
+    message.recorderID = object.recorderID ?? "";
     message.sessionID = object.sessionID ?? "";
     message.segmentID = object.segmentID ?? "";
     message.info = (object.info !== undefined && object.info !== null)
@@ -1296,19 +1365,22 @@ export const CreateSegmentRequest = {
 };
 
 function createBaseUpdateSegmentRequest(): UpdateSegmentRequest {
-  return { sessionID: "", segmentID: "", info: undefined };
+  return { recorderID: "", sessionID: "", segmentID: "", info: undefined };
 }
 
 export const UpdateSegmentRequest = {
   encode(message: UpdateSegmentRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.recorderID !== "") {
+      writer.uint32(10).string(message.recorderID);
+    }
     if (message.sessionID !== "") {
-      writer.uint32(10).string(message.sessionID);
+      writer.uint32(18).string(message.sessionID);
     }
     if (message.segmentID !== "") {
-      writer.uint32(18).string(message.segmentID);
+      writer.uint32(26).string(message.segmentID);
     }
     if (message.info !== undefined) {
-      SegmentInfo.encode(message.info, writer.uint32(26).fork()).ldelim();
+      SegmentInfo.encode(message.info, writer.uint32(34).fork()).ldelim();
     }
     return writer;
   },
@@ -1325,17 +1397,24 @@ export const UpdateSegmentRequest = {
             break;
           }
 
-          message.sessionID = reader.string();
+          message.recorderID = reader.string();
           continue;
         case 2:
           if (tag !== 18) {
             break;
           }
 
-          message.segmentID = reader.string();
+          message.sessionID = reader.string();
           continue;
         case 3:
           if (tag !== 26) {
+            break;
+          }
+
+          message.segmentID = reader.string();
+          continue;
+        case 4:
+          if (tag !== 34) {
             break;
           }
 
@@ -1352,6 +1431,7 @@ export const UpdateSegmentRequest = {
 
   fromJSON(object: any): UpdateSegmentRequest {
     return {
+      recorderID: isSet(object.recorderID) ? globalThis.String(object.recorderID) : "",
       sessionID: isSet(object.sessionID) ? globalThis.String(object.sessionID) : "",
       segmentID: isSet(object.segmentID) ? globalThis.String(object.segmentID) : "",
       info: isSet(object.info) ? SegmentInfo.fromJSON(object.info) : undefined,
@@ -1360,6 +1440,9 @@ export const UpdateSegmentRequest = {
 
   toJSON(message: UpdateSegmentRequest): unknown {
     const obj: any = {};
+    if (message.recorderID !== "") {
+      obj.recorderID = message.recorderID;
+    }
     if (message.sessionID !== "") {
       obj.sessionID = message.sessionID;
     }
@@ -1377,6 +1460,7 @@ export const UpdateSegmentRequest = {
   },
   fromPartial(object: DeepPartial<UpdateSegmentRequest>): UpdateSegmentRequest {
     const message = createBaseUpdateSegmentRequest();
+    message.recorderID = object.recorderID ?? "";
     message.sessionID = object.sessionID ?? "";
     message.segmentID = object.segmentID ?? "";
     message.info = (object.info !== undefined && object.info !== null)
@@ -1387,16 +1471,19 @@ export const UpdateSegmentRequest = {
 };
 
 function createBaseDeleteSegmentRequest(): DeleteSegmentRequest {
-  return { sessionID: "", segmentID: "" };
+  return { recorderID: "", sessionID: "", segmentID: "" };
 }
 
 export const DeleteSegmentRequest = {
   encode(message: DeleteSegmentRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.recorderID !== "") {
+      writer.uint32(10).string(message.recorderID);
+    }
     if (message.sessionID !== "") {
-      writer.uint32(10).string(message.sessionID);
+      writer.uint32(18).string(message.sessionID);
     }
     if (message.segmentID !== "") {
-      writer.uint32(18).string(message.segmentID);
+      writer.uint32(26).string(message.segmentID);
     }
     return writer;
   },
@@ -1413,10 +1500,17 @@ export const DeleteSegmentRequest = {
             break;
           }
 
-          message.sessionID = reader.string();
+          message.recorderID = reader.string();
           continue;
         case 2:
           if (tag !== 18) {
+            break;
+          }
+
+          message.sessionID = reader.string();
+          continue;
+        case 3:
+          if (tag !== 26) {
             break;
           }
 
@@ -1433,6 +1527,7 @@ export const DeleteSegmentRequest = {
 
   fromJSON(object: any): DeleteSegmentRequest {
     return {
+      recorderID: isSet(object.recorderID) ? globalThis.String(object.recorderID) : "",
       sessionID: isSet(object.sessionID) ? globalThis.String(object.sessionID) : "",
       segmentID: isSet(object.segmentID) ? globalThis.String(object.segmentID) : "",
     };
@@ -1440,6 +1535,9 @@ export const DeleteSegmentRequest = {
 
   toJSON(message: DeleteSegmentRequest): unknown {
     const obj: any = {};
+    if (message.recorderID !== "") {
+      obj.recorderID = message.recorderID;
+    }
     if (message.sessionID !== "") {
       obj.sessionID = message.sessionID;
     }
@@ -1454,6 +1552,7 @@ export const DeleteSegmentRequest = {
   },
   fromPartial(object: DeepPartial<DeleteSegmentRequest>): DeleteSegmentRequest {
     const message = createBaseDeleteSegmentRequest();
+    message.recorderID = object.recorderID ?? "";
     message.sessionID = object.sessionID ?? "";
     message.segmentID = object.segmentID ?? "";
     return message;
@@ -1461,16 +1560,19 @@ export const DeleteSegmentRequest = {
 };
 
 function createBaseRenderSegmentRequest(): RenderSegmentRequest {
-  return { sessionID: "", segmentID: "" };
+  return { recorderID: "", sessionID: "", segmentID: "" };
 }
 
 export const RenderSegmentRequest = {
   encode(message: RenderSegmentRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.recorderID !== "") {
+      writer.uint32(10).string(message.recorderID);
+    }
     if (message.sessionID !== "") {
-      writer.uint32(10).string(message.sessionID);
+      writer.uint32(18).string(message.sessionID);
     }
     if (message.segmentID !== "") {
-      writer.uint32(18).string(message.segmentID);
+      writer.uint32(26).string(message.segmentID);
     }
     return writer;
   },
@@ -1487,10 +1589,17 @@ export const RenderSegmentRequest = {
             break;
           }
 
-          message.sessionID = reader.string();
+          message.recorderID = reader.string();
           continue;
         case 2:
           if (tag !== 18) {
+            break;
+          }
+
+          message.sessionID = reader.string();
+          continue;
+        case 3:
+          if (tag !== 26) {
             break;
           }
 
@@ -1507,6 +1616,7 @@ export const RenderSegmentRequest = {
 
   fromJSON(object: any): RenderSegmentRequest {
     return {
+      recorderID: isSet(object.recorderID) ? globalThis.String(object.recorderID) : "",
       sessionID: isSet(object.sessionID) ? globalThis.String(object.sessionID) : "",
       segmentID: isSet(object.segmentID) ? globalThis.String(object.segmentID) : "",
     };
@@ -1514,6 +1624,9 @@ export const RenderSegmentRequest = {
 
   toJSON(message: RenderSegmentRequest): unknown {
     const obj: any = {};
+    if (message.recorderID !== "") {
+      obj.recorderID = message.recorderID;
+    }
     if (message.sessionID !== "") {
       obj.sessionID = message.sessionID;
     }
@@ -1528,6 +1641,7 @@ export const RenderSegmentRequest = {
   },
   fromPartial(object: DeepPartial<RenderSegmentRequest>): RenderSegmentRequest {
     const message = createBaseRenderSegmentRequest();
+    message.recorderID = object.recorderID ?? "";
     message.sessionID = object.sessionID ?? "";
     message.segmentID = object.segmentID ?? "";
     return message;
@@ -1548,7 +1662,7 @@ export const SessionSourceDefinition = {
       responseStream: true,
       options: {},
     },
-    /** Session RPC */
+    /** ## Session RPC */
     streamSessions: {
       name: "StreamSessions",
       requestType: StreamSessionRequest,
@@ -1622,7 +1736,7 @@ export interface SessionSourceServiceImplementation<CallContextExt = {}> {
     request: StreamRecordersRequest,
     context: CallContext & CallContextExt,
   ): ServerStreamingMethodResult<DeepPartial<Recorder>>;
-  /** Session RPC */
+  /** ## Session RPC */
   streamSessions(
     request: StreamSessionRequest,
     context: CallContext & CallContextExt,
@@ -1642,7 +1756,7 @@ export interface SessionSourceClient<CallOptionsExt = {}> {
     request: DeepPartial<StreamRecordersRequest>,
     options?: CallOptions & CallOptionsExt,
   ): AsyncIterable<Recorder>;
-  /** Session RPC */
+  /** ## Session RPC */
   streamSessions(
     request: DeepPartial<StreamSessionRequest>,
     options?: CallOptions & CallOptionsExt,

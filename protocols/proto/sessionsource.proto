@@ -85,47 +85,55 @@ message Session {
 }
 
 message SetKeepSessionRequest {
-	string sessionID = 1;
-	bool keep = 2;
+	string recorderID = 1;
+	string sessionID = 2;
+	bool keep = 3;
 }
 
 message DeleteSessionRequest {
-	string sessionID = 1;
+	string recorderID = 1;
+	string sessionID = 2;
 }
 
 message SetNameRequest {
-	string sessionID = 1;
-	string name = 2;
+	string recorderID = 1;
+	string sessionID = 2;
+	string name = 3;
 }
 
 message CreateSegmentRequest {
-	string sessionID = 1;
-	string segmentID = 2;
-	SegmentInfo info = 3;
+	string recorderID = 1;
+	string sessionID = 2;
+	string segmentID = 3;
+	SegmentInfo info = 4;
 }
 
 message UpdateSegmentRequest {
-	string sessionID = 1;
-	string segmentID = 2;
-	SegmentInfo info = 3;
+	string recorderID = 1;
+	string sessionID = 2;
+	string segmentID = 3;
+	SegmentInfo info = 4;
 }
 
 message DeleteSegmentRequest {
-	string sessionID = 1;
-	string segmentID = 2;
+	string recorderID = 1;
+	string sessionID = 2;
+	string segmentID = 3;
 }
 
 message RenderSegmentRequest {
-	string sessionID = 1;
-	string segmentID = 2;
+	string recorderID = 1;
+	string sessionID = 2;
+	string segmentID = 3;
 }
 
 service SessionSource {
 	// Recorder RPC
 	rpc StreamRecorders(StreamRecordersRequest) returns (stream Recorder);
 	
-	// Session RPC
+	// ## Session RPC
 	rpc StreamSessions(StreamSessionRequest) returns (stream Session);
+	
 	rpc SetKeepSession(SetKeepSessionRequest) returns (common.Respone);
 	rpc DeleteSession(DeleteSessionRequest) returns (common.Respone);
 	rpc SetName(SetNameRequest) returns (common.Respone);

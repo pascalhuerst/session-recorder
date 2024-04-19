@@ -2,6 +2,7 @@ package render
 
 import (
 	"bytes"
+	"context"
 	"crypto/md5"
 	_ "embed"
 	"io"
@@ -49,7 +50,7 @@ func TestCreateOverview(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, err := CreateOverview(tt.args.raw, tt.args.zoom, tt.args.width, tt.args.height)
+			got, err := CreateOverview(context.Background(), tt.args.raw, tt.args.zoom, tt.args.width, tt.args.height)
 			if err != nil {
 				t.Errorf("CreateOverview() error = %v, wantErr %v", err, tt.wantErr)
 			}

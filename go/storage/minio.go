@@ -109,27 +109,30 @@ func NewMinioStorage(endpoint, accessKey, secretKey string) (*Minio, error) {
 	}, nil
 }
 
-func (m *Minio) Start(ctx context.Context) error {
-	exists, err := m.client.BucketExists(ctx, bucketName)
+func (m *Minio) makeSureBucketExists(ctx context.Context) error {
+	err := m.client.MakeBucket(ctx, bucketName, minio.MakeBucketOptions{})
 	if err != nil {
-		return fmt.Errorf("cannot check if bucket exists: %w", err)
-	}
-
-	if !exists {
-		log.Debug().Msg("Bucket does not exist, creating...")
-
-		err = m.client.MakeBucket(ctx, bucketName, minio.MakeBucketOptions{})
+		exists, err := m.client.BucketExists(ctx, bucketName)
 		if err != nil {
+			return fmt.Errorf("cannot check if bucket exists: %w", err)
+		}
+
+		if !exists {
 			return fmt.Errorf("cannot create bucket: %w", err)
 		}
-
-		policy := fmt.Sprintf(publicAccessFormula, bucketName, bucketName)
-		if err := m.client.SetBucketPolicy(ctx, bucketName, policy); err != nil {
-			log.Err(err).Str("bucket", bucketName).Msg("Cannot set bucket policy")
-
-			return err
-		}
 	}
+
+	return nil
+}
+
+func (m *Minio) Start(ctx context.Context) error {
+	if err := m.makeSureBucketExists(ctx); err != nil {
+		log.Err(err).Msg("Cannot create bucket")
+
+		return err
+	}
+
+	var err error
 
 	m.system, err = m.getSystemMetadata(ctx)
 	if err != nil {
@@ -149,7 +152,7 @@ func (m *Minio) Start(ctx context.Context) error {
 		}
 	}
 
-	recorderIDs, err := m.readRecorderIDs(ctx)
+	recorderIDs, err := m.FindRecorderIDs(ctx)
 	if err != nil {
 		log.Err(err).Msg("Cannot read recorder IDs")
 
@@ -206,8 +209,6 @@ func (m *Minio) Start(ctx context.Context) error {
 			continue
 		}
 	}
-
-	fmt.Printf("%s", m.system)
 
 	return nil
 }
@@ -355,13 +356,15 @@ func (m *Minio) SafeChunks(ctx context.Context, recorderID, sessionID uuid.UUID,
 		go func(recorderID uuid.UUID, lastChunk minioChunk) {
 			sessionID := lastChunk.sessionID
 
+			log.Info().Stringer("recorder-id", recorderID).Stringer("session-id", sessionID).Msg("Closing session")
+
 			if err := m.closeSession(context.Background(), recorderID, sessionID, &lastChunk); err != nil {
 				log.Err(err).Stringer("recorder-id", recorderID).Stringer("session-id", sessionID).Msg("Cannot close session")
 
 				return
 			}
 
-			log.Debug().Stringer("recorder-id", recorderID).Stringer("session-id", sessionID).Msg("Session closed")
+			log.Info().Stringer("recorder-id", recorderID).Stringer("session-id", sessionID).Msg("Session closed")
 		}(recorderID, *chunk)
 
 		m.initSession(ctx, recorderID, sessionID, timeCreated)
@@ -408,6 +411,8 @@ func (m *Minio) isSessionClosed(ctx context.Context, recorderID, sessionID uuid.
 }
 
 func (m *Minio) flushChunks(ctx context.Context, recorderID, sessionID uuid.UUID, chunk *minioChunk) error {
+	log.Debug().Stringer("recorder-id", recorderID).Stringer("session-id", sessionID).Msg("Flushing chunks")
+
 	// If we have samples left for this session, let's push those first
 	objectName := fmt.Sprintf("%s/sessions/%s/chunks/%s", recorderID, sessionID, fmt.Sprintf("%016d", chunk.number))
 
@@ -423,10 +428,14 @@ func (m *Minio) flushChunks(ctx context.Context, recorderID, sessionID uuid.UUID
 		}
 	}
 
+	log.Debug().Stringer("recorder-id", recorderID).Stringer("session-id", sessionID).Msg("Done flushing chunks")
+
 	return nil
 }
 
 func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UUID) error {
+	log.Debug().Stringer("recorder-id", recorderID).Stringer("session-id", sessionID).Msg("Rendering session")
+
 	chunksPrefix := fmt.Sprintf("%s/sessions/%s/chunks", recorderID, sessionID)
 	rawDataObjectName := fmt.Sprintf("%s/sessions/%s/data.raw", recorderID, sessionID)
 
@@ -463,9 +472,6 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 	//		log.Err(err).Msg("Could not extend pre-rendered data")
 	//	}
 	//}
-
-	// Check result of:
-	// session-recorder/9ea55551-5b65-4c0c-9d91-531053677a79/sessions/22b83fea-c40e-4af9-b587-e586e74d691d
 
 	objectCh := m.client.ListObjects(ctx, bucketName, minio.ListObjectsOptions{Prefix: chunksPrefix, Recursive: true})
 	srcs := make([]minio.CopySrcOptions, 0)
@@ -532,9 +538,9 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 	}
 
 	readers, writer, closer := makeReaders(4)
-	eg, _ := errgroup.WithContext(ctx)
+	eg, egCtx := errgroup.WithContext(ctx)
 
-	// Writer copies from raw data to all the readers
+	// Setup some io for the rendering of waveform, overview, flac and ogg files
 	eg.Go(func() error {
 		defer closer.Close()
 
@@ -548,9 +554,9 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 		return nil
 	})
 
-	// Create waveform dat file. Reads from reader 2
+	// Create waveform dat file.
 	eg.Go(func() error {
-		waveformData, err := render.CreateWaveform(readers[0], 300, 10000, 200)
+		waveformData, err := render.CreateWaveform(egCtx, readers[0], 300, 10000, 200)
 		if err != nil {
 			log.Err(err).Msg("Cannot create waveform")
 
@@ -567,9 +573,9 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 		return nil
 	})
 
-	// Create waveform png overview file. Reads from reader 1
+	// Create waveform png overview file.
 	eg.Go(func() error {
-		overviewData, err := render.CreateOverview(readers[1], 300, 1000, 200)
+		overviewData, err := render.CreateOverview(egCtx, readers[1], 300, 1000, 200)
 		if err != nil {
 			log.Err(err).Msg("Cannot create waveform overview")
 
@@ -586,7 +592,7 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 		return nil
 	})
 
-	// Create flac file. Reads from reader 2
+	// Create flac file.
 	eg.Go(func() error {
 		var flacBuffer *bytes.Buffer
 		if flacBuffer, err = render.Flac(readers[2]); err != nil {
@@ -605,7 +611,7 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 		return nil
 	})
 
-	// Create ogg file. Reads from reader 3
+	// Create ogg file.
 	eg.Go(func() error {
 		ext := "ogg"
 
@@ -627,8 +633,6 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 	})
 
 	if err := eg.Wait(); err != nil {
-		log.Err(err).Msg("Cannot render session")
-
 		return err
 	}
 
@@ -642,15 +646,12 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 		m.cbLock.Unlock()
 	}
 
-	log.Info().
-		Stringer("recorder-id", recorderID).
-		Stringer("session-id", sessionID).
-		Msg("Session rendered")
+	log.Debug().Stringer("recorder-id", recorderID).Stringer("session-id", sessionID).Msg("Done rendering session")
 
 	return nil
 }
 
-func (m *Minio) readRecorderIDs(ctx context.Context) ([]uuid.UUID, error) {
+func (m *Minio) FindRecorderIDs(ctx context.Context) ([]uuid.UUID, error) {
 	recorders := make([]uuid.UUID, 0)
 
 	objectCh := m.client.ListObjects(ctx, bucketName, minio.ListObjectsOptions{Prefix: "", Recursive: false})
@@ -768,7 +769,6 @@ func (m *Minio) getSystemMetadata(ctx context.Context) (*System, error) {
 	}
 
 	return metadata, nil
-
 }
 
 func (m *Minio) putSystemMetadata(ctx context.Context, system *System) error {
@@ -886,7 +886,7 @@ func (m *Minio) EnsureRecorderExists(ctx context.Context, recorderID uuid.UUID, 
 }
 
 func (m *Minio) closeSessions(ctx context.Context, recorderID uuid.UUID) error {
-	log.Debug().Stringer("recorder-id", recorderID).Msg("Closing open sessions")
+	log.Debug().Stringer("recorder-id", recorderID).Msg("Closing all sessions for recorder")
 
 	sessionIDs, err := m.readSessionIDs(ctx, recorderID)
 	if err != nil {
@@ -899,7 +899,7 @@ func (m *Minio) closeSessions(ctx context.Context, recorderID uuid.UUID) error {
 		}
 	}
 
-	log.Debug().Stringer("recorder-id", recorderID).Msg("Open sessions closed")
+	log.Debug().Stringer("recorder-id", recorderID).Msg("Closeed all sessions for recorder")
 
 	return nil
 }
@@ -908,8 +908,6 @@ func (m *Minio) closeSession(ctx context.Context, recorderID, sessionID uuid.UUI
 	if m.isSessionClosed(ctx, recorderID, sessionID) {
 		return nil
 	}
-
-	log.Debug().Stringer("recorder-id", recorderID).Stringer("session-id", sessionID).Msg("Closing session")
 
 	if chunk != nil {
 		if err := m.flushChunks(ctx, recorderID, sessionID, chunk); err != nil {

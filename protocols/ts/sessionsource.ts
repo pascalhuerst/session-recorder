@@ -188,6 +188,10 @@ export interface RenderSegmentRequest {
   segmentID: string;
 }
 
+export interface CutSessionRequest {
+  recorderID: string;
+}
+
 function createBaseStreamRecordersRequest(): StreamRecordersRequest {
   return {};
 }
@@ -1648,6 +1652,63 @@ export const RenderSegmentRequest = {
   },
 };
 
+function createBaseCutSessionRequest(): CutSessionRequest {
+  return { recorderID: "" };
+}
+
+export const CutSessionRequest = {
+  encode(message: CutSessionRequest, writer: _m0.Writer = _m0.Writer.create()): _m0.Writer {
+    if (message.recorderID !== "") {
+      writer.uint32(10).string(message.recorderID);
+    }
+    return writer;
+  },
+
+  decode(input: _m0.Reader | Uint8Array, length?: number): CutSessionRequest {
+    const reader = input instanceof _m0.Reader ? input : _m0.Reader.create(input);
+    let end = length === undefined ? reader.len : reader.pos + length;
+    const message = createBaseCutSessionRequest();
+    while (reader.pos < end) {
+      const tag = reader.uint32();
+      switch (tag >>> 3) {
+        case 1:
+          if (tag !== 10) {
+            break;
+          }
+
+          message.recorderID = reader.string();
+          continue;
+      }
+      if ((tag & 7) === 4 || tag === 0) {
+        break;
+      }
+      reader.skipType(tag & 7);
+    }
+    return message;
+  },
+
+  fromJSON(object: any): CutSessionRequest {
+    return { recorderID: isSet(object.recorderID) ? globalThis.String(object.recorderID) : "" };
+  },
+
+  toJSON(message: CutSessionRequest): unknown {
+    const obj: any = {};
+    if (message.recorderID !== "") {
+      obj.recorderID = message.recorderID;
+    }
+    return obj;
+  },
+
+  create(base?: DeepPartial<CutSessionRequest>): CutSessionRequest {
+    return CutSessionRequest.fromPartial(base ?? {});
+  },
+  fromPartial(object: DeepPartial<CutSessionRequest>): CutSessionRequest {
+    const message = createBaseCutSessionRequest();
+    message.recorderID = object.recorderID ?? "";
+    return message;
+  },
+};
+
 export type SessionSourceDefinition = typeof SessionSourceDefinition;
 export const SessionSourceDefinition = {
   name: "SessionSource",
@@ -1727,6 +1788,14 @@ export const SessionSourceDefinition = {
       responseStream: false,
       options: {},
     },
+    cutSession: {
+      name: "CutSession",
+      requestType: CutSessionRequest,
+      requestStream: false,
+      responseType: Respone,
+      responseStream: false,
+      options: {},
+    },
   },
 } as const;
 
@@ -1748,6 +1817,7 @@ export interface SessionSourceServiceImplementation<CallContextExt = {}> {
   deleteSegment(request: DeleteSegmentRequest, context: CallContext & CallContextExt): Promise<DeepPartial<Respone>>;
   renderSegment(request: RenderSegmentRequest, context: CallContext & CallContextExt): Promise<DeepPartial<Respone>>;
   updateSegment(request: UpdateSegmentRequest, context: CallContext & CallContextExt): Promise<DeepPartial<Respone>>;
+  cutSession(request: CutSessionRequest, context: CallContext & CallContextExt): Promise<DeepPartial<Respone>>;
 }
 
 export interface SessionSourceClient<CallOptionsExt = {}> {
@@ -1768,6 +1838,7 @@ export interface SessionSourceClient<CallOptionsExt = {}> {
   deleteSegment(request: DeepPartial<DeleteSegmentRequest>, options?: CallOptions & CallOptionsExt): Promise<Respone>;
   renderSegment(request: DeepPartial<RenderSegmentRequest>, options?: CallOptions & CallOptionsExt): Promise<Respone>;
   updateSegment(request: DeepPartial<UpdateSegmentRequest>, options?: CallOptions & CallOptionsExt): Promise<Respone>;
+  cutSession(request: DeepPartial<CutSessionRequest>, options?: CallOptions & CallOptionsExt): Promise<Respone>;
 }
 
 type Builtin = Date | Function | Uint8Array | string | number | boolean | undefined;

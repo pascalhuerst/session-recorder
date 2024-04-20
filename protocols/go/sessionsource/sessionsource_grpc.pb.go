@@ -30,6 +30,7 @@ type SessionSourceClient interface {
 	DeleteSegment(ctx context.Context, in *DeleteSegmentRequest, opts ...grpc.CallOption) (*common.Respone, error)
 	RenderSegment(ctx context.Context, in *RenderSegmentRequest, opts ...grpc.CallOption) (*common.Respone, error)
 	UpdateSegment(ctx context.Context, in *UpdateSegmentRequest, opts ...grpc.CallOption) (*common.Respone, error)
+	CutSession(ctx context.Context, in *CutSessionRequest, opts ...grpc.CallOption) (*common.Respone, error)
 }
 
 type sessionSourceClient struct {
@@ -167,6 +168,15 @@ func (c *sessionSourceClient) UpdateSegment(ctx context.Context, in *UpdateSegme
 	return out, nil
 }
 
+func (c *sessionSourceClient) CutSession(ctx context.Context, in *CutSessionRequest, opts ...grpc.CallOption) (*common.Respone, error) {
+	out := new(common.Respone)
+	err := c.cc.Invoke(ctx, "/sessionsource.SessionSource/CutSession", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SessionSourceServer is the server API for SessionSource service.
 // All implementations should embed UnimplementedSessionSourceServer
 // for forward compatibility
@@ -182,6 +192,7 @@ type SessionSourceServer interface {
 	DeleteSegment(context.Context, *DeleteSegmentRequest) (*common.Respone, error)
 	RenderSegment(context.Context, *RenderSegmentRequest) (*common.Respone, error)
 	UpdateSegment(context.Context, *UpdateSegmentRequest) (*common.Respone, error)
+	CutSession(context.Context, *CutSessionRequest) (*common.Respone, error)
 }
 
 // UnimplementedSessionSourceServer should be embedded to have forward compatible implementations.
@@ -214,6 +225,9 @@ func (UnimplementedSessionSourceServer) RenderSegment(context.Context, *RenderSe
 }
 func (UnimplementedSessionSourceServer) UpdateSegment(context.Context, *UpdateSegmentRequest) (*common.Respone, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method UpdateSegment not implemented")
+}
+func (UnimplementedSessionSourceServer) CutSession(context.Context, *CutSessionRequest) (*common.Respone, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method CutSession not implemented")
 }
 
 // UnsafeSessionSourceServer may be embedded to opt out of forward compatibility for this service.
@@ -395,6 +409,24 @@ func _SessionSource_UpdateSegment_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SessionSource_CutSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CutSessionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SessionSourceServer).CutSession(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/sessionsource.SessionSource/CutSession",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SessionSourceServer).CutSession(ctx, req.(*CutSessionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SessionSource_ServiceDesc is the grpc.ServiceDesc for SessionSource service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -429,6 +461,10 @@ var SessionSource_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateSegment",
 			Handler:    _SessionSource_UpdateSegment_Handler,
+		},
+		{
+			MethodName: "CutSession",
+			Handler:    _SessionSource_CutSession_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

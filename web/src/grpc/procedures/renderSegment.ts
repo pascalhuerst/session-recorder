@@ -5,7 +5,7 @@ export const renderSegment = async (args: {
   segmentId: string;
 }) => {
   await sessionSourceClient.renderSegment({
-    sessionID: sessionId,
-    segmentID: segmentId,
+    sessionID: args.sessionId,
+    segmentID: args.segmentId,
   });
 };

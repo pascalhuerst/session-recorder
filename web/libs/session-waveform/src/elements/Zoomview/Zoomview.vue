@@ -3,11 +3,15 @@ import SeekInput from './controls/SeekInput.vue';
 import ZoomInput from './controls/ZoomInput.vue';
 import AmplitudeInput from './controls/AmplitudeInput.vue';
 import AddSegmentButton from '../Segments/controls/AddSegmentButton.vue';
-import { usePeaksContext } from '../../context/usePeaksContext';
 import { useWaverformLayoutProvider } from '../../waveform/useWaverformLayoutProvider';
+import { usePeaksContext } from '../../context/usePeaksContext';
+import { computed } from 'vue';
 
 const { inject } = useWaverformLayoutProvider();
 const { zoomviewRef } = inject();
+
+const { state } = usePeaksContext();
+const permissions = computed(() => state.toRef().value.permissions);
 </script>
 
 <template>
@@ -17,7 +21,7 @@ const { zoomviewRef } = inject();
       <SeekInput />
       <ZoomInput />
       <AmplitudeInput />
-      <AddSegmentButton />
+      <AddSegmentButton v-if="permissions.create" />
     </div>
   </div>
 </template>

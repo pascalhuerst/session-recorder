@@ -81,7 +81,6 @@ integrateSegments(props.session, ctx);
 <template>
   <div class="card">
     <div class="header">
-      {{ session.ID }}
       <span>Untitled #{{ props.index }}</span>
 
       <div class="metadata">

@@ -6,10 +6,10 @@ defineProps<{
 
 <template>
   <div class="status">
-    <span :class="['indicator', { 'is-recording': isRecording }]" />
     <span :class="['text', { 'is-recording': isRecording }]">
       {{ isRecording ? 'rec' : 'off' }}
     </span>
+    <span :class="['indicator', { 'is-recording': isRecording }]" />
   </div>
 </template>
 
@@ -18,6 +18,7 @@ defineProps<{
   display: flex;
   gap: var(--size-1);
   align-items: center;
+  padding: 0 4px;
 }
 
 .indicator {

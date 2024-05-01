@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { storeToRefs } from "pinia";
-import { useRecordersStore } from "../../store/useRecordersStore";
-import PageShell from "../../layout/PageShell.vue";
-import Container from "../../layout/Container.vue";
-import DevicePicker from "./elements/DevicePicker.vue";
+import { storeToRefs } from 'pinia';
+import { useRecordersStore } from '../../store/useRecordersStore';
+import PageShell from '../../layout/PageShell.vue';
+import Container from '../../layout/Container.vue';
+import DevicePicker from './elements/DevicePicker.vue';
+import RecorderActions from './elements/RecorderActions.vue';
 
 const { recorders, selectedRecorderId } = storeToRefs(useRecordersStore());
 </script>
@@ -16,6 +17,11 @@ const { recorders, selectedRecorderId } = storeToRefs(useRecordersStore());
           :recorders="recorders"
           :selected-recorder-id="selectedRecorderId"
         />
+      </Container>
+    </div>
+    <div class="action-bar">
+      <Container>
+        <RecorderActions />
       </Container>
     </div>
     <div class="content">

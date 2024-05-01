@@ -11,7 +11,11 @@ const props = defineProps<{
   selectedRecorderId?: string;
 }>();
 
-const recorders = computed(() => Array.from(props.recorders.values()));
+const recorders = computed(() =>
+  Array.from(props.recorders.values()).sort((a, b) => {
+    return a.recorderName.localeCompare(b.recorderName);
+  })
+);
 
 const setSelected = (item: string) => {
   router.push(`/recorders/${item}/sessions`);

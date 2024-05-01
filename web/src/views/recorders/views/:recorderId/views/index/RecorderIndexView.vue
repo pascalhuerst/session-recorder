@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { storeToRefs } from 'pinia';
-import { watch } from 'vue';
-import { useRouter } from 'vue-router';
-import { useRecordersStore } from '@/store/useRecordersStore';
+import { storeToRefs } from "pinia";
+import { watch } from "vue";
+import { useRouter } from "vue-router";
+import { useRecordersStore } from "@/store/useRecordersStore";
 
 const router = useRouter();
 
@@ -17,6 +17,8 @@ watch(
 );
 </script>
 
-<template></template>
+<template>
+  <slot />
+</template>
 
 <style scoped></style>

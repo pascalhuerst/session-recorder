@@ -6,6 +6,7 @@ import { useSessionsStore } from '@/store/useSessionsStore';
 import { EmptyScreen } from '@session-recorder/session-waveform';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import SessionCard from '@/views/recorders/elements/SessionCard.vue';
+import { cutSession } from "../../../../../../../../grpc/procedures/cutSession";
 
 const { selectedRecorderId } = storeToRefs(useRecordersStore());
 const { sessions } = storeToRefs(useSessionsStore());
@@ -21,6 +22,8 @@ const sortedSessions = computed(() => {
 </script>
 
 <template>
+  <Button @click="() => cutSession({ recorderID: selectedRecorderId })">Cut Session</Button>
+
   <div v-if="sortedSessions.length" class="list">
     <template v-for="(session, index) in sortedSessions" :key="session.ID">
       <SessionCard

@@ -22,7 +22,6 @@ export const useSessionsStore = defineStore('sessions', () => {
           recorderID: selectedRecorderId.value,
         },
         onMessage: (session) => {
-          console.log(session);
           if (session.removed) {
             sessions.delete(session.ID);
           } else {

@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { storeToRefs } from 'pinia';
-import { useRecordersStore } from '@/store/useRecordersStore';
-import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
-import { watch } from 'vue';
-import { EmptyScreen } from '@session-recorder/session-waveform';
+import { storeToRefs } from "pinia";
+import { useRecordersStore } from "@/store/useRecordersStore";
+import { FontAwesomeIcon } from "@fortawesome/vue-fontawesome";
+import { watch } from "vue";
+import { EmptyScreen } from "@session-recorder/session-waveform";
 
 const { recorders, selectedRecorderId } = storeToRefs(useRecordersStore());
 

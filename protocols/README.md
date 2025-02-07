@@ -10,6 +10,13 @@ npm install protobufjs long
 npm install --save-dev grpc-tools ts-proto
 ```
 
+## For rust
+
+```
+cargo install grpc-compiler
+cargo install protobuf-codegen
+```
+
 ## For go and cpp
 
 ```

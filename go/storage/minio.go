@@ -642,6 +642,8 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 
 	if m.onSessionClosedCb != nil {
 		m.cbLock.Lock()
+		log.Warn().Msg("Calling onSessionClosedCb")
+
 		m.onSessionClosedCb(sm)
 		m.cbLock.Unlock()
 	}

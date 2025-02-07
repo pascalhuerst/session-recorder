@@ -19,9 +19,10 @@ create_dirs:
 	$(MD) -p cpp
 	$(MD) -p ts
 	$(MD) -p go
+	$(MD) -p rust
 
 chunksink:
-	${PROTOC} \
+	$(PROTOC) \
 		--proto_path=${PROTOC_INCLUDES} \
 		--grpc_out=generate_mock_code=false:./cpp \
 		--cpp_out=./cpp \
@@ -37,6 +38,14 @@ chunksink:
 		--proto_path=proto \
 		--go-grpc_out=./go/$@ $@.proto
 
+	## Rust
+	$(MD) -p rust/$@
+
+	$(PROTOC) \
+	    --proto_path=${PROTOC_INCLUDES}:./proto \
+		--rs_out=./rust/$@ \
+        --rust-grpc_out=./rust/$@ \
+        proto/$@.proto
 
 sessionsource:
 	$(PROTOC) \
@@ -55,6 +64,15 @@ sessionsource:
 		--proto_path=proto \
 		--go-grpc_out=./go/$@ $@.proto
 
+	## Rust
+	$(MD) -p rust/$@
+
+	$(PROTOC) \
+	    --proto_path=${PROTOC_INCLUDES}:./proto \
+		--rs_out=./rust/$@ \
+        --rust-grpc_out=./rust/$@ \
+        proto/$@.proto
+
 common:
 	$(PROTOC) \
 		--proto_path=${PROTOC_INCLUDES} \
@@ -72,7 +90,7 @@ common:
 		--proto_path=proto \
 		--go-grpc_out=./go/$@ $@.proto
 
-	${PROTOC} \
+	$(PROTOC) \
 		--proto_path=${PROTOC_INCLUDES} \
 		--grpc_out=generate_mock_code=false:./cpp \
 		--cpp_out=./cpp \
@@ -80,7 +98,18 @@ common:
 		--proto_path=proto \
 		$@.proto
 
+	## Rust
+	$(MD) -p rust/$@
+
+	$(PROTOC) \
+	    --proto_path=${PROTOC_INCLUDES}:./proto \
+        --rs_out=./rust/$@ \
+        --rust-grpc_out=./rust/$@ \
+        proto/$@.proto
+
+
 clean:
 	rm -rf cpp
 	rm -rf ts
 	rm -rf go
+	rm -rf rust

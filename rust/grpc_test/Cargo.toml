@@ -1,0 +1,13 @@
+[package]
+name = "grpc_test"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+protobuf = "3.7.1"
+
+
+#[workspace.dependencies]
+#common = { path = "crates/common" }
+#chunksink = { path = "crates/chunksink" }
+#chunksource = { path = "crates/chunksource" }

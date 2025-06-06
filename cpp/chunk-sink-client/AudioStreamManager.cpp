@@ -213,7 +213,12 @@ void AudioStreamManager::start()
                 double chunkSum = 0.0;
                 for (unsigned int i=0; i<m_detectorBufferSize; ++i) {
 
-                    double monoSum = (buffer[i].left + buffer[i].right) / 2.0;
+                    // Convert samples to normalized floating point values (-1.0 to 1.0)
+                    double leftNorm = static_cast<double>(buffer[i].left) / 32768.0;
+                    double rightNorm = static_cast<double>(buffer[i].right) / 32768.0;
+                    
+                    // Calculate mono sum using normalized values
+                    double monoSum = (leftNorm + rightNorm) / 2.0;
                     chunkSum += (monoSum * monoSum);
 
                     if (buffer[i].left == std::numeric_limits<Sample>::max() || 
@@ -226,9 +231,10 @@ void AudioStreamManager::start()
 
                 std::cout << "clipping: " << clipping << std::endl;
 
-                double chunkSumMean = static_cast<double>(chunkSum) / static_cast<double>(m_detectorBufferSize);
+                double chunkSumMean = chunkSum / static_cast<double>(m_detectorBufferSize);
                 double rms = sqrt(chunkSumMean);
-                currentState.rmsPercent = 100.0 * rms / static_cast<double>(std::numeric_limits<Sample>::max());
+                // RMS is already normalized (0.0 to 1.0), so multiply by 100 for percentage
+                currentState.rmsPercent = rms * 100.0;
 
                 if (currentState.rmsPercent < m_detectorThreshold) {
                     if (rmsCounter > 0) {

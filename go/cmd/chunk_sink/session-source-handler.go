@@ -61,6 +61,8 @@ func (h *SessionSourceHandler) onSessionClosed(session *storage.Session) {
 }
 
 func (h *SessionSourceHandler) streamRecorders(ctx context.Context, request *sspb.StreamRecordersRequest, server sspb.SessionSource_StreamRecordersServer) error {
+	log.Debug().Msg("Streaming recorders")
+
 	recorders := h.sessionStorage.GetRecorders()
 
 	for _, recorder := range recorders {
@@ -90,12 +92,16 @@ func (h *SessionSourceHandler) streamRecorders(ctx context.Context, request *ssp
 				log.Err(err).Msg("Cannot send recorder data")
 			}
 		case <-ctx.Done():
+			log.Debug().Msg("Done streaming recorders")
+
 			return nil
 		}
 	}
 }
 
 func (h *SessionSourceHandler) streamSessions(ctx context.Context, request *sspb.StreamSessionRequest, server sspb.SessionSource_StreamSessionsServer) error {
+	log.Debug().Msg("Streaming sessions")
+
 	recorderID, err := uuid.Parse(request.RecorderID)
 	if err != nil {
 		log.Err(err).Str("recorder-id", request.RecorderID).Msg("Cannot parse recorder ID")
@@ -132,11 +138,19 @@ func (h *SessionSourceHandler) streamSessions(ctx context.Context, request *sspb
 	for {
 		select {
 		case session := <-h.sessionUpdateCh:
-			server.SendMsg(session)
+			if err := server.SendMsg(session); err != nil {
+				log.Err(err).Msg("Cannot send session data")
+			}
 		case <-ctx.Done():
+			log.Debug().Msg("Done streaming sessions")
+
 			return nil
 		}
 	}
+}
+
+func (h *SessionSourceHandler) cutSession(ctx context.Context, request *sspb.CutSessionRequest) (*cmpb.Respone, error) {
+	return noSuccess, nil
 }
 
 func parseIDs(recorderID string, sessionID string) (uuid.UUID, uuid.UUID, error) {
@@ -213,6 +227,8 @@ func (h *SessionSourceHandler) setKeepSession(ctx context.Context, request *sspb
 			},
 		},
 	}
+
+	log.Info().Str("session-id", request.SessionID).Bool("keep", request.Keep).Msg("Set keep session")
 
 	return success, nil
 }

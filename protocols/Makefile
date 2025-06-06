@@ -21,7 +21,7 @@ create_dirs:
 	$(MD) -p go
 
 chunksink:
-	${PROTOC} \
+	$(PROTOC) \
 		--proto_path=${PROTOC_INCLUDES} \
 		--grpc_out=generate_mock_code=false:./cpp \
 		--cpp_out=./cpp \
@@ -36,7 +36,6 @@ chunksink:
 		--go-grpc_opt=require_unimplemented_servers=false,paths=source_relative \
 		--proto_path=proto \
 		--go-grpc_out=./go/$@ $@.proto
-
 
 sessionsource:
 	$(PROTOC) \
@@ -75,7 +74,7 @@ common:
 		--proto_path=proto \
 		--go-grpc_out=./go/$@ $@.proto
 
-	${PROTOC} \
+	$(PROTOC) \
 		--proto_path=${PROTOC_INCLUDES} \
 		--grpc_out=generate_mock_code=false:./cpp \
 		--cpp_out=./cpp \

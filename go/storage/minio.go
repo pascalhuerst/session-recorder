@@ -286,6 +286,11 @@ func (m *Minio) DeleteSession(ctx context.Context, recorderID, sessionID uuid.UU
 func (m *Minio) deleteSession(ctx context.Context, recorderID, sessionID uuid.UUID) error {
 	chunksPrefix := fmt.Sprintf("%s/sessions/%s", recorderID, sessionID)
 
+	log.Warn().
+		Stringer("recorder-id", recorderID).
+		Stringer("session-id", sessionID).
+		Msg("Deleting session")
+
 	err := m.client.RemoveObject(ctx, bucketName, chunksPrefix, minio.RemoveObjectOptions{ForceDelete: true})
 	if err != nil {
 		log.Err(err).Str("object", chunksPrefix).Msg("Cannot remove object")

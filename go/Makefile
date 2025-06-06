@@ -3,7 +3,7 @@ GO ?= go
 GOBUILDFLAGS ?= -v
 
 BINARIES = \
-  chunk_sink
+  chunk_sink \
 
 PACKAGES = \
   mdns
@@ -15,4 +15,3 @@ chunk_sink:
 
 clean:
 	cd bin && rm -f ${BINARIES}
-

@@ -4,11 +4,10 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"time"
 
+	"github.com/google/uuid"
 	cspb "github.com/pascalhuerst/session-recorder/protocols/go/chunksink"
 	cmpb "github.com/pascalhuerst/session-recorder/protocols/go/common"
-	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
 )
 
@@ -24,13 +23,16 @@ type ChunkSinkServerConfig struct {
 }
 
 type ChunkSinkServer struct {
-	mutex  sync.Mutex
 	config *ChunkSinkServerConfig
+
+	sendCommandFuncMapLock sync.Mutex
+	sendCommandFuncMap     map[string]func(*cspb.Command) error
 }
 
 func NewChunkSinkServer(config *ChunkSinkServerConfig) *ChunkSinkServer {
 	return &ChunkSinkServer{
-		config: config,
+		config:             config,
+		sendCommandFuncMap: make(map[string]func(*cspb.Command) error),
 	}
 }
 
@@ -86,16 +88,25 @@ func (s *ChunkSinkServer) SetChunks(ctx context.Context, in *cspb.Chunks) (*cmpb
 }
 
 func (s *ChunkSinkServer) GetCommands(request *cspb.GetCommandRequest, server cspb.ChunkSink_GetCommandsServer) error {
-	for {
-		select {
-		case <-server.Context().Done():
-			return server.Context().Err()
-		case <-time.Tick(2 * time.Minute):
-			log.Info().Msg("Sending cut session command")
+	s.sendCommandFuncMapLock.Lock()
+	s.sendCommandFuncMap[request.RecorderID] = server.Send
+	s.sendCommandFuncMapLock.Unlock()
 
-			server.Send(&cspb.Command{
-				Command: &cspb.Command_CmdCutSession{CmdCutSession: &cspb.CmdCutSession{}},
-			})
-		}
+	<-server.Context().Done()
+	s.sendCommandFuncMapLock.Lock()
+	delete(s.sendCommandFuncMap, request.RecorderID)
+	s.sendCommandFuncMapLock.Unlock()
+
+	return server.Context().Err()
+}
+
+func (s *ChunkSinkServer) CutSession(recorderID uuid.UUID) error {
+	s.sendCommandFuncMapLock.Lock()
+	defer s.sendCommandFuncMapLock.Unlock()
+
+	if sendCommandFunc, ok := s.sendCommandFuncMap[recorderID.String()]; ok {
+		return sendCommandFunc(&cspb.Command{Command: &cspb.Command_CmdCutSession{CmdCutSession: &cspb.CmdCutSession{}}})
 	}
+
+	return fmt.Errorf("No connection to recorder %s", recorderID)
 }

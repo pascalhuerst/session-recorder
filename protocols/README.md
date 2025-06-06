@@ -5,9 +5,16 @@ To build the ptotobuf stuff, you need the following:
 ## For typescript:
 
 ```
-npm install nice-grpc
-npm install protobufjs long
-npm install --save-dev grpc-tools ts-proto
+npm install @protobuf-ts/runtime @protobuf-ts/runtime-rpc @protobuf-ts/grpcweb-transport
+npm install --save-dev @protobuf-ts/plugin grpc-tools
+npm install @protobuf-ts/grpcweb-transport
+```
+
+## For rust
+
+```
+cargo install grpc-compiler
+cargo install protobuf-codegen
 ```
 
 ## For go and cpp

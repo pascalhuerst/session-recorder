@@ -35,8 +35,9 @@ func main() {
 				log.Fatal().Err(err).Msg("Cannot receive recorder. Giving up")
 			}
 
-			go streamSessions(client, recorder)
-
+			if recorder.RecorderID == "6cc49ce1-2d89-448d-a657-ba7166547c51" {
+				streamSessions(client, recorder)
+			}
 		}
 	}()
 
@@ -56,6 +57,12 @@ func streamSessions(client sspb.SessionSourceClient, recorder *sspb.Recorder) {
 		if err != nil {
 			log.Fatal().Err(err).Msg("Cannot receive session. Giving up")
 		}
+
+		//time.Sleep(1 * time.Second)
+		//
+		//log.Info().Msgf("Setting keep for session: %v", session.ID)
+		//
+		//client.SetKeepSession(context.Background(), &sspb.SetKeepSessionRequest{RecorderID: recorder.RecorderID, SessionID: session.ID, Keep: true}, grpc.EmptyCallOption{})
 
 		fmt.Printf("  Session: %v\n", session)
 	}

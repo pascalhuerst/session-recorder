@@ -10,11 +10,11 @@ defineProps<{
       <div
         class="indicator"
         :style="{
-          'clip-path': `inset(0px ${100 - value * 100}% 0px 0px)`,
+          'clip-path': `inset(0px ${100 - value}% 0px 0px)`,
         }"
       ></div>
     </div>
-    <div class="text">{{ Math.ceil(value * 100) }}%</div>
+    <div class="text">{{ Math.ceil(value) }}%</div>
   </div>
 </template>
 

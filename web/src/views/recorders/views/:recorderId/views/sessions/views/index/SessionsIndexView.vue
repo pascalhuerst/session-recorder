@@ -11,13 +11,19 @@ const { selectedRecorderId } = storeToRefs(useRecordersStore());
 const { sessions } = storeToRefs(useSessionsStore());
 
 const sortedSessions = computed(() => {
-  return sessions.value.slice().sort((a, b) => {
+  console.log('🔄 Computed sortedSessions triggered, sessions count:', sessions.value.length);
+  console.log('Session IDs in computed:', sessions.value.map(s => s.iD));
+  
+  const sorted = sessions.value.slice().sort((a, b) => {
     const aTime = a.info.oneofKind === 'updated' && a.info.updated.timeCreated ? 
       a.info.updated.timeCreated.seconds * 1000 : 0;
     const bTime = b.info.oneofKind === 'updated' && b.info.updated.timeCreated ? 
       b.info.updated.timeCreated.seconds * 1000 : 0;
     return bTime - aTime;
   });
+  
+  console.log('Sorted sessions:', sorted.map(s => s.iD));
+  return sorted;
 });
 </script>
 

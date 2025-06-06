@@ -22,28 +22,25 @@ export const useSessionsStore = defineStore('sessions', () => {
           recorderID: selectedRecorderId.value,
         },
         onMessage: (session) => {
-          console.log('Received session:', session);
-          console.log('Session ID:', session.iD);
-          console.log('Session info type:', session.info.oneofKind);
-          console.log('Current sessions count:', sessions.size);
-          
           if (session.info.oneofKind === 'removed') {
-            console.log('Removing session:', session.iD);
+            console.log('🗑️ Removing session:', session.iD);
             const index = sessions.findIndex(s => s.iD === session.iD);
             if (index !== -1) {
               sessions.splice(index, 1);
+              console.log('✅ Session removed successfully');
+            } else {
+              console.warn('❌ Session not found for removal:', session.iD);
             }
-          } else {
-            console.log('Adding/updating session:', session.iD);
+          } else if (session.info.oneofKind === 'updated') {
             const existingIndex = sessions.findIndex(s => s.iD === session.iD);
             if (existingIndex !== -1) {
               sessions[existingIndex] = session;
             } else {
               sessions.push(session);
             }
+          } else {
+            console.warn('⚠️ Unknown session info type:', session.info.oneofKind);
           }
-          
-          console.log('Sessions after update:', sessions.map(s => s.iD));
         },
         onError: (err) => {
           console.error('Sessions stream error:', err);

@@ -16,7 +16,7 @@ const recorder = computed(() => {
 <template>
   <div v-if="recorder" class="actions">
     <div
-      v-if="recorder.status.signalStatus === SignalStatus.SIGNAL"
+      v-if="recorder.info.oneofKind === 'status' && recorder.info.status.signalStatus === SignalStatus.SIGNAL"
       class="banner"
     >
       <div>This recorder is currently recording</div>

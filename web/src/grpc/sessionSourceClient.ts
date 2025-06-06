@@ -1,10 +1,9 @@
-import { createChannel, createClient, FetchTransport } from "nice-grpc-web";
-import { type SessionSourceClient, SessionSourceDefinition } from "@session-recorder/protocols/ts/sessionsource";
+import { GrpcWebFetchTransport } from "@protobuf-ts/grpcweb-transport";
+import { SessionSourceClient } from "@session-recorder/protocols/ts/sessionsource.client";
 import { env } from "../env";
 
-const channel = createChannel(env.VITE_GRPC_SERVER_URL, FetchTransport());
+const transport = new GrpcWebFetchTransport({
+  baseUrl: env.VITE_GRPC_SERVER_URL,
+});
 
-export const sessionSourceClient: SessionSourceClient = createClient(
-  SessionSourceDefinition,
-  channel
-);
+export const sessionSourceClient = new SessionSourceClient(transport);

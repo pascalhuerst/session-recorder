@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { type Recorder } from '@session-recorder/protocols/ts/sessionsource';
+import { Recorder } from '@session-recorder/protocols/ts/sessionsource';
 import { SignalStatus } from '@session-recorder/protocols/ts/common';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import StatusIndicator from './StatusIndicator.vue';
@@ -12,7 +12,8 @@ const props = defineProps<{
 }>();
 
 const isRecording = computed(() => {
-  return props.recorder.status.signalStatus === SignalStatus.SIGNAL;
+  return props.recorder.info.oneofKind === 'status' && 
+         props.recorder.info.status.signalStatus === SignalStatus.SIGNAL;
 });
 </script>
 
@@ -24,7 +25,7 @@ const isRecording = computed(() => {
     </div>
     <div class="indicators">
       <StatusIndicator :isRecording="isRecording" />
-      <RmsIndicator v-if="isRecording" :value="recorder.status.rmsPercent" />
+      <RmsIndicator v-if="isRecording && recorder.info.oneofKind === 'status'" :value="recorder.info.status.rmsPercent" />
     </div>
   </div>
 </template>

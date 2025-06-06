@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useRouter } from 'vue-router';
-import { type Recorder } from '@session-recorder/protocols/ts/sessionsource';
+import { Recorder } from '@session-recorder/protocols/ts/sessionsource';
 import { computed } from 'vue';
 import DeviceCard from './DeviceCard.vue';
 

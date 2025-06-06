@@ -1,10 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import SessionMenu from './SessionMenu.vue';
-import {
-  SegmentState,
-  type Session,
-} from '@session-recorder/protocols/ts/sessionsource';
+import { Session, SegmentState } from '@session-recorder/protocols/ts/sessionsource';
 import { useDateFormat } from '@vueuse/core';
 import { useSessionData } from '@/useSessionData';
 import {
@@ -21,26 +18,27 @@ const props = defineProps<{
 }>();
 
 const createdAt = computed(() => {
-  if (!props.session.updated.timeCreated) {
+  if (props.session.info.oneofKind !== 'updated' || !props.session.info.updated.timeCreated) {
     return { iso: '', formatted: '' };
   }
+  const createdDate = new Date(props.session.info.updated.timeCreated.seconds * 1000);
   const format =
-    props.session.updated.timeCreated.getFullYear() === new Date().getFullYear()
+    createdDate.getFullYear() === new Date().getFullYear()
       ? 'ddd, MMM D, HH:mm'
       : 'MMM D, YYYY HH:mm';
   return {
-    iso: props.session.updated.timeCreated.toISOString(),
-    formatted: useDateFormat(props.session.updated.timeCreated, format).value,
+    iso: createdDate.toISOString(),
+    formatted: useDateFormat(createdDate, format).value,
   };
 });
 
 const { waveformUrl, audioUrls } = useSessionData({
-  sessionId: props.session.ID,
+  sessionId: props.session.iD,
   recorderId: props.recorderId,
 });
 
 const buildUrlPath = (segmentId: string, ext: string) => {
-  return `/session-recorder/${props.session.ID}/sessions/${props.recorderId}/segments/${segmentId}.${ext}`;
+  return `/session-recorder/${props.session.iD}/sessions/${props.recorderId}/segments/${segmentId}.${ext}`;
 };
 
 const ctx = createPeaksContext({
@@ -52,13 +50,13 @@ const ctx = createPeaksContext({
       update: true,
       delete: true,
     },
-    segments: props.session.updated.segments.map((s) => ({
+    segments: (props.session.info.oneofKind === 'updated' ? props.session.info.updated.segments || [] : []).map((s) => ({
       id: s.segmentID,
-      labelText: s.updated.name,
-      startTime: s.updated.timeStart.getTime(),
-      endTime: s.updated.timeEnd.getTime(),
+      labelText: s.info.oneofKind === 'updated' ? s.info.updated.name || '' : '',
+      startTime: s.info.oneofKind === 'updated' && s.info.updated.timeStart ? new Date(s.info.updated.timeStart.seconds * 1000).getTime() : 0,
+      endTime: s.info.oneofKind === 'updated' && s.info.updated.timeEnd ? new Date(s.info.updated.timeEnd.seconds * 1000).getTime() : 0,
       renders:
-        s.updated.state === SegmentState.SEGMENT_STATE_FINISHED
+        s.info.oneofKind === 'updated' && s.info.updated.state === SegmentState.SEGMENT_STATE_FINISHED
           ? [
               {
                 type: 'audio/mp3',

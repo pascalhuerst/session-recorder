@@ -21,7 +21,7 @@
     "lodash.merge": "^4.6.2",
     "nanoevents": "^9.0.0",
     "nanostores": "^0.9.5",
-    "nice-grpc-web": "^3.3.2",
+    "@protobuf-ts/grpcweb-transport": "^2.9.4",
     "pinia": "^2.1.7",
     "pollen-css": "^4.6.2",
     "vue": "^3.4.18",

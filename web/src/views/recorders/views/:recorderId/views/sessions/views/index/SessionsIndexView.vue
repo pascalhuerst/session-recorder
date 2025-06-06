@@ -11,22 +11,23 @@ const { selectedRecorderId } = storeToRefs(useRecordersStore());
 const { sessions } = storeToRefs(useSessionsStore());
 
 const sortedSessions = computed(() => {
-  return Array.from(sessions.value.values()).sort((a, b) => {
-    return (
-      Number(b.updated.timeCreated?.getTime()) -
-      Number(a.updated.timeCreated?.getTime())
-    );
+  return sessions.value.slice().sort((a, b) => {
+    const aTime = a.info.oneofKind === 'updated' && a.info.updated.timeCreated ? 
+      a.info.updated.timeCreated.seconds * 1000 : 0;
+    const bTime = b.info.oneofKind === 'updated' && b.info.updated.timeCreated ? 
+      b.info.updated.timeCreated.seconds * 1000 : 0;
+    return bTime - aTime;
   });
 });
 </script>
 
 <template>
   <div v-if="sortedSessions.length" class="list">
-    <template v-for="(session, index) in sortedSessions" :key="session.ID">
+    <template v-for="(session, index) in sortedSessions" :key="session.iD">
       <SessionCard
         :session="session"
         :recorder-id="selectedRecorderId"
-        :index="sessions.size - index"
+        :index="sessions.length - index"
       />
     </template>
     <router-view />

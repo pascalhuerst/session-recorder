@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { type Session } from '@session-recorder/protocols/ts/sessionsource';
+import { Session } from '@session-recorder/protocols/ts/sessionsource';
 import { computed } from 'vue';
 import { setKeepSession } from '@/grpc/procedures/setKeepSession';
 import { deleteSession } from '@/grpc/procedures/deleteSession';
@@ -21,32 +21,33 @@ const props = defineProps<{
 const { awaitConfirmation, modalProps } = useConfirmation();
 
 const { audioUrls } = useSessionData({
-  sessionId: props.session.ID,
+  sessionId: props.session.iD,
   recorderId: props.recorderId,
 });
 
 const ttl = computed(() => {
   if (
-    !props.session.updated.lifetime.seconds &&
-    !props.session.updated.lifetime.nanos
+    props.session.info.oneofKind !== 'updated' ||
+    !props.session.info.updated.lifetime?.seconds &&
+    !props.session.info.updated.lifetime?.nanos
   ) {
     return undefined;
   }
 
-  const val = Math.floor(props.session.updated.lifetime.seconds / 3600);
+  const val = Math.floor(props.session.info.updated.lifetime.seconds / 3600);
   if (val > 0) {
     return `${val} hours`;
   }
 
-  const minutes = Math.floor(props.session.updated.lifetime.seconds);
+  const minutes = Math.floor(props.session.info.updated.lifetime.seconds);
   return `${minutes} minutes`;
 });
 
-const onKeep = () => setKeepSession({ recorderId: props.recorderId, sessionId: props.session.ID, keep: !props.session.updated.keep });
+const onKeep = () => setKeepSession({ recorderId: props.recorderId, sessionId: props.session.iD, keep: !(props.session.info.oneofKind === 'updated' && props.session.info.updated.keep) });
 const onDelete = () => {
   awaitConfirmation().then(({ isConfirmed }) => {
     if (isConfirmed) {
-      deleteSession({ recorderId: props.recorderId, sessionId: props.session.ID });
+      deleteSession({ recorderId: props.recorderId, sessionId: props.session.iD });
     }
   });
 };
@@ -54,10 +55,10 @@ const onDelete = () => {
 
 <template>
   <div class="menu">
-    <div v-if="ttl && !session.updated.keep" class="balance">
+    <div v-if="ttl && !(session.info.oneofKind === 'updated' && session.info.updated.keep)" class="balance">
       {{ ttl }} until deleted
     </div>
-    <Button size="xs" v-if="!session.updated.keep" @click="onKeep">
+    <Button size="xs" v-if="!(session.info.oneofKind === 'updated' && session.info.updated.keep)" @click="onKeep">
       <font-awesome-icon icon="fa-solid fa-heart"></font-awesome-icon>
       Keep
     </Button>

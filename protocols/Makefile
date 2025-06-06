@@ -1,7 +1,7 @@
 PROTOC ?= protoc
 PROTOC_INCLUDES ?= /usr/include/google/protobuf
 GRPC_CPP_PLUGIN ?= $(shell which grpc_cpp_plugin)
-GRPC_TS_PLUGIN ?= ./node_modules/.bin/protoc-gen-ts_proto
+PROTOBUF_TS_PLUGIN ?= ./node_modules/.bin/protoc-gen-ts
 MD ?= mkdir
 CP ?= cp
 
@@ -41,9 +41,11 @@ chunksink:
 sessionsource:
 	$(PROTOC) \
 		--proto_path=${PROTOC_INCLUDES} \
-		--plugin=protoc-gen-ts_proto=$(GRPC_TS_PLUGIN) \
-		--ts_proto_out=./ts \
-		--ts_proto_opt=outputServices=nice-grpc,outputServices=generic-definitions,useExactTypes=false,esModuleInterop=true \
+		--ts_out=./ts \
+		--ts_opt=generate_dependencies \
+		--ts_opt=long_type_string \
+		--ts_opt=client_generic \
+		--plugin=protoc-gen-ts=$(PROTOBUF_TS_PLUGIN) \
 		--proto_path=proto \
 		$@.proto
 
@@ -58,9 +60,10 @@ sessionsource:
 common:
 	$(PROTOC) \
 		--proto_path=${PROTOC_INCLUDES} \
-		--plugin=protoc-gen-ts_proto=$(GRPC_TS_PLUGIN) \
-		--ts_proto_out=./ts \
-		--ts_proto_opt=outputServices=nice-grpc,outputServices=generic-definitions,useExactTypes=false,esModuleInterop=true \
+		--ts_out=./ts \
+		--ts_opt=generate_dependencies \
+		--ts_opt=long_type_string \
+		--plugin=protoc-gen-ts=$(PROTOBUF_TS_PLUGIN) \
 		--proto_path=proto \
 		$@.proto
 

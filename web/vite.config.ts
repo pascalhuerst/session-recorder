@@ -10,6 +10,15 @@ export default defineConfig({
   server: {
     port: 4200,
     host: 'localhost',
+    strictPort: true,
+    proxy: {
+      '/sessionsource.SessionSource': {
+        target: 'http://localhost:8780',
+        changeOrigin: true,
+        ws: true,
+        rewrite: (path) => path,
+      },
+    },
   },
 
   preview: {
@@ -30,6 +39,21 @@ export default defineConfig({
     commonjsOptions: {
       transformMixedEsModules: true,
     },
+  },
+
+  optimizeDeps: {
+    include: [
+      '@protobuf-ts/runtime',
+      '@protobuf-ts/runtime-rpc',
+      '@protobuf-ts/grpcweb-transport',
+      '@session-recorder/protocols/ts/sessionsource',
+      '@session-recorder/protocols/ts/sessionsource.client',
+      '@session-recorder/protocols/ts/common'
+    ],
+  },
+
+  define: {
+    global: 'globalThis',
   },
 
   test: {

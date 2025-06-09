@@ -955,11 +955,20 @@ func (m *Minio) closeSession(ctx context.Context, recorderID, sessionID uuid.UUI
 func (m *Minio) GetPresignedURL(ctx context.Context, recorderID, sessionID uuid.UUID, filename string, expiry time.Duration) (string, error) {
 	objectName := fmt.Sprintf("%s/sessions/%s/%s", recorderID, sessionID, filename)
 	
+	// First check if the object exists
+	_, err := m.client.StatObject(ctx, bucketName, objectName, minio.StatObjectOptions{})
+	if err != nil {
+		log.Debug().Str("object", objectName).Err(err).Msg("Object does not exist for presigned URL generation")
+		return "", fmt.Errorf("object %s does not exist: %w", objectName, err)
+	}
+	
 	reqParams := make(url.Values)
 	presignedURL, err := m.publicClient.PresignedGetObject(ctx, bucketName, objectName, expiry, reqParams)
 	if err != nil {
+		log.Error().Str("object", objectName).Str("bucket", bucketName).Err(err).Msg("Failed to generate presigned URL")
 		return "", fmt.Errorf("cannot generate presigned URL for %s: %w", objectName, err)
 	}
 	
+	log.Debug().Str("object", objectName).Str("url", presignedURL.String()).Msg("Generated presigned URL")
 	return presignedURL.String(), nil
 }

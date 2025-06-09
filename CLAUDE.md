@@ -9,45 +9,86 @@ Session Recorder is a distributed audio recording system with three main compone
 - **Go Backend Server**: Receives audio chunks, manages sessions, provides API
 - **Vue.js Web Interface**: User interface for managing recordings and sessions
 
-## Common Commands
+## Local Development Setup
 
-### Protocol Generation (Required First)
+### 1. Build C++ Client
+```bash
+cd cpp/chunk-sink-client/
+cmake --build .
+chmod +x chunk-sink-client
+```
+
+### 2. Start MinIO Storage
+```bash
+docker run \
+   -p 9000:9000 \
+   -p 9090:9090 \
+   -v ~/minio/data:/data \
+   -e "MINIO_ROOT_USER=your_minio_username" \
+   -e "MINIO_ROOT_PASSWORD=your_minio_password" \
+   quay.io/minio/minio server /data --console-address ":9090"
+```
+
+### 3. Configure S3 Environment
+Access MinIO console at http://localhost:9090 with credentials above, then set:
+```bash
+export S3_ENDPOINT=127.0.0.1:9000
+export S3_ACCESS_KEY=your_s3_access_key
+export S3_SECRET_KEY=your_s3_secret_key
+```
+
+### 4. Run Go Backend Services
+```bash
+# Chunk sink server (receives audio chunks)
+cd go/
+go run cmd/chunk_sink/main.go cmd/chunk_sink/session-source-handler.go cmd/chunk_sink/chunk-sink-handler.go
+
+# Session source client (in separate terminal)
+cd go/
+go run cmd/session_source_client/main.go
+```
+
+### 5. Start gRPC-Web Proxy
+```bash
+cd grpc-web-proxy/
+docker-compose up envoy
+```
+
+### 6. Run Web Interface
+```bash
+# Install protocol dependencies first
+cd protocols/
+npm install
+
+# Start web app
+cd ../web/
+npm install
+npm start
+```
+
+## Additional Commands
+
+### Protocol Generation
 ```bash
 cd protocols/
-npm install  # Install protobuf TypeScript plugin
 make all     # Generate C++, Go, and TypeScript code from .proto files
 ```
 
-### Go Backend
+### Go Build Commands
 ```bash
 cd go/
-make chunk_sink           # Build chunk sink server
-./bin/chunk_sink          # Run server (requires S3 env vars)
+make chunk_sink           # Build chunk sink server binary
+./bin/chunk_sink          # Run built binary
 ```
 
-### C++ Client
-```bash
-cd cpp/chunk-sink-client/
-cmake .
-make
-```
-
-### Web Interface
+### Web Development
 ```bash
 cd web/
-npm install
-npm start                 # Development server
 npm test                  # Run tests with Vitest
 npm run build            # Production build
 
 # For session-waveform library development:
 npx nx storybook --project session-waveform
-```
-
-### gRPC-Web Proxy (Required for Web)
-```bash
-cd grpc-web-proxy/
-docker-compose up envoy   # Proxy on port 8080
 ```
 
 ## Architecture
@@ -73,19 +114,23 @@ dnf install alsa-lib-devel avahi-devel grpc-data grpc grpc-cpp grpc-plugins grpc
 ```
 
 **Environment Variables**:
-- `S3_ENDPOINT`: MinIO server endpoint
-- `S3_ACCESS_KEY`: S3 access key
-- `S3_SECRET_KEY`: S3 secret key
+- `S3_ENDPOINT`: MinIO server endpoint (127.0.0.1:9000 for local)
+- `S3_ACCESS_KEY`: S3 access key (get from MinIO console)
+- `S3_SECRET_KEY`: S3 secret key (get from MinIO console)
 - `VITE_GRPC_SERVER_URL`: gRPC-Web proxy URL (default: http://localhost:4200)
 - `VITE_FILE_SERVER_URL`: File server URL (default: http://172.17.0.2:9090)
 
 ## Development Workflow
 
-1. **Setup**: Install system dependencies and generate protocols
-2. **Backend**: Start Go server with S3 configuration
-3. **Proxy**: Run Envoy proxy for gRPC-Web
-4. **Frontend**: Create `.env` from `.env.example` and start web server
-5. **Client**: Build and run C++ client for audio capture
+1. **Build C++ Client**: Compile chunk-sink-client executable
+2. **Storage**: Start MinIO container for S3-compatible storage
+3. **Environment**: Configure S3 credentials from MinIO console
+4. **Backend Services**: Run chunk sink server and session source client
+5. **Proxy**: Start Envoy proxy for gRPC-Web communication
+6. **Web Interface**: Install dependencies and start development server
+7. **Audio Capture**: Run C++ client to begin recording
+
+**Service Startup Order**: MinIO → Go backends → Envoy proxy → Web interface → C++ client
 
 ## Project Structure
 

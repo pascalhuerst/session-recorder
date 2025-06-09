@@ -4,7 +4,7 @@ import { storeToRefs } from 'pinia';
 import { useRecordersStore } from '../../../store/useRecordersStore';
 import { computed } from 'vue';
 import { SignalStatus } from '@session-recorder/protocols/ts/common';
-import { Button } from '../../../../libs/session-waveform/src';
+import { Button } from '@session-recorder/session-waveform';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 
 const { recorders, selectedRecorderId } = storeToRefs(useRecordersStore());
@@ -16,7 +16,10 @@ const recorder = computed(() => {
 <template>
   <div v-if="recorder" class="actions">
     <div
-      v-if="recorder.info.oneofKind === 'status' && recorder.info.status.signalStatus === SignalStatus.SIGNAL"
+      v-if="
+        recorder.info.oneofKind === 'status' &&
+        recorder.info.status.signalStatus === SignalStatus.SIGNAL
+      "
       class="banner"
     >
       <div>This recorder is currently recording</div>

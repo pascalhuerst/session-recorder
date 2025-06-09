@@ -1,11 +1,14 @@
-import { UpdateSegmentRequest, SegmentInfo } from "@session-recorder/protocols/ts/sessionsource";
-import { sessionSourceClient } from "../sessionSourceClient";
+import {
+  UpdateSegmentRequest,
+  SegmentInfo,
+} from '@session-recorder/protocols/ts/sessionsource';
+import { sessionSourceClient } from '../sessionSourceClient';
 
 export const updateSegment = async (args: {
   recorderId: string;
   sessionId: string;
   segmentId: string;
-  segment: Partial<SegmentInfo>;
+  segment?: SegmentInfo;
 }) => {
   const request: UpdateSegmentRequest = {
     recorderID: args.recorderId,

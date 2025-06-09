@@ -66,6 +66,7 @@ message SessionInfo {
 	string name = 5;
 	string audioFileName = 6;
 	string waveformDataFile = 7;
+	string losslessAudioFileName = 11;
 	bool keep = 8;
 
 	SessionState state = 9;

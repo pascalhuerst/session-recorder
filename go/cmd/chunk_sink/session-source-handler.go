@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	cmpb "github.com/pascalhuerst/session-recorder/protocols/go/common"

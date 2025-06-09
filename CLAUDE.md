@@ -2,6 +2,24 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Claude Code Guidelines
+
+### CLI Operations
+- **ALWAYS** add timeouts to CLI operations using the timeout parameter (default 120s, max 600s)
+- Use appropriate timeouts based on operation type:
+  - Quick operations (ls, git status): 30s
+  - Build operations: 300s (5 minutes)
+  - Long-running tests: 600s (10 minutes)
+  - Network operations: 180s (3 minutes)
+
+### Cost Optimization
+- **Batch tool calls** whenever possible to reduce API overhead
+- Use **parallel tool execution** for independent operations
+- Prefer **targeted searches** (Grep/Glob) over broad exploration
+- Use the **Task tool** for complex searches requiring multiple rounds
+- **Read specific files** rather than exploring entire directories
+- **Minimize context usage** by reading only necessary file sections
+
 ## Project Overview
 
 Session Recorder is a distributed audio recording system with three main components:

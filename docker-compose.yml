@@ -70,16 +70,27 @@ services:
       - ./grpc-web-proxy/envoy.yaml:/etc/envoy/envoy.yaml:ro
     restart: unless-stopped
 
-  # Web Interface (commented out for testing)
-  # web:
-  #   build:
-  #     context: ./web
-  #     dockerfile: Dockerfile
-  #   ports:
-  #     - "3000:80"     # Web interface
-  #   depends_on:
-  #     - grpc-proxy
-  #   restart: unless-stopped
+  # Web Interface
+  web:
+    build:
+      context: .
+      dockerfile: ./web/Dockerfile
+      args:
+        - VITE_GRPC_SERVER_URL=http://localhost:8080
+        - VITE_FILE_SERVER_URL=http://localhost:9000
+    ports:
+      - "3000:80"     # Web interface
+    depends_on:
+      - grpc-proxy
+      - minio
+    networks:
+      - session-recorder-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # C++ Audio Client (commented out for testing)
   # audio-client:

@@ -231,22 +231,3 @@ make chunk_sink  # Build Go binary
 cd web/
 npm run build    # Build web assets
 ```
-
-## Configuration
-
-### Environment Variables
-- `S3_ENDPOINT`: MinIO server endpoint
-- `S3_ACCESS_KEY`: S3 access key from MinIO console
-- `S3_SECRET_KEY`: S3 secret key from MinIO console
-- `VITE_GRPC_SERVER_URL`: gRPC-Web proxy URL (default: http://localhost:4200)
-- `VITE_FILE_SERVER_URL`: File server URL (default: http://172.17.0.2:9090)
-
-### Web Configuration
-Create `.env` file in `web/` directory using `.env.example` as reference.
-
-## Troubleshooting
-
-- Ensure all services start in the correct order: MinIO → Go backends → Envoy proxy → Web interface
-- Check that S3 environment variables are properly set before starting Go services
-- Verify Docker containers are running for MinIO and Envoy
-- Confirm audio devices are accessible if using C++ client for recording

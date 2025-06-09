@@ -12,6 +12,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
   - Long-running tests: 600s (10 minutes)
   - Network operations: 180s (3 minutes)
 
+### Output Display
+- **ALWAYS** display CLI output immediately as it becomes available
+- **Prefer actual command output** over explanatory text, reasoning, or descriptions
+- **Show real-time results** instead of cryptic thinking or guessing during operations
+- **Let the output speak for itself** - avoid interpreting or summarizing unless explicitly asked
+
 ### Cost Optimization
 - **Batch tool calls** whenever possible to reduce API overhead
 - Use **parallel tool execution** for independent operations

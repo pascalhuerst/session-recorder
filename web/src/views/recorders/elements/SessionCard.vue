@@ -41,8 +41,7 @@ const createdAt = computed(() => {
 });
 
 const { waveformUrl, audioUrls } = useSessionData({
-  sessionId: props.session.iD,
-  recorderId: props.recorderId,
+  session: props.session,
 });
 
 const buildUrlPath = (segmentId: string, ext: string) => {

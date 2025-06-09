@@ -8,13 +8,16 @@ RUN apk add --no-cache git ca-certificates tzdata
 WORKDIR /app
 
 # Copy go mod and sum files
-COPY go.mod go.sum ./
+COPY go/go.mod go/go.sum ./
+
+# Copy protocols directory for local dependency
+COPY protocols ./protocols
 
 # Download dependencies
 RUN go mod download
 
-# Copy source code and protocols directory
-COPY . .
+# Copy source code
+COPY go/ .
 
 # Build the application
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o chunk_sink ./cmd/chunk_sink

@@ -21,8 +21,7 @@ const props = defineProps<{
 const { awaitConfirmation, modalProps } = useConfirmation();
 
 const { audioUrls } = useSessionData({
-  sessionId: props.session.iD,
-  recorderId: props.recorderId,
+  session: props.session,
 });
 
 const ttl = computed(() => {

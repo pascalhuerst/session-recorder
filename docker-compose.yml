@@ -33,8 +33,8 @@ services:
   # Go Backend Services
   go-backend:
     build:
-      context: ./go
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: ./go/Dockerfile
     hostname: session-recorder-docker
     ports:
       - "8779:8779"   # ChunkSink service

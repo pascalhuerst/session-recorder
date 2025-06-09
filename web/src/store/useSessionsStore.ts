@@ -22,6 +22,8 @@ export const useSessionsStore = defineStore('sessions', () => {
           recorderID: selectedRecorderId.value,
         },
         onMessage: (session) => {
+          console.log('Received session:', session);
+
           if (session.info.oneofKind === 'removed') {
             const index = sessions.findIndex((s) => s.iD === session.iD);
             if (index !== -1) {

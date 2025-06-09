@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -927,4 +928,16 @@ func (m *Minio) closeSession(ctx context.Context, recorderID, sessionID uuid.UUI
 	log.Debug().Stringer("recorder-id", recorderID).Stringer("session-id", sessionID).Msg("Session closed")
 
 	return nil
+}
+
+func (m *Minio) GetPresignedURL(ctx context.Context, recorderID, sessionID uuid.UUID, filename string, expiry time.Duration) (string, error) {
+	objectName := fmt.Sprintf("%s/sessions/%s/%s", recorderID, sessionID, filename)
+	
+	reqParams := make(url.Values)
+	presignedURL, err := m.client.PresignedGetObject(ctx, bucketName, objectName, expiry, reqParams)
+	if err != nil {
+		return "", fmt.Errorf("cannot generate presigned URL for %s: %w", objectName, err)
+	}
+	
+	return presignedURL.String(), nil
 }

@@ -1,12 +1,13 @@
 #!/bin/bash
 
 # Session Recorder Build Script
-# Builds all necessary components in the correct order
+# Builds all necessary components natively on the local system
 
 set -e  # Exit on any error
 
 # Parse command line arguments
 SKIP_CPP=false
+SKIP_PROTOCOLS=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -14,22 +15,25 @@ while [[ $# -gt 0 ]]; do
             SKIP_CPP=true
             shift
             ;;
+        --skip-protocols)
+            SKIP_PROTOCOLS=true
+            shift
+            ;;
         --clean)
             echo "🧹 Cleaning build artifacts..."
+            rm -rf bin/
             rm -rf protocols/node_modules protocols/cpp protocols/ts protocols/go
-            rm -rf cpp/chunk-sink-client/CMakeFiles cpp/chunk-sink-client/CMakeCache.txt cpp/chunk-sink-client/Makefile cpp/chunk-sink-client/cmake_install.cmake cpp/chunk-sink-client/chunk-sink-client
-            rm -f cpp/Dockerfile
-            echo "🐳 Cleaning Docker build images..."
-            docker rmi session-recorder-protocols session-recorder-cpp 2>/dev/null || true
+            rm -rf cpp/chunk-sink-client/CMakeFiles cpp/chunk-sink-client/CMakeCache.txt cpp/chunk-sink-client/Makefile cpp/chunk-sink-client/cmake_install.cmake
             echo "✅ Clean complete"
             exit 0
             ;;
         --help)
             echo "Usage: $0 [OPTIONS]"
             echo "Options:"
-            echo "  --skip-cpp    Skip C++ client build"
-            echo "  --clean       Clean all build artifacts"
-            echo "  --help        Show this help message"
+            echo "  --skip-cpp        Skip C++ client build"
+            echo "  --skip-protocols  Skip protocol generation"
+            echo "  --clean           Clean all build artifacts"
+            echo "  --help            Show this help message"
             exit 0
             ;;
         *)
@@ -72,129 +76,136 @@ if [ ! -f "README.md" ] || [ ! -d "protocols" ] || [ ! -d "go" ] || [ ! -d "cpp"
     exit 1
 fi
 
-# 1. Generate Protocol Buffers (using Docker)
-print_status "Step 1/2: Generating Protocol Buffers (via Docker)"
+# Function to check if a command exists
+check_command() {
+    if ! command -v "$1" &> /dev/null; then
+        print_error "$1 is required but not installed. Please install $1."
+        exit 1
+    fi
+}
 
-# Check if Docker is installed
-if ! command -v docker &> /dev/null; then
-    print_error "Docker is required but not installed. Please install Docker."
-    exit 1
+# Function to check for native build dependencies
+check_dependencies() {
+    print_status "Checking build dependencies..."
+    
+    if [ "$SKIP_PROTOCOLS" = false ]; then
+        check_command "protoc"
+        check_command "npm"
+        check_command "go"
+        
+        # Check for protoc plugins
+        if ! protoc --plugin=protoc-gen-go --version &> /dev/null; then
+            print_error "protoc-gen-go plugin not found. Install with: go install google.golang.org/protobuf/cmd/protoc-gen-go@latest"
+            exit 1
+        fi
+        
+        if ! protoc --plugin=protoc-gen-go-grpc --version &> /dev/null; then
+            print_error "protoc-gen-go-grpc plugin not found. Install with: go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest"
+            exit 1
+        fi
+    fi
+    
+    if [ "$SKIP_CPP" = false ]; then
+        check_command "cmake"
+        check_command "make"
+        check_command "g++"
+        
+        # Check for required libraries (these checks might vary by system)
+        print_status "Note: Ensure you have the following development packages installed:"
+        print_status "  - alsa-lib-devel (or libasound2-dev)"
+        print_status "  - avahi-devel (or libavahi-client-dev)"
+        print_status "  - grpc-devel (or libgrpc++-dev)"
+        print_status "  - protobuf-devel (or libprotobuf-dev)"
+        print_status "  - boost-devel (or libboost-all-dev)"
+    fi
+    
+    print_success "Dependency check completed"
+}
+
+check_dependencies
+
+# 1. Generate Protocol Buffers (native)
+if [ "$SKIP_PROTOCOLS" = true ]; then
+    print_warning "Skipping protocol generation (--skip-protocols flag)"
+else
+    print_status "Step 1/2: Generating Protocol Buffers (native)"
+    
+    cd protocols
+    
+    # Install Node.js dependencies
+    print_status "Installing Node.js dependencies..."
+    npm install
+    
+    # Use existing Makefile for protocol generation (most reliable)
+    print_status "Generating protocol files using Makefile..."
+    make clean
+    make all
+    
+    cd ..
+    print_success "Protocol generation completed (native)"
 fi
 
-# Build protocols in container and extract generated files
-print_status "Building protocols container and extracting generated files..."
-if ! docker build -t session-recorder-protocols ./protocols/; then
-    print_error "Failed to build protocols container"
-    exit 1
-fi
-
-# Create temporary container to copy files
-container_id=$(docker create session-recorder-protocols)
-if [ $? -ne 0 ]; then
-    print_error "Failed to create protocols container"
-    exit 1
-fi
-
-# Copy generated files from container
-print_status "Extracting generated protocol files..."
-docker cp "$container_id:/app/cpp" ./protocols/
-docker cp "$container_id:/app/ts" ./protocols/
-docker cp "$container_id:/app/go" ./protocols/
-
-# Clean up container
-docker rm "$container_id" > /dev/null
-
-print_success "Protocol generation completed (containerized)"
-
-# 2. Build C++ Client (using Docker)
+# 2. Build C++ Client (native)
 if [ "$SKIP_CPP" = true ]; then
     print_warning "Skipping C++ client build (--skip-cpp flag)"
 else
-    print_status "Step 2/2: Building C++ Client (via Docker)"
+    print_status "Step 2/2: Building C++ Client (native)"
     
-    # Create C++ client Dockerfile if it doesn't exist
-    if [ ! -f "cpp/Dockerfile" ]; then
-        print_status "Creating C++ client Dockerfile..."
-        cat > cpp/Dockerfile << 'EOF'
-# C++ Client Build Dockerfile
-FROM fedora:39
-
-# Install build dependencies
-RUN dnf update -y && dnf install -y \
-    cmake \
-    gcc-c++ \
-    make \
-    pkg-config \
-    alsa-lib-devel \
-    avahi-devel \
-    grpc-devel \
-    grpc-cpp \
-    grpc-plugins \
-    protobuf-devel \
-    openssl-devel \
-    boost-devel \
-    c-ares-devel \
-    re2-devel \
-    zlib-devel \
-    && dnf clean all
-
-WORKDIR /app
-
-# Copy protocol files
-COPY protocols/cpp/ protocols/cpp/
-
-# Copy C++ source code
-COPY cpp/chunk-sink-client/ chunk-sink-client/
-
-# Build the application
-WORKDIR /app/chunk-sink-client
-RUN cmake . -Wno-dev && cmake --build .
-RUN chmod +x chunk-sink-client
-
-# This is a build-only container
-EOF
-    fi
+    # Create bin directory for build artifacts
+    mkdir -p bin
     
-    # Build C++ client in container
-    print_status "Building C++ client container..."
-    if ! docker build -t session-recorder-cpp -f cpp/Dockerfile .; then
-        print_error "Failed to build C++ client container"
+    cd cpp/chunk-sink-client
+    
+    # Copy protocol files to the build directory
+    print_status "Copying protocol files..."
+    if [ -d "../../protocols/cpp" ]; then
+        cp -r ../../protocols/cpp/* .
+    else
+        print_error "Protocol files not found. Please run protocol generation first."
         exit 1
     fi
     
-    # Extract built binary
-    container_id=$(docker create session-recorder-cpp)
-    if [ $? -ne 0 ]; then
-        print_error "Failed to create C++ client container"
-        exit 1
-    fi
+    # Configure build with CMake
+    print_status "Configuring build with CMake..."
+    cmake . -Wno-dev
     
-    print_status "Extracting C++ binary..."
-    docker cp "$container_id:/app/chunk-sink-client/chunk-sink-client" ./cpp/chunk-sink-client/
-    docker rm "$container_id" > /dev/null
+    # Build the application
+    print_status "Building C++ client..."
+    cmake --build .
     
-    print_success "C++ client build completed (containerized)"
+    # Move binary to bin directory and make executable
+    print_status "Moving binary to bin directory..."
+    mv chunk-sink-client ../../bin/
+    chmod +x ../../bin/chunk-sink-client
+    
+    cd ../..
+    print_success "C++ client build completed (native)"
 fi
 
 
 echo ""
 echo "🎉 Build Complete!"
 echo "=================="
-print_success "All components have been built successfully (using Docker):"
-echo "  ✅ Protocol Buffers generated (containerized)"
-if [ "$SKIP_CPP" = true ]; then
-    echo "  ⚠️  C++ client: Skipped (use --skip-cpp to build)"
+print_success "All components have been built successfully (native):"
+
+if [ "$SKIP_PROTOCOLS" = true ]; then
+    echo "  ⚠️  Protocol Buffers: Skipped (--skip-protocols flag)"
 else
-    echo "  ✅ C++ client: ./cpp/chunk-sink-client/chunk-sink-client (containerized)"
+    echo "  ✅ Protocol Buffers generated (native)"
 fi
+
+if [ "$SKIP_CPP" = true ]; then
+    echo "  ⚠️  C++ client: Skipped (--skip-cpp flag)"
+else
+    echo "  ✅ C++ client: ./bin/chunk-sink-client (native)"
+fi
+
 echo ""
 print_warning "Note: Generated files are excluded from git (.gitignore)"
 print_status "To clean build artifacts: ./build-audio-client.sh --clean"
 echo ""
 print_status "Next steps:"
-echo "  1. Start MinIO storage container"
-echo "  2. Configure S3 environment variables"
-echo "  3. Run the Go backend services"
-echo "  4. Execute the C++ client for audio capture"
+echo "  1. Start the backend services: ./docker-build.sh up --build"
+echo "  2. Run the C++ client: ./bin/chunk-sink-client"
 echo ""
 print_status "See README.md for detailed runtime instructions."

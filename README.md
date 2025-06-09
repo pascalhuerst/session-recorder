@@ -11,7 +11,34 @@ Session Recorder consists of three main components:
 
 ## Quick Start
 
-### Option 1: Single Build Command
+### Option 1: Docker Deployment (Recommended)
+
+Use Docker Compose for the easiest setup:
+
+```bash
+# Start all services
+./docker-build.sh up --build
+
+# Start with audio client (requires audio devices)
+./docker-build.sh up --profile audio --build
+
+# View logs
+./docker-build.sh logs
+
+# Stop services
+./docker-build.sh down
+
+# Clean up everything
+./docker-build.sh clean
+```
+
+**Service URLs:**
+- 🌐 Web Interface: http://localhost:3000
+- 📊 MinIO Console: http://localhost:9090 (admin/password123)
+- 🔧 Go Backend: localhost:8779 (ChunkSink), localhost:8780 (SessionSource)
+- 🌉 gRPC-Web Proxy: localhost:8080
+
+### Option 2: Local Build Command
 
 Use the automated build script to build all components:
 
@@ -25,7 +52,7 @@ Use the automated build script to build all components:
 - `./build.sh --clean` - Clean all build artifacts and generated files
 - `./build.sh --help` - Show all available options
 
-### Option 2: Manual Build Process
+### Option 3: Manual Build Process
 
 Follow these steps to run the complete system locally:
 
@@ -107,16 +134,17 @@ cd cpp/chunk-sink-client/
 
 ## System Requirements
 
-### Dependencies (Fedora)
-```bash
-dnf install alsa-lib-devel avahi-devel grpc-data grpc grpc-cpp grpc-plugins grpc-devel
-```
+### Docker Deployment (Recommended)
+- **Docker** (version 20.10+)
+- **Docker Compose** (version 2.0+)
+- **Audio devices** (for audio client - optional)
 
-### Docker
-- Required for MinIO storage and Envoy proxy
-
-### Node.js
-- Required for web interface and protocol generation
+### Local Development
+- **Dependencies (Fedora)**: `alsa-lib-devel avahi-devel grpc-data grpc grpc-cpp grpc-plugins grpc-devel`
+- **Docker** (for MinIO storage and Envoy proxy)
+- **Node.js** (for web interface and protocol generation)
+- **Go** (version 1.21+)
+- **CMake** and **C++ compiler**
 
 ## Architecture
 
@@ -129,6 +157,54 @@ The system uses a microservices architecture with the following data flow:
 5. **Session Management**: Go server provides session API via gRPC (port 8780)
 6. **Web Interface**: Vue.js app connects via gRPC-Web through Envoy proxy
 7. **Visualization**: Real-time waveform rendering using Peaks.js
+
+## Docker Deployment
+
+### Quick Commands
+
+```bash
+# Start all services
+./docker-build.sh up --build
+
+# Start with audio recording capability
+./docker-build.sh up --profile audio --build
+
+# View service status
+./docker-build.sh ps
+
+# Follow logs
+./docker-build.sh logs
+
+# Stop services
+./docker-build.sh down
+
+# Complete cleanup
+./docker-build.sh clean
+```
+
+### Service Architecture
+
+The Docker deployment includes:
+
+- **MinIO**: S3-compatible storage for audio files
+- **Go Backend**: ChunkSink and SessionSource gRPC services
+- **gRPC-Web Proxy**: Envoy proxy for web client communication
+- **Web Interface**: Vue.js application served by Nginx
+- **Audio Client**: C++ client for audio capture (optional)
+
+### Configuration
+
+Environment variables can be configured in `.env.docker`:
+
+- `MINIO_ROOT_USER`: MinIO admin username
+- `MINIO_ROOT_PASSWORD`: MinIO admin password
+- `S3_ENDPOINT`: S3 server endpoint
+- `VITE_GRPC_SERVER_URL`: gRPC-Web proxy URL for web client
+
+### Volumes and Data
+
+- `minio-data`: Persistent storage for audio files
+- `protocol-data`: Generated protocol buffer files shared between services
 
 ## Development
 

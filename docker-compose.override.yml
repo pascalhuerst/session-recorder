@@ -1,0 +1,43 @@
+# Docker Compose Override for Development
+# This file provides development-specific overrides
+
+version: '3.3'
+
+services:
+  # Development overrides for Go backend
+  go-backend:
+    volumes:
+      - ./go:/app/src:ro  # Mount source for live development
+    environment:
+      - GO_ENV=development
+      - LOG_LEVEL=debug
+
+  # Development overrides for web interface (commented out)
+  # web:
+  #   volumes:
+  #     - ./web/src:/app/src:ro  # Mount source for live development
+  #   environment:
+  #     - NODE_ENV=development
+
+  # Development overrides for audio client (commented out)
+  # audio-client:
+  #   volumes:
+  #     - ./cpp/chunk-sink-client:/app/src:ro  # Mount source
+  #   environment:
+  #     - DEBUG=1
+
+# Additional development services
+  # Database for development (if needed)
+  # postgres:
+  #   image: postgres:15-alpine
+  #   environment:
+  #     - POSTGRES_DB=session_recorder
+  #     - POSTGRES_USER=dev
+  #     - POSTGRES_PASSWORD=dev
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - postgres-data:/var/lib/postgresql/data
+
+# volumes:
+#   postgres-data:

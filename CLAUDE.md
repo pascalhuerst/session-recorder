@@ -9,9 +9,20 @@ Session Recorder is a distributed audio recording system with three main compone
 - **Go Backend Server**: Receives audio chunks, manages sessions, provides API
 - **Vue.js Web Interface**: User interface for managing recordings and sessions
 
+## Docker Deployment (Recommended)
+
+Use Docker Compose for complete containerized deployment:
+```bash
+./docker-build.sh up --build    # Start all services
+./docker-build.sh up --profile audio --build  # Include audio client
+./docker-build.sh logs          # View logs
+./docker-build.sh down          # Stop services
+./docker-build.sh clean         # Clean up everything
+```
+
 ## Build All Components
 
-Use the automated build script:
+Use the automated build script for local development:
 ```bash
 ./build.sh                # Build all components
 ./build.sh --skip-cpp     # Skip C++ client (if dependencies missing)

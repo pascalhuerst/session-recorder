@@ -1,15 +1,6 @@
 version: '3.3'
 
 services:
-  # Protocol buffer generation service (build-time only)
-  # protocols:
-  #   build:
-  #     context: ./protocols
-  #     dockerfile: Dockerfile
-  #   volumes:
-  #     - protocol-data:/app
-  #   command: ["true"]  # Exit immediately after build
-
   # MinIO S3-compatible storage
   minio:
     image: quay.io/minio/minio:latest
@@ -92,21 +83,6 @@ services:
       timeout: 10s
       retries: 3
 
-  # C++ Audio Client (commented out for testing)
-  # audio-client:
-  #   build:
-  #     context: ./cpp/chunk-sink-client
-  #     dockerfile: Dockerfile
-  #   depends_on:
-  #     - go-backend
-  #   devices:
-  #     - "/dev/snd:/dev/snd"
-  #   volumes:
-  #     - "/run/user/1000/pulse:/run/user/1000/pulse"
-  #   environment:
-  #     - PULSE_RUNTIME_PATH=/run/user/1000/pulse
-  #   network_mode: host
-  #   restart: unless-stopped
 
 # volumes:
   # minio-data:

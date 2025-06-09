@@ -1,31 +1,65 @@
-# Development
+# ChunkSink Server
 
-## Server setup:
+Main Go backend server that provides both ChunkSink and SessionSource gRPC services.
 
-To be able to store chunks and create sessions, you need a minio server:
+## Services
 
+- **ChunkSink**: Receives audio chunks from C++ clients (port 8779)
+- **SessionSource**: Provides session management API (port 8780)
+- **mDNS Advertising**: Broadcasts service discovery for audio clients
+
+## Quick Start
+
+### Docker (Recommended)
+```bash
+# From project root
+./docker-build.sh up --build
 ```
+
+### Local Development
+```bash
+# Run with source files
+go run main.go session-source-handler.go chunk-sink-handler.go
+
+# Or build and run binary
+cd ../../
+make chunk_sink
+./bin/chunk_sink
+```
+
+## Prerequisites
+
+### MinIO Storage
+```bash
 docker run \
    -p 9000:9000 \
    -p 9090:9090 \
-   --user $(id -u):$(id -g) \
-   --name minio1 \
-   -e "MINIO_ROOT_USER=paso" \
-   -e "MINIO_ROOT_PASSWORD=hnw4main" \
-   -v ${HOME}/minio/data:/data \
+   -v ./data/minio:/data \
+   -e "MINIO_ROOT_USER=admin" \
+   -e "MINIO_ROOT_PASSWORD=password123" \
    quay.io/minio/minio server /data --console-address ":9090"
 ```
 
-Currently `go run cmd/chunk_sink/main.go` runs a chunk sink server and a session source server, so we should probably
-rename it soon. This works fine for the chunk sink client (=the recoder) and the go implementation of the session source
-client, but to run it from a web client, we need to run a proxy:
+### Environment Variables
+```bash
+export S3_ENDPOINT=127.0.0.1:9000
+export S3_ACCESS_KEY=admin
+export S3_SECRET_KEY=password123
+export S3_USE_SSL=false
+```
 
+### gRPC-Web Proxy (for web clients)
+```bash
+cd ../../../grpc-web-proxy/
+docker-compose up envoy
 ```
-grpcwebproxy
-    --server_tls_cert_file=${GOPATH}/src/github.com/improbable-eng/grpc-web/misc/localhost.crt \ 
-    --server_tls_key_file=/${GOPATH}/src/github.com/improbable-eng/grpc-web/misc/localhost.key \
-    --backend_addr=<your-ip>:8780 \
-    --backend_tls_noverify \
-    --allow_all_origins \
-    --server_bind_address=<your-ip>
-```
+
+## Architecture
+
+This server handles:
+1. **Audio Chunk Reception**: From C++ clients via ChunkSink gRPC
+2. **Session Management**: Create, manage, export sessions via SessionSource gRPC
+3. **Storage**: Audio data stored in MinIO S3-compatible storage
+4. **Service Discovery**: mDNS advertising for client auto-discovery
+
+See `.claude/architecture.md` for complete system design.

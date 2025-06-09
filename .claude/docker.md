@@ -3,11 +3,8 @@
 ## Quick Commands
 
 ```bash
-# Start all services
+# Start all backend services (recommended)
 ./docker-build.sh up --build
-
-# Start with audio recording capability
-./docker-build.sh up --profile audio --build
 
 # View service status
 ./docker-build.sh ps
@@ -24,27 +21,37 @@
 
 ## Service Architecture
 
-The Docker deployment includes:
+The Docker deployment includes backend services only:
 
 - **MinIO**: S3-compatible storage for audio files
-- **Go Backend**: ChunkSink and SessionSource gRPC services
+- **Go Backend**: ChunkSink and SessionSource gRPC services with mDNS advertising
 - **gRPC-Web Proxy**: Envoy proxy for web client communication
 - **Web Interface**: Vue.js application served by Nginx
-- **Audio Client**: C++ client for audio capture (optional)
+
+Audio clients run separately and connect via mDNS discovery.
+
+## Multiple Audio Sources
+
+The system is designed for multiple distributed audio clients:
+
+1. **Backend Discovery**: Go backend advertises via mDNS (`_session-recorder-chunksink._tcp`)
+2. **Client Connection**: C++ clients scan for and auto-connect to the backend
+3. **Distributed Recording**: Multiple clients can record simultaneously from different locations
+4. **Unified Management**: All clients appear in the single web interface
 
 ## Configuration
 
 Environment variables can be configured in `.env.docker`:
 
-- `MINIO_ROOT_USER`: MinIO admin username
-- `MINIO_ROOT_PASSWORD`: MinIO admin password
+- `MINIO_ROOT_USER`: MinIO admin username (default: admin)
+- `MINIO_ROOT_PASSWORD`: MinIO admin password (default: password123)
 - `S3_ENDPOINT`: S3 server endpoint
 - `VITE_GRPC_SERVER_URL`: gRPC-Web proxy URL for web client
 
 ## Volumes and Data
 
-- `minio-data`: Persistent storage for audio files
-- `protocol-data`: Generated protocol buffer files shared between services
+- Local data storage: `./data/minio` (persisted on host)
+- No separate volumes needed - uses bind mounts for persistence
 
 ## Service URLs
 

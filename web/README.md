@@ -1,38 +1,63 @@
-# Session Recorder Web
+# Session Recorder Web Interface
+
+Vue.js web application for managing audio recording sessions with real-time waveform visualization.
+
+## Features
+
+- **Session Management**: View, start, stop, and manage recording sessions
+- **Real-time Visualization**: Audio waveform display using Peaks.js
+- **Multi-source Support**: Monitor multiple connected audio clients
+- **Export Functionality**: Export sessions in various formats
+- **Responsive UI**: Modern Vue.js interface with NX workspace
+
+## Quick Start
+
+### Docker (Recommended)
+```bash
+# From project root
+./docker-build.sh up --build
+# Access: http://localhost:3000
+```
+
+### Local Development
+```bash
+npm install
+npm start
+```
 
 ## Development
 
+### Prerequisites
+- Node.js & npm
+- Backend services running (see main README.md)
+
+### Environment Setup
+Create `.env` file with:
+```bash
+VITE_GRPC_SERVER_URL=http://localhost:8080
+VITE_FILE_SERVER_URL=http://localhost:9000
+```
+
 ### Libraries
 
-#### Session Waveform (Player App)
-
-The easiest way to work on the Player app is by launching Storybook:
-
-```
+#### Session Waveform Component
+Reusable waveform visualization library:
+```bash
 npx nx storybook --project session-waveform
 ```
 
-### Application
-
-#### Dev Mode
-
-To run application in dev mode, go to `/web` directory:
-
-##### Run `npm install`
-
-##### Start proxy for grpc web
-
-Run envoy in docker container: (You might have to adapt the config)
-
-```
-cd grpc-web-proxy
-docker-compose up envoy
+### Build
+```bash
+npm run build    # Production build
+npm test         # Run tests
 ```
 
-##### Setup .env
+## Architecture
 
-- create `.env` using `.env.example` as a reference
+- **NX Workspace**: Monorepo with shared libraries
+- **Vue.js 3**: Composition API with TypeScript
+- **gRPC-Web**: Communication with Go backend
+- **Peaks.js**: Audio waveform visualization
+- **Vite**: Build tool and dev server
 
-##### Start the app
-
-- run npm `npm start`
+See `.claude/architecture.md` for complete system design.

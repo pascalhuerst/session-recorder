@@ -31,7 +31,6 @@ print_error() {
 
 # Parse command line arguments
 ACTION="up"
-PROFILE=""
 BUILD_FLAG=""
 
 while [[ $# -gt 0 ]]; do
@@ -39,10 +38,6 @@ while [[ $# -gt 0 ]]; do
         --build)
             BUILD_FLAG="--build"
             shift
-            ;;
-        --profile)
-            PROFILE="--profile $2"
-            shift 2
             ;;
         up|down|logs|ps|clean)
             ACTION="$1"
@@ -52,7 +47,7 @@ while [[ $# -gt 0 ]]; do
             echo "Usage: $0 [ACTION] [OPTIONS]"
             echo ""
             echo "Actions:"
-            echo "  up      Start all services (default)"
+            echo "  up      Start all backend services (default)"
             echo "  down    Stop all services"
             echo "  logs    Show logs from all services"
             echo "  ps      Show running containers"
@@ -60,15 +55,15 @@ while [[ $# -gt 0 ]]; do
             echo ""
             echo "Options:"
             echo "  --build           Force rebuild of images"
-            echo "  --profile PROFILE Use specific profile (e.g., 'audio' for audio client)"
             echo "  --help           Show this help message"
             echo ""
             echo "Examples:"
             echo "  $0 up --build                    # Start all services with fresh build"
-            echo "  $0 up --profile audio           # Start with audio client"
             echo "  $0 logs                          # Show all logs"
             echo "  $0 down                          # Stop all services"
             echo "  $0 clean                         # Clean up everything"
+            echo ""
+            echo "Note: Audio clients run separately and connect via mDNS discovery"
             exit 0
             ;;
         *)
@@ -95,29 +90,27 @@ echo "====================================="
 
 case $ACTION in
     "up")
-        print_status "Starting Session Recorder services..."
-        if [ -n "$PROFILE" ]; then
-            print_status "Using profile: $PROFILE"
-        fi
-        docker-compose $PROFILE up $BUILD_FLAG -d
+        print_status "Starting Session Recorder backend services..."
+        docker-compose up $BUILD_FLAG -d
         
         print_status "Waiting for services to be ready..."
         sleep 5
         
-        print_success "Services started successfully!"
+        print_success "Backend services started successfully!"
         echo ""
         print_status "Service URLs:"
-        echo "  📊 MinIO Console:    http://localhost:9091 (admin/password123)"
-        echo "  🌐 Web Interface:    http://localhost:3000 (currently disabled)"
-        echo "  🔧 Go Backend:       localhost:8781 (ChunkSink), localhost:8782 (SessionSource)"
-        echo "  🌉 gRPC-Web Proxy:   localhost:8081"
+        echo "  📊 MinIO Console:    http://localhost:9090 (admin/password123)"
+        echo "  🌐 Web Interface:    http://localhost:3000"
+        echo "  🔧 Go Backend:       localhost:8779 (ChunkSink), localhost:8780 (SessionSource)"
+        echo "  🌉 gRPC-Web Proxy:   localhost:8080"
         echo ""
+        print_status "Audio clients will auto-discover via mDNS and connect to the backend"
         print_status "Use 'docker-compose logs -f' to follow logs"
         ;;
         
     "down")
         print_status "Stopping Session Recorder services..."
-        docker-compose $PROFILE down
+        docker-compose down
         print_success "Services stopped successfully!"
         ;;
         

@@ -5,11 +5,9 @@
 Use the build script for complete setup:
 
 ```bash
-./build.sh                # Build all components
-./build.sh --skip-cpp     # Skip C++ client (if dependencies missing)
-./build.sh --skip-web     # Skip web interface
-./build.sh --clean        # Clean all build artifacts
-./build.sh --help         # Show options
+./build-audio-client.sh                # Build all components
+./build-audio-client.sh --clean        # Clean all build artifacts
+./build-audio-client.sh --help         # Show options
 ```
 
 ## Manual Local Development Setup
@@ -17,11 +15,13 @@ Use the build script for complete setup:
 ### Prerequisites
 
 **Required System Dependencies (Fedora):**
+
 ```bash
 dnf install alsa-lib-devel avahi-devel grpc-data grpc grpc-cpp grpc-plugins grpc-devel pkg-config cmake
 ```
 
 **Required Tools:**
+
 - Node.js & npm (for protocols and web)
 - Go 1.21+ (for backend)
 - CMake (for C++ client)
@@ -37,6 +37,7 @@ make all
 ```
 
 This generates:
+
 - C++ headers in `cpp/`
 - Go packages in `go/`
 - TypeScript files in `ts/`
@@ -98,18 +99,21 @@ export S3_USE_SSL=false
 ### 3. Run Go Backend Services
 
 **Terminal 1 - Chunk Sink Server:**
+
 ```bash
 cd go/
 go run cmd/chunk_sink/main.go cmd/chunk_sink/session-source-handler.go cmd/chunk_sink/chunk-sink-handler.go
 ```
 
 **Terminal 2 - Session Source Client:**
+
 ```bash
 cd go/
 go run cmd/session_source_client/main.go
 ```
 
 Or use the built binary:
+
 ```bash
 cd go/
 ./bin/chunk_sink
@@ -125,12 +129,14 @@ docker-compose up envoy
 ### 5. Serve Web Interface
 
 **Development server:**
+
 ```bash
 cd web/
 npm start
 ```
 
 **Production serve:**
+
 ```bash
 cd web/
 npm run preview  # Serves ./dist/
@@ -152,6 +158,7 @@ For development with live reloading:
 ```
 
 This starts:
+
 - **MinIO**: S3 storage on ports 9000/9090
 - **Go Backend**: gRPC services on ports 8779/8780
 - **gRPC Proxy**: Envoy on port 8080
@@ -179,6 +186,7 @@ The go-backend service mounts source for development via `docker-compose.overrid
 ## Troubleshooting
 
 **Missing Dependencies:**
+
 ```bash
 # Fedora
 dnf install alsa-lib-devel avahi-devel grpc-devel grpc-cpp grpc-plugins
@@ -188,6 +196,7 @@ pkg-config --exists alsa avahi-client grpc++
 ```
 
 **CMake Configuration Issues:**
+
 ```bash
 cd cpp/chunk-sink-client/
 rm -rf CMakeFiles CMakeCache.txt Makefile
@@ -195,6 +204,7 @@ cmake . -Wno-dev
 ```
 
 **Protocol Generation Issues:**
+
 ```bash
 cd protocols/
 npm install
@@ -202,6 +212,7 @@ make clean && make all
 ```
 
 **Clean Everything:**
+
 ```bash
-./build.sh --clean
+./build-audio-client.sh --clean
 ```

@@ -189,7 +189,7 @@ else
 fi
 echo ""
 print_warning "Note: Generated files are excluded from git (.gitignore)"
-print_status "To clean build artifacts: ./build.sh --clean"
+print_status "To clean build artifacts: ./build-audio-client.sh --clean"
 echo ""
 print_status "Next steps:"
 echo "  1. Start MinIO storage container"

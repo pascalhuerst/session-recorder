@@ -39,7 +39,7 @@ Audio capture issues -> cpp/chunk-sink-client/
 Backend API problems -> go/cmd/, go/grpc/
 Web interface bugs -> web/src/
 Protocol changes -> protocols/proto/, protocols/
-Build problems -> build.sh, docker-build.sh
+Build problems -> build-audio-client.sh, docker-build-audio-client.sh
 ```
 
 ### Common Workflows
@@ -72,10 +72,10 @@ Build problems -> build.sh, docker-build.sh
 Always run these with appropriate timeouts:
 ```bash
 # Use 300s timeout for build verification
-./build.sh
+./build-audio-client.sh
 
 # Use 180s timeout for docker operations  
-./docker-build.sh up --build
+./docker-build-audio-client.sh up --build
 
 # Use 120s timeout for protocol generation
 cd protocols && make all

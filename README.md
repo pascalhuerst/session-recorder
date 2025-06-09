@@ -2,19 +2,7 @@
 
 A distributed audio recording system with real-time streaming and web-based session management.
 
-## Quick Start with Docker
-
-### 1. Build the components
-
-The build script generates protocols and builds the C++ client:
-
-```bash
-./build.sh
-```
-
-**Note**: This is optional since the Docker deployment handles all builds automatically.
-
-### 2. Start the Services
+## Start the Services
 
 ```bash
 ./docker-build.sh up --build
@@ -30,8 +18,15 @@ This starts:
 - **gRPC-Web Proxy**: http://localhost:8080
 - **MinIO API**: http://localhost:9000
 
+## Connect Audio Sources
 
-### 3. Connect Audio Sources
+The system supports multiple audio sources that automatically discover the backend via mDNS.
 
-The system supports multiple audio sources that automatically discover the backend via mDNS:
-Use the binary built in step 1 to start the recording.
+```bash
+# Build the audio client binary with
+./build-audio-client.sh
+
+# Execute it
+chmod +x ./cpp/chunk-sink-client
+./cpp/chunk-sink-client
+```

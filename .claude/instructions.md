@@ -44,7 +44,7 @@ Always follow this sequence for development tasks:
 5. Verify changes with appropriate test commands
 
 #### Common Operations
-- **Build verification**: Use 300s timeout for `./build.sh`
+- **Build verification**: Use 300s timeout for `./build-audio-client.sh`
 - **Service startup**: Use 180s timeout for docker operations
 - **Test execution**: Use 600s timeout for comprehensive test suites
 - **Protocol generation**: Use 120s timeout for `make all` in protocols/

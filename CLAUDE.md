@@ -7,7 +7,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ### Fast Commands
 ```bash
 # Local build protocols and C++ client only
-./build.sh
+./build-audio-client.sh
 
 # Docker deployment (recommended)
 ./docker-build.sh up --build

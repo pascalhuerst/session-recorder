@@ -16,6 +16,7 @@ Use the automated build script:
 ./build.sh                # Build all components
 ./build.sh --skip-cpp     # Skip C++ client (if dependencies missing)
 ./build.sh --skip-web     # Skip web interface
+./build.sh --clean        # Clean all build artifacts
 ./build.sh --help         # Show options
 ```
 

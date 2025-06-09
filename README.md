@@ -22,6 +22,7 @@ Use the automated build script to build all components:
 **Build options:**
 - `./build.sh --skip-cpp` - Skip C++ client build (if dependencies are missing)
 - `./build.sh --skip-web` - Skip web interface build
+- `./build.sh --clean` - Clean all build artifacts and generated files
 - `./build.sh --help` - Show all available options
 
 ### Option 2: Manual Build Process

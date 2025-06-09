@@ -19,11 +19,20 @@ while [[ $# -gt 0 ]]; do
             SKIP_WEB=true
             shift
             ;;
+        --clean)
+            echo "🧹 Cleaning build artifacts..."
+            rm -rf protocols/node_modules protocols/cpp protocols/ts protocols/go
+            rm -rf go/bin cpp/chunk-sink-client/CMakeFiles cpp/chunk-sink-client/CMakeCache.txt cpp/chunk-sink-client/Makefile cpp/chunk-sink-client/cmake_install.cmake cpp/chunk-sink-client/chunk-sink-client
+            rm -rf web/node_modules web/dist web/.nx
+            echo "✅ Clean complete"
+            exit 0
+            ;;
         --help)
             echo "Usage: $0 [OPTIONS]"
             echo "Options:"
             echo "  --skip-cpp    Skip C++ client build"
             echo "  --skip-web    Skip web interface build"
+            echo "  --clean       Clean all build artifacts"
             echo "  --help        Show this help message"
             exit 0
             ;;
@@ -205,8 +214,19 @@ echo "=================="
 print_success "All components have been built successfully:"
 echo "  ✅ Protocol Buffers generated"
 echo "  ✅ Go backend: ./go/bin/chunk_sink"
-echo "  ✅ C++ client: ./cpp/chunk-sink-client/chunk-sink-client"
-echo "  ✅ Web interface: ./web/dist/"
+if [ "$SKIP_CPP" = true ]; then
+    echo "  ⚠️  C++ client: Skipped (use --skip-cpp to build)"
+else
+    echo "  ✅ C++ client: ./cpp/chunk-sink-client/chunk-sink-client"
+fi
+if [ "$SKIP_WEB" = true ]; then
+    echo "  ⚠️  Web interface: Skipped"
+else
+    echo "  ✅ Web interface: ./web/dist/"
+fi
+echo ""
+print_warning "Note: Generated files are excluded from git (.gitignore)"
+print_status "To clean build artifacts: ./build.sh --clean"
 echo ""
 print_status "Next steps:"
 echo "  1. Start MinIO storage container"

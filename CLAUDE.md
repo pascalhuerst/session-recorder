@@ -6,14 +6,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### Fast Commands
 ```bash
-# Docker deployment (recommended)
-./docker-build.sh up --build
-
 # Local build protocols and C++ client only
 ./build.sh
 
-# Protocol generation
-cd protocols/ && make all
+# Docker deployment (recommended)
+./docker-build.sh up --build
 ```
 
 ### Build System

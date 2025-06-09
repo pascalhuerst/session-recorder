@@ -7,6 +7,10 @@ WORKDIR /build
 # Copy protocols with generated TypeScript files
 COPY protocols/ ./protocols/
 
+# Install protocols dependencies
+WORKDIR /build/protocols
+RUN npm ci
+
 # Switch to web directory
 WORKDIR /build/web
 

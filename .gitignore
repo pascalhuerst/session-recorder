@@ -84,4 +84,9 @@ Thumbs.db
 minio/
 
 # Docker
-docker-compose.override.yml
+.env.docker.local
+docker-compose.override.yml.local
+*.log
+
+# Local data directories
+data/

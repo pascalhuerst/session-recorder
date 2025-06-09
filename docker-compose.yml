@@ -1,0 +1,110 @@
+version: '3.3'
+
+services:
+  # Protocol buffer generation service (build-time only)
+  # protocols:
+  #   build:
+  #     context: ./protocols
+  #     dockerfile: Dockerfile
+  #   volumes:
+  #     - protocol-data:/app
+  #   command: ["true"]  # Exit immediately after build
+
+  # MinIO S3-compatible storage
+  minio:
+    image: quay.io/minio/minio:latest
+    command: server /data --console-address ":9090"
+    ports:
+      - "9000:9000"   # API
+      - "9090:9090"   # Console
+    environment:
+      - MINIO_ROOT_USER=admin
+      - MINIO_ROOT_PASSWORD=password123
+    volumes:
+      - ./data/minio:/data
+    networks:
+      - session-recorder-net
+    healthcheck:
+      test: [ "CMD", "mc", "ready", "local" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Go Backend Services
+  go-backend:
+    build:
+      context: ./go
+      dockerfile: Dockerfile
+    hostname: session-recorder-docker
+    ports:
+      - "8779:8779"   # ChunkSink service
+      - "8780:8780"   # SessionSource service
+    environment:
+      - S3_ENDPOINT=minio:9000
+      - S3_ACCESS_KEY=admin
+      - S3_SECRET_KEY=password123
+      - S3_USE_SSL=false
+    depends_on:
+      - minio
+    networks:
+      - session-recorder-net
+    volumes:
+      # Mount D-Bus system socket for mDNS functionality
+      - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket:ro
+    # volumes:
+    #   - protocol-data:/protocols:ro
+    restart: unless-stopped
+
+  # gRPC-Web Proxy (Envoy)
+  grpc-proxy:
+    build:
+      context: ./grpc-web-proxy
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"   # gRPC-Web proxy
+    depends_on:
+      - go-backend
+    networks:
+      - session-recorder-net
+    volumes:
+      - ./grpc-web-proxy/envoy.yaml:/etc/envoy/envoy.yaml:ro
+    restart: unless-stopped
+
+  # Web Interface (commented out for testing)
+  # web:
+  #   build:
+  #     context: ./web
+  #     dockerfile: Dockerfile
+  #   ports:
+  #     - "3000:80"     # Web interface
+  #   depends_on:
+  #     - grpc-proxy
+  #   restart: unless-stopped
+
+  # C++ Audio Client (commented out for testing)
+  # audio-client:
+  #   build:
+  #     context: ./cpp/chunk-sink-client
+  #     dockerfile: Dockerfile
+  #   depends_on:
+  #     - go-backend
+  #   devices:
+  #     - "/dev/snd:/dev/snd"
+  #   volumes:
+  #     - "/run/user/1000/pulse:/run/user/1000/pulse"
+  #   environment:
+  #     - PULSE_RUNTIME_PATH=/run/user/1000/pulse
+  #   network_mode: host
+  #   restart: unless-stopped
+
+# volumes:
+  # minio-data:
+  #   driver: local
+
+networks:
+  session-recorder-net:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.25.0.0/16

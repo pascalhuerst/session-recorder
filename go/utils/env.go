@@ -33,3 +33,10 @@ func Get(name string) (string, error) {
 
 	return strings.Clone(s), nil
 }
+
+func GetWithDefault(name, defaultValue string) string {
+	if value, err := Get(name); err == nil {
+		return value
+	}
+	return defaultValue
+}

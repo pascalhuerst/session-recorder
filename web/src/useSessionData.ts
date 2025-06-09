@@ -3,17 +3,17 @@ import { type Session } from '@session-recorder/protocols/ts/sessionsource';
 
 export const useSessionData = ({ session }: { session: Session }) => {
   const waveformUrl = computed(() => {
-    return session.info.updated.waveformUrl;
+    return session.info.updated.waveformDataFile ?? '';
   });
 
   const audioUrls = computed(() => {
     return [
       {
-        src: session.info.updated.audioUrl,
+        src: session.info.updated.audioFileName ?? '',
         type: 'audio/ogg',
       },
       {
-        src: session.info.updated.losslessAudioUrl,
+        src: session.info.updated.losslessAudioFileName ?? '',
         type: 'audio/flac',
       },
     ];

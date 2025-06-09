@@ -34,12 +34,13 @@ func main() {
 	logger.Setup()
 
 	s3Endpoint := utils.MustGet("S3_ENDPOINT")
+	s3PublicEndpoint := utils.GetWithDefault("S3_PUBLIC_ENDPOINT", s3Endpoint)
 	s3AccessKey := utils.MustGet("S3_ACCESS_KEY")
 	s3SecretKey := utils.MustGet("S3_SECRET_KEY")
 
 	log.Info().Msg("Setting up storage server")
 
-	s, err := storage.NewMinioStorage(s3Endpoint, s3AccessKey, s3SecretKey)
+	s, err := storage.NewMinioStorageWithPublicEndpoint(s3Endpoint, s3PublicEndpoint, s3AccessKey, s3SecretKey)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Cannot create storage. Giving up")
 

@@ -44,6 +44,7 @@ services:
       - "8780:8780"   # SessionSource service
     environment:
       - S3_ENDPOINT=minio:9000
+      - S3_PUBLIC_ENDPOINT=localhost:9000
       - S3_ACCESS_KEY=admin
       - S3_SECRET_KEY=password123
       - S3_USE_SSL=false

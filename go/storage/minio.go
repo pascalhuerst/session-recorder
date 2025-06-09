@@ -78,11 +78,13 @@ type minioChunk struct {
 type Minio struct {
 	system *System
 
-	endpoint  string
-	accessKey string
-	secretLey string
+	endpoint       string
+	publicEndpoint string
+	accessKey      string
+	secretLey      string
 
-	client *minio.Client
+	client       *minio.Client
+	publicClient *minio.Client // Client configured for public URL generation
 
 	// Key is recorder ID
 	chunks   map[uuid.UUID]*minioChunk
@@ -93,6 +95,10 @@ type Minio struct {
 }
 
 func NewMinioStorage(endpoint, accessKey, secretKey string) (*Minio, error) {
+	return NewMinioStorageWithPublicEndpoint(endpoint, endpoint, accessKey, secretKey)
+}
+
+func NewMinioStorageWithPublicEndpoint(endpoint, publicEndpoint, accessKey, secretKey string) (*Minio, error) {
 	c, err := minio.New(endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(accessKey, secretKey, ""),
 		Secure: false,
@@ -101,12 +107,28 @@ func NewMinioStorage(endpoint, accessKey, secretKey string) (*Minio, error) {
 		return nil, fmt.Errorf("cannot create minio client: %w", err)
 	}
 
+	// Create public client for URL generation if endpoints differ
+	var publicClient *minio.Client
+	if endpoint != publicEndpoint {
+		publicClient, err = minio.New(publicEndpoint, &minio.Options{
+			Creds:  credentials.NewStaticV4(accessKey, secretKey, ""),
+			Secure: false,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("cannot create public minio client: %w", err)
+		}
+	} else {
+		publicClient = c
+	}
+
 	return &Minio{
-		endpoint:  endpoint,
-		accessKey: accessKey,
-		secretLey: secretKey,
-		client:    c,
-		chunks:    make(map[uuid.UUID]*minioChunk),
+		endpoint:       endpoint,
+		publicEndpoint: publicEndpoint,
+		accessKey:      accessKey,
+		secretLey:      secretKey,
+		client:         c,
+		publicClient:   publicClient,
+		chunks:         make(map[uuid.UUID]*minioChunk),
 	}, nil
 }
 
@@ -934,7 +956,7 @@ func (m *Minio) GetPresignedURL(ctx context.Context, recorderID, sessionID uuid.
 	objectName := fmt.Sprintf("%s/sessions/%s/%s", recorderID, sessionID, filename)
 	
 	reqParams := make(url.Values)
-	presignedURL, err := m.client.PresignedGetObject(ctx, bucketName, objectName, expiry, reqParams)
+	presignedURL, err := m.publicClient.PresignedGetObject(ctx, bucketName, objectName, expiry, reqParams)
 	if err != nil {
 		return "", fmt.Errorf("cannot generate presigned URL for %s: %w", objectName, err)
 	}

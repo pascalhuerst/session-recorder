@@ -5,9 +5,9 @@ import { createPinia } from 'pinia';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import RecordersView from './views/recorders/RecordersView.vue';
 import RecordersIndexView from './views/recorders/views/index/RecordersIndexView.vue';
-import RecorderView from './views/recorders/views/:recorderId/RecorderView.vue';
-import SessionsView from './views/recorders/views/:recorderId/views/sessions/SessionsView.vue';
-import SessionsIndexView from './views/recorders/views/:recorderId/views/sessions/views/index/SessionsIndexView.vue';
+import RecorderView from './views/recorders/views/_recorderId/RecorderView.vue';
+import SessionsView from './views/recorders/views/_recorderId/views/sessions/SessionsView.vue';
+import SessionsIndexView from './views/recorders/views/_recorderId/views/sessions/views/index/SessionsIndexView.vue';
 import { setup } from '@session-recorder/session-waveform';
 
 const router = createRouter({

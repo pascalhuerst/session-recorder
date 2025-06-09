@@ -24,7 +24,7 @@ export const useSessionsStore = defineStore('sessions', () => {
         onMessage: (session) => {
           if (session.info.oneofKind === 'removed') {
             console.log('🗑️ Removing session:', session.iD);
-            const index = sessions.findIndex(s => s.iD === session.iD);
+            const index = sessions.findIndex((s) => s.iD === session.iD);
             if (index !== -1) {
               sessions.splice(index, 1);
               console.log('✅ Session removed successfully');
@@ -32,14 +32,16 @@ export const useSessionsStore = defineStore('sessions', () => {
               console.warn('❌ Session not found for removal:', session.iD);
             }
           } else if (session.info.oneofKind === 'updated') {
-            const existingIndex = sessions.findIndex(s => s.iD === session.iD);
+            const existingIndex = sessions.findIndex(
+              (s) => s.iD === session.iD
+            );
             if (existingIndex !== -1) {
               sessions[existingIndex] = session;
             } else {
               sessions.push(session);
             }
           } else {
-            console.warn('⚠️ Unknown session info type:', session.info.oneofKind);
+            console.warn('⚠️ Unknown session info type:', session.info);
           }
         },
         onError: (err) => {

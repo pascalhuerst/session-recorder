@@ -12,8 +12,10 @@ const props = defineProps<{
 }>();
 
 const isRecording = computed(() => {
-  return props.recorder.info.oneofKind === 'status' && 
-         props.recorder.info.status.signalStatus === SignalStatus.SIGNAL;
+  return (
+    props.recorder.info.oneofKind === 'status' &&
+    props.recorder.info.status.signalStatus === SignalStatus.SIGNAL
+  );
 });
 </script>
 
@@ -25,7 +27,10 @@ const isRecording = computed(() => {
     </div>
     <div class="indicators">
       <StatusIndicator :isRecording="isRecording" />
-      <RmsIndicator v-if="isRecording && recorder.info.oneofKind === 'status'" :value="recorder.info.status.rmsPercent" />
+      <RmsIndicator
+        v-if="isRecording && recorder.info.oneofKind === 'status'"
+        :value="recorder.info.status.rmsPercent"
+      />
     </div>
   </div>
 </template>

@@ -1,5 +1,5 @@
 import { computed } from 'vue';
-import { env } from '@/env';
+import { env } from './env';
 
 export const useSessionData = ({
   recorderId,
@@ -16,7 +16,7 @@ export const useSessionData = ({
   const waveformUrl = computed(() => {
     return new URL(
       buildUrlPath('waveform.dat'),
-      env.VITE_FILE_SERVER_URL
+      env.VITE_FILE_SERVER_URL,
     ).toString();
   });
 
@@ -25,14 +25,14 @@ export const useSessionData = ({
       {
         src: new URL(
           buildUrlPath('data.ogg'),
-          env.VITE_FILE_SERVER_URL
+          env.VITE_FILE_SERVER_URL,
         ).toString(),
         type: 'audio/ogg',
       },
       {
         src: new URL(
           buildUrlPath('data.flac'),
-          env.VITE_FILE_SERVER_URL
+          env.VITE_FILE_SERVER_URL,
         ).toString(),
         type: 'audio/flac',
       },

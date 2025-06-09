@@ -16,7 +16,7 @@ export const envFactory = () => {
       // VITE_SERVER_URL: import.meta.env.VITE_SERVER_URL,
       VITE_GRPC_SERVER_URL: import.meta.env.VITE_GRPC_SERVER_URL,
       VITE_FILE_SERVER_URL: import.meta.env.VITE_FILE_SERVER_URL,
-    })
+    }),
   );
 };
 

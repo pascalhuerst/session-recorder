@@ -19,7 +19,7 @@ type ProtocolServer interface {
 
 func StartProtocolServer(server ProtocolServer, mdnsServer *mdns.Server, mdnsName string, port uint16) (uint16, error) {
 	host := fmt.Sprintf(":%d", port)
-	listener, err := net.Listen("tcp4", host)
+	listener, err := net.Listen("tcp", host)
 	if err != nil {
 		return 0, fmt.Errorf("cannot listen on %s: %v", host, err)
 	}
@@ -38,7 +38,9 @@ func StartProtocolServer(server ProtocolServer, mdnsServer *mdns.Server, mdnsNam
 	}()
 
 	if mdnsServer != nil {
-		_, err = mdnsServer.PublishRecord(mdnsServer.Hostname(), mdnsName, "", port, server.announcement())
+		// Use a unique service name based on the service type and port to avoid collisions
+		serviceName := fmt.Sprintf("%s-%d", mdnsServer.Hostname(), port)
+		_, err = mdnsServer.PublishRecord(serviceName, mdnsName, "", port, server.announcement())
 		if err != nil {
 			return 0, fmt.Errorf("unable to publish mDNS record %s: %v", mdnsName, err)
 		}

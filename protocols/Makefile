@@ -1,5 +1,5 @@
 PROTOC ?= protoc
-PROTOC_INCLUDES ?= /usr/include/google/protobuf
+PROTOC_INCLUDES ?= /usr/include
 GRPC_CPP_PLUGIN ?= $(shell which grpc_cpp_plugin)
 PROTOBUF_TS_PLUGIN ?= ./node_modules/.bin/protoc-gen-ts
 MD ?= mkdir

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	cmpb "github.com/pascalhuerst/session-recorder/protocols/go/common"
@@ -41,20 +42,51 @@ func NewSessionSourceHandler(sessionStorage storage.Storage, recorderUpdateCh ch
 
 // Called after a session has been closed and rendered by storage. Setup above in the constructor
 func (h *SessionSourceHandler) onSessionClosed(session *storage.Session) {
-	// TODO: Refine this
+	// Generate presigned URLs for session files (24 hour expiry)
+	expiry := 24 * time.Hour
+	ctx := context.Background()
+	
+	// Get the recorder ID from the storage
+	recorderID := uuid.Nil
+	for rID, recorder := range h.sessionStorage.GetRecorders() {
+		if _, exists := recorder.Sessions[session.ID]; exists {
+			recorderID = rID
+			break
+		}
+	}
+	
+	oggURL, err := h.sessionStorage.GetPresignedURL(ctx, recorderID, session.ID, "data.ogg", expiry)
+	if err != nil {
+		log.Err(err).Str("session-id", session.ID.String()).Msg("Cannot generate presigned URL for OGG file")
+		oggURL = "data.ogg" // fallback to original filename
+	}
+	
+	waveformURL, err := h.sessionStorage.GetPresignedURL(ctx, recorderID, session.ID, "waveform.dat", expiry)
+	if err != nil {
+		log.Err(err).Str("session-id", session.ID.String()).Msg("Cannot generate presigned URL for waveform file")
+		waveformURL = "waveform.dat" // fallback to original filename
+	}
+	
+	flacURL, err := h.sessionStorage.GetPresignedURL(ctx, recorderID, session.ID, "data.flac", expiry)
+	if err != nil {
+		log.Err(err).Str("session-id", session.ID.String()).Msg("Cannot generate presigned URL for FLAC file")
+		flacURL = "data.flac" // fallback to original filename
+	}
+	
 	h.sessionUpdateCh <- &sspb.Session{
 		ID: session.ID.String(),
 		Info: &sspb.Session_Updated{
 			Updated: &sspb.SessionInfo{
-				TimeCreated:      timestamppb.New(session.StartTime),
-				TimeFinished:     timestamppb.New(session.EndTime),
-				Lifetime:         durationpb.New(defaultLifetime), //TODO: This info needs to be stored in the session
-				Name:             session.Name,
-				AudioFileName:    "data.ogg",
-				WaveformDataFile: "waveform.dat",
-				Keep:             session.Keep,
-				State:            sspb.SessionState_SESSION_STATE_FINISHED,
-				Segments:         []*sspb.Segment{},
+				TimeCreated:           timestamppb.New(session.StartTime),
+				TimeFinished:          timestamppb.New(session.EndTime),
+				Lifetime:              durationpb.New(defaultLifetime), //TODO: This info needs to be stored in the session
+				Name:                  session.Name,
+				AudioFileName:         oggURL,
+				WaveformDataFile:      waveformURL,
+				LosslessAudioFileName: flacURL,
+				Keep:                  session.Keep,
+				State:                 sspb.SessionState_SESSION_STATE_FINISHED,
+				Segments:              []*sspb.Segment{},
 			},
 		},
 	}
@@ -112,18 +144,40 @@ func (h *SessionSourceHandler) streamSessions(ctx context.Context, request *sspb
 	sessions := h.sessionStorage.GetSessions(recorderID)
 	for _, session := range sessions {
 		if session.IsClosed {
+			// Generate presigned URLs for session files (24 hour expiry)
+			expiry := 24 * time.Hour
+			
+			oggURL, err := h.sessionStorage.GetPresignedURL(ctx, recorderID, session.ID, "data.ogg", expiry)
+			if err != nil {
+				log.Err(err).Str("session-id", session.ID.String()).Msg("Cannot generate presigned URL for OGG file")
+				oggURL = "data.ogg" // fallback to original filename
+			}
+			
+			waveformURL, err := h.sessionStorage.GetPresignedURL(ctx, recorderID, session.ID, "waveform.dat", expiry)
+			if err != nil {
+				log.Err(err).Str("session-id", session.ID.String()).Msg("Cannot generate presigned URL for waveform file")
+				waveformURL = "waveform.dat" // fallback to original filename
+			}
+			
+			flacURL, err := h.sessionStorage.GetPresignedURL(ctx, recorderID, session.ID, "data.flac", expiry)
+			if err != nil {
+				log.Err(err).Str("session-id", session.ID.String()).Msg("Cannot generate presigned URL for FLAC file")
+				flacURL = "data.flac" // fallback to original filename
+			}
+			
 			if err := server.SendMsg(
 				&sspb.Session{
 					ID: session.ID.String(),
 					Info: &sspb.Session_Updated{
 						Updated: &sspb.SessionInfo{
-							TimeCreated:      timestamppb.New(session.StartTime),
-							TimeFinished:     timestamppb.New(session.EndTime),
-							Lifetime:         durationpb.New(defaultLifetime),
-							Name:             session.Name,
-							AudioFileName:    "data.ogg",
-							WaveformDataFile: "waveform.dat",
-							Keep:             session.Keep,
+							TimeCreated:           timestamppb.New(session.StartTime),
+							TimeFinished:          timestamppb.New(session.EndTime),
+							Lifetime:              durationpb.New(defaultLifetime),
+							Name:                  session.Name,
+							AudioFileName:         oggURL,
+							WaveformDataFile:      waveformURL,
+							LosslessAudioFileName: flacURL,
+							Keep:                  session.Keep,
 							// If the session is closed, the state must be finished
 							State: sspb.SessionState_SESSION_STATE_FINISHED,
 						},
@@ -210,17 +264,39 @@ func (h *SessionSourceHandler) setKeepSession(ctx context.Context, request *sspb
 		return noSuccess, err
 	}
 
+	// Generate presigned URLs for session files (24 hour expiry)
+	expiry := 24 * time.Hour
+	
+	oggURL, err := h.sessionStorage.GetPresignedURL(ctx, recorderID, sessionID, "data.ogg", expiry)
+	if err != nil {
+		log.Err(err).Str("session-id", request.SessionID).Msg("Cannot generate presigned URL for OGG file")
+		oggURL = "data.ogg" // fallback to original filename
+	}
+	
+	waveformURL, err := h.sessionStorage.GetPresignedURL(ctx, recorderID, sessionID, "waveform.dat", expiry)
+	if err != nil {
+		log.Err(err).Str("session-id", request.SessionID).Msg("Cannot generate presigned URL for waveform file")
+		waveformURL = "waveform.dat" // fallback to original filename
+	}
+	
+	flacURL, err := h.sessionStorage.GetPresignedURL(ctx, recorderID, sessionID, "data.flac", expiry)
+	if err != nil {
+		log.Err(err).Str("session-id", request.SessionID).Msg("Cannot generate presigned URL for FLAC file")
+		flacURL = "data.flac" // fallback to original filename
+	}
+
 	h.sessionUpdateCh <- &sspb.Session{
 		ID: session.ID.String(),
 		Info: &sspb.Session_Updated{
 			Updated: &sspb.SessionInfo{
-				TimeCreated:      timestamppb.New(session.StartTime),
-				TimeFinished:     timestamppb.New(session.EndTime),
-				Lifetime:         durationpb.New(defaultLifetime),
-				Name:             session.Name,
-				AudioFileName:    "data.ogg",
-				WaveformDataFile: "waveform.dat",
-				Keep:             session.Keep,
+				TimeCreated:           timestamppb.New(session.StartTime),
+				TimeFinished:          timestamppb.New(session.EndTime),
+				Lifetime:              durationpb.New(defaultLifetime),
+				Name:                  session.Name,
+				AudioFileName:         oggURL,
+				WaveformDataFile:      waveformURL,
+				LosslessAudioFileName: flacURL,
+				Keep:                  session.Keep,
 				// If we can modify the session in the frontend, it's closed
 				// we might have to rework that though
 				State: sspb.SessionState_SESSION_STATE_FINISHED,

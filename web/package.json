@@ -21,6 +21,8 @@
     "lodash.merge": "^4.6.2",
     "nanoevents": "^9.0.0",
     "nanostores": "^0.9.5",
+    "@protobuf-ts/runtime": "^2.9.4",
+    "@protobuf-ts/runtime-rpc": "^2.9.4",
     "@protobuf-ts/grpcweb-transport": "^2.9.4",
     "pinia": "^2.1.7",
     "pollen-css": "^4.6.2",

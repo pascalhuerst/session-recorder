@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -77,11 +78,13 @@ type minioChunk struct {
 type Minio struct {
 	system *System
 
-	endpoint  string
-	accessKey string
-	secretLey string
+	endpoint       string
+	publicEndpoint string
+	accessKey      string
+	secretLey      string
 
-	client *minio.Client
+	client       *minio.Client
+	publicClient *minio.Client // Client configured for public URL generation
 
 	// Key is recorder ID
 	chunks   map[uuid.UUID]*minioChunk
@@ -92,6 +95,10 @@ type Minio struct {
 }
 
 func NewMinioStorage(endpoint, accessKey, secretKey string) (*Minio, error) {
+	return NewMinioStorageWithPublicEndpoint(endpoint, endpoint, accessKey, secretKey)
+}
+
+func NewMinioStorageWithPublicEndpoint(endpoint, publicEndpoint, accessKey, secretKey string) (*Minio, error) {
 	c, err := minio.New(endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(accessKey, secretKey, ""),
 		Secure: false,
@@ -100,12 +107,28 @@ func NewMinioStorage(endpoint, accessKey, secretKey string) (*Minio, error) {
 		return nil, fmt.Errorf("cannot create minio client: %w", err)
 	}
 
+	// Create public client for URL generation if endpoints differ
+	var publicClient *minio.Client
+	if endpoint != publicEndpoint {
+		publicClient, err = minio.New(publicEndpoint, &minio.Options{
+			Creds:  credentials.NewStaticV4(accessKey, secretKey, ""),
+			Secure: false,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("cannot create public minio client: %w", err)
+		}
+	} else {
+		publicClient = c
+	}
+
 	return &Minio{
-		endpoint:  endpoint,
-		accessKey: accessKey,
-		secretLey: secretKey,
-		client:    c,
-		chunks:    make(map[uuid.UUID]*minioChunk),
+		endpoint:       endpoint,
+		publicEndpoint: publicEndpoint,
+		accessKey:      accessKey,
+		secretLey:      secretKey,
+		client:         c,
+		publicClient:   publicClient,
+		chunks:         make(map[uuid.UUID]*minioChunk),
 	}, nil
 }
 
@@ -927,4 +950,25 @@ func (m *Minio) closeSession(ctx context.Context, recorderID, sessionID uuid.UUI
 	log.Debug().Stringer("recorder-id", recorderID).Stringer("session-id", sessionID).Msg("Session closed")
 
 	return nil
+}
+
+func (m *Minio) GetPresignedURL(ctx context.Context, recorderID, sessionID uuid.UUID, filename string, expiry time.Duration) (string, error) {
+	objectName := fmt.Sprintf("%s/sessions/%s/%s", recorderID, sessionID, filename)
+	
+	// First check if the object exists
+	_, err := m.client.StatObject(ctx, bucketName, objectName, minio.StatObjectOptions{})
+	if err != nil {
+		log.Debug().Str("object", objectName).Err(err).Msg("Object does not exist for presigned URL generation")
+		return "", fmt.Errorf("object %s does not exist: %w", objectName, err)
+	}
+	
+	reqParams := make(url.Values)
+	presignedURL, err := m.publicClient.PresignedGetObject(ctx, bucketName, objectName, expiry, reqParams)
+	if err != nil {
+		log.Error().Str("object", objectName).Str("bucket", bucketName).Err(err).Msg("Failed to generate presigned URL")
+		return "", fmt.Errorf("cannot generate presigned URL for %s: %w", objectName, err)
+	}
+	
+	log.Debug().Str("object", objectName).Str("url", presignedURL.String()).Msg("Generated presigned URL")
+	return presignedURL.String(), nil
 }

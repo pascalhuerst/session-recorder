@@ -1,15 +1,18 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import SessionMenu from './SessionMenu.vue';
-import { Session, SegmentState } from '@session-recorder/protocols/ts/sessionsource';
+import {
+  Session,
+  SegmentState,
+} from '@session-recorder/protocols/ts/sessionsource';
 import { useDateFormat } from '@vueuse/core';
-import { useSessionData } from '@/useSessionData';
 import {
   createPeaksContext,
   providePeaksContext,
   WaveformEditor,
 } from '@session-recorder/session-waveform';
 import { integrateSegments } from '../../../grpc/integrateSegments';
+import { useSessionData } from '../../../useSessionData';
 
 const props = defineProps<{
   session: Session;
@@ -18,10 +21,15 @@ const props = defineProps<{
 }>();
 
 const createdAt = computed(() => {
-  if (props.session.info.oneofKind !== 'updated' || !props.session.info.updated.timeCreated) {
+  if (
+    props.session.info.oneofKind !== 'updated' ||
+    !props.session.info.updated.timeCreated
+  ) {
     return { iso: '', formatted: '' };
   }
-  const createdDate = new Date(props.session.info.updated.timeCreated.seconds * 1000);
+  const createdDate = new Date(
+    props.session.info.updated.timeCreated.seconds * 1000
+  );
   const format =
     createdDate.getFullYear() === new Date().getFullYear()
       ? 'ddd, MMM D, HH:mm'
@@ -33,8 +41,7 @@ const createdAt = computed(() => {
 });
 
 const { waveformUrl, audioUrls } = useSessionData({
-  sessionId: props.session.iD,
-  recorderId: props.recorderId,
+  session: props.session,
 });
 
 const buildUrlPath = (segmentId: string, ext: string) => {
@@ -50,13 +57,24 @@ const ctx = createPeaksContext({
       update: true,
       delete: true,
     },
-    segments: (props.session.info.oneofKind === 'updated' ? props.session.info.updated.segments || [] : []).map((s) => ({
+    segments: (props.session.info.oneofKind === 'updated'
+      ? props.session.info.updated.segments || []
+      : []
+    ).map((s) => ({
       id: s.segmentID,
-      labelText: s.info.oneofKind === 'updated' ? s.info.updated.name || '' : '',
-      startTime: s.info.oneofKind === 'updated' && s.info.updated.timeStart ? new Date(s.info.updated.timeStart.seconds * 1000).getTime() : 0,
-      endTime: s.info.oneofKind === 'updated' && s.info.updated.timeEnd ? new Date(s.info.updated.timeEnd.seconds * 1000).getTime() : 0,
+      labelText:
+        s.info.oneofKind === 'updated' ? s.info.updated.name || '' : '',
+      startTime:
+        s.info.oneofKind === 'updated' && s.info.updated.timeStart
+          ? new Date(s.info.updated.timeStart.seconds * 1000).getTime()
+          : 0,
+      endTime:
+        s.info.oneofKind === 'updated' && s.info.updated.timeEnd
+          ? new Date(s.info.updated.timeEnd.seconds * 1000).getTime()
+          : 0,
       renders:
-        s.info.oneofKind === 'updated' && s.info.updated.state === SegmentState.SEGMENT_STATE_FINISHED
+        s.info.oneofKind === 'updated' &&
+        s.info.updated.state === SegmentState.FINISHED
           ? [
               {
                 type: 'audio/mp3',

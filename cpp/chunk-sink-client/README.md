@@ -1,17 +1,19 @@
-# Chunk Sink Client, a.k.a Chunk Source
+# Session Recorder Audio Client
 
-This is part of sesion-recorder.
+C++ audio capture client that streams audio chunks to the Session Recorder backend via gRPC.
 
-## What does it do?
+## Features
 
-This opens an alsa device and detects whether there is something to record or not. If signal is detected, chunk-source starts pushing chunks of audio to chunk-sinks. Chunk-sinks are found using mdns.
+- **ALSA Audio Capture**: Records from ALSA audio devices
+- **Automatic Discovery**: Finds backend services via mDNS (`_session-recorder-chunksink._tcp`)
+- **Real-time Streaming**: Streams audio chunks over gRPC
+- **Signal Detection**: Only records when audio signal is detected
+- **Multiple Clients**: Supports multiple simultaneous recording sources
 
-## Building
+## Quick Start
 
-### Fedora
-
-Dependencies:
-
-```
-dnf install alsa-lib-devel avahi-devel grpc-data grpc grpc-cpp grpc-plugins grpc-devel
+### Build
+From the project root directory:
+```bash
+./build-audio-client.sh
 ```

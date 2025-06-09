@@ -42,6 +42,8 @@ find_package(Boost 1.81 COMPONENTS program_options REQUIRED)
 
 include_directories("${CMAKE_CURRENT_BINARY_DIR}")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../../protocols/cpp")
+include_directories("/usr/include")
+include_directories("/tmp/usr_local_include")
 
 add_executable(${PROJECT_NAME} ${SOURCES})
 

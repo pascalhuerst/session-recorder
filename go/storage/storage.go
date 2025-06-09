@@ -29,6 +29,9 @@ type Storage interface {
 	//CloseOpenSessions(ctx context.Context, recorderID uuid.UUID) error
 
 	RegisterOnSessionClosedCallback(cb OnSessionClosedCb) error
+
+	// Generate presigned URLs for session files
+	GetPresignedURL(ctx context.Context, recorderID, sessionID uuid.UUID, filename string, expiry time.Duration) (string, error)
 }
 
 type System struct {

@@ -1,0 +1,115 @@
+version: '3.3'
+
+services:
+  # Protocol Generation Service
+  protocols:
+    build:
+      context: ./protocols
+      dockerfile: Dockerfile
+    volumes:
+      - protocol-data:/app/cpp
+      - protocol-data:/app/ts  
+      - protocol-data:/app/go
+    networks:
+      - session-recorder-net
+
+  # MinIO S3-compatible storage
+  minio:
+    image: quay.io/minio/minio:latest
+    command: server /data --console-address ":9090"
+    ports:
+      - "9000:9000"   # API
+      - "9090:9090"   # Console
+    environment:
+      - MINIO_ROOT_USER=admin
+      - MINIO_ROOT_PASSWORD=password123
+    volumes:
+      - ./data/minio:/data
+    networks:
+      - session-recorder-net
+    healthcheck:
+      test: [ "CMD", "mc", "ready", "local" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Go Backend Services
+  go-backend:
+    build:
+      context: .
+      dockerfile: ./go/Dockerfile
+    hostname: session-recorder-docker
+    ports:
+      - "8779:8779"   # ChunkSink service
+      - "8780:8780"   # SessionSource service
+    environment:
+      - S3_ENDPOINT=minio:9000
+      - S3_PUBLIC_ENDPOINT=localhost:9000
+      - S3_ACCESS_KEY=admin
+      - S3_SECRET_KEY=password123
+      - S3_USE_SSL=false
+    depends_on:
+      - protocols
+      - minio
+    networks:
+      - session-recorder-net
+    volumes:
+      # Mount D-Bus system socket for mDNS functionality
+      - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket:ro
+      # Mount generated protocol files
+      - protocol-data:/protocols:ro
+    restart: unless-stopped
+
+  # gRPC-Web Proxy (Envoy)
+  grpc-proxy:
+    build:
+      context: ./grpc-web-proxy
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"   # gRPC-Web proxy
+    depends_on:
+      - go-backend
+    networks:
+      - session-recorder-net
+    volumes:
+      - ./grpc-web-proxy/envoy.yaml:/etc/envoy/envoy.yaml:ro
+    restart: unless-stopped
+
+  # Web Interface
+  web:
+    build:
+      context: .
+      dockerfile: ./web/Dockerfile
+      args:
+        - VITE_GRPC_SERVER_URL=http://localhost:8080
+        - VITE_FILE_SERVER_URL=http://localhost:9000
+    ports:
+      - "3000:80"     # Web interface
+    depends_on:
+      - protocols
+      - grpc-proxy
+      - minio
+    networks:
+      - session-recorder-net
+    volumes:
+      # Mount generated protocol files for TypeScript
+      - protocol-data:/protocols:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+
+volumes:
+  protocol-data:
+    driver: local
+
+networks:
+  session-recorder-net:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.25.0.0/16

@@ -1,30 +1,57 @@
-# Dependencies
+# Session Recorder Protocol Definitions
 
-To build the ptotobuf stuff, you need the following:
+Shared gRPC protocol definitions and code generation for all Session Recorder components.
 
-## For typescript:
+## Protocols
 
+- **ChunkSink**: Audio chunk streaming from C++ clients to Go backend
+- **SessionSource**: Session management API for web interface
+- **Common**: Shared types and definitions
+
+## Quick Start
+
+### Generate All Code
+```bash
+npm install
+make clean
+make all
 ```
+
+This generates:
+- **C++ headers**: `cpp/` directory
+- **Go packages**: `go/` directory  
+- **TypeScript**: `ts/` directory
+
+## Build Requirements
+
+### System Dependencies (Fedora)
+```bash
+dnf install grpc-plugins grpc-devel protobuf-devel
+```
+
+### Node.js Dependencies
+```bash
 npm install @protobuf-ts/runtime @protobuf-ts/runtime-rpc @protobuf-ts/grpcweb-transport
 npm install --save-dev @protobuf-ts/plugin grpc-tools
-npm install @protobuf-ts/grpcweb-transport
 ```
 
-## For rust
+## Manual Protocol Compiler Setup
 
-```
-cargo install grpc-compiler
-cargo install protobuf-codegen
-```
-
-## For go and cpp
-
-```
-dnf install grpc-plugins golang-google-protobuf golang-google-grpc
-```
-
-## To use a specific version of `protoc`, go to the github page, download a release and set the variables accordingly:
-```
+To use a specific `protoc` version:
+```bash
+# Download from https://github.com/protocolbuffers/protobuf/releases
 export PROTOC_INCLUDES=~/Downloads/protoc-23.4-linux-x86_64/include/google/protobuf
 export PROTOC=~/Downloads/protoc-23.4-linux-x86_64/bin/protoc
 ```
+
+## Generated Files
+
+**Note**: Generated files are excluded from git (`.gitignore`) and must be built locally.
+
+## Development Workflow
+
+1. **Modify .proto files** in `proto/` directory
+2. **Regenerate code** with `make all`
+3. **Rebuild components** that use the protocols
+
+See the main project README.md for complete build instructions.

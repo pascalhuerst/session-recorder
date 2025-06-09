@@ -7,7 +7,6 @@ set -e  # Exit on any error
 
 # Parse command line arguments
 SKIP_CPP=false
-SKIP_WEB=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -15,18 +14,13 @@ while [[ $# -gt 0 ]]; do
             SKIP_CPP=true
             shift
             ;;
-        --skip-web)
-            SKIP_WEB=true
-            shift
-            ;;
         --clean)
             echo "🧹 Cleaning build artifacts..."
             rm -rf protocols/node_modules protocols/cpp protocols/ts protocols/go
-            rm -rf go/bin cpp/chunk-sink-client/CMakeFiles cpp/chunk-sink-client/CMakeCache.txt cpp/chunk-sink-client/Makefile cpp/chunk-sink-client/cmake_install.cmake cpp/chunk-sink-client/chunk-sink-client
-            rm -rf web/node_modules web/dist web/.nx
+            rm -rf cpp/chunk-sink-client/CMakeFiles cpp/chunk-sink-client/CMakeCache.txt cpp/chunk-sink-client/Makefile cpp/chunk-sink-client/cmake_install.cmake cpp/chunk-sink-client/chunk-sink-client
             rm -f cpp/Dockerfile
             echo "🐳 Cleaning Docker build images..."
-            docker rmi session-recorder-protocols session-recorder-go session-recorder-cpp session-recorder-web 2>/dev/null || true
+            docker rmi session-recorder-protocols session-recorder-cpp 2>/dev/null || true
             echo "✅ Clean complete"
             exit 0
             ;;
@@ -34,7 +28,6 @@ while [[ $# -gt 0 ]]; do
             echo "Usage: $0 [OPTIONS]"
             echo "Options:"
             echo "  --skip-cpp    Skip C++ client build"
-            echo "  --skip-web    Skip web interface build"
             echo "  --clean       Clean all build artifacts"
             echo "  --help        Show this help message"
             exit 0
@@ -74,7 +67,7 @@ print_error() {
 }
 
 # Check if we're in the right directory
-if [ ! -f "README.md" ] || [ ! -d "protocols" ] || [ ! -d "go" ] || [ ! -d "cpp" ] || [ ! -d "web" ]; then
+if [ ! -f "README.md" ] || [ ! -d "protocols" ] || [ ! -d "go" ] || [ ! -d "cpp" ]; then
     print_error "Please run this script from the session-recorder root directory"
     exit 1
 fi
@@ -113,35 +106,11 @@ docker rm "$container_id" > /dev/null
 
 print_success "Protocol generation completed (containerized)"
 
-# 2. Build Go Backend (using Docker)
-print_status "Step 2/4: Building Go Backend (via Docker)"
-
-# Build Go backend in container
-print_status "Building Go backend container..."
-if ! docker build -t session-recorder-go -f go/Dockerfile .; then
-    print_error "Failed to build Go backend container"
-    exit 1
-fi
-
-# Extract built binaries
-container_id=$(docker create session-recorder-go)
-if [ $? -ne 0 ]; then
-    print_error "Failed to create Go backend container"
-    exit 1
-fi
-
-print_status "Extracting Go binaries..."
-mkdir -p go/bin
-docker cp "$container_id:/root/chunk_sink" ./go/bin/
-docker rm "$container_id" > /dev/null
-
-print_success "Go backend build completed (containerized)"
-
-# 3. Build C++ Client (using Docker)
+# 2. Build C++ Client (using Docker)
 if [ "$SKIP_CPP" = true ]; then
     print_warning "Skipping C++ client build (--skip-cpp flag)"
 else
-    print_status "Step 3/4: Building C++ Client (via Docker)"
+    print_status "Step 2/2: Building C++ Client (via Docker)"
     
     # Create C++ client Dockerfile if it doesn't exist
     if [ ! -f "cpp/Dockerfile" ]; then
@@ -207,54 +176,16 @@ EOF
     print_success "C++ client build completed (containerized)"
 fi
 
-# 4. Build Web Interface (using Docker)
-if [ "$SKIP_WEB" = true ]; then
-    print_warning "Skipping web interface build (--skip-web flag)"
-else
-    print_status "Step 4/4: Building Web Interface (via Docker)"
-    
-    # Build web interface using existing Dockerfile
-    print_status "Building web interface container..."
-    if ! docker build -t session-recorder-web -f web/Dockerfile --build-arg VITE_GRPC_SERVER_URL=http://localhost:8080 --build-arg VITE_FILE_SERVER_URL=http://localhost:9000 .; then
-        print_error "Failed to build web interface container"
-        exit 1
-    fi
-    
-    # Extract built files
-    container_id=$(docker create session-recorder-web)
-    if [ $? -ne 0 ]; then
-        print_error "Failed to create web interface container"
-        exit 1
-    fi
-    
-    print_status "Extracting web build files..."
-    mkdir -p web/dist
-    docker cp "$container_id:/usr/share/nginx/html/" ./web/dist/
-    # Move files from html subdirectory to dist
-    if [ -d "web/dist/html" ]; then
-        mv web/dist/html/* web/dist/
-        rmdir web/dist/html
-    fi
-    docker rm "$container_id" > /dev/null
-    
-    print_success "Web interface build completed (containerized)"
-fi
 
 echo ""
 echo "🎉 Build Complete!"
 echo "=================="
 print_success "All components have been built successfully (using Docker):"
 echo "  ✅ Protocol Buffers generated (containerized)"
-echo "  ✅ Go backend: ./go/bin/chunk_sink (containerized)"
 if [ "$SKIP_CPP" = true ]; then
     echo "  ⚠️  C++ client: Skipped (use --skip-cpp to build)"
 else
     echo "  ✅ C++ client: ./cpp/chunk-sink-client/chunk-sink-client (containerized)"
-fi
-if [ "$SKIP_WEB" = true ]; then
-    echo "  ⚠️  Web interface: Skipped"
-else
-    echo "  ✅ Web interface: ./web/dist/ (containerized)"
 fi
 echo ""
 print_warning "Note: Generated files are excluded from git (.gitignore)"
@@ -264,8 +195,6 @@ print_status "Next steps:"
 echo "  1. Start MinIO storage container"
 echo "  2. Configure S3 environment variables"
 echo "  3. Run the Go backend services"
-echo "  4. Start the gRPC-Web proxy"
-echo "  5. Serve the web interface"
-echo "  6. Execute the C++ client for audio capture"
+echo "  4. Execute the C++ client for audio capture"
 echo ""
 print_status "See README.md for detailed runtime instructions."

@@ -76,29 +76,39 @@ if [ ! -f "README.md" ] || [ ! -d "protocols" ] || [ ! -d "go" ] || [ ! -d "cpp"
     exit 1
 fi
 
-# 1. Generate Protocol Buffers
-print_status "Step 1/4: Generating Protocol Buffers"
-cd protocols/
+# 1. Generate Protocol Buffers (using Docker)
+print_status "Step 1/4: Generating Protocol Buffers (via Docker)"
 
-# Check if npm is installed
-if ! command -v npm &> /dev/null; then
-    print_error "npm is required but not installed. Please install Node.js and npm."
+# Check if Docker is installed
+if ! command -v docker &> /dev/null; then
+    print_error "Docker is required but not installed. Please install Docker."
     exit 1
 fi
 
-# Install protobuf TypeScript plugin if needed
-if [ ! -d "node_modules" ]; then
-    print_status "Installing protocol dependencies..."
-    npm install
+# Build protocols in container and extract generated files
+print_status "Building protocols container and extracting generated files..."
+if ! docker build -t session-recorder-protocols ./protocols/; then
+    print_error "Failed to build protocols container"
+    exit 1
 fi
 
-# Generate protocol code
-print_status "Generating C++, Go, and TypeScript code from proto files..."
-make clean
-make all
+# Create temporary container to copy files
+container_id=$(docker create session-recorder-protocols)
+if [ $? -ne 0 ]; then
+    print_error "Failed to create protocols container"
+    exit 1
+fi
 
-print_success "Protocol generation completed"
-cd ..
+# Copy generated files from container
+print_status "Extracting generated protocol files..."
+docker cp "$container_id:/app/cpp" ./protocols/
+docker cp "$container_id:/app/ts" ./protocols/
+docker cp "$container_id:/app/go" ./protocols/
+
+# Clean up container
+docker rm "$container_id" > /dev/null
+
+print_success "Protocol generation completed (containerized)"
 
 # 2. Build Go Backend
 print_status "Step 2/4: Building Go Backend"

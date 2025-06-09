@@ -1,6 +1,18 @@
 version: '3.3'
 
 services:
+  # Protocol Generation Service
+  protocols:
+    build:
+      context: ./protocols
+      dockerfile: Dockerfile
+    volumes:
+      - protocol-data:/app/cpp
+      - protocol-data:/app/ts  
+      - protocol-data:/app/go
+    networks:
+      - session-recorder-net
+
   # MinIO S3-compatible storage
   minio:
     image: quay.io/minio/minio:latest
@@ -36,14 +48,15 @@ services:
       - S3_SECRET_KEY=password123
       - S3_USE_SSL=false
     depends_on:
+      - protocols
       - minio
     networks:
       - session-recorder-net
     volumes:
       # Mount D-Bus system socket for mDNS functionality
       - /var/run/dbus/system_bus_socket:/var/run/dbus/system_bus_socket:ro
-    # volumes:
-    #   - protocol-data:/protocols:ro
+      # Mount generated protocol files
+      - protocol-data:/protocols:ro
     restart: unless-stopped
 
   # gRPC-Web Proxy (Envoy)
@@ -72,10 +85,14 @@ services:
     ports:
       - "3000:80"     # Web interface
     depends_on:
+      - protocols
       - grpc-proxy
       - minio
     networks:
       - session-recorder-net
+    volumes:
+      # Mount generated protocol files for TypeScript
+      - protocol-data:/protocols:ro
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/health"]
@@ -84,9 +101,9 @@ services:
       retries: 3
 
 
-# volumes:
-  # minio-data:
-  #   driver: local
+volumes:
+  protocol-data:
+    driver: local
 
 networks:
   session-recorder-net:

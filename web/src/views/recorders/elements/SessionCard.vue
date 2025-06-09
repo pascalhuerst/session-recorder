@@ -28,7 +28,7 @@ const createdAt = computed(() => {
     return { iso: '', formatted: '' };
   }
   const createdDate = new Date(
-    props.session.info.updated.timeCreated.seconds * 1000,
+    props.session.info.updated.timeCreated.seconds * 1000
   );
   const format =
     createdDate.getFullYear() === new Date().getFullYear()
@@ -75,7 +75,7 @@ const ctx = createPeaksContext({
           : 0,
       renders:
         s.info.oneofKind === 'updated' &&
-        s.info.updated.state === SegmentState.SEGMENT_STATE_FINISHED
+        s.info.updated.state === SegmentState.FINISHED
           ? [
               {
                 type: 'audio/mp3',

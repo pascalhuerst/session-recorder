@@ -6,20 +6,12 @@ import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import SessionCard from '@/views/recorders/elements/SessionCard.vue';
 import { useSessionsStore } from '../../../../../../../../store/useSessionsStore';
 import { useRecordersStore } from '../../../../../../../../store/useRecordersStore';
+import { type Session } from '@session-recorder/protocols/ts/sessionsource';
 
 const { selectedRecorderId } = storeToRefs(useRecordersStore());
 const { sessions } = storeToRefs(useSessionsStore());
 
 const sortedSessions = computed(() => {
-  console.log(
-    '🔄 Computed sortedSessions triggered, sessions count:',
-    sessions.value.length,
-  );
-  console.log(
-    'Session IDs in computed:',
-    sessions.value.map((s) => s.iD),
-  );
-
   const sorted = sessions.value.slice().sort((a, b) => {
     const aTime =
       a.info.oneofKind === 'updated' && a.info.updated.timeCreated
@@ -32,11 +24,7 @@ const sortedSessions = computed(() => {
     return bTime - aTime;
   });
 
-  console.log(
-    'Sorted sessions:',
-    sorted.map((s) => s.iD),
-  );
-  return sorted;
+  return sorted satisfies Session[];
 });
 </script>
 

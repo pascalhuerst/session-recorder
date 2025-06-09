@@ -4,7 +4,7 @@ import { storeToRefs } from 'pinia';
 import { useRecordersStore } from '../../../store/useRecordersStore';
 import { computed } from 'vue';
 import { SignalStatus } from '@session-recorder/protocols/ts/common';
-import { Button } from '../../../../libs/session-waveform/src';
+import { Button } from '@session-recorder/session-waveform';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 
 const { recorders, selectedRecorderId } = storeToRefs(useRecordersStore());

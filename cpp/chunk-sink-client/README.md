@@ -42,4 +42,4 @@ chmod +x chunk-sink-client
 
 ## Architecture
 
-See `.claude/architecture.md` for complete system design and data flow.
+See the main project README.md for complete system design and data flow.

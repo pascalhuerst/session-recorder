@@ -4,11 +4,15 @@ A distributed audio recording system with real-time streaming and web-based sess
 
 ## Quick Start with Docker
 
-### 1. Build the components
+### 1. Build the components (Optional)
+
+The build script generates protocols and builds the C++ client:
 
 ```bash
 ./build.sh
 ```
+
+**Note**: This is optional since the Docker deployment handles all builds automatically.
 
 ### 2. Start the Services
 

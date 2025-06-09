@@ -28,7 +28,7 @@ go run cmd/chunk_sink/main.go cmd/chunk_sink/session-source-handler.go cmd/chunk
 ## Prerequisites
 
 - Go 1.21+
-- MinIO S3 storage (see `.claude/development.md`)
+- MinIO S3 storage (configured in docker-compose.yml)
 - Environment variables:
   - `S3_ENDPOINT`
   - `S3_ACCESS_KEY` 
@@ -36,4 +36,4 @@ go run cmd/chunk_sink/main.go cmd/chunk_sink/session-source-handler.go cmd/chunk
 
 ## Architecture
 
-See `.claude/architecture.md` for complete system design.
+See the main project README.md for complete system design.

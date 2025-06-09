@@ -9,15 +9,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Docker deployment (recommended)
 ./docker-build.sh up --build
 
-# Local build all components
+# Local build protocols and C++ client only
 ./build.sh
 
 # Protocol generation
 cd protocols/ && make all
 ```
 
-### Documentation
-Detailed guides are available in the `.claude/` directory:
-- **Development**: `.claude/development.md` - Local setup and workflow
-- **Architecture**: `.claude/architecture.md` - System design and components
-- **Docker**: `.claude/docker.md` - Container deployment guide
+### Build System
+The build script now focuses on essential components:
+- **Protocol generation**: Creates gRPC interfaces for all languages
+- **C++ client build**: Compiles the audio capture client
+- **Docker deployment**: Handles Go backend and web interface builds automatically

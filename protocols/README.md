@@ -54,4 +54,4 @@ export PROTOC=~/Downloads/protoc-23.4-linux-x86_64/bin/protoc
 2. **Regenerate code** with `make all`
 3. **Rebuild components** that use the protocols
 
-See `.claude/development.md` for complete build instructions.
+See the main project README.md for complete build instructions.

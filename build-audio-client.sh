@@ -73,7 +73,7 @@ if [ ! -f "README.md" ] || [ ! -d "protocols" ] || [ ! -d "go" ] || [ ! -d "cpp"
 fi
 
 # 1. Generate Protocol Buffers (using Docker)
-print_status "Step 1/4: Generating Protocol Buffers (via Docker)"
+print_status "Step 1/2: Generating Protocol Buffers (via Docker)"
 
 # Check if Docker is installed
 if ! command -v docker &> /dev/null; then

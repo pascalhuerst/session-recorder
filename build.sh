@@ -24,6 +24,9 @@ while [[ $# -gt 0 ]]; do
             rm -rf protocols/node_modules protocols/cpp protocols/ts protocols/go
             rm -rf go/bin cpp/chunk-sink-client/CMakeFiles cpp/chunk-sink-client/CMakeCache.txt cpp/chunk-sink-client/Makefile cpp/chunk-sink-client/cmake_install.cmake cpp/chunk-sink-client/chunk-sink-client
             rm -rf web/node_modules web/dist web/.nx
+            rm -f cpp/Dockerfile
+            echo "🐳 Cleaning Docker build images..."
+            docker rmi session-recorder-protocols session-recorder-go session-recorder-cpp session-recorder-web 2>/dev/null || true
             echo "✅ Clean complete"
             exit 0
             ;;
@@ -110,129 +113,148 @@ docker rm "$container_id" > /dev/null
 
 print_success "Protocol generation completed (containerized)"
 
-# 2. Build Go Backend
-print_status "Step 2/4: Building Go Backend"
-cd go/
+# 2. Build Go Backend (using Docker)
+print_status "Step 2/4: Building Go Backend (via Docker)"
 
-# Check if Go is installed
-if ! command -v go &> /dev/null; then
-    print_error "Go is required but not installed. Please install Go."
+# Build Go backend in container
+print_status "Building Go backend container..."
+if ! docker build -t session-recorder-go -f go/Dockerfile .; then
+    print_error "Failed to build Go backend container"
     exit 1
 fi
 
-# Build the chunk sink server
-print_status "Building chunk sink server..."
-mkdir -p bin
-make clean
-make chunk_sink
+# Extract built binaries
+container_id=$(docker create session-recorder-go)
+if [ $? -ne 0 ]; then
+    print_error "Failed to create Go backend container"
+    exit 1
+fi
 
-print_success "Go backend build completed"
-cd ..
+print_status "Extracting Go binaries..."
+mkdir -p go/bin
+docker cp "$container_id:/root/chunk_sink" ./go/bin/
+docker rm "$container_id" > /dev/null
 
-# 3. Build C++ Client
+print_success "Go backend build completed (containerized)"
+
+# 3. Build C++ Client (using Docker)
 if [ "$SKIP_CPP" = true ]; then
     print_warning "Skipping C++ client build (--skip-cpp flag)"
 else
-    print_status "Step 3/4: Building C++ Client"
-    cd cpp/chunk-sink-client/
+    print_status "Step 3/4: Building C++ Client (via Docker)"
+    
+    # Create C++ client Dockerfile if it doesn't exist
+    if [ ! -f "cpp/Dockerfile" ]; then
+        print_status "Creating C++ client Dockerfile..."
+        cat > cpp/Dockerfile << 'EOF'
+# C++ Client Build Dockerfile
+FROM fedora:39
 
-# Check if CMake is installed
-if ! command -v cmake &> /dev/null; then
-    print_error "CMake is required but not installed. Please install CMake."
-    exit 1
-fi
+# Install build dependencies
+RUN dnf update -y && dnf install -y \
+    cmake \
+    gcc-c++ \
+    make \
+    pkg-config \
+    alsa-lib-devel \
+    avahi-devel \
+    grpc-devel \
+    grpc-cpp \
+    grpc-plugins \
+    protobuf-devel \
+    openssl-devel \
+    boost-devel \
+    c-ares-devel \
+    re2-devel \
+    zlib-devel \
+    && dnf clean all
 
-# Check if required system dependencies are available (Fedora)
-print_status "Checking system dependencies..."
-missing_deps=()
+WORKDIR /app
 
-# Check for pkg-config first
-if ! command -v pkg-config &> /dev/null; then
-    missing_deps+=("pkg-config")
-fi
+# Copy protocol files
+COPY protocols/cpp/ protocols/cpp/
 
-# Check for required libraries using pkg-config
-for lib in alsa avahi-client avahi-core; do
-    if ! pkg-config --exists $lib 2>/dev/null; then
-        missing_deps+=("$lib-devel")
+# Copy C++ source code
+COPY cpp/chunk-sink-client/ chunk-sink-client/
+
+# Build the application
+WORKDIR /app/chunk-sink-client
+RUN cmake . -Wno-dev && cmake --build .
+RUN chmod +x chunk-sink-client
+
+# This is a build-only container
+EOF
     fi
-done
-
-# Check for gRPC
-if ! pkg-config --exists grpc++ 2>/dev/null; then
-    missing_deps+=("grpc-devel grpc-cpp grpc-plugins")
-fi
-
-if [ ${#missing_deps[@]} -ne 0 ]; then
-    print_error "Missing system dependencies. Please install:"
-    print_error "dnf install ${missing_deps[*]}"
-    exit 1
-fi
-
-# Clean any existing build files first
-if [ -f "Makefile" ] || [ -d "CMakeFiles" ]; then
-    print_status "Cleaning previous build files..."
-    rm -rf CMakeFiles CMakeCache.txt Makefile cmake_install.cmake
-fi
-
-# Build the C++ client
-print_status "Configuring CMake build..."
-if ! cmake . -Wno-dev; then
-    print_error "CMake configuration failed. Check system dependencies."
-    exit 1
-fi
-
-print_status "Building C++ client..."
-if ! cmake --build . --parallel; then
-    print_warning "Parallel build failed, trying sequential build..."
-    if ! cmake --build .; then
-        print_error "C++ build failed. Check protobuf/gRPC installation."
-        print_error "Try: sudo dnf reinstall protobuf-devel grpc-devel"
+    
+    # Build C++ client in container
+    print_status "Building C++ client container..."
+    if ! docker build -t session-recorder-cpp -f cpp/Dockerfile .; then
+        print_error "Failed to build C++ client container"
         exit 1
     fi
+    
+    # Extract built binary
+    container_id=$(docker create session-recorder-cpp)
+    if [ $? -ne 0 ]; then
+        print_error "Failed to create C++ client container"
+        exit 1
+    fi
+    
+    print_status "Extracting C++ binary..."
+    docker cp "$container_id:/app/chunk-sink-client/chunk-sink-client" ./cpp/chunk-sink-client/
+    docker rm "$container_id" > /dev/null
+    
+    print_success "C++ client build completed (containerized)"
 fi
 
-# Make the binary executable
-chmod +x chunk-sink-client
-
-    print_success "C++ client build completed"
-    cd ../..
-fi
-
-# 4. Build Web Interface
+# 4. Build Web Interface (using Docker)
 if [ "$SKIP_WEB" = true ]; then
     print_warning "Skipping web interface build (--skip-web flag)"
 else
-    print_status "Step 4/4: Building Web Interface"
-    cd web/
-
-# Install web dependencies
-print_status "Installing web dependencies..."
-npm install
-
-# Build the web application
-print_status "Building web application..."
-npm run build
-
-    print_success "Web interface build completed"
-    cd ..
+    print_status "Step 4/4: Building Web Interface (via Docker)"
+    
+    # Build web interface using existing Dockerfile
+    print_status "Building web interface container..."
+    if ! docker build -t session-recorder-web -f web/Dockerfile --build-arg VITE_GRPC_SERVER_URL=http://localhost:8080 --build-arg VITE_FILE_SERVER_URL=http://localhost:9000 .; then
+        print_error "Failed to build web interface container"
+        exit 1
+    fi
+    
+    # Extract built files
+    container_id=$(docker create session-recorder-web)
+    if [ $? -ne 0 ]; then
+        print_error "Failed to create web interface container"
+        exit 1
+    fi
+    
+    print_status "Extracting web build files..."
+    mkdir -p web/dist
+    docker cp "$container_id:/usr/share/nginx/html/" ./web/dist/
+    # Move files from html subdirectory to dist
+    if [ -d "web/dist/html" ]; then
+        mv web/dist/html/* web/dist/
+        rmdir web/dist/html
+    fi
+    docker rm "$container_id" > /dev/null
+    
+    print_success "Web interface build completed (containerized)"
 fi
 
 echo ""
 echo "🎉 Build Complete!"
 echo "=================="
-print_success "All components have been built successfully:"
-echo "  ✅ Protocol Buffers generated"
-echo "  ✅ Go backend: ./go/bin/chunk_sink"
+print_success "All components have been built successfully (using Docker):"
+echo "  ✅ Protocol Buffers generated (containerized)"
+echo "  ✅ Go backend: ./go/bin/chunk_sink (containerized)"
 if [ "$SKIP_CPP" = true ]; then
     echo "  ⚠️  C++ client: Skipped (use --skip-cpp to build)"
 else
-    echo "  ✅ C++ client: ./cpp/chunk-sink-client/chunk-sink-client"
+    echo "  ✅ C++ client: ./cpp/chunk-sink-client/chunk-sink-client (containerized)"
 fi
 if [ "$SKIP_WEB" = true ]; then
     echo "  ⚠️  Web interface: Skipped"
 else
-    echo "  ✅ Web interface: ./web/dist/"
+    echo "  ✅ Web interface: ./web/dist/ (containerized)"
 fi
 echo ""
 print_warning "Note: Generated files are excluded from git (.gitignore)"

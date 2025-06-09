@@ -1,8 +1,8 @@
 # Protocol Generation Dockerfile
 FROM node:18-alpine AS protocols
 
-# Install protoc
-RUN apk add --no-cache protobuf protobuf-dev
+# Install protoc, make, go and grpc plugins
+RUN apk add --no-cache protobuf protobuf-dev make go grpc grpc-dev
 
 # Set working directory
 WORKDIR /app
@@ -12,6 +12,13 @@ COPY package*.json ./
 
 # Install dependencies
 RUN npm ci
+
+# Install Go protobuf plugins
+RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest
+RUN go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@latest
+
+# Add Go bin to PATH
+ENV PATH="/root/go/bin:${PATH}"
 
 # Copy proto files
 COPY proto/ proto/

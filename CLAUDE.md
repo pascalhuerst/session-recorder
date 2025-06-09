@@ -9,6 +9,16 @@ Session Recorder is a distributed audio recording system with three main compone
 - **Go Backend Server**: Receives audio chunks, manages sessions, provides API
 - **Vue.js Web Interface**: User interface for managing recordings and sessions
 
+## Build All Components
+
+Use the automated build script:
+```bash
+./build.sh                # Build all components
+./build.sh --skip-cpp     # Skip C++ client (if dependencies missing)
+./build.sh --skip-web     # Skip web interface
+./build.sh --help         # Show options
+```
+
 ## Local Development Setup
 
 ### 1. Build C++ Client

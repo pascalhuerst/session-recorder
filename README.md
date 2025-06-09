@@ -11,6 +11,21 @@ Session Recorder consists of three main components:
 
 ## Quick Start
 
+### Option 1: Single Build Command
+
+Use the automated build script to build all components:
+
+```bash
+./build.sh
+```
+
+**Build options:**
+- `./build.sh --skip-cpp` - Skip C++ client build (if dependencies are missing)
+- `./build.sh --skip-web` - Skip web interface build
+- `./build.sh --help` - Show all available options
+
+### Option 2: Manual Build Process
+
 Follow these steps to run the complete system locally:
 
 ### 1. Build C++ Audio Client

@@ -72,7 +72,16 @@ func main() {
 	var recorderUpdateCh chan *sspb.Recorder = make(chan *sspb.Recorder)
 	var sessionUpdateCh chan *sspb.Session = make(chan *sspb.Session)
 
-	sessionSourceHandler := NewSessionSourceHandler(sessionStorage, recorderUpdateCh, sessionUpdateCh)
+	chunkSinkHandler := NewChunkSinkHandler(sessionStorage, recorderUpdateCh)
+
+	chunkSinkServer := grpc.NewChunkSinkServer(&grpc.ChunkSinkServerConfig{
+		Name:               hostname,
+		Version:            version,
+		OnRecorderStatusCB: chunkSinkHandler.setRecorderStatus,
+		OnChunksCB:         chunkSinkHandler.setChunks,
+	})
+
+	sessionSourceHandler := NewSessionSourceHandler(sessionStorage, chunkSinkServer, recorderUpdateCh, sessionUpdateCh)
 
 	sessionSourceServer := grpc.NewSessionSourceServer(&grpc.SessionSourceServerConfig{
 		Name:              hostname,
@@ -82,7 +91,7 @@ func main() {
 		DeleteSessionCB:   sessionSourceHandler.deleteSession,
 		SetKeepSessionCB:  sessionSourceHandler.setKeepSession,
 		SetNameCB:         sessionSourceHandler.setName,
-		HandleCommandCB:   sessionSourceHandler.cutSession,
+		CutSessionCB:      sessionSourceHandler.cutSession,
 	})
 
 	port, err := grpc.StartProtocolServer(sessionSourceServer, mdnsServer, sessionSourceService, sessionSourcePort)
@@ -92,15 +101,6 @@ func main() {
 		return
 	}
 	log.Info().Msgf("Session source server is now being served on port %d", port)
-
-	chunkSinkhandler := NewChunkSinkHandler(sessionStorage, recorderUpdateCh)
-
-	chunkSinkServer := grpc.NewChunkSinkServer(&grpc.ChunkSinkServerConfig{
-		Name:               hostname,
-		Version:            version,
-		OnRecorderStatusCB: chunkSinkhandler.setRecorderStatus,
-		OnChunksCB:         chunkSinkhandler.setChunks,
-	})
 
 	port, err = grpc.StartProtocolServer(chunkSinkServer, mdnsServer, chunkSinkService, chunkSinkPort)
 	if err != nil {

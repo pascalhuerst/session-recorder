@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/pascalhuerst/session-recorder/grpc"
 	cmpb "github.com/pascalhuerst/session-recorder/protocols/go/common"
 	sspb "github.com/pascalhuerst/session-recorder/protocols/go/sessionsource"
 	"github.com/pascalhuerst/session-recorder/storage"
@@ -20,13 +21,20 @@ var (
 
 type SessionSourceHandler struct {
 	sessionStorage   storage.Storage
+	chunkSinkServer  *grpc.ChunkSinkServer
 	recorderUpdateCh chan *sspb.Recorder
 	sessionUpdateCh  chan *sspb.Session
 }
 
-func NewSessionSourceHandler(sessionStorage storage.Storage, recorderUpdateCh chan *sspb.Recorder, sessionUpdateCh chan *sspb.Session) *SessionSourceHandler {
+func NewSessionSourceHandler(
+	sessionStorage storage.Storage,
+	chunkSinkServer *grpc.ChunkSinkServer,
+	recorderUpdateCh chan *sspb.Recorder,
+	sessionUpdateCh chan *sspb.Session,
+) *SessionSourceHandler {
 	h := &SessionSourceHandler{
 		sessionStorage:   sessionStorage,
+		chunkSinkServer:  chunkSinkServer,
 		recorderUpdateCh: recorderUpdateCh,
 		sessionUpdateCh:  sessionUpdateCh,
 	}
@@ -151,7 +159,21 @@ func (h *SessionSourceHandler) streamSessions(ctx context.Context, request *sspb
 }
 
 func (h *SessionSourceHandler) cutSession(ctx context.Context, request *sspb.CutSessionRequest) (*cmpb.Respone, error) {
-	return noSuccess, nil
+	log.Debug().Msg("Streaming sessions")
+
+	recorderID, err := uuid.Parse(request.RecorderID)
+	if err != nil {
+		log.Err(err).Str("recorder-id", request.RecorderID).Msg("Cannot parse recorder ID")
+
+		return nil, err
+	}
+
+	if err := h.chunkSinkServer.CutSession(recorderID); err != nil {
+		log.Err(err).Str("recorder-id", request.RecorderID).Msg("Cannot cut session")
+		return nil, err
+	}
+
+	return success, nil
 }
 
 func parseIDs(recorderID string, sessionID string) (uuid.UUID, uuid.UUID, error) {

@@ -1,8 +1,8 @@
-version: '3.3'
+version: "3.3"
 
 services:
   envoy:
-    image: envoyproxy/envoy:v1.28-latest
+    image: envoyproxy/envoy:v1.31-latest
     container_name: session-recorder-envoy
     ports:
       - "8080:8080"

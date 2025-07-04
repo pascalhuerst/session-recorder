@@ -1,5 +1,5 @@
 # gRPC-Web Proxy Dockerfile
-FROM envoyproxy/envoy:v1.28-latest
+FROM envoyproxy/envoy:v1.31-latest
 
 # Copy Envoy configuration
 COPY envoy.yaml /etc/envoy/envoy.yaml

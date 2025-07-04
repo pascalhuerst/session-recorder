@@ -17,6 +17,7 @@ import (
 
 	"github.com/bogem/id3v2"
 	"github.com/fsnotify/fsnotify"
+	"github.com/pascalhuerst/session-recorder/storage"
 )
 
 const (
@@ -46,13 +47,13 @@ type Recorder struct {
 
 // OpenSession represents an open session which can be closes to a recording with this server
 type OpenSession struct {
-	ID               string    `json:"id,omitempty"`
-	WAVFileName      string    `json:"wav_file_name,omitempty"`
-	OGGFileName      string    `json:"ogg_file_name,omitempty"`
-	WaveformFileName string    `json:"waveform_file_name,omitempty"`
-	Timestamp        time.Time `json:"timestamp,omitempty"`
-	HoursToLive      float64   `json:"hours_to_live,omitempty"`
-	Flagged          bool      `json:"flagged,omitempty"`
+	ID               string           `json:"id,omitempty"`
+	OGGFileName      storage.Filename `json:"ogg_file_name,omitempty"`
+	FLACFileName     storage.Filename `json:"flac_file_name,omitempty"`
+	WaveformFileName storage.Filename `json:"waveform_file_name,omitempty"`
+	Timestamp        time.Time        `json:"timestamp,omitempty"`
+	HoursToLive      float64          `json:"hours_to_live,omitempty"`
+	Flagged          bool             `json:"flagged,omitempty"`
 }
 
 func (os OpenSession) String() string {
@@ -61,7 +62,7 @@ func (os OpenSession) String() string {
 	ret += fmt.Sprintf("HoursToLive:      %v\n", os.HoursToLive)
 	ret += fmt.Sprintf("Timestamp:        %v\n", os.Timestamp)
 	ret += fmt.Sprintf("OGGFileName:      %v\n", os.OGGFileName)
-	ret += fmt.Sprintf("WAVFileName:      %v\n", os.WAVFileName)
+	ret += fmt.Sprintf("FLACFileName:     %v\n", os.FLACFileName)
 	ret += fmt.Sprintf("WaveformFileName: %v\n", os.WaveformFileName)
 	ret += fmt.Sprintf("Flagged:          %v\n", os.Flagged)
 	return ret
@@ -361,9 +362,9 @@ func (f *fileServer) parseOpenSessions() error {
 
 			s := OpenSession{
 				ID:               session.Name(),
-				OGGFileName:      "data.ogg",
-				WAVFileName:      "data.wav",
-				WaveformFileName: "waveform.dat",
+				OGGFileName:      storage.FILENAME_OGG,
+				FLACFileName:     storage.FILENAME_FLAC,
+				WaveformFileName: storage.FILENAME_WAVEFORM,
 				Timestamp:        time.Unix(0, epoche),
 				HoursToLive:      toLive.Hours(),
 				Flagged:          isFlagged,

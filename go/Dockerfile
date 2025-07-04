@@ -11,7 +11,7 @@ WORKDIR /app
 COPY go/go.mod go/go.sum ./
 
 # Copy protocols directory for local dependency (needed before go mod download)
-COPY protocols ./protocols
+COPY protocols ../protocols
 
 # Download dependencies
 RUN go mod download

@@ -1,10 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import SessionMenu from './SessionMenu.vue';
-import {
-  Session,
-  SegmentState,
-} from '@session-recorder/protocols/ts/sessionsource';
 import { useDateFormat } from '@vueuse/core';
 import {
   createPeaksContext,
@@ -12,7 +8,7 @@ import {
   WaveformEditor,
 } from '@session-recorder/session-waveform';
 import { integrateSegments } from '../../../grpc/integrateSegments';
-import { useSessionData } from '../../../useSessionData';
+import type { Session } from '@/types';
 
 const props = defineProps<{
   session: Session;
@@ -20,72 +16,41 @@ const props = defineProps<{
   index: number;
 }>();
 
-const createdAt = computed(() => {
-  if (
-    props.session.info.oneofKind !== 'updated' ||
-    !props.session.info.updated.timeCreated
-  ) {
-    return { iso: '', formatted: '' };
-  }
-  const createdDate = new Date(
-    props.session.info.updated.timeCreated.seconds * 1000
-  );
+const displayDate = computed(() => {
+  const { startedAt } = props.session;
   const format =
-    createdDate.getFullYear() === new Date().getFullYear()
+    startedAt.getFullYear() === new Date().getFullYear()
       ? 'ddd, MMM D, HH:mm'
       : 'MMM D, YYYY HH:mm';
   return {
-    iso: createdDate.toISOString(),
-    formatted: useDateFormat(createdDate, format).value,
+    iso: startedAt.toISOString(),
+    formatted: useDateFormat(startedAt, format).value,
   };
 });
 
-const { waveformUrl, audioUrls } = useSessionData({
-  session: props.session,
-});
-
-const buildUrlPath = (segmentId: string, ext: string) => {
-  return `/session-recorder/${props.session.iD}/sessions/${props.recorderId}/segments/${segmentId}.${ext}`;
-};
-
 const ctx = createPeaksContext({
   initialState: {
-    waveformUrl: waveformUrl.value,
-    audioUrls: audioUrls.value as any,
+    waveformUrl: props.session.inlineFiles.waveform,
+    audioUrls: [
+      {
+        src: props.session.inlineFiles.ogg,
+        type: 'audio/ogg',
+      },
+      {
+        src: props.session.inlineFiles.flac,
+        type: 'audio/flac',
+      },
+    ],
     permissions: {
       create: false,
       update: true,
       delete: true,
     },
-    segments: (props.session.info.oneofKind === 'updated'
-      ? props.session.info.updated.segments || []
-      : []
-    ).map((s) => ({
-      id: s.segmentID,
-      labelText:
-        s.info.oneofKind === 'updated' ? s.info.updated.name || '' : '',
-      startTime:
-        s.info.oneofKind === 'updated' && s.info.updated.timeStart
-          ? new Date(s.info.updated.timeStart.seconds * 1000).getTime()
-          : 0,
-      endTime:
-        s.info.oneofKind === 'updated' && s.info.updated.timeEnd
-          ? new Date(s.info.updated.timeEnd.seconds * 1000).getTime()
-          : 0,
-      renders:
-        s.info.oneofKind === 'updated' &&
-        s.info.updated.state === SegmentState.FINISHED
-          ? [
-              {
-                type: 'audio/mp3',
-                src: buildUrlPath(s.segmentID, 'mp3'),
-              },
-              {
-                type: 'audio/ogg',
-                src: buildUrlPath(s.segmentID, 'ogg'),
-              },
-            ]
-          : [],
+    segments: props.session.segments.map((s) => ({
+      id: s.id,
+      labelText: s.name,
+      startTime: s.timeStart.getTime(),
+      endTime: s.timeEnd.getTime(),
     })),
   },
 });
@@ -100,8 +65,8 @@ integrateSegments(props.session, ctx);
       <span>Untitled #{{ props.index }}</span>
 
       <div class="metadata">
-        <time class="timestamp" :datetime="createdAt.iso"
-          >{{ createdAt.formatted }}
+        <time class="timestamp" :datetime="displayDate.iso"
+          >{{ displayDate.formatted }}
         </time>
         <div class="menu">
           <SessionMenu :session="session" :recorder-id="recorderId" />

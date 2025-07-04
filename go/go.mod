@@ -1,13 +1,15 @@
 module github.com/pascalhuerst/session-recorder
 
-go 1.23
+go 1.23.0
+
+toolchain go1.24.3
 
 require (
 	github.com/bogem/id3v2 v1.2.0
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/godbus/dbus/v5 v5.1.0
-	github.com/golang/protobuf v1.5.3
-	github.com/google/uuid v1.5.0
+	github.com/golang/protobuf v1.5.4
+	github.com/google/uuid v1.6.0
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/holoplot/go-avahi v1.0.1
 	github.com/mattn/go-colorable v0.1.13
@@ -17,7 +19,7 @@ require (
 	github.com/pascalhuerst/session-recorder/protocols/go v0.0.0-20240420153411-21708cdb8a48
 	github.com/pkg/errors v0.9.1
 	github.com/rs/zerolog v1.31.0
-	golang.org/x/sync v0.5.0
+	golang.org/x/sync v0.12.0
 	google.golang.org/grpc v1.73.0
 	google.golang.org/protobuf v1.36.6
 )
@@ -36,12 +38,12 @@ require (
 	github.com/modern-go/reflect2 v1.0.2 // indirect
 	github.com/rs/xid v1.5.0 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
-	golang.org/x/crypto v0.16.0 // indirect
-	golang.org/x/net v0.19.0 // indirect
-	golang.org/x/sys v0.15.0 // indirect
-	golang.org/x/text v0.14.0 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20231127180814-3a041ad873d4 // indirect
+	golang.org/x/crypto v0.36.0 // indirect
+	golang.org/x/net v0.38.0 // indirect
+	golang.org/x/sys v0.31.0 // indirect
+	golang.org/x/text v0.23.0 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20250324211829-b45e905df463 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 )
 
-replace github.com/pascalhuerst/session-recorder/protocols/go => ./protocols/go
+replace github.com/pascalhuerst/session-recorder/protocols/go => ../protocols/go

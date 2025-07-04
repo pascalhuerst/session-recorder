@@ -39,11 +39,9 @@ COPY web/index.html ./
 
 # Set build-time environment variables with defaults for containerized deployment
 ARG VITE_GRPC_SERVER_URL=http://grpc-proxy:8080
-ARG VITE_FILE_SERVER_URL=http://minio:9000
 
 # Create environment file for build
-RUN echo "VITE_GRPC_SERVER_URL=${VITE_GRPC_SERVER_URL}" > .env.production && \
-    echo "VITE_FILE_SERVER_URL=${VITE_FILE_SERVER_URL}" >> .env.production
+RUN echo "VITE_GRPC_SERVER_URL=${VITE_GRPC_SERVER_URL}" > .env.production
 
 # Build the application with NX verbose output for debugging
 RUN npx nx build web --verbose

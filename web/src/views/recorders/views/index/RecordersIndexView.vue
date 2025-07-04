@@ -2,7 +2,7 @@
 import { storeToRefs } from 'pinia';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { watch } from 'vue';
-import { EmptyScreen } from '@session-recorder/session-waveform';
+import { EmptyScreen } from '../../../../../libs/session-waveform/src';
 import { useRecordersStore } from '../../../../store/useRecordersStore';
 
 const { recorders, selectedRecorderId } = storeToRefs(useRecordersStore());
@@ -15,7 +15,7 @@ watch(
       selectedRecorderId.value = keys[0];
     }
   },
-  { immediate: true, deep: true },
+  { immediate: true, deep: true }
 );
 </script>
 

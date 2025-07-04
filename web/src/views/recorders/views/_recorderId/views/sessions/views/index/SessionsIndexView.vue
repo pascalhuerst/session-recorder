@@ -1,36 +1,18 @@
 <script setup lang="ts">
-import { computed } from 'vue';
 import { storeToRefs } from 'pinia';
 import { EmptyScreen } from '@session-recorder/session-waveform';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import SessionCard from '@/views/recorders/elements/SessionCard.vue';
-import { useSessionsStore } from '../../../../../../../../store/useSessionsStore';
 import { useRecordersStore } from '../../../../../../../../store/useRecordersStore';
-import { type Session } from '@session-recorder/protocols/ts/sessionsource';
+import { useSessionsStore } from '../../../../../../../../store/useSessionsStore';
 
 const { selectedRecorderId } = storeToRefs(useRecordersStore());
 const { sessions } = storeToRefs(useSessionsStore());
-
-const sortedSessions = computed(() => {
-  const sorted = sessions.value.slice().sort((a, b) => {
-    const aTime =
-      a.info.oneofKind === 'updated' && a.info.updated.timeCreated
-        ? a.info.updated.timeCreated.seconds * 1000
-        : 0;
-    const bTime =
-      b.info.oneofKind === 'updated' && b.info.updated.timeCreated
-        ? b.info.updated.timeCreated.seconds * 1000
-        : 0;
-    return bTime - aTime;
-  });
-
-  return sorted satisfies Session[];
-});
 </script>
 
 <template>
-  <div v-if="sortedSessions.length" class="list">
-    <template v-for="(session, index) in sortedSessions" :key="session.iD">
+  <div v-if="sessions.length" class="list">
+    <template v-for="(session, index) in sessions" :key="session.id">
       <SessionCard
         :session="session"
         :recorder-id="selectedRecorderId"

@@ -15,7 +15,7 @@ message RecordereRemoved {}
 message Recorder {
 	string recorderID = 1;
 	string recorderName = 2;
-	
+
 	oneof info {
 		common.RecorderStatus status = 3;
 		RecordereRemoved removed = 4;
@@ -36,7 +36,7 @@ enum SegmentState {
 message SegmentInfo {
 	google.protobuf.Timestamp timeStart = 1;
 	google.protobuf.Timestamp timeEnd = 2;
-	
+
 	string name = 3;
 	SegmentState state = 4;
 }
@@ -45,7 +45,7 @@ message SegmentRemoved {}
 
 message Segment {
 	string segmentID = 1;
-	
+
 	oneof info {
 		SegmentInfo updated = 2;
 		SegmentRemoved removed = 3;
@@ -59,26 +59,32 @@ enum SessionState {
 }
 
 message SessionInfo {
+    message Files {
+        string ogg = 1;
+        string flac = 2;
+        string waveform = 3;
+    }
+
 	google.protobuf.Timestamp timeCreated = 2;
 	google.protobuf.Timestamp timeFinished = 3;
 	google.protobuf.Duration lifetime = 4;
-	
+
 	string name = 5;
-	string audioFileName = 6;
-	string waveformDataFile = 7;
-	string losslessAudioFileName = 11;
 	bool keep = 8;
 
 	SessionState state = 9;
 
 	repeated Segment segments = 10;
+
+	Files inlineFiles = 11;
+	Files downloadFiles = 12;
 }
 
 message SessionRemoved {}
 
 message Session {
 	string ID = 1;
-	
+
 	oneof info {
 		SessionInfo updated = 2;
 		SessionRemoved removed = 3;
@@ -136,7 +142,7 @@ service SessionSource {
 	// Stream
 	rpc StreamRecorders(StreamRecordersRequest) returns (stream Recorder);
 	rpc StreamSessions(StreamSessionRequest) returns (stream Session);
-	
+
 	// Unary
 	rpc SetKeepSession(SetKeepSessionRequest) returns (common.Respone);
 	rpc DeleteSession(DeleteSessionRequest) returns (common.Respone);

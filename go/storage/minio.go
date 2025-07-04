@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net/url"
 	"strings"
 	"sync"
 	"time"
@@ -77,9 +78,10 @@ type minioChunk struct {
 type Minio struct {
 	system *System
 
-	endpoint  string
-	accessKey string
-	secretLey string
+	endpoint       string
+	publicEndpoint string
+	accessKey      string
+	secretLey      string
 
 	client *minio.Client
 
@@ -91,7 +93,7 @@ type Minio struct {
 	cbLock            sync.Mutex
 }
 
-func NewMinioStorage(endpoint, accessKey, secretKey string) (*Minio, error) {
+func NewMinioStorage(endpoint, publicEndpoint, accessKey, secretKey string) (*Minio, error) {
 	c, err := minio.New(endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(accessKey, secretKey, ""),
 		Secure: false,
@@ -101,11 +103,12 @@ func NewMinioStorage(endpoint, accessKey, secretKey string) (*Minio, error) {
 	}
 
 	return &Minio{
-		endpoint:  endpoint,
-		accessKey: accessKey,
-		secretLey: secretKey,
-		client:    c,
-		chunks:    make(map[uuid.UUID]*minioChunk),
+		endpoint:       endpoint,
+		publicEndpoint: publicEndpoint,
+		accessKey:      accessKey,
+		secretLey:      secretKey,
+		client:         c,
+		chunks:         make(map[uuid.UUID]*minioChunk),
 	}, nil
 }
 
@@ -235,13 +238,14 @@ func (m *Minio) initSession(ctx context.Context, recorderID, sessionID uuid.UUID
 	}
 
 	session := Session{
-		ID:        sessionID,
-		StartTime: timeCreated,
-		EndTime:   time.Time{},
-		Duration:  0,
-		IsClosed:  false,
-		Keep:      false,
-		Segments:  make(map[uuid.UUID]Segment),
+		ID:         sessionID,
+		RecorderID: recorderID,
+		StartTime:  timeCreated,
+		EndTime:    time.Time{},
+		Duration:   0,
+		IsClosed:   false,
+		Keep:       false,
+		Segments:   make(map[uuid.UUID]Segment),
 	}
 
 	if err := m.putSessionMetadata(ctx, recorderID, sessionID, &session); err != nil {
@@ -445,7 +449,7 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 	rawDataObjectName := fmt.Sprintf("%s/sessions/%s/data.raw", recorderID, sessionID)
 
 	// I need to double check this, but this dance does not seem to be necessary...
-	//rawPreRenderedObjectName := fmt.Sprintf("%s/sessions/%s/pre_rendered_data.raw", recorderID, sessionID)
+	//rawPreRenderedObjectName := fmt.Sprintf("%s/sessions/%s/pre_rendered_data.raw", RecorderID, sessionID)
 	//
 	//havePreRenderedData := false
 	//
@@ -458,7 +462,7 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 	//	havePreRenderedData = true
 	//
 	//	log.Info().
-	//		Stringer("recorder-id", recorderID).
+	//		Stringer("recorder-id", RecorderID).
 	//		Stringer("session-id", sessionID).
 	//		Msg("Session already rendered, but more chunks found. Will re-render.")
 	//
@@ -796,7 +800,7 @@ func (m *Minio) putSystemMetadata(ctx context.Context, system *System) error {
 }
 
 func (m *Minio) getSessionMetadata(ctx context.Context, recorderID, sessionID uuid.UUID) (*Session, error) {
-	objectName := fmt.Sprintf("%s/sessions/%s/metadata.json", recorderID, sessionID)
+	objectName := fmt.Sprintf("%s/sessions/%s/%s", recorderID, sessionID, FILENAME_METADATA)
 
 	obj, err := m.client.GetObject(ctx, bucketName, objectName, minio.GetObjectOptions{})
 	if err != nil {
@@ -820,7 +824,7 @@ func (m *Minio) getSessionMetadata(ctx context.Context, recorderID, sessionID uu
 }
 
 func (m *Minio) putSessionMetadata(ctx context.Context, recorderID, sessionID uuid.UUID, session *Session) error {
-	objectName := fmt.Sprintf("%s/sessions/%s/metadata.json", recorderID, sessionID)
+	objectName := fmt.Sprintf("%s/sessions/%s/%s", recorderID, sessionID, FILENAME_METADATA)
 
 	buffer := new(bytes.Buffer)
 	err := json.NewEncoder(buffer).Encode(session)
@@ -927,4 +931,23 @@ func (m *Minio) closeSession(ctx context.Context, recorderID, sessionID uuid.UUI
 	log.Debug().Stringer("recorder-id", recorderID).Stringer("session-id", sessionID).Msg("Session closed")
 
 	return nil
+}
+
+func (m *Minio) GetPresignedURL(ctx context.Context, asset AssetOptions, signing SigningOptions) (string, error) {
+	objectName := fmt.Sprintf("%s/sessions/%s/%s", asset.RecorderID.String(), asset.SessionID.String(), asset.Filename)
+
+	values := make(url.Values)
+
+	if signing.Download {
+		values.Set("response-content-disposition", fmt.Sprintf("attachment; Filename=%s", asset.Filename))
+	}
+
+	presignedURL, err := m.client.PresignedGetObject(ctx, bucketName, objectName, signing.Expires, values)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate presigned URL: %w", err)
+	}
+
+	publicUrl := strings.Replace(presignedURL.String(), m.endpoint, m.publicEndpoint, 1)
+
+	return publicUrl, nil
 }

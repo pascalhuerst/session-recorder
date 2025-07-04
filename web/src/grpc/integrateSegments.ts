@@ -1,9 +1,9 @@
-import type { PeaksContext } from '../../libs/session-waveform/src/context/usePeaksContext';
 import { createSegment } from './procedures/createSegment';
 import { Session } from '@session-recorder/protocols/ts/sessionsource';
 import { updateSegment } from './procedures/updateSegment';
 import { deleteSegment } from './procedures/deleteSegment';
 import { renderSegment } from './procedures/renderSegment';
+import type { PeaksContext } from '@session-recorder/session-waveform';
 
 export const integrateSegments = (session: Session, ctx: PeaksContext) => {
   ctx.eventEmitter.on('segmentAdded', async (segment) => {
@@ -12,8 +12,14 @@ export const integrateSegments = (session: Session, ctx: PeaksContext) => {
       sessionId: session.iD,
       segmentId: segment.id,
       segment: {
-        timeStart: { seconds: Math.floor(segment.startTime / 1000), nanos: 0 },
-        timeEnd: { seconds: Math.floor(segment.endTime / 1000), nanos: 0 },
+        timeStart: {
+          seconds: Math.floor(segment.startTime / 1000).toString(),
+          nanos: 0,
+        },
+        timeEnd: {
+          seconds: Math.floor(segment.endTime / 1000).toString(),
+          nanos: 0,
+        },
         name: segment.labelText,
       },
     });
@@ -25,8 +31,14 @@ export const integrateSegments = (session: Session, ctx: PeaksContext) => {
       sessionId: session.iD,
       segmentId: segmentId,
       segment: {
-        timeStart: { seconds: Math.floor(segment.startTime / 1000), nanos: 0 },
-        timeEnd: { seconds: Math.floor(segment.endTime / 1000), nanos: 0 },
+        timeStart: {
+          seconds: Math.floor(segment.startTime / 1000).toString(),
+          nanos: 0,
+        },
+        timeEnd: {
+          seconds: Math.floor(segment.endTime / 1000).toString(),
+          nanos: 0,
+        },
         name: segment.labelText,
       },
     });

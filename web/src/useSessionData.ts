@@ -1,39 +1,19 @@
 import { computed } from 'vue';
-import { env } from '@/env';
+import { type Session } from '@session-recorder/protocols/ts/sessionsource';
 
-export const useSessionData = ({
-  recorderId,
-  sessionId,
-}: {
-  recorderId: string;
-  sessionId: string;
-}) => {
-  // @todo: get this from backend
-  const buildUrlPath = (fileName: string) => {
-    return `/session-recorder/${recorderId}/sessions/${sessionId}/${fileName}`;
-  };
-
+export const useSessionData = ({ session }: { session: Session }) => {
   const waveformUrl = computed(() => {
-    return new URL(
-      buildUrlPath('waveform.dat'),
-      env.VITE_FILE_SERVER_URL
-    ).toString();
+    return session.info.updated.waveformDataFile ?? '';
   });
 
   const audioUrls = computed(() => {
     return [
       {
-        src: new URL(
-          buildUrlPath('data.ogg'),
-          env.VITE_FILE_SERVER_URL
-        ).toString(),
+        src: session.info.updated.audioFileName ?? '',
         type: 'audio/ogg',
       },
       {
-        src: new URL(
-          buildUrlPath('data.flac'),
-          env.VITE_FILE_SERVER_URL
-        ).toString(),
+        src: session.info.updated.losslessAudioFileName ?? '',
         type: 'audio/flac',
       },
     ];

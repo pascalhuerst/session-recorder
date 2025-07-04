@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { Session } from '@session-recorder/protocols/ts/sessionsource';
 import { computed } from 'vue';
-import { setKeepSession } from '@/grpc/procedures/setKeepSession';
-import { deleteSession } from '@/grpc/procedures/deleteSession';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
-import { useSessionData } from '@/useSessionData';
 import {
   Button,
   Modal,
   useConfirmation,
 } from '@session-recorder/session-waveform';
+import { useSessionData } from '../../../useSessionData';
+import { setKeepSession } from '../../../grpc/procedures/setKeepSession';
+import { deleteSession } from '../../../grpc/procedures/deleteSession';
 
 // @todo: break this down and make composable
 
@@ -21,15 +21,14 @@ const props = defineProps<{
 const { awaitConfirmation, modalProps } = useConfirmation();
 
 const { audioUrls } = useSessionData({
-  sessionId: props.session.iD,
-  recorderId: props.recorderId,
+  session: props.session,
 });
 
 const ttl = computed(() => {
   if (
     props.session.info.oneofKind !== 'updated' ||
-    !props.session.info.updated.lifetime?.seconds &&
-    !props.session.info.updated.lifetime?.nanos
+    (!props.session.info.updated.lifetime?.seconds &&
+      !props.session.info.updated.lifetime?.nanos)
   ) {
     return undefined;
   }
@@ -43,11 +42,22 @@ const ttl = computed(() => {
   return `${minutes} minutes`;
 });
 
-const onKeep = () => setKeepSession({ recorderId: props.recorderId, sessionId: props.session.iD, keep: !(props.session.info.oneofKind === 'updated' && props.session.info.updated.keep) });
+const onKeep = () =>
+  setKeepSession({
+    recorderId: props.recorderId,
+    sessionId: props.session.iD,
+    keep: !(
+      props.session.info.oneofKind === 'updated' &&
+      props.session.info.updated.keep
+    ),
+  });
 const onDelete = () => {
   awaitConfirmation().then(({ isConfirmed }) => {
     if (isConfirmed) {
-      deleteSession({ recorderId: props.recorderId, sessionId: props.session.iD });
+      deleteSession({
+        recorderId: props.recorderId,
+        sessionId: props.session.iD,
+      });
     }
   });
 };
@@ -55,10 +65,22 @@ const onDelete = () => {
 
 <template>
   <div class="menu">
-    <div v-if="ttl && !(session.info.oneofKind === 'updated' && session.info.updated.keep)" class="balance">
+    <div
+      v-if="
+        ttl &&
+        !(session.info.oneofKind === 'updated' && session.info.updated.keep)
+      "
+      class="balance"
+    >
       {{ ttl }} until deleted
     </div>
-    <Button size="xs" v-if="!(session.info.oneofKind === 'updated' && session.info.updated.keep)" @click="onKeep">
+    <Button
+      size="xs"
+      v-if="
+        !(session.info.oneofKind === 'updated' && session.info.updated.keep)
+      "
+      @click="onKeep"
+    >
       <font-awesome-icon icon="fa-solid fa-heart"></font-awesome-icon>
       Keep
     </Button>

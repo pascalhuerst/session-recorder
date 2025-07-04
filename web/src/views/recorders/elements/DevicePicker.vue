@@ -14,7 +14,7 @@ const props = defineProps<{
 const recorders = computed(() =>
   Array.from(props.recorders.values()).sort((a, b) => {
     return a.recorderName.localeCompare(b.recorderName);
-  })
+  }),
 );
 
 const setSelected = (item: string) => {

@@ -17,7 +17,7 @@ type StreamRecordersCB func(ctx context.Context, request *sspb.StreamRecordersRe
 type DeleteSessionCB func(ctx context.Context, request *sspb.DeleteSessionRequest) (*cmpb.Respone, error)
 type SetKeepSessionCB func(ctx context.Context, request *sspb.SetKeepSessionRequest) (*cmpb.Respone, error)
 type SetNameCB func(ctx context.Context, request *sspb.SetNameRequest) (*cmpb.Respone, error)
-type HandleCommandCB func(ctx context.Context, request *sspb.CutSessionRequest) (*cmpb.Respone, error)
+type CutSessionCB func(ctx context.Context, request *sspb.CutSessionRequest) (*cmpb.Respone, error)
 
 var noSuccess = &cmpb.Respone{Success: true}
 
@@ -30,7 +30,7 @@ type SessionSourceServerConfig struct {
 	DeleteSessionCB   DeleteSessionCB
 	SetKeepSessionCB  SetKeepSessionCB
 	SetNameCB         SetNameCB
-	HandleCommandCB   HandleCommandCB
+	CutSessionCB      CutSessionCB
 }
 
 type SessionSourceServer struct {
@@ -100,8 +100,9 @@ func (s *SessionSourceServer) SetName(ctx context.Context, in *sspb.SetNameReque
 }
 
 func (s *SessionSourceServer) CutSession(ctx context.Context, in *sspb.CutSessionRequest) (*common.Respone, error) {
-	log.Warn().Str("recorder-id", in.GetRecorderID()).Msg("HandleCommand not implemented")
-
+	if s.config.CutSessionCB != nil {
+		return s.config.CutSessionCB(ctx, in)
+	}
 	return noSuccess, nil
 }
 

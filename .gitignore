@@ -1,1 +1,92 @@
+# IDE
 .idea
+.vscode
+
+# Environment files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Build outputs
+dist/
+build/
+out/
+
+# Go
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+go.work
+
+# C++
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+*.cmake
+!CMakeLists.txt
+Makefile
+*.o
+*.so
+*.a
+*.out
+chunk-sink-client
+
+# Protocol Buffers (generated files)
+protocols/cpp/
+protocols/ts/
+protocols/go/
+
+# Web Framework
+.nx/
+.nuxt/
+.next/
+.svelte-kit/
+
+# Coverage & Testing
+coverage/
+*.lcov
+.nyc_output/
+
+# Logs
+logs/
+*.log
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.swp
+*.swo
+*~
+
+# MinIO data (local development)
+minio/
+
+# Docker
+.env.docker.local
+docker-compose.override.yml.local
+*.log
+
+# Local data directories
+data/

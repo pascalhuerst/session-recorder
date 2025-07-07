@@ -7,8 +7,14 @@ import {
   createPeaksContext,
   providePeaksContext,
   usePeaksContext,
+  type PeaksContext,
 } from './context/usePeaksContext';
 
 export { EmptyScreen, WaveformEditor, Button, Modal, useConfirmation };
 export * from './setup';
-export { usePeaksContext, createPeaksContext, providePeaksContext };
+export {
+  usePeaksContext,
+  createPeaksContext,
+  providePeaksContext,
+  type PeaksContext,
+};

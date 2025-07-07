@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import { Session } from '@session-recorder/protocols/ts/sessionsource';
 import { computed } from 'vue';
-import { setKeepSession } from '@/grpc/procedures/setKeepSession';
-import { deleteSession } from '@/grpc/procedures/deleteSession';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
-import { useSessionData } from '@/useSessionData';
 import {
   Button,
   Modal,
   useConfirmation,
 } from '@session-recorder/session-waveform';
+import { setKeepSession } from '../../../grpc/procedures/setKeepSession';
+import { deleteSession } from '../../../grpc/procedures/deleteSession';
+import type { Session } from '../../../types';
+import { useDateFormat } from '@vueuse/core';
 
 // @todo: break this down and make composable
 
@@ -20,34 +20,33 @@ const props = defineProps<{
 
 const { awaitConfirmation, modalProps } = useConfirmation();
 
-const { audioUrls } = useSessionData({
-  sessionId: props.session.iD,
-  recorderId: props.recorderId,
+const displayExpiryDate = computed(() => {
+  const { expiresAt } = props.session;
+  const format =
+    expiresAt.getFullYear() === new Date().getFullYear()
+      ? 'ddd, MMM D, HH:mm'
+      : 'MMM D, YYYY HH:mm';
+  return {
+    iso: expiresAt.toISOString(),
+    formatted: useDateFormat(expiresAt, format).value,
+  };
 });
 
-const ttl = computed(() => {
-  if (
-    props.session.info.oneofKind !== 'updated' ||
-    !props.session.info.updated.lifetime?.seconds &&
-    !props.session.info.updated.lifetime?.nanos
-  ) {
-    return undefined;
-  }
+const onKeep = () => {
+  return setKeepSession({
+    recorderId: props.recorderId,
+    sessionId: props.session.id,
+    keep: !props.session.keep,
+  });
+};
 
-  const val = Math.floor(props.session.info.updated.lifetime.seconds / 3600);
-  if (val > 0) {
-    return `${val} hours`;
-  }
-
-  const minutes = Math.floor(props.session.info.updated.lifetime.seconds);
-  return `${minutes} minutes`;
-});
-
-const onKeep = () => setKeepSession({ recorderId: props.recorderId, sessionId: props.session.iD, keep: !(props.session.info.oneofKind === 'updated' && props.session.info.updated.keep) });
 const onDelete = () => {
   awaitConfirmation().then(({ isConfirmed }) => {
     if (isConfirmed) {
-      deleteSession({ recorderId: props.recorderId, sessionId: props.session.iD });
+      deleteSession({
+        recorderId: props.recorderId,
+        sessionId: props.session.id,
+      });
     }
   });
 };
@@ -55,10 +54,8 @@ const onDelete = () => {
 
 <template>
   <div class="menu">
-    <div v-if="ttl && !(session.info.oneofKind === 'updated' && session.info.updated.keep)" class="balance">
-      {{ ttl }} until deleted
-    </div>
-    <Button size="xs" v-if="!(session.info.oneofKind === 'updated' && session.info.updated.keep)" @click="onKeep">
+    <div class="balance">Kept until {{ ttl }}</div>
+    <Button size="xs" v-if="!session.keep" @click="onKeep">
       <font-awesome-icon icon="fa-solid fa-heart"></font-awesome-icon>
       Keep
     </Button>
@@ -66,20 +63,18 @@ const onDelete = () => {
       <font-awesome-icon icon="fa-solid fa-trash"></font-awesome-icon>
       Delete
     </Button>
-    <template v-for="audioUrl in audioUrls" :key="audioUrl.src">
-      <Button
-        size="xs"
-        tag-name="a"
-        :href="audioUrl.src"
-        target="_blank"
-        download
-        color="primary"
-        variant="ghost"
-      >
-        <font-awesome-icon icon="fa-solid fa-download"></font-awesome-icon>
-        {{ audioUrl.type.split('/').at(-1) }}
-      </Button>
-    </template>
+    <Button
+      size="xs"
+      tag-name="a"
+      :href="session.downloadFiles.flac"
+      target="_blank"
+      download
+      color="primary"
+      variant="ghost"
+    >
+      <font-awesome-icon icon="fa-solid fa-download"></font-awesome-icon>
+      flac
+    </Button>
   </div>
   <Modal :open="modalProps.open.value" @close="modalProps.onClose">
     <template #header>Are you sure?</template>

@@ -1,6 +1,8 @@
+version: "3.3"
+
 services:
   envoy:
-    image: envoyproxy/envoy:v1.28-latest
+    image: envoyproxy/envoy:v1.31-latest
     container_name: session-recorder-envoy
     ports:
       - "8080:8080"
@@ -8,4 +10,10 @@ services:
     volumes:
       - ./envoy.yaml:/etc/envoy/envoy.yaml
     command: /usr/local/bin/envoy -c /etc/envoy/envoy.yaml
-    network_mode: host
+    networks:
+      - session-recorder-net
+
+networks:
+  session-recorder-net:
+    external: true
+    name: session-recorder_session-recorder-net

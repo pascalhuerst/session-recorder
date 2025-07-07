@@ -10,6 +10,26 @@ import (
 
 type OnSessionClosedCb func(session *Session)
 
+type Filename string
+
+const (
+	FILENAME_OGG      = Filename("data.ogg")
+	FILENAME_FLAC     = Filename("data.flac")
+	FILENAME_WAVEFORM = Filename("waveform.dat")
+	FILENAME_METADATA = Filename("metadata.json")
+)
+
+type AssetOptions struct {
+	RecorderID uuid.UUID
+	SessionID  uuid.UUID
+	Filename   Filename
+}
+
+type SigningOptions struct {
+	Expires  time.Duration
+	Download bool
+}
+
 type Storage interface {
 	GetRecorders() map[uuid.UUID]Recorder
 
@@ -25,10 +45,12 @@ type Storage interface {
 	SetKeepSession(ctx context.Context, recorderID, sessionID uuid.UUID, keep bool) error
 
 	isSessionClosed(ctx context.Context, recorderID, sessionID uuid.UUID) bool
-	//CloseSession(ctx context.Context, recorderID, sessionID uuid.UUID) error
-	//CloseOpenSessions(ctx context.Context, recorderID uuid.UUID) error
+	//CloseSession(ctx context.Context, RecorderID, SessionID uuid.UUID) error
+	//CloseOpenSessions(ctx context.Context, RecorderID uuid.UUID) error
 
 	RegisterOnSessionClosedCallback(cb OnSessionClosedCb) error
+
+	GetPresignedURL(ctx context.Context, asset AssetOptions, options SigningOptions) (string, error)
 }
 
 type System struct {
@@ -69,8 +91,9 @@ func (r Recorder) String() string {
 }
 
 type Session struct {
-	ID   uuid.UUID `json:"id"`
-	Name string    `json:"name"`
+	ID         uuid.UUID `json:"id"`
+	RecorderID uuid.UUID `json:"recorder_id"`
+	Name       string    `json:"name"`
 
 	StartTime time.Time     `json:"start_time"`
 	EndTime   time.Time     `json:"end_time"`

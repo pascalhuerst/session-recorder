@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/pascalhuerst/session-recorder/grpc"
 	cmpb "github.com/pascalhuerst/session-recorder/protocols/go/common"
 	sspb "github.com/pascalhuerst/session-recorder/protocols/go/sessionsource"
 	"github.com/pascalhuerst/session-recorder/storage"
@@ -19,13 +21,20 @@ var (
 
 type SessionSourceHandler struct {
 	sessionStorage   storage.Storage
+	chunkSinkServer  *grpc.ChunkSinkServer
 	recorderUpdateCh chan *sspb.Recorder
 	sessionUpdateCh  chan *sspb.Session
 }
 
-func NewSessionSourceHandler(sessionStorage storage.Storage, recorderUpdateCh chan *sspb.Recorder, sessionUpdateCh chan *sspb.Session) *SessionSourceHandler {
+func NewSessionSourceHandler(
+	sessionStorage storage.Storage,
+	chunkSinkServer *grpc.ChunkSinkServer,
+	recorderUpdateCh chan *sspb.Recorder,
+	sessionUpdateCh chan *sspb.Session,
+) *SessionSourceHandler {
 	h := &SessionSourceHandler{
 		sessionStorage:   sessionStorage,
+		chunkSinkServer:  chunkSinkServer,
 		recorderUpdateCh: recorderUpdateCh,
 		sessionUpdateCh:  sessionUpdateCh,
 	}
@@ -39,30 +48,67 @@ func NewSessionSourceHandler(sessionStorage storage.Storage, recorderUpdateCh ch
 	return h
 }
 
+func getFileURL(ctx context.Context, h *SessionSourceHandler, session *storage.Session, filename storage.Filename, download bool) string {
+	fileURL, err := h.sessionStorage.GetPresignedURL(
+		ctx,
+		storage.AssetOptions{
+			RecorderID: session.RecorderID,
+			SessionID:  session.ID,
+			Filename:   filename,
+		},
+		storage.SigningOptions{
+			Expires:  time.Hour * 24,
+			Download: download,
+		})
+
+	if err != nil {
+		log.Error().Str("filename", string(filename)).Err(err).Msg("Failed to get presigned URL for fileURL")
+		return ""
+	}
+
+	return fileURL
+}
+
+func newSessionInfo(ctx context.Context, h *SessionSourceHandler, session *storage.Session) *sspb.SessionInfo {
+	getURL := func(filename storage.Filename, download bool) string {
+		return getFileURL(ctx, h, session, filename, download)
+	}
+
+	return &sspb.SessionInfo{
+		TimeCreated:  timestamppb.New(session.StartTime),
+		TimeFinished: timestamppb.New(session.EndTime),
+		Lifetime:     durationpb.New(defaultLifetime), //TODO: This info needs to be stored in the session
+		Name:         session.Name,
+		Keep:         session.Keep,
+		State:        sspb.SessionState_SESSION_STATE_FINISHED,
+		Segments:     []*sspb.Segment{},
+		InlineFiles: &sspb.SessionInfo_Files{
+			Ogg:      getURL(storage.FILENAME_OGG, false),
+			Flac:     getURL(storage.FILENAME_FLAC, false),
+			Waveform: getURL(storage.FILENAME_WAVEFORM, false),
+		},
+		DownloadFiles: &sspb.SessionInfo_Files{
+			Ogg:      getURL(storage.FILENAME_OGG, true),
+			Flac:     getURL(storage.FILENAME_FLAC, true),
+			Waveform: getURL(storage.FILENAME_WAVEFORM, true),
+		},
+	}
+}
+
 // Called after a session has been closed and rendered by storage. Setup above in the constructor
 func (h *SessionSourceHandler) onSessionClosed(session *storage.Session) {
+	log.Debug().Interface("session", session).Msg("Session closed")
+
 	// TODO: Refine this
 	h.sessionUpdateCh <- &sspb.Session{
 		ID: session.ID.String(),
 		Info: &sspb.Session_Updated{
-			Updated: &sspb.SessionInfo{
-				TimeCreated:      timestamppb.New(session.StartTime),
-				TimeFinished:     timestamppb.New(session.EndTime),
-				Lifetime:         durationpb.New(defaultLifetime), //TODO: This info needs to be stored in the session
-				Name:             session.Name,
-				AudioFileName:    "data.ogg",
-				WaveformDataFile: "waveform.dat",
-				Keep:             session.Keep,
-				State:            sspb.SessionState_SESSION_STATE_FINISHED,
-				Segments:         []*sspb.Segment{},
-			},
+			Updated: newSessionInfo(context.Background(), h, session),
 		},
 	}
 }
 
 func (h *SessionSourceHandler) streamRecorders(ctx context.Context, request *sspb.StreamRecordersRequest, server sspb.SessionSource_StreamRecordersServer) error {
-	log.Debug().Msg("Streaming recorders")
-
 	recorders := h.sessionStorage.GetRecorders()
 
 	for _, recorder := range recorders {
@@ -110,23 +156,14 @@ func (h *SessionSourceHandler) streamSessions(ctx context.Context, request *sspb
 	}
 
 	sessions := h.sessionStorage.GetSessions(recorderID)
+
 	for _, session := range sessions {
 		if session.IsClosed {
 			if err := server.SendMsg(
 				&sspb.Session{
 					ID: session.ID.String(),
 					Info: &sspb.Session_Updated{
-						Updated: &sspb.SessionInfo{
-							TimeCreated:      timestamppb.New(session.StartTime),
-							TimeFinished:     timestamppb.New(session.EndTime),
-							Lifetime:         durationpb.New(defaultLifetime),
-							Name:             session.Name,
-							AudioFileName:    "data.ogg",
-							WaveformDataFile: "waveform.dat",
-							Keep:             session.Keep,
-							// If the session is closed, the state must be finished
-							State: sspb.SessionState_SESSION_STATE_FINISHED,
-						},
+						Updated: newSessionInfo(ctx, h, &session),
 					},
 				},
 			); err != nil {
@@ -150,7 +187,21 @@ func (h *SessionSourceHandler) streamSessions(ctx context.Context, request *sspb
 }
 
 func (h *SessionSourceHandler) cutSession(ctx context.Context, request *sspb.CutSessionRequest) (*cmpb.Respone, error) {
-	return noSuccess, nil
+	log.Debug().Msg("Streaming sessions")
+
+	recorderID, err := uuid.Parse(request.RecorderID)
+	if err != nil {
+		log.Err(err).Str("recorder-id", request.RecorderID).Msg("Cannot parse recorder ID")
+
+		return nil, err
+	}
+
+	if err := h.chunkSinkServer.CutSession(recorderID); err != nil {
+		log.Err(err).Str("recorder-id", request.RecorderID).Msg("Cannot cut session")
+		return nil, err
+	}
+
+	return success, nil
 }
 
 func parseIDs(recorderID string, sessionID string) (uuid.UUID, uuid.UUID, error) {
@@ -213,18 +264,7 @@ func (h *SessionSourceHandler) setKeepSession(ctx context.Context, request *sspb
 	h.sessionUpdateCh <- &sspb.Session{
 		ID: session.ID.String(),
 		Info: &sspb.Session_Updated{
-			Updated: &sspb.SessionInfo{
-				TimeCreated:      timestamppb.New(session.StartTime),
-				TimeFinished:     timestamppb.New(session.EndTime),
-				Lifetime:         durationpb.New(defaultLifetime),
-				Name:             session.Name,
-				AudioFileName:    "data.ogg",
-				WaveformDataFile: "waveform.dat",
-				Keep:             session.Keep,
-				// If we can modify the session in the frontend, it's closed
-				// we might have to rework that though
-				State: sspb.SessionState_SESSION_STATE_FINISHED,
-			},
+			Updated: newSessionInfo(ctx, h, &session),
 		},
 	}
 

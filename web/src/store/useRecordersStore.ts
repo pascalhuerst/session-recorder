@@ -2,7 +2,7 @@ import { computed, ref } from 'vue';
 import { Recorder } from '@session-recorder/protocols/ts/sessionsource';
 import { useRoute, useRouter } from 'vue-router';
 import { defineStore } from 'pinia';
-import { streamRecorders } from '@/grpc/procedures/streamRecorders';
+import { streamRecorders } from '../grpc/procedures/streamRecorders';
 
 export const useRecordersStore = defineStore('recorders', () => {
   const router = useRouter();

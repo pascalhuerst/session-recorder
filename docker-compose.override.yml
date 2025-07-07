@@ -1,0 +1,13 @@
+# Docker Compose Override for Development
+# This file provides development-specific overrides
+
+version: '3.3'
+
+services:
+  # Development overrides for Go backend
+  go-backend:
+    volumes:
+      - ./go:/app/src:ro  # Mount source for live development
+    environment:
+      - GO_ENV=development
+      - LOG_LEVEL=debug

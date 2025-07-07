@@ -13,7 +13,7 @@ export default defineConfig({
     strictPort: true,
     proxy: {
       '/sessionsource.SessionSource': {
-        target: 'http://localhost:8780',
+        target: 'http://localhost:8080',
         changeOrigin: true,
         ws: true,
         rewrite: (path) => path,

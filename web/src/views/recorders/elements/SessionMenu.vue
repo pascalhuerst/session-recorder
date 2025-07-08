@@ -54,11 +54,13 @@ const onDelete = () => {
 
 <template>
   <div class="menu">
-    <div class="balance">Kept until {{ ttl }}</div>
-    <Button size="xs" v-if="!session.keep" @click="onKeep">
-      <font-awesome-icon icon="fa-solid fa-heart"></font-awesome-icon>
-      Keep
-    </Button>
+    <template v-if="!session.keep">
+      <div class="balance">Kept until {{ displayExpiryDate.formatted }}</div>
+      <Button size="xs" @click="onKeep">
+        <font-awesome-icon icon="fa-solid fa-heart"></font-awesome-icon>
+        Keep
+      </Button>
+    </template>
     <Button size="xs" @click="onDelete">
       <font-awesome-icon icon="fa-solid fa-trash"></font-awesome-icon>
       Delete

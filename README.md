@@ -76,3 +76,25 @@ cd ../..
 ./cpp/chunk-sink-client/chunk-sink-client --recorder-id <uuid> --recorder-name <name>
 # ./cpp/chunk-sink-client/chunk-sink-client --recorder-id 10b26ce0-75ff-4548-84e1-c91d955b1151 --recorder-name "Living Room"
 ```
+
+## Dev Environment
+
+```bash
+# Start envoy & minio
+./start-dev.sh
+
+# Stop envoy & minio
+./stop-dev.sh
+```
+
+```bash
+# Start go Backend
+cd ./go/cmd/chunk_sink
+S3_ENDPOINT=localhost:9000 S3_PUBLIC_ENDPOINT=localhost:9000 S3_ACCESS_KEY=admin S3_SECRET_KEY=password123 go run .
+```
+
+```bash
+# Start web interface
+cd ./web
+npm start
+```

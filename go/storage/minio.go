@@ -939,7 +939,11 @@ func (m *Minio) GetPresignedURL(ctx context.Context, asset AssetOptions, signing
 	values := make(url.Values)
 
 	if signing.Download {
-		values.Set("response-content-disposition", fmt.Sprintf("attachment; Filename=%s", asset.Filename))
+		signedFilename := signing.DownloadFilename
+		if signedFilename == "" {
+			signedFilename = string(asset.Filename)
+		}
+		values.Set("response-content-disposition", fmt.Sprintf("attachment; Filename=%s", signedFilename))
 	}
 
 	presignedURL, err := m.client.PresignedGetObject(ctx, bucketName, objectName, signing.Expires, values)

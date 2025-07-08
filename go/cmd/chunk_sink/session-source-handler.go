@@ -2,6 +2,9 @@ package main
 
 import (
 	"context"
+	"path/filepath"
+	"regexp"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -49,6 +52,19 @@ func NewSessionSourceHandler(
 }
 
 func getFileURL(ctx context.Context, h *SessionSourceHandler, session *storage.Session, filename storage.Filename, download bool) string {
+	// Create URL-friendly session name
+	urlFriendlyName := strings.ReplaceAll(session.Name, " ", "_")
+	urlFriendlyName = regexp.MustCompile(`[^a-zA-Z0-9_-]`).ReplaceAllString(urlFriendlyName, "")
+
+	// Format date as URL-friendly string
+	dateStr := session.StartTime.Format("2006-01-02_15-04-05")
+
+	// Get file extension from filename
+	ext := filepath.Ext(string(filename))
+
+	// Construct download filename
+	downloadFilename := urlFriendlyName + "_" + dateStr + ext
+
 	fileURL, err := h.sessionStorage.GetPresignedURL(
 		ctx,
 		storage.AssetOptions{
@@ -57,8 +73,9 @@ func getFileURL(ctx context.Context, h *SessionSourceHandler, session *storage.S
 			Filename:   filename,
 		},
 		storage.SigningOptions{
-			Expires:  time.Hour * 24,
-			Download: download,
+			Expires:          time.Hour * 24,
+			Download:         download,
+			DownloadFilename: downloadFilename,
 		})
 
 	if err != nil {

@@ -1,0 +1,51 @@
+version: "3.3"
+
+services:
+  # MinIO S3-compatible storage
+  minio:
+    image: quay.io/minio/minio:latest
+    command: server /data --console-address ":9090"
+    ports:
+      - "9000:9000" # API
+      - "9090:9090" # Console
+    environment:
+      - MINIO_ROOT_USER=admin
+      - MINIO_ROOT_PASSWORD=password123
+    volumes:
+      - ./data/minio:/data
+    networks:
+      - session-recorder-net
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # gRPC-Web Proxy (Envoy)
+  grpc-proxy:
+    image: envoyproxy/envoy:v1.31-latest
+    container_name: session-recorder-envoy-dev
+    ports:
+      - "8080:8080" # gRPC-Web proxy
+      - "9901:9901" # Admin interface
+    volumes:
+      - ./grpc-web-proxy/envoy.dev.yaml:/etc/envoy/envoy.yaml:ro
+    command: /usr/local/bin/envoy -c /etc/envoy/envoy.yaml -l debug
+    networks:
+      - session-recorder-net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+
+networks:
+  session-recorder-net:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.25.0.0/16
+
+volumes:
+  protocol-data:
+    driver: local

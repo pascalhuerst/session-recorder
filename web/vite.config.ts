@@ -18,6 +18,12 @@ export default defineConfig({
         ws: true,
         rewrite: (path) => path,
       },
+      '/grpc': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        ws: true,
+        rewrite: (path) => path.replace(/^\/grpc/, ''),
+      },
     },
   },
 
@@ -48,7 +54,7 @@ export default defineConfig({
       '@protobuf-ts/grpcweb-transport',
       '@session-recorder/protocols/ts/sessionsource',
       '@session-recorder/protocols/ts/sessionsource.client',
-      '@session-recorder/protocols/ts/common'
+      '@session-recorder/protocols/ts/common',
     ],
   },
 

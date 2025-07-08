@@ -26,8 +26,9 @@ type AssetOptions struct {
 }
 
 type SigningOptions struct {
-	Expires  time.Duration
-	Download bool
+	Expires          time.Duration
+	Download         bool
+	DownloadFilename string
 }
 
 type Storage interface {

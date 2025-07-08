@@ -6,11 +6,24 @@ import { computed } from 'vue';
 import { SignalStatus } from '@session-recorder/protocols/ts/common';
 import { Button } from '@session-recorder/session-waveform';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
+import { toastService } from '../../../services/Toaster';
 
 const { recorders, selectedRecorderId } = storeToRefs(useRecordersStore());
 const recorder = computed(() => {
   return recorders.value.get(selectedRecorderId.value);
 });
+
+const handleCutSession = async () => {
+  try {
+    await cutSession({ recorderID: selectedRecorderId.value });
+    toastService.success(
+      'Session has ended. It may take some seconds before the session files are prepared.'
+    );
+  } catch (error) {
+    console.error('Failed to cut session:', error);
+    toastService.error('Failed to cut session');
+  }
+};
 </script>
 
 <template>
@@ -23,10 +36,7 @@ const recorder = computed(() => {
       class="banner"
     >
       <div>This recorder is currently recording</div>
-      <Button
-        @click="() => cutSession({ recorderID: selectedRecorderId })"
-        color="primary"
-      >
+      <Button @click="handleCutSession" color="primary">
         <font-awesome-icon icon="fa-solid fa-scissors" />
         Cut Session
       </Button>

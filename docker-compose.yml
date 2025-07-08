@@ -81,7 +81,7 @@ services:
       context: .
       dockerfile: ./web/Dockerfile
       args:
-        - VITE_GRPC_SERVER_URL=http://localhost:8080
+        - VITE_GRPC_SERVER_URL=http://localhost:3000/grpc
     ports:
       - "3000:80" # Web interface
     depends_on:

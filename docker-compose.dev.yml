@@ -30,7 +30,7 @@ services:
       - "8080:8080" # gRPC-Web proxy
       - "9901:9901" # Admin interface
     volumes:
-      - ./grpc-web-proxy/envoy.yaml:/etc/envoy/envoy.yaml:ro
+      - ./grpc-web-proxy/envoy.dev.yaml:/etc/envoy/envoy.yaml:ro
     command: /usr/local/bin/envoy -c /etc/envoy/envoy.yaml -l debug
     networks:
       - session-recorder-net

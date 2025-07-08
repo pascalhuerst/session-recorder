@@ -18,6 +18,10 @@ import { faArrowsLeftRightToLine } from '@fortawesome/free-solid-svg-icons/faArr
 import { faDownload } from '@fortawesome/free-solid-svg-icons/faDownload';
 import { faMusic } from '@fortawesome/free-solid-svg-icons/faMusic';
 import { faScissors } from '@fortawesome/free-solid-svg-icons/faScissors';
+import { faCheckCircle } from '@fortawesome/free-solid-svg-icons/faCheckCircle';
+import { faExclamationCircle } from '@fortawesome/free-solid-svg-icons/faExclamationCircle';
+import { faExclamationTriangle } from '@fortawesome/free-solid-svg-icons/faExclamationTriangle';
+import { faInfoCircle } from '@fortawesome/free-solid-svg-icons/faInfoCircle';
 
 export const setup = () => {
   library.add(
@@ -38,6 +42,10 @@ export const setup = () => {
     faClock,
     faDownload,
     faMusic,
-    faScissors
+    faScissors,
+    faCheckCircle,
+    faExclamationCircle,
+    faExclamationTriangle,
+    faInfoCircle
   );
 };

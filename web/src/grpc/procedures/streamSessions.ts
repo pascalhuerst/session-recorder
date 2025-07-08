@@ -158,7 +158,7 @@ export const streamSessions = (args: {
             break;
           }
           case 'removed': {
-            if ('deleted' in response.info) {
+            if ('removed' in response.info) {
               args.onMessage({
                 type: 'deleted',
                 id: response.iD,

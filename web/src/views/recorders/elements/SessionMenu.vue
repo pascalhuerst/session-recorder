@@ -10,6 +10,7 @@ import { setKeepSession } from '../../../grpc/procedures/setKeepSession';
 import { deleteSession } from '../../../grpc/procedures/deleteSession';
 import type { Session } from '../../../types';
 import { useDateFormat } from '@vueuse/core';
+import { toastService } from '../../../services/Toaster/ToastService';
 
 // @todo: break this down and make composable
 
@@ -33,11 +34,21 @@ const displayExpiryDate = computed(() => {
 });
 
 const onKeep = () => {
+  const keepAction = !props.session.keep;
   return setKeepSession({
     recorderId: props.recorderId,
     sessionId: props.session.id,
-    keep: !props.session.keep,
-  });
+    keep: keepAction,
+  })
+    .then(() => {
+      toastService.success(
+        keepAction ? 'Session kept successfully' : 'Session unkeep successfully'
+      );
+    })
+    .catch((error) => {
+      console.error('Failed to update session keep status:', error);
+      toastService.error('Failed to update session keep status');
+    });
 };
 
 const onDelete = () => {
@@ -46,7 +57,14 @@ const onDelete = () => {
       deleteSession({
         recorderId: props.recorderId,
         sessionId: props.session.id,
-      });
+      })
+        .then(() => {
+          toastService.success('Session deleted successfully');
+        })
+        .catch((error) => {
+          console.error('Failed to delete session:', error);
+          toastService.error('Failed to delete session');
+        });
     }
   });
 };

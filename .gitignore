@@ -20,6 +20,7 @@ yarn-error.log*
 dist/
 build/
 out/
+tmp/
 
 # Go
 bin/

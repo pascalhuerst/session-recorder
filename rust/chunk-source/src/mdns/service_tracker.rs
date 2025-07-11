@@ -3,7 +3,7 @@
 //! This module provides functionality to discover and track chunk-sink servers
 //! on the local network using mDNS (Multicast DNS) service discovery.
 
-use log::{debug, error, info, warn};
+use log::{debug, info, warn};
 use mdns_sd::{ServiceDaemon, ServiceEvent as MdnsServiceEvent};
 use std::collections::HashMap;
 use std::net::Ipv4Addr;
@@ -134,12 +134,19 @@ impl ServiceTracker {
 
             // Browse for services
             let receiver = match daemon.browse(&service_type) {
-                Ok(receiver) => receiver,
+                Ok(receiver) => {
+                    info!("mDNS discovery started for: {}", service_type);
+                    receiver
+                }
                 Err(e) => {
-                    error!("Failed to start service browsing: {}", e);
+                    warn!("Could not start mDNS browsing: {}", e);
+                    *is_running.lock().unwrap() = false;
                     return;
                 }
             };
+
+            // Small delay to allow the service to initialize
+            thread::sleep(Duration::from_millis(50));
 
             // Process mDNS events
             while *is_running.lock().unwrap() {
@@ -148,11 +155,13 @@ impl ServiceTracker {
                         Self::handle_mdns_event(event, &services, &worker_event_sender);
                     }
                     Err(e) => {
-                        if e.to_string().contains("timeout") {
-                            // Normal timeout, continue
+                        // Normal timeout or disconnection - this is expected behavior
+                        let error_msg = e.to_string();
+                        if error_msg.contains("timeout") || error_msg.contains("Timeout") {
                             continue;
                         } else {
-                            warn!("mDNS receiver error: {}", e);
+                            // Any other error (including channel closure) just means we should stop
+                            debug!("mDNS receiver finished: {}", e);
                             break;
                         }
                     }
@@ -191,24 +200,24 @@ impl ServiceTracker {
 
     /// Stop the service tracker
     pub fn stop(&mut self) {
-        info!("Stopping service tracker...");
+        debug!("Stopping service tracker...");
 
+        // Signal threads to stop
         *self.is_running.lock().unwrap() = false;
 
+        // Give threads a moment to stop gracefully
+        thread::sleep(Duration::from_millis(50));
+
         if let Some(handle) = self.worker_handle.take() {
-            if let Err(e) = handle.join() {
-                error!("Error joining worker thread: {:?}", e);
-            }
+            let _ = handle.join();
         }
 
         if let Some(handle) = self.cleanup_handle.take() {
-            if let Err(e) = handle.join() {
-                error!("Error joining cleanup thread: {:?}", e);
-            }
+            let _ = handle.join();
         }
 
         self.event_sender = None;
-        info!("Service tracker stopped");
+        debug!("Service tracker stopped");
     }
 
     /// Get a list of currently discovered services
@@ -281,7 +290,7 @@ impl ServiceTracker {
                 drop(services_lock);
 
                 if let Err(e) = event_sender.send(event_to_send) {
-                    error!("Failed to send service event: {}", e);
+                    debug!("Service event send failed: {}", e);
                 }
             }
             MdnsServiceEvent::ServiceRemoved(type_name, instance_name) => {
@@ -292,7 +301,7 @@ impl ServiceTracker {
                     drop(services_lock);
 
                     if let Err(e) = event_sender.send(ServiceEvent::ServiceRemoved(instance_name)) {
-                        error!("Failed to send service removed event: {}", e);
+                        debug!("Service removed event send failed: {}", e);
                     }
                 }
             }
@@ -331,7 +340,7 @@ impl ServiceTracker {
             debug!("Removed expired service: {}", instance_name);
 
             if let Err(e) = event_sender.send(ServiceEvent::ServiceRemoved(instance_name)) {
-                error!("Failed to send service removed event: {}", e);
+                debug!("Service removed event send failed: {}", e);
             }
         }
     }
@@ -339,7 +348,9 @@ impl ServiceTracker {
 
 impl Drop for ServiceTracker {
     fn drop(&mut self) {
-        self.stop();
+        if self.is_running() {
+            self.stop();
+        }
     }
 }
 

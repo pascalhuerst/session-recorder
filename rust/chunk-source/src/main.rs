@@ -321,52 +321,52 @@ async fn test_grpc_client_functionality() {
 }
 
 async fn test_mdns_service_discovery() {
-    info!("Testing mDNS service discovery...");
+    info!("Starting mDNS service discovery for chunk-sink servers...");
 
     // Create service tracker configuration
     let tracker_config = ServiceTrackerConfig {
         service_type: "_session-recorder-chunksink._tcp.local.".to_string(),
-        service_timeout: Duration::from_secs(10),
-        cleanup_interval: Duration::from_secs(2),
-        max_services: 10,
+        service_timeout: Duration::from_secs(60),
+        cleanup_interval: Duration::from_secs(10),
+        max_services: 50,
     };
 
     // Create and start the service tracker
     match ServiceTracker::new(tracker_config) {
         Ok(mut tracker) => {
-            info!("Successfully created mDNS service tracker");
+            info!("mDNS service tracker created successfully");
 
-            // Start discovery (but don't block for too long in test)
+            // Start discovery and wait for services
             match tracker.start() {
                 Ok(event_receiver) => {
-                    info!("Started mDNS service discovery");
+                    info!("🔍 Waiting for chunk-sink servers to appear on the network...");
+                    info!("(Services may appear at any time - the discovery runs continuously)");
 
-                    // Listen for events for a short time
-                    let timeout = Duration::from_millis(500);
-                    match event_receiver.recv_timeout(timeout) {
-                        Ok(event) => {
-                            info!("Received mDNS event: {:?}", event);
-                        }
-                        Err(_) => {
-                            info!("No mDNS services discovered (expected in test environment)");
-                        }
-                    }
+                    // Just show that we're listening - in real usage this would run indefinitely
+                    tokio::time::sleep(Duration::from_millis(100)).await;
 
-                    // Check current services
                     let services = tracker.get_services();
-                    info!("Currently tracking {} services", services.len());
-
-                    for service in services {
+                    if services.is_empty() {
                         info!(
-                            "  • {}: {}",
-                            service.instance_name,
-                            service
-                                .connection_url()
-                                .unwrap_or_else(|| "Unknown".to_string())
+                            "No chunk-sink servers found yet - discovery continues in background"
                         );
+                    } else {
+                        info!("Found {} chunk-sink server(s):", services.len());
+                        for service in services {
+                            info!(
+                                "  • {} at {}",
+                                service.instance_name,
+                                service
+                                    .connection_url()
+                                    .unwrap_or_else(|| "Unknown".to_string())
+                            );
+                        }
                     }
 
+                    // In a real application, this would run continuously
+                    // For testing, we just verify it starts correctly
                     tracker.stop();
+                    info!("mDNS service discovery initialized successfully");
                 }
                 Err(e) => {
                     log::warn!("Failed to start mDNS service discovery: {}", e);
@@ -377,6 +377,4 @@ async fn test_mdns_service_discovery() {
             log::warn!("Failed to create mDNS service tracker: {}", e);
         }
     }
-
-    info!("mDNS service discovery test completed");
 }

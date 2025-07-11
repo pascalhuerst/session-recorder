@@ -120,7 +120,11 @@ export const streamSessions = (args: {
   onEnd?: () => void;
 }) => {
   console.log('Starting streamSessions for recorder:', args.request.recorderID);
-  const call = sessionSourceClient.streamSessions(args.request);
+
+  const abortController = new AbortController();
+  const call = sessionSourceClient.streamSessions(args.request, {
+    abort: abortController.signal,
+  });
 
   // Handle streaming responses
   (async () => {
@@ -187,5 +191,5 @@ export const streamSessions = (args: {
     }
   })();
 
-  return call;
+  return () => abortController.abort();
 };

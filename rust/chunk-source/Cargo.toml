@@ -19,6 +19,8 @@ tonic = "0.12"
 prost = "0.13"
 prost-types = "0.13"
 futures-util = "0.3"
+mdns-sd = "0.10"
+gethostname = "0.5"
 
 [build-dependencies]
 tonic-build = "0.12"

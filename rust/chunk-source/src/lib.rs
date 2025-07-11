@@ -15,6 +15,11 @@ pub mod grpc {
     pub mod chunk_sink_client;
 }
 
+pub mod mdns {
+    pub mod service_tracker;
+}
+
 pub use audio::*;
 pub use grpc::*;
 pub use io::*;
+pub use mdns::*;

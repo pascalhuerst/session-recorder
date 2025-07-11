@@ -7,6 +7,7 @@ use chunk_source::grpc::chunk_sink_client::{
     ChunkSinkClientService, ChunkSinkConfig, RecorderStatusInfo,
 };
 use chunk_source::io::{input_key::InputKey, led::Led};
+use chunk_source::mdns::service_tracker::{ServiceTracker, ServiceTrackerConfig};
 use evdev::KeyCode;
 use log::info;
 use ringbuf::traits::{Consumer, Producer};
@@ -30,6 +31,9 @@ async fn main() {
 
     // Test gRPC client functionality
     test_grpc_client_functionality().await;
+
+    // Test mDNS service discovery
+    test_mdns_service_discovery().await;
 
     // Create Audio Settings
     let audio_settings = AudioSettings {
@@ -314,4 +318,65 @@ async fn test_grpc_client_functionality() {
     }
 
     info!("gRPC client test completed");
+}
+
+async fn test_mdns_service_discovery() {
+    info!("Testing mDNS service discovery...");
+
+    // Create service tracker configuration
+    let tracker_config = ServiceTrackerConfig {
+        service_type: "_session-recorder-chunksink._tcp.local.".to_string(),
+        service_timeout: Duration::from_secs(10),
+        cleanup_interval: Duration::from_secs(2),
+        max_services: 10,
+    };
+
+    // Create and start the service tracker
+    match ServiceTracker::new(tracker_config) {
+        Ok(mut tracker) => {
+            info!("Successfully created mDNS service tracker");
+
+            // Start discovery (but don't block for too long in test)
+            match tracker.start() {
+                Ok(event_receiver) => {
+                    info!("Started mDNS service discovery");
+
+                    // Listen for events for a short time
+                    let timeout = Duration::from_millis(500);
+                    match event_receiver.recv_timeout(timeout) {
+                        Ok(event) => {
+                            info!("Received mDNS event: {:?}", event);
+                        }
+                        Err(_) => {
+                            info!("No mDNS services discovered (expected in test environment)");
+                        }
+                    }
+
+                    // Check current services
+                    let services = tracker.get_services();
+                    info!("Currently tracking {} services", services.len());
+
+                    for service in services {
+                        info!(
+                            "  • {}: {}",
+                            service.instance_name,
+                            service
+                                .connection_url()
+                                .unwrap_or_else(|| "Unknown".to_string())
+                        );
+                    }
+
+                    tracker.stop();
+                }
+                Err(e) => {
+                    log::warn!("Failed to start mDNS service discovery: {}", e);
+                }
+            }
+        }
+        Err(e) => {
+            log::warn!("Failed to create mDNS service tracker: {}", e);
+        }
+    }
+
+    info!("mDNS service discovery test completed");
 }

@@ -11,5 +11,10 @@ pub mod io {
     pub mod led;
 }
 
+pub mod grpc {
+    pub mod chunk_sink_client;
+}
+
 pub use audio::*;
+pub use grpc::*;
 pub use io::*;

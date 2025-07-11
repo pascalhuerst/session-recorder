@@ -1,4 +1,4 @@
-use ringbuf::{traits::*, HeapRb};
+use ringbuf::{HeapRb, traits::*};
 
 type AudioRingBuffer = HeapRb<f32>;
 pub type AudioRingBufferConsumer =
@@ -54,14 +54,28 @@ pub struct ParameterChannels {
     pub output_producer: ParameterRingBufferProducer,
 }
 
-impl ParameterChannels {
+pub struct ParameterChannelPair {
+    pub callback_channels: ParameterChannels,
+    pub main_channels: ParameterChannels,
+}
+
+impl ParameterChannelPair {
     pub fn new(buffer_size: usize) -> Self {
-        let rb = HeapRb::<Parameters>::new(buffer_size);
-        let (output_producer, input_consumer) = rb.split();
+        let input_rb = HeapRb::<Parameters>::new(buffer_size);
+        let (input_producer, input_consumer) = input_rb.split();
+
+        let output_rb = HeapRb::<Parameters>::new(buffer_size);
+        let (output_producer, output_consumer) = output_rb.split();
 
         Self {
-            input_consumer,
-            output_producer,
+            callback_channels: ParameterChannels {
+                input_consumer,
+                output_producer,
+            },
+            main_channels: ParameterChannels {
+                input_consumer: output_consumer,
+                output_producer: input_producer,
+            },
         }
     }
 }

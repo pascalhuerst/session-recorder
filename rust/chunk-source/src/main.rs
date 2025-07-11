@@ -3,6 +3,9 @@ use chunk_source::audio::{
     callback_thread::start_callback_thread,
     channels::AudioChannelPair,
 };
+use chunk_source::grpc::chunk_sink_client::{
+    ChunkSinkClientService, ChunkSinkConfig, RecorderStatusInfo,
+};
 use chunk_source::io::{input_key::InputKey, led::Led};
 use evdev::KeyCode;
 use log::info;
@@ -12,7 +15,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::Duration;
 
-fn main() {
+#[tokio::main]
+async fn main() {
     // Initialize logger
     env_logger::init();
 
@@ -23,6 +27,9 @@ fn main() {
 
     // Test input key functionality
     test_input_key_functionality();
+
+    // Test gRPC client functionality
+    test_grpc_client_functionality().await;
 
     // Create Audio Settings
     let audio_settings = AudioSettings {
@@ -223,4 +230,88 @@ fn test_input_key_functionality() {
     } else {
         info!("No input devices available for testing");
     }
+}
+
+async fn test_grpc_client_functionality() {
+    info!("Testing gRPC client functionality...");
+
+    // Create gRPC client configuration
+    let config = ChunkSinkConfig {
+        server_address: "http://localhost:50051".to_string(),
+        recorder_id: "test-recorder".to_string(),
+        recorder_name: "Test Recorder".to_string(),
+        connect_timeout: Duration::from_secs(5),
+        request_timeout: Duration::from_secs(3),
+        retry_interval: Duration::from_secs(2),
+        max_retries: 2,
+        audio_buffer_size: 4096,
+        parameter_buffer_size: 32,
+    };
+
+    let mut grpc_client = ChunkSinkClientService::new(config);
+
+    // Initialize channels
+    grpc_client.initialize_channels();
+    info!("gRPC client channels initialized");
+
+    // Try to connect (this will likely fail in test environment)
+    match grpc_client.connect().await {
+        Ok(_) => {
+            info!("Successfully connected to gRPC server");
+
+            // Send test recorder status
+            let status = RecorderStatusInfo {
+                signal_status: chunk_source::grpc::chunk_sink_client::common::SignalStatus::Signal,
+                rms_percent: 0.75,
+                clipping: false,
+            };
+
+            match grpc_client.set_recorder_status(status).await {
+                Ok(success) => {
+                    info!("Recorder status sent successfully: {}", success);
+                }
+                Err(e) => {
+                    log::warn!("Failed to send recorder status: {}", e);
+                }
+            }
+
+            // Test audio data sending
+            let test_audio_data = vec![0.1, 0.2, 0.3, 0.4, 0.5];
+            match grpc_client.send_audio_data(&test_audio_data) {
+                Ok(samples_sent) => {
+                    info!("Sent {} audio samples to gRPC pipeline", samples_sent);
+                }
+                Err(e) => {
+                    log::warn!("Failed to send audio data: {}", e);
+                }
+            }
+
+            // Start command listener
+            match grpc_client.start_command_listener().await {
+                Ok(_) => {
+                    info!("Command listener started successfully");
+                }
+                Err(e) => {
+                    log::warn!("Failed to start command listener: {}", e);
+                }
+            }
+
+            // Test parameter checking
+            use chunk_source::audio::channels::Parameters;
+            let mut param_buffer = [Parameters::Cut(); 4];
+            match grpc_client.receive_parameters(&mut param_buffer) {
+                Ok(params_received) => {
+                    info!("Received {} parameters from server", params_received);
+                }
+                Err(e) => {
+                    log::warn!("Failed to receive parameters: {}", e);
+                }
+            }
+        }
+        Err(e) => {
+            log::warn!("Failed to connect to gRPC server (expected in test): {}", e);
+        }
+    }
+
+    info!("gRPC client test completed");
 }

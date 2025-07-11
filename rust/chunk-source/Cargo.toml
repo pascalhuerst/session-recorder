@@ -15,3 +15,10 @@ libc = "0.2"
 ctrlc = "3.4"
 evdev = "0.13"
 tokio = { version = "1.0", features = ["full"] }
+tonic = "0.12"
+prost = "0.13"
+prost-types = "0.13"
+futures-util = "0.3"
+
+[build-dependencies]
+tonic-build = "0.12"

@@ -3,6 +3,8 @@ use chunk_source::audio::{
     callback_thread::start_callback_thread,
     channels::AudioChannelPair,
 };
+use chunk_source::io::{input_key::InputKey, led::Led};
+use evdev::KeyCode;
 use log::info;
 use ringbuf::traits::{Consumer, Producer};
 use std::sync::Arc;
@@ -13,6 +15,14 @@ use std::time::Duration;
 fn main() {
     // Initialize logger
     env_logger::init();
+
+    info!("Starting session recorder with audio, input key, and LED support");
+
+    // Test LED functionality
+    test_led_functionality();
+
+    // Test input key functionality
+    test_input_key_functionality();
 
     // Create Audio Settings
     let audio_settings = AudioSettings {
@@ -130,4 +140,87 @@ fn main() {
     }
 
     info!("Shutdown complete");
+}
+
+fn test_led_functionality() {
+    info!("Testing LED functionality...");
+
+    // List available LEDs
+    match Led::list_available() {
+        Ok(leds) => {
+            info!("Available LEDs: {:?}", leds);
+
+            // Try to control the first LED if available
+            if let Some(led_name) = leds.first() {
+                match Led::new(led_name) {
+                    Ok(led) => {
+                        info!("Successfully created LED controller for: {}", led_name);
+                        info!("LED info: max_brightness={}", led.max_brightness());
+
+                        // Test turning LED on and off
+                        if let Err(e) = led.on() {
+                            log::warn!("Failed to turn LED on: {}", e);
+                        } else {
+                            info!("LED turned on");
+                        }
+
+                        thread::sleep(Duration::from_millis(500));
+
+                        if let Err(e) = led.off() {
+                            log::warn!("Failed to turn LED off: {}", e);
+                        } else {
+                            info!("LED turned off");
+                        }
+                    }
+                    Err(e) => {
+                        log::warn!("Failed to create LED controller: {}", e);
+                    }
+                }
+            } else {
+                info!("No LEDs available for testing");
+            }
+        }
+        Err(e) => {
+            log::warn!("Failed to list LEDs: {}", e);
+        }
+    }
+}
+
+fn test_input_key_functionality() {
+    info!("Testing input key functionality...");
+
+    // List available input devices
+    let devices = InputKey::list_devices();
+    info!("Available input devices: {:?}", devices);
+
+    // Try to create an input key handler for the first device
+    if let Some((device_path, device_name)) = devices.first() {
+        match InputKey::from_path(device_path) {
+            Ok(mut input_key) => {
+                info!(
+                    "Successfully created input key handler for: {}",
+                    device_name
+                );
+
+                // Register a key handler for the space key
+                input_key.register_key(
+                    KeyCode::KEY_SPACE,
+                    || {
+                        info!("Space key pressed!");
+                    },
+                    |duration| {
+                        info!("Space key released after {:?}", duration);
+                    },
+                );
+
+                // Start monitoring (but don't actually start since we're in a test)
+                info!("Input key handler configured (not started for testing)");
+            }
+            Err(e) => {
+                log::warn!("Failed to create input key handler: {}", e);
+            }
+        }
+    } else {
+        info!("No input devices available for testing");
+    }
 }

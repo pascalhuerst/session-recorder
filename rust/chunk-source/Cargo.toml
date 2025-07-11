@@ -13,3 +13,5 @@ ringbuf = "0.4"
 num-traits = "0.2"
 libc = "0.2"
 ctrlc = "3.4"
+evdev = "0.13"
+tokio = { version = "1.0", features = ["full"] }

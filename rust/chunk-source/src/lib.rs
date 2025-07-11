@@ -6,4 +6,10 @@ pub mod audio {
     pub mod utils;
 }
 
+pub mod io {
+    pub mod input_key;
+    pub mod led;
+}
+
 pub use audio::*;
+pub use io::*;

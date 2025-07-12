@@ -448,6 +448,11 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 	chunksPrefix := fmt.Sprintf("%s/sessions/%s/chunks", recorderID, sessionID)
 	rawDataObjectName := fmt.Sprintf("%s/sessions/%s/data.raw", recorderID, sessionID)
 
+	log.Debug().
+		Str("chunks-prefix", chunksPrefix).
+		Str("raw-data-object", rawDataObjectName).
+		Msg("Starting session rendering - prepared object names")
+
 	// I need to double check this, but this dance does not seem to be necessary...
 	//rawPreRenderedObjectName := fmt.Sprintf("%s/sessions/%s/pre_rendered_data.raw", RecorderID, sessionID)
 	//
@@ -482,6 +487,7 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 	//	}
 	//}
 
+	log.Debug().Str("prefix", chunksPrefix).Msg("Listing objects for chunk composition")
 	objectCh := m.client.ListObjects(ctx, bucketName, minio.ListObjectsOptions{Prefix: chunksPrefix, Recursive: true})
 	srcs := make([]minio.CopySrcOptions, 0)
 
@@ -507,11 +513,17 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 		})
 	}
 
+	log.Info().
+		Int("chunk-count", len(srcs)).
+		Str("chunks-prefix", chunksPrefix).
+		Msg("Found chunks for composition")
+
 	dst := minio.CopyDestOptions{
 		Bucket: bucketName,
 		Object: rawDataObjectName,
 	}
 
+	log.Debug().Msg("Starting chunk composition into raw data file")
 	ui, err := m.client.ComposeObject(ctx, dst, srcs...)
 	if err != nil {
 		log.Err(err).Msg("Cannot compose object, too small. Will delete session.")
@@ -519,11 +531,22 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 		return m.deleteSession(ctx, recorderID, sessionID)
 	}
 
+	log.Info().
+		Int64("composed-size-bytes", ui.Size).
+		Str("raw-data-object", rawDataObjectName).
+		Msg("Successfully composed chunks into raw data file")
+
 	// We need to make this generic and nicer, hack for now to get teh exact end time for the session
 	// raw samples for 48000hz, 2 Bytes (16bit), 2 channels
 	const bytesPerSecond float64 = 48000.0 * 2.0 * 2.0
 	durationSeconds := float64(ui.Size) / bytesPerSecond
 
+	log.Debug().
+		Float64("duration-seconds", durationSeconds).
+		Float64("bytes-per-second", bytesPerSecond).
+		Msg("Calculated session duration from raw data size")
+
+	log.Debug().Msg("Updating session metadata with calculated duration")
 	sm, err := m.getSessionMetadata(ctx, recorderID, sessionID)
 	if err != nil {
 		log.Err(err).Msg("Cannot get session metadata")
@@ -535,10 +558,17 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 		m.dataLock.Lock()
 		if err = m.putSessionMetadata(ctx, recorderID, sessionID, sm); err != nil {
 			log.Err(err).Msg("Cannot put session metadata")
+		} else {
+			log.Info().
+				Dur("session-duration", sm.Duration).
+				Time("start-time", sm.StartTime).
+				Time("end-time", sm.EndTime).
+				Msg("Successfully updated session metadata")
 		}
 		m.dataLock.Unlock()
 	}
 
+	log.Debug().Str("object", dst.Object).Msg("Retrieving composed raw data for rendering")
 	var rawData *minio.Object
 	if rawData, err = m.client.GetObject(ctx, bucketName, dst.Object, minio.GetObjectOptions{}); err != nil {
 		log.Err(err).Str("object", dst.Object).Msg("Cannot get object")
@@ -546,6 +576,7 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 		return err
 	}
 
+	log.Info().Msg("Starting parallel rendering of audio formats (waveform, overview, flac, ogg)")
 	readers, writer, closer := makeReaders(4)
 	eg, egCtx := errgroup.WithContext(ctx)
 
@@ -565,6 +596,7 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 
 	// Create waveform dat file.
 	eg.Go(func() error {
+		log.Debug().Msg("Starting waveform generation")
 		waveformData, err := render.CreateWaveform(egCtx, readers[0], 300, 10000, 200)
 		if err != nil {
 			log.Err(err).Msg("Cannot create waveform")
@@ -579,11 +611,16 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 			return err
 		}
 
+		log.Info().
+			Str("object", waveformObject).
+			Int("size-bytes", waveformData.Len()).
+			Msg("Successfully created waveform data file")
 		return nil
 	})
 
 	// Create waveform png overview file.
 	eg.Go(func() error {
+		log.Debug().Msg("Starting overview PNG generation")
 		overviewData, err := render.CreateOverview(egCtx, readers[1], 300, 1000, 200)
 		if err != nil {
 			log.Err(err).Msg("Cannot create waveform overview")
@@ -598,11 +635,16 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 			return err
 		}
 
+		log.Info().
+			Str("object", overviewObject).
+			Int("size-bytes", overviewData.Len()).
+			Msg("Successfully created overview PNG file")
 		return nil
 	})
 
 	// Create flac file.
 	eg.Go(func() error {
+		log.Debug().Msg("Starting FLAC conversion")
 		var flacBuffer *bytes.Buffer
 		if flacBuffer, err = render.Flac(readers[2]); err != nil {
 			log.Err(err).Msg("Cannot convert to flac")
@@ -617,11 +659,16 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 			return err
 		}
 
+		log.Info().
+			Str("object", flacObject).
+			Int("size-bytes", flacBuffer.Len()).
+			Msg("Successfully created FLAC file")
 		return nil
 	})
 
 	// Create ogg file.
 	eg.Go(func() error {
+		log.Debug().Msg("Starting OGG conversion")
 		ext := "ogg"
 
 		var buffer *bytes.Buffer
@@ -638,21 +685,33 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 			return err
 		}
 
+		log.Info().
+			Str("object", object).
+			Int("size-bytes", buffer.Len()).
+			Msg("Successfully created OGG file")
 		return nil
 	})
 
+	log.Debug().Msg("Waiting for all rendering goroutines to complete")
 	if err := eg.Wait(); err != nil {
+		log.Err(err).Msg("One or more rendering goroutines failed")
 		return err
 	}
+	log.Info().Msg("All audio format rendering completed successfully")
 
+	log.Debug().Str("chunks-prefix", chunksPrefix).Msg("Cleaning up chunk files")
 	if err := m.client.RemoveObject(ctx, bucketName, chunksPrefix, minio.RemoveObjectOptions{ForceDelete: true}); err != nil {
 		log.Err(err).Str("object", chunksPrefix).Msg("Cannot remove object")
+	} else {
+		log.Info().Str("chunks-prefix", chunksPrefix).Msg("Successfully cleaned up chunk files")
 	}
 
 	if m.onSessionClosedCb != nil {
+		log.Debug().Msg("Invoking session closed callback")
 		m.cbLock.Lock()
 		m.onSessionClosedCb(sm)
 		m.cbLock.Unlock()
+		log.Debug().Msg("Session closed callback completed")
 	}
 
 	log.Debug().Stringer("recorder-id", recorderID).Stringer("session-id", sessionID).Msg("Done rendering session")

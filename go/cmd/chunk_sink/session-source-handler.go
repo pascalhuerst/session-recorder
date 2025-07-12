@@ -23,23 +23,23 @@ var (
 )
 
 type SessionSourceHandler struct {
-	sessionStorage   storage.Storage
-	chunkSinkServer  *grpc.ChunkSinkServer
-	recorderUpdateCh chan *sspb.Recorder
-	sessionUpdateCh  chan *sspb.Session
+	sessionStorage           storage.Storage
+	chunkSinkServer          *grpc.ChunkSinkServer
+	recorderUpdateCh         chan *sspb.Recorder
+	sessionUpdateBroadcaster RecorderChannelRegistry
 }
 
 func NewSessionSourceHandler(
 	sessionStorage storage.Storage,
 	chunkSinkServer *grpc.ChunkSinkServer,
 	recorderUpdateCh chan *sspb.Recorder,
-	sessionUpdateCh chan *sspb.Session,
+	sessionUpdateBroadcaster RecorderChannelRegistry,
 ) *SessionSourceHandler {
 	h := &SessionSourceHandler{
-		sessionStorage:   sessionStorage,
-		chunkSinkServer:  chunkSinkServer,
-		recorderUpdateCh: recorderUpdateCh,
-		sessionUpdateCh:  sessionUpdateCh,
+		sessionStorage:           sessionStorage,
+		chunkSinkServer:          chunkSinkServer,
+		recorderUpdateCh:         recorderUpdateCh,
+		sessionUpdateBroadcaster: sessionUpdateBroadcaster,
 	}
 
 	sessionStorage.RegisterOnSessionClosedCallback(
@@ -112,12 +112,47 @@ func newSessionInfo(ctx context.Context, h *SessionSourceHandler, session *stora
 	}
 }
 
+func (h *SessionSourceHandler) Start(ctx context.Context) {
+	go func() {
+		for {
+			select {
+			case recorder := <-h.recorderUpdateCh:
+				recorderID, err := uuid.Parse(recorder.RecorderID)
+				if err != nil {
+					log.Err(err).Str("recorder-id", recorder.RecorderID).Msg("Cannot parse recorder ID")
+
+					return
+				}
+
+				if _, err := h.sessionUpdateBroadcaster.RegisterRecorder(recorderID); err != nil {
+					log.Err(err).Msg("Failed to register recorder")
+					return
+				}
+			case <-ctx.Done():
+				if err := h.sessionUpdateBroadcaster.Reset(); err != nil {
+					log.Err(err).Msg("Failed to reset session update broadcaster")
+				}
+				return
+			}
+		}
+	}()
+}
+
+func (h *SessionSourceHandler) Stop(ctx context.Context) error {
+	return h.sessionUpdateBroadcaster.Reset()
+}
+
 // Called after a session has been closed and rendered by storage. Setup above in the constructor
 func (h *SessionSourceHandler) onSessionClosed(session *storage.Session) {
 	log.Debug().Interface("session", session).Msg("Session closed")
 
-	// TODO: Refine this
-	h.sessionUpdateCh <- &sspb.Session{
+	ch, err := h.sessionUpdateBroadcaster.GetRecorderChannel(session.RecorderID)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to get recorder channel. Make sure to register the recorder beforehand")
+		return
+	}
+
+	ch <- &sspb.Session{
 		ID: session.ID.String(),
 		Info: &sspb.Session_Updated{
 			Updated: newSessionInfo(context.Background(), h, session),
@@ -189,9 +224,16 @@ func (h *SessionSourceHandler) streamSessions(ctx context.Context, request *sspb
 		}
 	}
 
+	ch, err := h.sessionUpdateBroadcaster.GetRecorderChannel(recorderID)
+	if err != nil {
+		log.Err(err).Str("recorder-id", recorderID.String()).Msg("Cannot get session stream")
+
+		return err
+	}
+
 	for {
 		select {
-		case session := <-h.sessionUpdateCh:
+		case session := <-ch:
 			if err := server.SendMsg(session); err != nil {
 				log.Err(err).Msg("Cannot send session data")
 			}
@@ -249,7 +291,14 @@ func (h *SessionSourceHandler) deleteSession(ctx context.Context, request *sspb.
 		return noSuccess, err
 	}
 
-	h.sessionUpdateCh <- &sspb.Session{
+	ch, err := h.sessionUpdateBroadcaster.GetRecorderChannel(recorderID)
+	if err != nil {
+		log.Err(err).Str("recorder-id", recorderID.String()).Msg("Cannot get session stream")
+
+		return nil, err
+	}
+
+	ch <- &sspb.Session{
 		ID:   sessionID.String(),
 		Info: &sspb.Session_Removed{Removed: &sspb.SessionRemoved{}},
 	}
@@ -278,7 +327,14 @@ func (h *SessionSourceHandler) setKeepSession(ctx context.Context, request *sspb
 		return noSuccess, err
 	}
 
-	h.sessionUpdateCh <- &sspb.Session{
+	ch, err := h.sessionUpdateBroadcaster.GetRecorderChannel(recorderID)
+	if err != nil {
+		log.Err(err).Str("recorder-id", recorderID.String()).Msg("Cannot get session stream")
+
+		return nil, err
+	}
+
+	ch <- &sspb.Session{
 		ID: session.ID.String(),
 		Info: &sspb.Session_Updated{
 			Updated: newSessionInfo(ctx, h, &session),

@@ -71,7 +71,6 @@ func main() {
 	}
 
 	var recorderUpdateCh chan *sspb.Recorder = make(chan *sspb.Recorder)
-	var sessionUpdateCh chan *sspb.Session = make(chan *sspb.Session)
 
 	chunkSinkHandler := NewChunkSinkHandler(sessionStorage, recorderUpdateCh)
 
@@ -82,7 +81,19 @@ func main() {
 		OnChunksCB:         chunkSinkHandler.setChunks,
 	})
 
-	sessionSourceHandler := NewSessionSourceHandler(sessionStorage, chunkSinkServer, recorderUpdateCh, sessionUpdateCh)
+	log.Info().Msg("Setting sesssion update broadcaster")
+
+	sessionUpdateBroadcaster := NewSessionUpdateBroadcaster()
+
+	sessionSourceHandler := NewSessionSourceHandler(
+		sessionStorage,
+		chunkSinkServer,
+		recorderUpdateCh,
+		sessionUpdateBroadcaster,
+	)
+
+	sessionSourceHandler.Start(ctx)
+	defer sessionSourceHandler.Stop(ctx)
 
 	sessionSourceServer := grpc.NewSessionSourceServer(&grpc.SessionSourceServerConfig{
 		Name:              hostname,

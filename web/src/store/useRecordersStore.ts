@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue';
+import { computed, onBeforeMount, onBeforeUnmount, ref } from 'vue';
 import { Recorder } from '@session-recorder/protocols/ts/sessionsource';
 import { useRoute, useRouter } from 'vue-router';
 import { defineStore } from 'pinia';
@@ -18,7 +18,7 @@ export const useRecordersStore = defineStore('recorders', () => {
     },
   });
 
-  streamRecorders({
+  const stop = streamRecorders({
     onMessage: (recorderInfo) => {
       recorders.value.set(recorderInfo.recorderID, recorderInfo);
     },
@@ -28,6 +28,10 @@ export const useRecordersStore = defineStore('recorders', () => {
     onEnd: () => {
       console.log('Recorders stream ended');
     },
+  });
+
+  onBeforeUnmount(() => {
+    stop();
   });
 
   return { recorders, selectedRecorderId };

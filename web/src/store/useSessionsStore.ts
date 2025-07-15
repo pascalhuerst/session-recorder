@@ -1,23 +1,29 @@
-import { computed, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, ref, watch } from 'vue';
 import { streamSessions } from '../grpc/procedures/streamSessions';
 import { useRecordersStore } from './useRecordersStore';
 import { defineStore, storeToRefs } from 'pinia';
 import type { Session } from '../types';
+import { noop } from '@vueuse/core';
 
 export const useSessionsStore = defineStore('sessions', () => {
   const { selectedRecorderId } = storeToRefs(useRecordersStore());
   const sessions = ref<Session[]>([]);
 
+  let stop = noop;
+
   watch(
     selectedRecorderId,
     () => {
+      stop();
+      stop = noop;
+
       if (!selectedRecorderId.value) {
         return;
       }
 
       sessions.value = [];
 
-      streamSessions({
+      stop = streamSessions({
         request: {
           recorderID: selectedRecorderId.value,
         },
@@ -50,6 +56,10 @@ export const useSessionsStore = defineStore('sessions', () => {
       immediate: true,
     }
   );
+
+  onBeforeUnmount(() => {
+    stop();
+  });
 
   const sortedSessions = computed(() => {
     return sessions.value.sort((a, b) => {

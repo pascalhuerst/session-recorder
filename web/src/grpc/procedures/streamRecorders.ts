@@ -1,5 +1,8 @@
-import { StreamRecordersRequest, Recorder } from "@session-recorder/protocols/ts/sessionsource";
-import { sessionSourceClient } from "../sessionSourceClient";
+import {
+  StreamRecordersRequest,
+  Recorder,
+} from '@session-recorder/protocols/ts/sessionsource';
+import { sessionSourceClient } from '../sessionSourceClient';
 
 export const streamRecorders = (args: {
   onMessage: (info: Recorder) => void;
@@ -7,9 +10,12 @@ export const streamRecorders = (args: {
   onEnd?: () => void;
 }) => {
   const request: StreamRecordersRequest = {};
-  
-  const call = sessionSourceClient.streamRecorders(request);
-  
+
+  const abortController = new AbortController();
+  const call = sessionSourceClient.streamRecorders(request, {
+    abort: abortController.signal,
+  });
+
   // Handle streaming responses
   (async () => {
     try {
@@ -26,6 +32,6 @@ export const streamRecorders = (args: {
       }
     }
   })();
-  
-  return call;
+
+  return () => abortController.abort();
 };

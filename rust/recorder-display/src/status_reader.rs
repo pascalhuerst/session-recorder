@@ -17,7 +17,7 @@ pub mod common {
 
 use chunksink::chunk_sink_server::{ChunkSink, ChunkSinkServer};
 use chunksink::{Chunks, Command, GetCommandRequest};
-use common::{RecorderStatus, Respone, SignalStatus};
+use common::{RecorderStatus, Respone};
 
 #[derive(Debug)]
 pub struct StatusReaderService {
@@ -79,10 +79,10 @@ impl ChunkSink for StatusReaderService {
 
     async fn get_commands(
         &self,
-        request: Request<GetCommandRequest>,
+        _request: Request<GetCommandRequest>,
     ) -> Result<Response<Self::GetCommandsStream>, Status> {
-        let req = request.into_inner();
-        println!("Recorder {} requesting commands", req.recorder_id);
+        //let req = request.into_inner();
+        //println!("Recorder {} requesting commands", req.recorder_id);
 
         // Create a channel for streaming commands
         let (tx, rx) = tokio::sync::mpsc::channel(4);
@@ -108,41 +108,44 @@ impl StatusReaderService {
         }
 
         // Also log for debugging purposes
-        println!("=== Recorder Status Update ===");
-        println!("Recorder ID: {}", status.recorder_id);
-        println!("Recorder Name: {}", status.recorder_name);
-        println!(
-            "Signal Status: {}",
-            self.signal_status_to_string(status.signal_status)
-        );
-        println!("RMS Percent: {:.2}%", status.rms_percent);
-        println!("Clipping: {}", if status.clipping { "Yes" } else { "No" });
-        println!("==============================");
+        //println!("=== Recorder Status Update ===");
+        //println!("Recorder ID: {}", status.recorder_id);
+        //println!("Recorder Name: {}", status.recorder_name);
+        //println!(
+        //    "Signal Status: {}",
+        //    self.signal_status_to_string(status.signal_status)
+        //);
+        //println!("RMS Percent: {:.2}%", status.rms_percent);
+        //println!("Clipping: {}", if status.clipping { "Yes" } else { "No" });
+        //println!("==============================");
     }
 
-    /// Convert SignalStatus enum to human-readable string
-    fn signal_status_to_string(&self, status: i32) -> &'static str {
-        match SignalStatus::try_from(status) {
-            Ok(SignalStatus::Unknown) => "Unknown",
-            Ok(SignalStatus::NoSignal) => "No Signal",
-            Ok(SignalStatus::Signal) => "Signal",
-            Err(_) => "Invalid Status",
-        }
-    }
+    //fn signal_status_to_string(&self, status: i32) -> &'static str {
+    //    match SignalStatus::try_from(status) {
+    //        Ok(SignalStatus::Unknown) => "Unknown",
+    //        Ok(SignalStatus::NoSignal) => "No Signal",
+    //        Ok(SignalStatus::Signal) => "Signal",
+    //        Err(_) => "Invalid Status",
+    //    }
+    //}
 }
 
 /// Convenience function to create and start a status reader server
 pub async fn run_status_reader_server(
     addr: &str,
     recorder_statuses: RecorderStatusMap,
+    disable_mdns: bool,
 ) -> Result<(), Box<dyn Error>> {
     let addr: std::net::SocketAddr = addr.parse()?;
 
-    // Extract port from address for mDNS announcement
-    let port = addr.port();
-
-    // Start mDNS service announcement
-    let _mdns_service = AvahiService::new(port)?;
+    // Start mDNS service announcement if not disabled
+    let _mdns_service = if !disable_mdns {
+        let port = addr.port();
+        Some(AvahiService::new(port)?)
+    } else {
+        println!("mDNS-SD service announcement disabled");
+        None
+    };
 
     println!("Starting ChunkSink gRPC server on {}", addr);
 

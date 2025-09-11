@@ -32,10 +32,18 @@ fn main() -> Result<(), Box<dyn Error>> {
                 .action(clap::ArgAction::SetTrue)
                 .help("Run in test mode with simulated recorder data"),
         )
+        .arg(
+            Arg::new("disable-mdns")
+                .short('d')
+                .long("disable-mdns")
+                .action(clap::ArgAction::SetTrue)
+                .help("Disable mDNS-SD service announcement"),
+        )
         .get_matches();
 
     let address = matches.get_one::<String>("address").unwrap().to_string();
     let test_mode = matches.get_flag("test-mode");
+    let disable_mdns = matches.get_flag("disable-mdns");
 
     // Create shared state for recorder statuses
     let recorder_statuses: RecorderStatusMap = Arc::new(std::sync::Mutex::new(HashMap::new()));
@@ -56,7 +64,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         let _server_handle = std::thread::spawn(move || {
             let rt = tokio::runtime::Runtime::new().unwrap();
             rt.block_on(async {
-                if let Err(e) = run_status_reader_server(&address, recorder_statuses_clone).await {
+                if let Err(e) =
+                    run_status_reader_server(&address, recorder_statuses_clone, disable_mdns).await
+                {
                     eprintln!("Error running status reader server: {}", e);
                 }
             })

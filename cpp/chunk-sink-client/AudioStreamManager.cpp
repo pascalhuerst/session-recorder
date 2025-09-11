@@ -97,7 +97,7 @@ void sendChunks(ServiceTracker::ServiceMap &services, chunksink::Chunks &chunks)
     }
 }
 
-void sendDetectorStatus(const std::string &displayUrl, ServiceTracker::ServiceMap &services, common::RecorderStatus &recorderStatus)
+void sendDetectorStatus(ServiceTracker::ServiceMap &services, common::RecorderStatus &recorderStatus)
 {
     auto sendFunc = [&](const std::string &url) -> bool {
         auto channel = grpc::CreateChannel(url, grpc::InsecureChannelCredentials());
@@ -125,11 +125,9 @@ void sendDetectorStatus(const std::string &displayUrl, ServiceTracker::ServiceMa
         return true;
     };
 
-    if (displayUrl.length() > 0) {
-        std::cout << "[INFO] Display URL: " << displayUrl << std::endl;
+    // For display hack
+    sendFunc("127.0.0.1:50051");
 
-        sendFunc(displayUrl);
-    }
 
     for (const auto &service : services) {
         for (const auto &se : service.second) {
@@ -184,10 +182,10 @@ void AudioStreamManager::start()
             throw std::invalid_argument(strOptAudioRate + "must be set!");
         }
 
-        std::string display_address;
-        if (m_vmCombined.count(strOptDisplayUrl)) {
-            display_address = m_vmCombined[strOptDisplayUrl].as<std::string>();
-        }
+        //std::string display_address;
+        //if (m_vmCombined.count(strOptDisplayUrl)) {
+        //    display_address = m_vmCombined[strOptDisplayUrl].as<std::string>();
+        //}
 
         //TODO; This crashed when destroyed
         m_serviceTracker.reset(new ServiceTracker("_session-recorder-chunksink._tcp"));
@@ -276,7 +274,7 @@ void AudioStreamManager::start()
                 recorderStatus.set_clipping(clipping);
 
                 auto services = m_serviceTracker->GetServiceMap();
-                sendDetectorStatus(display_address, services, recorderStatus);
+                sendDetectorStatus(services, recorderStatus);
 
                 if (m_detectorStateChangedCB)
                     m_detectorStateChangedCB(currentState);

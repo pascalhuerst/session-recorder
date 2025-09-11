@@ -156,10 +156,10 @@ int main(int argc, char **argv)
         if (vmCombined.count(strOptInputKeyNumber)) {
             int keyNumber = vmCombined[strOptInputKeyNumber].as<int>();
             inputKey = std::make_unique<InputKey>(vmCombined, keyNumber);
-            
+
             // Register any key press/release for session cutting (using KEY_SPACE as example)
             // You can change this to specific key codes as needed
-            inputKey->registerKey(57, // KEY_SPACE - change this to the specific key you want
+            inputKey->registerKey(28, // KEY_SPACE - change this to the specific key you want
                 []() {
                     // Key pressed callback - could add visual feedback here
                     std::cout << "Cut key pressed..." << std::endl;

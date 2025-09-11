@@ -1,7 +1,7 @@
 use std::error::Error;
 use tonic::{Request, Response, Status, transport::Server};
 
-use crate::mdns_service::MdnsService;
+use crate::mdns_service::AvahiService;
 
 // Generated protobuf code
 pub mod chunksink {
@@ -115,7 +115,7 @@ pub async fn run_status_reader_server(addr: &str) -> Result<(), Box<dyn Error>> 
     let port = addr.port();
 
     // Start mDNS service announcement
-    let _mdns_service = MdnsService::new(port)?;
+    let _mdns_service = AvahiService::new(port)?;
 
     println!("Starting ChunkSink gRPC server on {}", addr);
 

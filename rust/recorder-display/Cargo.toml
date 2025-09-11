@@ -10,7 +10,7 @@ tonic = "0.10"
 prost = "0.12"
 prost-types = "0.12"
 clap = { version = "4.0", features = ["derive"] }
-mdns-sd = "0.7"
+zeroconf = "0.15"
 gethostname = "0.4"
 
 [build-dependencies]

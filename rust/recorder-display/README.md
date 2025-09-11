@@ -1,6 +1,6 @@
 # Recorder Display
 
-A GUI application for displaying real-time recorder status updates on a Raspberry Pi 7" Touch LCD (800x480). The application receives status updates via gRPC and displays them in an intuitive touch-friendly interface.
+A modern GUI application for displaying real-time recorder status updates on a Raspberry Pi 7" Touch LCD (800x480). The application receives status updates via gRPC and displays them in an intuitive touch-friendly interface with full Wayland support for optimal performance.
 
 ## Overview
 
@@ -10,11 +10,13 @@ This Rust application provides a dual-function system:
 
 ### Features
 
+- **Modern Wayland Support**: Minimal compositor setup for optimal embedded performance
 - **Touch-Optimized GUI**: Designed specifically for 800x480 resolution with large, touch-friendly elements
 - **Real-time Updates**: Live display of recorder status including signal levels, RMS values, and clipping indicators
 - **Multi-Recorder Support**: Displays status for multiple recorders simultaneously in a responsive card layout
 - **Auto-Discovery**: gRPC server automatically announces itself via mDNS for service discovery
 - **Connection Monitoring**: Visual indicators show when recorders haven't sent updates recently
+- **Flexible Display Backends**: Supports Wayland (preferred), X11, and automatic detection
 
 ## Hardware Requirements
 
@@ -22,15 +24,26 @@ This Rust application provides a dual-function system:
 - 7" Touch LCD Display (800x480 resolution)
 - Network connection for receiving gRPC status updates
 
-## Building
+## Quick Setup for Raspberry Pi
 
-Make sure you have Rust installed, then build the project:
+### Automated Wayland Installation
+
+For the best performance on Raspberry Pi, use our automated Wayland setup:
 
 ```bash
-cargo build
+# Run the installation script (one-time setup)
+./install-wayland.sh
+
+# Reboot to apply configuration
+sudo reboot
+
+# Run with test data
+./run-wayland.sh --test-mode
 ```
 
-For optimized performance on Raspberry Pi:
+### Manual Building
+
+Make sure you have Rust installed, then build the project:
 
 ```bash
 cargo build --release
@@ -38,12 +51,26 @@ cargo build --release
 
 ## Running
 
-### Quick Start
+### Quick Start Options
 
-Use the provided run script:
-
+**Recommended: Auto-detecting runner (detects best backend)**
 ```bash
-./run.sh
+./run-auto.sh --test-mode
+```
+
+**Wayland (best performance for embedded)**
+```bash
+./run-wayland.sh --test-mode
+```
+
+**X11 (fallback option)**
+```bash
+./run-direct.sh --test-mode
+```
+
+**Use existing display server**
+```bash
+./run.sh --test-mode
 ```
 
 ### Manual Start
@@ -51,7 +78,7 @@ Use the provided run script:
 Start the recorder display application:
 
 ```bash
-cargo run
+cargo run --release -- --test-mode
 ```
 
 By default, the gRPC server listens on `0.0.0.0:50051`. You can specify a different address:
@@ -150,43 +177,85 @@ sudo netstat -tlnp | grep :50051
 
 ## Raspberry Pi Setup
 
-### Display Configuration
+### Wayland Setup (Recommended)
 
-For optimal performance on the 7" touch display, add to `/boot/config.txt`:
+For the best performance, use the automated Wayland setup:
+
+```bash
+./install-wayland.sh
+sudo reboot
+```
+
+This script automatically configures:
+- GPU acceleration with VC4/KMS
+- 7" touchscreen support
+- Optimal display settings
+- Wayland compositors (Cage/Weston)
+- User permissions
+- Boot optimization
+
+### Manual Display Configuration
+
+For manual setup, add to `/boot/firmware/config.txt` (or `/boot/config.txt`):
 
 ```ini
-# Enable 7" touchscreen
-dtoverlay=rpi-ft5406
-lcd_rotate=2  # Rotate display if needed
-
-# GPU memory split
+# GPU acceleration (required for Wayland)
+dtoverlay=vc4-kms-v3d
 gpu_mem=128
 
-# Disable overscan for exact fit
+# 7" touchscreen
+dtoverlay=rpi-ft5406
+lcd_rotate=0
+
+# 800x480 resolution
+hdmi_group=2
+hdmi_mode=87
+hdmi_cvt=800 480 60 6 0 0 0
 disable_overscan=1
+
+# Boot optimization
+quiet
+logo.nologo=1
+disable_splash=1
 ```
 
 ### Auto-Start on Boot
 
-Create a systemd service to start the application on boot:
+The installation script creates a systemd service. To enable it:
+
+```bash
+# Enable auto-start
+sudo systemctl enable recorder-display-wayland.service
+sudo systemctl start recorder-display-wayland.service
+
+# Check status
+sudo systemctl status recorder-display-wayland.service
+
+# View logs
+journalctl -u recorder-display-wayland.service -f
+```
+
+Manual service creation:
 
 ```ini
 # /etc/systemd/system/recorder-display.service
 [Unit]
-Description=Session Recorder Display
-After=graphical-session.target
+Description=Session Recorder Display (Wayland)
+After=multi-user.target
 
 [Service]
 Type=simple
 User=pi
-Environment=DISPLAY=:0
+Environment=XDG_RUNTIME_DIR=/tmp/runtime-pi
+Environment=WAYLAND_DISPLAY=wayland-0
+Environment=WINIT_UNIX_BACKEND=wayland
 WorkingDirectory=/home/pi/session-recorder/rust/recorder-display
-ExecStart=/home/pi/session-recorder/rust/recorder-display/target/release/recorder-display
+ExecStart=/home/pi/session-recorder/rust/recorder-display/run-wayland.sh
 Restart=always
-RestartSec=5
+RestartSec=10
 
 [Install]
-WantedBy=graphical-session.target
+WantedBy=multi-user.target
 ```
 
 Enable the service:
@@ -194,6 +263,23 @@ Enable the service:
 ```bash
 sudo systemctl enable recorder-display.service
 sudo systemctl start recorder-display.service
+```
+
+### Backend Selection
+
+The application automatically detects the best display backend:
+
+1. **Wayland with Cage** (preferred for kiosk mode)
+2. **Wayland with Weston** (more features)
+3. **X11 minimal** (fallback)
+
+Force a specific backend:
+```bash
+# Force Wayland
+WINIT_UNIX_BACKEND=wayland ./target/release/recorder-display
+
+# Force X11
+WINIT_UNIX_BACKEND=x11 ./target/release/recorder-display
 ```
 
 ## Development
@@ -223,11 +309,32 @@ Key dependencies:
 
 ## Troubleshooting
 
-### GUI Not Displaying
+### Display Issues
 
-1. Check if X11 is running: `echo $DISPLAY`
-2. Ensure proper permissions: `xhost +local:`
-3. Try forcing X11 backend: `export WINIT_UNIX_BACKEND=x11`
+**Wayland not working:**
+```bash
+# Check DRM devices
+ls -la /dev/dri/
+
+# Check GPU memory
+vcgencmd get_mem gpu
+
+# Test with simple app
+cage -- weston-simple-egl
+
+# Check compositor availability
+which cage weston
+```
+
+**X11 fallback:**
+```bash
+# Check X11
+echo $DISPLAY
+xset q
+
+# Test X11 backend
+WINIT_UNIX_BACKEND=x11 ./target/release/recorder-display --test-mode
+```
 
 ### No Recorder Data
 
@@ -238,8 +345,36 @@ Key dependencies:
 ### Performance Issues
 
 1. Use release build: `cargo build --release`
-2. Increase GPU memory: Edit `gpu_mem` in `/boot/config.txt`
-3. Close unnecessary applications
+2. Ensure GPU acceleration: `vcgencmd get_mem gpu` should show 128MB+
+3. Check compositor: Cage uses less resources than Weston
+4. Monitor temperature: `vcgencmd measure_temp`
+5. Check CPU governor: `cat /sys/devices/system/cpu/cpu0/cpufreq/scaling_governor`
+
+### Touch Issues
+
+```bash
+# List input devices
+libinput list-devices
+
+# Test touch events
+sudo libinput debug-events
+
+# Check permissions
+ls -la /dev/input/
+```
+
+### Getting Help
+
+```bash
+# Check logs
+journalctl -u recorder-display-wayland.service -f
+
+# Debug mode
+RUST_LOG=debug WAYLAND_DEBUG=1 ./run-wayland.sh --test-mode
+
+# System info
+./install-wayland.sh --check  # If you added a check option
+```
 
 ## Example Integration
 
@@ -264,6 +399,21 @@ go run main.go --host YOUR_RPI_IP_ADDRESS
 - Stale recorder entries are automatically removed after 30 seconds
 - The interface is optimized for touch interaction with large tap targets
 - Memory usage is kept low through efficient state management
+
+## Documentation
+
+- **[Wayland Setup Guide](SETUP_WAYLAND.md)** - Detailed Wayland configuration
+- **[Raspberry Pi Setup](SETUP_RASPBERRY_PI.md)** - X11 and general Pi setup
+- **[Running Options](run-auto.sh)** - Auto-detecting display backend
+
+## Performance Notes
+
+- **Wayland + Cage**: Lowest resource usage, perfect for kiosk mode
+- **Wayland + Weston**: More features, slightly higher resource usage  
+- **X11**: Fallback option, higher resource usage than Wayland
+- **Frame Rate**: Targets 10 FPS for smooth updates with low CPU usage
+- **Memory**: Efficient state management keeps usage under 50MB
+- **GPU**: Hardware acceleration via VC4/KMS on Pi 4, legacy GPU on Pi 3
 
 ## License
 

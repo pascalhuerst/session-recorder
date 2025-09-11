@@ -15,5 +15,6 @@ gethostname = "0.4"
 eframe = "0.27"
 egui = "0.27"
 
+
 [build-dependencies]
 tonic-build = "0.10"

@@ -51,8 +51,11 @@ impl eframe::App for RecorderDisplayApp {
             self.last_update_check = now;
         }
 
-        // Use larger UI scale for touch screen usability
-        ctx.set_pixels_per_point(1.2);
+        // Ensure consistent scaling for touch screen usability
+        ctx.set_pixels_per_point(1.25);
+
+        // Configure for embedded/kiosk mode
+        ctx.send_viewport_cmd(egui::ViewportCommand::Fullscreen(true));
 
         egui::CentralPanel::default().show(ctx, |ui| {
             // Header with larger text for readability
@@ -224,13 +227,31 @@ pub fn run_gui(recorder_statuses: RecorderStatusMap) -> eframe::Result<()> {
             .with_max_inner_size([800.0, 480.0])
             .with_resizable(false)
             .with_decorations(false) // No window decorations for embedded display
-            .with_fullscreen(true), // Fullscreen for embedded use
+            .with_fullscreen(true) // Fullscreen for embedded use
+            .with_always_on_top()
+            .with_maximized(true),
+        hardware_acceleration: eframe::HardwareAcceleration::Required,
         ..Default::default()
     };
 
     eframe::run_native(
         "Session Recorder Display",
         options,
-        Box::new(|_cc| Box::new(app)),
+        Box::new(|cc| {
+            // Configure for Wayland/embedded use
+            cc.egui_ctx.set_pixels_per_point(1.2);
+            cc.egui_ctx.set_visuals(egui::Visuals::dark());
+
+            // Optimize for touch input
+            cc.egui_ctx.style_mut(|style| {
+                style.interaction.resize_grab_radius_side = 8.0;
+                style.interaction.resize_grab_radius_corner = 12.0;
+                style.spacing.button_padding = egui::vec2(12.0, 8.0);
+                style.spacing.item_spacing = egui::vec2(8.0, 6.0);
+                style.spacing.menu_margin = egui::Margin::same(8.0);
+            });
+
+            Box::new(app)
+        }),
     )
 }

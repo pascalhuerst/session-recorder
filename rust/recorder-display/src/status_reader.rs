@@ -4,7 +4,7 @@ use std::time::Instant;
 use tonic::{Request, Response, Status, transport::Server};
 
 use crate::mdns_service::AvahiService;
-use crate::ui::RecorderStatusMap;
+use crate::ui::{RecorderStatusMap, RecordingSession};
 
 // Generated protobuf code
 pub mod chunksink {
@@ -66,6 +66,9 @@ impl ChunkSink for StatusReaderService {
             chunks.chunk_count, chunks.recorder_id
         );
 
+        // Update recording session with chunk data
+        self.update_recording_session(&chunks);
+
         // Return success response
         let response = Respone {
             success: true,
@@ -104,7 +107,15 @@ impl StatusReaderService {
     /// Update recorder status in shared state for GUI
     fn update_recorder_status(&self, status: &RecorderStatus) {
         if let Ok(mut statuses) = self.recorder_statuses.lock() {
-            statuses.insert(status.recorder_id.clone(), (status.clone(), Instant::now()));
+            // Update existing entry or create new one, preserving recording session if it exists
+            let existing_session = statuses
+                .get(&status.recorder_id)
+                .and_then(|(_, _, session)| session.clone());
+
+            statuses.insert(
+                status.recorder_id.clone(),
+                (status.clone(), Instant::now(), existing_session),
+            );
         }
 
         // Also log for debugging purposes
@@ -118,6 +129,55 @@ impl StatusReaderService {
         //println!("RMS Percent: {:.2}%", status.rms_percent);
         //println!("Clipping: {}", if status.clipping { "Yes" } else { "No" });
         //println!("==============================");
+    }
+
+    /// Update or create recording session with new chunk data
+    fn update_recording_session(&self, chunks: &Chunks) {
+        if let Ok(mut statuses) = self.recorder_statuses.lock() {
+            let now = Instant::now();
+
+            if let Some((_status, last_seen, recording_session)) =
+                statuses.get_mut(&chunks.recorder_id)
+            {
+                // Update last seen time
+                *last_seen = now;
+
+                match recording_session {
+                    Some(session) => {
+                        // Update existing session
+                        if session.session_id != chunks.session_id {
+                            // New session started, replace the old one
+                            *session = RecordingSession::new(chunks.session_id.clone());
+                        }
+                        session.add_chunk_data(&chunks.data);
+                    }
+                    None => {
+                        // Start new recording session
+                        let mut new_session = RecordingSession::new(chunks.session_id.clone());
+                        new_session.add_chunk_data(&chunks.data);
+                        *recording_session = Some(new_session);
+                    }
+                }
+            } else {
+                // No recorder status yet, create entry with recording session
+                let mut new_session = RecordingSession::new(chunks.session_id.clone());
+                new_session.add_chunk_data(&chunks.data);
+
+                // Create a placeholder status if we don't have one yet
+                let placeholder_status = RecorderStatus {
+                    recorder_id: chunks.recorder_id.clone(),
+                    recorder_name: format!("Recorder {}", chunks.recorder_id),
+                    signal_status: 0, // Unknown
+                    rms_percent: 0.0,
+                    clipping: false,
+                };
+
+                statuses.insert(
+                    chunks.recorder_id.clone(),
+                    (placeholder_status, now, Some(new_session)),
+                );
+            }
+        }
     }
 
     //fn signal_status_to_string(&self, status: i32) -> &'static str {

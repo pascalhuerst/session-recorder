@@ -136,7 +136,7 @@ fn generate_test_data(recorder_statuses: RecorderStatusMap) {
 
             // Update the shared state
             if let Ok(mut statuses) = recorder_statuses.lock() {
-                statuses.insert(id.to_string(), (status, Instant::now()));
+                statuses.insert(id.to_string(), (status, Instant::now(), None));
             }
         }
 

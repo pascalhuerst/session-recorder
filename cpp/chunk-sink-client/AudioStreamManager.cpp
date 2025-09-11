@@ -141,7 +141,7 @@ void sendDetectorStatus(ServiceTracker::ServiceMap &services, common::RecorderSt
 
     for (const auto &service : services) {
         for (const auto &se : service.second) {
-            if (!sendFunc(se.second.address + ":" + std::to_string(se.second.port))) {
+            if (sendFunc(se.second.address + ":" + std::to_string(se.second.port))) {
                 return;
             }
         }

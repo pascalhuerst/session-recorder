@@ -16,6 +16,7 @@
  */
 
 #include "InputKey.h"
+#include <algorithm>
 #include <exception>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -113,6 +114,8 @@ void InputKey::workerThread(int inputNr)
 
                 if (ev.type != EV_KEY)
                     continue;
+
+                std::cout << "Event type: " << ev.type << ", code: " << ev.code << ", value: " << ev.value << std::endl;
 
                 { // Block for RAII (unique_lock)
                     std::unique_lock<std::mutex> mlock(m_mutex);

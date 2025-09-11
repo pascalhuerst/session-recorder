@@ -91,8 +91,13 @@ int main(int argc, char **argv)
         odDisplay.add_options()
                 (strOptDisplayUrl.c_str(), po::value<std::string>(), "Use this url for display daemon");
 
+        // ########## Input Key Options ##########
+        po::options_description odInputKey("InputKey");
+        odInputKey.add_options()
+                (strOptInputKeyNumber.c_str(), po::value<int>(), "Input event device number (e.g., 0 for /dev/input/event0) for session cutting");
+
         // ########## Combined ##########
-        odCombined.add(odGeneric).add(odAudio).add(odDetector).add(odLed).add(odDisplay);
+        odCombined.add(odGeneric).add(odAudio).add(odDetector).add(odLed).add(odDisplay).add(odInputKey);
         po::variables_map vmCombined;
         po::store(po::parse_command_line(argc, argv, odCombined), vmCombined);
         po::notify(vmCombined);
@@ -145,6 +150,31 @@ int main(int argc, char **argv)
         );
 
         streamManager.start();
+
+        // Setup input key for session cutting
+        std::unique_ptr<InputKey> inputKey = nullptr;
+        if (vmCombined.count(strOptInputKeyNumber)) {
+            int keyNumber = vmCombined[strOptInputKeyNumber].as<int>();
+            inputKey = std::make_unique<InputKey>(vmCombined, keyNumber);
+            
+            // Register any key press/release for session cutting (using KEY_SPACE as example)
+            // You can change this to specific key codes as needed
+            inputKey->registerKey(57, // KEY_SPACE - change this to the specific key you want
+                []() {
+                    // Key pressed callback - could add visual feedback here
+                    std::cout << "Cut key pressed..." << std::endl;
+                },
+                [&streamManager](std::chrono::milliseconds pressTime) {
+                    // Key released callback - check if held for 500ms
+                    if (pressTime >= std::chrono::milliseconds(500)) {
+                        std::cout << "Cut key held for " << pressTime.count() << "ms - cutting session!" << std::endl;
+                        streamManager.cutSession();
+                    } else {
+                        std::cout << "Cut key released after " << pressTime.count() << "ms (too short)" << std::endl;
+                    }
+                }
+            );
+        }
         while(getchar() != 'q') {
             std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         }

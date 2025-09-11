@@ -419,3 +419,8 @@ bool AudioStreamManager::isValidPath(const std::string &path)
 
     return ret;
 }
+
+void AudioStreamManager::cutSession()
+{
+    m_cutSession = true;
+}

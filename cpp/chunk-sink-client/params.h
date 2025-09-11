@@ -42,3 +42,6 @@ const std::string strOptLedDetector = "led-detector";
 const std::string strOptLedIndexer = "led-indexer";
 
 const std::string strOptDisplayUrl = "display-url";
+
+// ########## Input Key Options ##########
+const std::string strOptInputKeyNumber = "input-key";

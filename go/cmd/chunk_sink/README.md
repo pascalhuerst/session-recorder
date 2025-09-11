@@ -22,10 +22,18 @@ client, but to run it from a web client, we need to run a proxy:
 
 ```
 grpcwebproxy
-    --server_tls_cert_file=${GOPATH}/src/github.com/improbable-eng/grpc-web/misc/localhost.crt \ 
+    --server_tls_cert_file=${GOPATH}/src/github.com/improbable-eng/grpc-web/misc/localhost.crt \
     --server_tls_key_file=/${GOPATH}/src/github.com/improbable-eng/grpc-web/misc/localhost.key \
     --backend_addr=<your-ip>:8780 \
     --backend_tls_noverify \
     --allow_all_origins \
     --server_bind_address=<your-ip>
 ```
+
+grpcwebproxy
+    --server_tls_cert_file=/var/www/certs/localhost.crt \
+    --server_tls_key_file=/var/www/certs/localhost.key \
+    --backend_addr=127.0.0.1:8780 \
+    --backend_tls_noverify \
+    --allow_all_origins \
+    --server_bind_address=10.100.4.1

@@ -66,33 +66,43 @@ AudioStreamManager::~AudioStreamManager()
 
 void sendChunks(ServiceTracker::ServiceMap &services, chunksink::Chunks &chunks)
 {
+
+    auto sendFunc = [&](const std::string &url) -> bool {
+        auto channel = grpc::CreateChannel(url, grpc::InsecureChannelCredentials());
+        auto stub_ = chunksink::ChunkSink::NewStub(channel);
+
+        grpc::ClientContext context;
+        common::Respone response;
+
+        grpc::Status status = stub_->SetChunks(&context, chunks, &response);
+
+        if (!status.ok()) {
+            std::cout << "[ERROR] SetChunks: " << url << std::endl;
+
+            return false;
+        }
+
+        if (response.success() != true) {
+            std::cout << "[ERROR] SetChunks: " << url << " -- " <<  response.errormessage() << std::endl;
+
+            return false;
+        }
+
+        std::cout << "[OK    ] SetChunks: " << url << std::endl;
+
+        return true;
+    };
+
+    // For display hack
+    sendFunc("127.0.0.1:50051");
+
     for (const auto &service : services) {
         for (const auto &se : service.second) {
             std::string url = se.second.address + ":" + std::to_string(se.second.port);
 
-            auto channel = grpc::CreateChannel(url, grpc::InsecureChannelCredentials());
-            auto stub_ = chunksink::ChunkSink::NewStub(channel);
-
-            grpc::ClientContext context;
-            common::Respone response;
-
-            grpc::Status status = stub_->SetChunks(&context, chunks, &response);
-
-            if (!status.ok()) {
-                std::cout << "[ERROR] SetChunks: " << url << std::endl;
-
-                continue;
+            if (sendFunc(url)) {
+               return;
             }
-
-            if (response.success() != true) {
-                std::cout << "[ERROR] SetChunks: " << url << " -- " <<  response.errormessage() << std::endl;
-
-                continue;
-            }
-
-            std::cout << "[OK    ] SetChunks: " << url << std::endl;
-
-            return;
         }
     }
 }

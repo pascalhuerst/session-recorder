@@ -12,6 +12,8 @@ prost-types = "0.12"
 clap = { version = "4.0", features = ["derive"] }
 zeroconf = "0.15"
 gethostname = "0.4"
+eframe = "0.27"
+egui = "0.27"
 
 [build-dependencies]
 tonic-build = "0.10"

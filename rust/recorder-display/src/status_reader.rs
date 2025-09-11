@@ -1,7 +1,10 @@
+use std::collections::HashMap;
 use std::error::Error;
+use std::time::Instant;
 use tonic::{Request, Response, Status, transport::Server};
 
 use crate::mdns_service::AvahiService;
+use crate::ui::RecorderStatusMap;
 
 // Generated protobuf code
 pub mod chunksink {
@@ -16,8 +19,24 @@ use chunksink::chunk_sink_server::{ChunkSink, ChunkSinkServer};
 use chunksink::{Chunks, Command, GetCommandRequest};
 use common::{RecorderStatus, Respone, SignalStatus};
 
-#[derive(Debug, Default)]
-pub struct StatusReaderService {}
+#[derive(Debug)]
+pub struct StatusReaderService {
+    pub recorder_statuses: RecorderStatusMap,
+}
+
+impl Default for StatusReaderService {
+    fn default() -> Self {
+        Self {
+            recorder_statuses: std::sync::Arc::new(std::sync::Mutex::new(HashMap::new())),
+        }
+    }
+}
+
+impl StatusReaderService {
+    pub fn new(recorder_statuses: RecorderStatusMap) -> Self {
+        Self { recorder_statuses }
+    }
+}
 
 #[tonic::async_trait]
 impl ChunkSink for StatusReaderService {
@@ -27,8 +46,8 @@ impl ChunkSink for StatusReaderService {
     ) -> Result<Response<Respone>, Status> {
         let status = request.into_inner();
 
-        // Log the received status
-        self.log_recorder_status(&status);
+        // Update GUI state instead of just logging
+        self.update_recorder_status(&status);
 
         // Return success response
         let response = Respone {
@@ -82,8 +101,13 @@ impl ChunkSink for StatusReaderService {
 }
 
 impl StatusReaderService {
-    /// Log recorder status information
-    fn log_recorder_status(&self, status: &RecorderStatus) {
+    /// Update recorder status in shared state for GUI
+    fn update_recorder_status(&self, status: &RecorderStatus) {
+        if let Ok(mut statuses) = self.recorder_statuses.lock() {
+            statuses.insert(status.recorder_id.clone(), (status.clone(), Instant::now()));
+        }
+
+        // Also log for debugging purposes
         println!("=== Recorder Status Update ===");
         println!("Recorder ID: {}", status.recorder_id);
         println!("Recorder Name: {}", status.recorder_name);
@@ -108,7 +132,10 @@ impl StatusReaderService {
 }
 
 /// Convenience function to create and start a status reader server
-pub async fn run_status_reader_server(addr: &str) -> Result<(), Box<dyn Error>> {
+pub async fn run_status_reader_server(
+    addr: &str,
+    recorder_statuses: RecorderStatusMap,
+) -> Result<(), Box<dyn Error>> {
     let addr: std::net::SocketAddr = addr.parse()?;
 
     // Extract port from address for mDNS announcement
@@ -120,7 +147,9 @@ pub async fn run_status_reader_server(addr: &str) -> Result<(), Box<dyn Error>> 
     println!("Starting ChunkSink gRPC server on {}", addr);
 
     Server::builder()
-        .add_service(ChunkSinkServer::new(StatusReaderService::default()))
+        .add_service(ChunkSinkServer::new(StatusReaderService::new(
+            recorder_statuses,
+        )))
         .serve(addr)
         .await?;
 
@@ -151,7 +180,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_set_recorder_status() {
-        let service = StatusReaderService::default();
+        let recorder_statuses = std::sync::Arc::new(std::sync::Mutex::new(HashMap::new()));
+        let service = StatusReaderService::new(recorder_statuses.clone());
 
         let status = RecorderStatus {
             recorder_id: "test-recorder".to_string(),
@@ -161,12 +191,16 @@ mod tests {
             clipping: false,
         };
 
-        let request = Request::new(status);
+        let request = Request::new(status.clone());
         let response = service.set_recorder_status(request).await;
 
         assert!(response.is_ok());
         let response = response.unwrap().into_inner();
         assert!(response.success);
         assert!(response.error_message.is_empty());
+
+        // Verify status was stored
+        let statuses = recorder_statuses.lock().unwrap();
+        assert!(statuses.contains_key("test-recorder"));
     }
 }

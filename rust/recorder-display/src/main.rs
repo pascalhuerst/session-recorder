@@ -12,7 +12,7 @@ use status_reader::{
     common::{RecorderStatus, SignalStatus},
     run_status_reader_server,
 };
-use ui::{RecorderStatusMap, run_gui};
+use ui::{RecorderStatusMap, RmsLevel, run_gui};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let matches = Command::new("recorder-display")
@@ -136,7 +136,10 @@ fn generate_test_data(recorder_statuses: RecorderStatusMap) {
 
             // Update the shared state
             if let Ok(mut statuses) = recorder_statuses.lock() {
-                statuses.insert(id.to_string(), (status, Instant::now(), None));
+                statuses.insert(
+                    id.to_string(),
+                    (status, Instant::now(), None, RmsLevel::new()),
+                );
             }
         }
 

@@ -4,7 +4,7 @@ use std::time::Instant;
 use tonic::{Request, Response, Status, transport::Server};
 
 use crate::mdns_service::AvahiService;
-use crate::ui::{RecorderStatusMap, RecordingSession};
+use crate::ui::{RecorderStatusMap, RecordingSession, RmsLevel};
 
 // Generated protobuf code
 pub mod chunksink {
@@ -108,13 +108,22 @@ impl StatusReaderService {
     fn update_recorder_status(&self, status: &RecorderStatus) {
         if let Ok(mut statuses) = self.recorder_statuses.lock() {
             // Update existing entry or create new one, preserving recording session if it exists
-            let existing_session = statuses
+            let (existing_session, mut existing_rms) = statuses
                 .get(&status.recorder_id)
-                .and_then(|(_, _, session)| session.clone());
+                .map(|(_, _, session, rms)| (session.clone(), rms.clone()))
+                .unwrap_or((None, RmsLevel::new()));
+
+            // Update RMS level with new data
+            existing_rms.update(status.rms_percent as f32, status.clipping);
 
             statuses.insert(
                 status.recorder_id.clone(),
-                (status.clone(), Instant::now(), existing_session),
+                (
+                    status.clone(),
+                    Instant::now(),
+                    existing_session,
+                    existing_rms,
+                ),
             );
         }
 
@@ -136,7 +145,7 @@ impl StatusReaderService {
         if let Ok(mut statuses) = self.recorder_statuses.lock() {
             let now = Instant::now();
 
-            if let Some((_status, last_seen, recording_session)) =
+            if let Some((_status, last_seen, recording_session, _rms)) =
                 statuses.get_mut(&chunks.recorder_id)
             {
                 // Update last seen time
@@ -174,7 +183,7 @@ impl StatusReaderService {
 
                 statuses.insert(
                     chunks.recorder_id.clone(),
-                    (placeholder_status, now, Some(new_session)),
+                    (placeholder_status, now, Some(new_session), RmsLevel::new()),
                 );
             }
         }

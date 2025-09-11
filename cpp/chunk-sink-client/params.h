@@ -40,3 +40,5 @@ const std::string strOptDetectorThreshold = "detector-threshold";
 // ########## Led Options ##########
 const std::string strOptLedDetector = "led-detector";
 const std::string strOptLedIndexer = "led-indexer";
+
+const std::string strOptDisplayUrl = "display-url";

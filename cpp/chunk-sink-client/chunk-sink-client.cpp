@@ -87,9 +87,12 @@ int main(int argc, char **argv)
                 (strOptLedDetector.c_str(), po::value<std::string>(), "Use this led for detector state")
                 (strOptLedIndexer.c_str(), po::value<std::string>(), "Use this led for indexer state");
 
+        po::options_description odDisplay("Display");
+        odDisplay.add_options()
+                (strOptDisplayUrl.c_str(), po::value<std::string>(), "Use this url for display daemon");
 
         // ########## Combined ##########
-        odCombined.add(odGeneric).add(odAudio).add(odDetector).add(odLed);
+        odCombined.add(odGeneric).add(odAudio).add(odDetector).add(odLed).add(odDisplay);
         po::variables_map vmCombined;
         po::store(po::parse_command_line(argc, argv, odCombined), vmCombined);
         po::notify(vmCombined);
@@ -125,9 +128,9 @@ int main(int argc, char **argv)
 
         AudioStreamManager streamManager(vmCombined,
             [&](AudioStreamManager::DetectorState s) {
-                std::cout << "detector:   " << s.rmsPercent << "%%  " 
+                std::cout << "detector:   " << s.rmsPercent << "%%  "
                           << (s.state == AudioStreamManager::STATE_SIGNAL ? "[SIGNAL]" : "[SILENCE]") << std::endl;
-                
+
                 if (detectorLed) {
                     if (s.state == AudioStreamManager::STATE_SIGNAL) {
                         detectorLed->on();

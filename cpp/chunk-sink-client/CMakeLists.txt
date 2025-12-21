@@ -19,9 +19,9 @@ endfunction(linkLib)
 file(GLOB GRPC_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/../../protocols/cpp/*.cc")
 
 set(LIBS alsa avahi-client)
-set(SOURCES 
+set(SOURCES
   ${GRPC_SOURCES}
-  
+
   chunk-sink-client.cpp
   AlsaAudioInput.cpp
   publishZeroConf/publishAvahi.cpp
@@ -36,12 +36,17 @@ foreach(lib ${LIBS})
   addLib(${lib})
 endforeach(lib)
 
-find_package(gRPC REQUIRED)
+# Use pkg-config for gRPC and protobuf (more portable across distros)
+pkg_check_modules(GRPC REQUIRED grpc++)
+pkg_check_modules(PROTOBUF REQUIRED protobuf)
+
 find_package(Threads REQUIRED)
-find_package(Boost 1.81 COMPONENTS program_options REQUIRED)
+find_package(Boost 1.74 COMPONENTS program_options REQUIRED)
 
 include_directories("${CMAKE_CURRENT_BINARY_DIR}")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../../protocols/cpp")
+include_directories(${GRPC_INCLUDE_DIRS})
+include_directories(${PROTOBUF_INCLUDE_DIRS})
 
 add_executable(${PROJECT_NAME} ${SOURCES})
 
@@ -49,16 +54,14 @@ foreach(lib ${LIBS})
   linkLib(${lib} ${PROJECT_NAME})
 endforeach(lib)
 
-message(STATUS "gRPC libraries: ${gRPC_LIBRARIES}")
-message(STATUS "Protobuf libraries: ${Protobuf_LIBRARIES}")
+message(STATUS "gRPC libraries: ${GRPC_LIBRARIES}")
+message(STATUS "Protobuf libraries: ${PROTOBUF_LIBRARIES}")
 
 target_link_libraries(${PROJECT_NAME}
-  libstdc++fs.a
   ${CMAKE_THREAD_LIBS_INIT}
   ${Boost_LIBRARIES}
-  protobuf::libprotobuf
-  gRPC::grpc
-  gRPC::grpc++
+  ${PROTOBUF_LIBRARIES}
+  ${GRPC_LIBRARIES}
 )
 
 install(TARGETS ${PROJECT_NAME} RUNTIME DESTINATION sbin COMPONENT runtime)

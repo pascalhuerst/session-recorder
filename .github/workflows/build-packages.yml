@@ -1,0 +1,169 @@
+name: Build Packages
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build-native:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # x86_64 builds
+          - os: ubuntu-22.04
+            runner: ubuntu-22.04
+            arch: amd64
+            pkg_type: deb
+          - os: ubuntu-24.04
+            runner: ubuntu-24.04
+            arch: amd64
+            pkg_type: deb
+          - os: fedora-40
+            runner: ubuntu-latest
+            arch: amd64
+            pkg_type: rpm
+            container: fedora:40
+
+    container: ${{ matrix.container || '' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies (Ubuntu/Debian)
+        if: matrix.pkg_type == 'deb' && !matrix.container
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential cmake \
+            libasound2-dev \
+            libavahi-client-dev \
+            libgrpc++-dev \
+            libprotobuf-dev protobuf-compiler-grpc \
+            libboost-program-options-dev \
+            rpm
+
+      - name: Install dependencies (Fedora)
+        if: matrix.container == 'fedora:40'
+        run: |
+          dnf install -y \
+            gcc-c++ cmake make \
+            alsa-lib-devel \
+            avahi-devel \
+            grpc-devel grpc-plugins \
+            protobuf-devel \
+            boost-devel \
+            rpm-build
+
+      - name: Generate protocol files
+        run: |
+          cd protocols
+          make cpp || true
+
+      - name: Build
+        run: |
+          cd cpp/chunk-sink-client
+          mkdir -p build && cd build
+          cmake .. -DCMAKE_BUILD_TYPE=Release
+          make -j$(nproc)
+
+      - name: Create packages
+        run: |
+          cd cpp/chunk-sink-client/build
+          cpack -G "${{ matrix.pkg_type == 'deb' && 'DEB;TGZ' || 'RPM;TGZ' }}"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages-${{ matrix.os }}-${{ matrix.arch }}
+          path: |
+            cpp/chunk-sink-client/build/*.deb
+            cpp/chunk-sink-client/build/*.rpm
+            cpp/chunk-sink-client/build/*.tar.gz
+
+  build-arm:
+    name: Build (ARM ${{ matrix.arch }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            deb_arch: arm64
+            triple: aarch64-linux-gnu
+            qemu_arch: aarch64
+          - arch: armhf
+            deb_arch: armhf
+            triple: arm-linux-gnueabihf
+            qemu_arch: arm
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Build in container
+        uses: uraimo/run-on-arch-action@v2
+        with:
+          arch: ${{ matrix.qemu_arch }}
+          distro: bookworm
+          githubToken: ${{ github.token }}
+          install: |
+            apt-get update
+            apt-get install -y \
+              build-essential cmake \
+              libasound2-dev \
+              libavahi-client-dev \
+              libgrpc++-dev \
+              libprotobuf-dev protobuf-compiler-grpc \
+              libboost-program-options-dev
+          run: |
+            cd protocols
+            make cpp || true
+            cd ../cpp/chunk-sink-client
+            mkdir -p build && cd build
+            cmake .. -DCMAKE_BUILD_TYPE=Release
+            make -j$(nproc)
+            cpack -G "DEB;TGZ"
+
+      - name: Copy artifacts
+        run: |
+          mkdir -p artifacts
+          cp cpp/chunk-sink-client/build/*.deb artifacts/ || true
+          cp cpp/chunk-sink-client/build/*.tar.gz artifacts/ || true
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages-debian-${{ matrix.arch }}
+          path: artifacts/
+
+  release:
+    name: Create Release
+    needs: [build-native, build-arm]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: packages
+          merge-multiple: true
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: packages/*
+          generate_release_notes: true

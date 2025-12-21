@@ -1,0 +1,26 @@
+[Unit]
+Description=Chunk Sink Client - Audio streaming for session recording
+Documentation=https://github.com/pascalhuerst/session-recorder
+After=network.target avahi-daemon.service sound.target
+Wants=avahi-daemon.service
+
+[Service]
+Type=simple
+EnvironmentFile=-/etc/default/chunk-sink-client
+ExecStart=/usr/sbin/chunk-sink-client $CHUNK_SINK_CLIENT_OPTS
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+
+# Security hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+# Audio access
+SupplementaryGroups=audio
+
+[Install]
+WantedBy=multi-user.target

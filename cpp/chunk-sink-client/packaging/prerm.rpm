@@ -1,0 +1,10 @@
+#!/bin/sh
+# RPM pre-uninstall script
+
+# Stop and disable the service before removal
+if [ -d /run/systemd/system ]; then
+    systemctl stop chunk-sink-client.service || true
+    systemctl disable chunk-sink-client.service || true
+fi
+
+exit 0

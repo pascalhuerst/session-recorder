@@ -44,7 +44,11 @@ Makefile
 *.so
 *.a
 *.out
-chunk-sink-client
+# Ignore the compiled binary, not the directory or packaging files
+cpp/chunk-sink-client/chunk-sink-client
+# Ignore generated protobuf files in wrong location (should be in protocols/cpp/)
+cpp/chunk-sink-client/*.pb.cc
+cpp/chunk-sink-client/*.pb.h
 
 # Protocol Buffers (generated files)
 protocols/cpp/

@@ -1,0 +1,17 @@
+#!/bin/sh
+# RPM post-install script
+
+# Reload systemd to recognize new service
+if [ -d /run/systemd/system ]; then
+    systemctl daemon-reload || true
+fi
+
+# Enable the service (but don't start automatically)
+if [ -d /run/systemd/system ]; then
+    systemctl enable chunk-sink-client.service || true
+    echo "chunk-sink-client service installed."
+    echo "Configure /etc/default/chunk-sink-client then run:"
+    echo "  sudo systemctl start chunk-sink-client"
+fi
+
+exit 0

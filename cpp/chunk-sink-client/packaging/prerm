@@ -1,0 +1,14 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+    remove|purge)
+        # Stop and disable the service
+        if [ -d /run/systemd/system ]; then
+            systemctl stop chunk-sink-client.service || true
+            systemctl disable chunk-sink-client.service || true
+        fi
+        ;;
+esac
+
+exit 0

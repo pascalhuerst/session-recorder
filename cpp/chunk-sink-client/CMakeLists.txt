@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.5.1)
+cmake_minimum_required(VERSION 3.10...3.31)
 
 project(chunk-sink-client C CXX)
 
@@ -18,7 +18,7 @@ endfunction(linkLib)
 
 file(GLOB GRPC_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/../../protocols/cpp/*.cc")
 
-set(LIBS alsa avahi-client avahi-core)
+set(LIBS alsa avahi-client)
 set(SOURCES 
   ${GRPC_SOURCES}
   

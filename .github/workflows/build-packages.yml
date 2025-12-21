@@ -96,13 +96,11 @@ jobs:
       matrix:
         include:
           - arch: arm64
-            deb_arch: arm64
-            triple: aarch64-linux-gnu
-            qemu_arch: aarch64
+            platform: linux/arm64
+            image: arm64v8/debian:bookworm
           - arch: armhf
-            deb_arch: armhf
-            triple: arm-linux-gnueabihf
-            qemu_arch: arm
+            platform: linux/arm/v7
+            image: arm32v7/debian:bookworm
 
     steps:
       - name: Checkout
@@ -111,41 +109,39 @@ jobs:
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
-      - name: Build in container
-        uses: uraimo/run-on-arch-action@v2
-        with:
-          arch: ${{ matrix.qemu_arch }}
-          distro: bookworm
-          githubToken: ${{ github.token }}
-          install: |
-            apt-get update
-            apt-get install -y \
-              build-essential cmake \
-              libasound2-dev \
-              libavahi-client-dev \
-              libgrpc++-dev \
-              libprotobuf-dev protobuf-compiler-grpc \
-              libboost-program-options-dev
-          run: |
-            cd protocols
-            make cpp || true
-            cd ../cpp/chunk-sink-client
-            mkdir -p build && cd build
-            cmake .. -DCMAKE_BUILD_TYPE=Release
-            make -j$(nproc)
-            cpack -G "DEB;TGZ"
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      - name: Copy artifacts
+      - name: Build in container
         run: |
-          mkdir -p artifacts
-          cp cpp/chunk-sink-client/build/*.deb artifacts/ || true
-          cp cpp/chunk-sink-client/build/*.tar.gz artifacts/ || true
+          docker run --rm --platform ${{ matrix.platform }} \
+            -v ${{ github.workspace }}:/work \
+            -w /work \
+            ${{ matrix.image }} \
+            bash -c '
+              apt-get update && apt-get install -y \
+                build-essential cmake \
+                libasound2-dev \
+                libavahi-client-dev \
+                libgrpc++-dev \
+                libprotobuf-dev protobuf-compiler-grpc \
+                libboost-program-options-dev
+
+              cd protocols && make cpp || true
+              cd ../cpp/chunk-sink-client
+              mkdir -p build && cd build
+              cmake .. -DCMAKE_BUILD_TYPE=Release
+              make -j$(nproc)
+              cpack -G "DEB;TGZ"
+            '
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: packages-debian-${{ matrix.arch }}
-          path: artifacts/
+          path: |
+            cpp/chunk-sink-client/build/*.deb
+            cpp/chunk-sink-client/build/*.tar.gz
 
   release:
     name: Create Release

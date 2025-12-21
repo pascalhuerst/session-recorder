@@ -1,6 +1,9 @@
 PROTOC ?= protoc
 PROTOC_INCLUDES ?= /usr/include/google/protobuf
-GRPC_CPP_PLUGIN ?= $(shell which grpc_cpp_plugin)
+# Find grpc_cpp_plugin: try common locations if 'which' fails
+GRPC_CPP_PLUGIN ?= $(shell which grpc_cpp_plugin 2>/dev/null || \
+    (test -x /usr/bin/grpc_cpp_plugin && echo /usr/bin/grpc_cpp_plugin) || \
+    (test -x /usr/local/bin/grpc_cpp_plugin && echo /usr/local/bin/grpc_cpp_plugin))
 PROTOBUF_TS_PLUGIN ?= ./node_modules/.bin/protoc-gen-ts
 MD ?= mkdir
 CP ?= cp

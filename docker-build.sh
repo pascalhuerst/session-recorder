@@ -74,14 +74,14 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Check if docker and docker-compose are installed
+# Check if docker and docker compose are installed
 if ! command -v docker &> /dev/null; then
     print_error "Docker is required but not installed. Please install Docker."
     exit 1
 fi
 
-if ! command -v docker-compose &> /dev/null; then
-    print_error "docker-compose is required but not installed. Please install docker-compose."
+if ! docker compose version &> /dev/null; then
+    print_error "docker compose plugin is required but not installed. Please install docker compose-plugin."
     exit 1
 fi
 
@@ -91,7 +91,7 @@ echo "====================================="
 case $ACTION in
     "up")
         print_status "Starting Session Recorder backend services..."
-        docker-compose up $BUILD_FLAG -d
+        docker compose up $BUILD_FLAG -d
         
         print_status "Waiting for services to be ready..."
         sleep 5
@@ -105,23 +105,23 @@ case $ACTION in
         echo "  🌉 gRPC-Web Proxy:   localhost:8080"
         echo ""
         print_status "Audio clients will auto-discover via mDNS and connect to the backend"
-        print_status "Use 'docker-compose logs -f' to follow logs"
+        print_status "Use 'docker compose logs -f' to follow logs"
         ;;
         
     "down")
         print_status "Stopping Session Recorder services..."
-        docker-compose down
+        docker compose down
         print_success "Services stopped successfully!"
         ;;
         
     "logs")
         print_status "Showing logs from all services..."
-        docker-compose logs -f
+        docker compose logs -f
         ;;
         
     "ps")
         print_status "Running containers:"
-        docker-compose ps
+        docker compose ps
         ;;
         
     "clean")
@@ -130,13 +130,13 @@ case $ACTION in
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             print_status "Stopping services..."
-            docker-compose down
+            docker compose down
             
             print_status "Removing containers, networks, and volumes..."
-            docker-compose down --volumes --remove-orphans
+            docker compose down --volumes --remove-orphans
             
             print_status "Removing images..."
-            docker-compose down --rmi all --volumes --remove-orphans
+            docker compose down --rmi all --volumes --remove-orphans
             
             print_status "Pruning Docker system..."
             docker system prune -f

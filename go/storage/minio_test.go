@@ -1,0 +1,311 @@
+package storage
+
+import (
+	"testing"
+	"time"
+
+	"github.com/google/uuid"
+)
+
+func TestNewMinioStorage_InvalidEndpoint(t *testing.T) {
+	// Test with invalid endpoint - should still create the struct
+	// but fail when trying to connect
+	storage, err := NewMinioStorage("invalid:endpoint:format", "public", "access", "secret")
+	if err != nil {
+		// Some invalid endpoints may fail at creation time
+		t.Logf("NewMinioStorage() error = %v (expected for invalid endpoint)", err)
+		return
+	}
+
+	if storage == nil {
+		t.Error("NewMinioStorage() returned nil storage")
+	}
+}
+
+func TestNewMinioStorage_EmptyCredentials(t *testing.T) {
+	// Test with empty credentials - should still create the struct
+	storage, err := NewMinioStorage("localhost:9000", "localhost:9000", "", "")
+	if err != nil {
+		t.Logf("NewMinioStorage() error = %v", err)
+		return
+	}
+
+	if storage == nil {
+		t.Error("NewMinioStorage() returned nil storage")
+	}
+}
+
+func TestMinio_GetRecorders_Empty(t *testing.T) {
+	// Create a Minio struct directly for unit testing
+	m := &Minio{
+		system: &System{
+			ID:        uuid.New(),
+			Name:      "Test System",
+			Recorders: make(map[uuid.UUID]Recorder),
+		},
+		chunks: make(map[uuid.UUID]*minioChunk),
+	}
+
+	recorders := m.GetRecorders()
+	if recorders == nil {
+		t.Error("GetRecorders() returned nil")
+	}
+	if len(recorders) != 0 {
+		t.Errorf("GetRecorders() returned %d recorders, want 0", len(recorders))
+	}
+}
+
+func TestMinio_GetRecorders_WithData(t *testing.T) {
+	recorderID := uuid.New()
+
+	m := &Minio{
+		system: &System{
+			ID:   uuid.New(),
+			Name: "Test System",
+			Recorders: map[uuid.UUID]Recorder{
+				recorderID: {
+					ID:       recorderID,
+					Name:     "Test Recorder",
+					Sessions: make(map[uuid.UUID]Session),
+				},
+			},
+		},
+		chunks: make(map[uuid.UUID]*minioChunk),
+	}
+
+	recorders := m.GetRecorders()
+	if len(recorders) != 1 {
+		t.Errorf("GetRecorders() returned %d recorders, want 1", len(recorders))
+	}
+
+	if _, ok := recorders[recorderID]; !ok {
+		t.Error("GetRecorders() does not contain expected recorder")
+	}
+}
+
+func TestMinio_GetSessions_Empty(t *testing.T) {
+	recorderID := uuid.New()
+
+	m := &Minio{
+		system: &System{
+			ID:   uuid.New(),
+			Name: "Test System",
+			Recorders: map[uuid.UUID]Recorder{
+				recorderID: {
+					ID:       recorderID,
+					Name:     "Test Recorder",
+					Sessions: make(map[uuid.UUID]Session),
+				},
+			},
+		},
+		chunks: make(map[uuid.UUID]*minioChunk),
+	}
+
+	sessions := m.GetSessions(recorderID)
+	if sessions == nil {
+		t.Error("GetSessions() returned nil")
+	}
+	if len(sessions) != 0 {
+		t.Errorf("GetSessions() returned %d sessions, want 0", len(sessions))
+	}
+}
+
+func TestMinio_GetSessions_WithData(t *testing.T) {
+	recorderID := uuid.New()
+	sessionID := uuid.New()
+
+	m := &Minio{
+		system: &System{
+			ID:   uuid.New(),
+			Name: "Test System",
+			Recorders: map[uuid.UUID]Recorder{
+				recorderID: {
+					ID:   recorderID,
+					Name: "Test Recorder",
+					Sessions: map[uuid.UUID]Session{
+						sessionID: {
+							ID:         sessionID,
+							RecorderID: recorderID,
+							Name:       "Test Session",
+							StartTime:  time.Now(),
+							IsClosed:   true,
+						},
+					},
+				},
+			},
+		},
+		chunks: make(map[uuid.UUID]*minioChunk),
+	}
+
+	sessions := m.GetSessions(recorderID)
+	if len(sessions) != 1 {
+		t.Errorf("GetSessions() returned %d sessions, want 1", len(sessions))
+	}
+
+	if _, ok := sessions[sessionID]; !ok {
+		t.Error("GetSessions() does not contain expected session")
+	}
+}
+
+func TestMinio_GetSession_Success(t *testing.T) {
+	recorderID := uuid.New()
+	sessionID := uuid.New()
+
+	expectedSession := Session{
+		ID:         sessionID,
+		RecorderID: recorderID,
+		Name:       "Test Session",
+		StartTime:  time.Now(),
+		IsClosed:   true,
+		Keep:       true,
+	}
+
+	m := &Minio{
+		system: &System{
+			ID:   uuid.New(),
+			Name: "Test System",
+			Recorders: map[uuid.UUID]Recorder{
+				recorderID: {
+					ID:   recorderID,
+					Name: "Test Recorder",
+					Sessions: map[uuid.UUID]Session{
+						sessionID: expectedSession,
+					},
+				},
+			},
+		},
+		chunks: make(map[uuid.UUID]*minioChunk),
+	}
+
+	session, err := m.GetSession(recorderID, sessionID)
+	if err != nil {
+		t.Errorf("GetSession() error = %v", err)
+		return
+	}
+
+	if session.ID != expectedSession.ID {
+		t.Errorf("GetSession() ID = %v, want %v", session.ID, expectedSession.ID)
+	}
+	if session.Name != expectedSession.Name {
+		t.Errorf("GetSession() Name = %v, want %v", session.Name, expectedSession.Name)
+	}
+}
+
+func TestMinio_GetSession_RecorderNotFound(t *testing.T) {
+	m := &Minio{
+		system: &System{
+			ID:        uuid.New(),
+			Name:      "Test System",
+			Recorders: make(map[uuid.UUID]Recorder),
+		},
+		chunks: make(map[uuid.UUID]*minioChunk),
+	}
+
+	_, err := m.GetSession(uuid.New(), uuid.New())
+	if err == nil {
+		t.Error("GetSession() error = nil, want error for non-existent recorder")
+	}
+}
+
+func TestMinio_GetSession_SessionNotFound(t *testing.T) {
+	recorderID := uuid.New()
+
+	m := &Minio{
+		system: &System{
+			ID:   uuid.New(),
+			Name: "Test System",
+			Recorders: map[uuid.UUID]Recorder{
+				recorderID: {
+					ID:       recorderID,
+					Name:     "Test Recorder",
+					Sessions: make(map[uuid.UUID]Session),
+				},
+			},
+		},
+		chunks: make(map[uuid.UUID]*minioChunk),
+	}
+
+	_, err := m.GetSession(recorderID, uuid.New())
+	if err == nil {
+		t.Error("GetSession() error = nil, want error for non-existent session")
+	}
+}
+
+func TestMinio_RegisterOnSessionClosedCallback(t *testing.T) {
+	m := &Minio{
+		chunks: make(map[uuid.UUID]*minioChunk),
+	}
+
+	callback := func(session *Session) {
+		// Callback implementation
+	}
+
+	err := m.RegisterOnSessionClosedCallback(callback)
+	if err != nil {
+		t.Errorf("RegisterOnSessionClosedCallback() error = %v", err)
+	}
+
+	if m.onSessionClosedCb == nil {
+		t.Error("RegisterOnSessionClosedCallback() did not set callback")
+	}
+}
+
+func TestFilenameConstants(t *testing.T) {
+	tests := []struct {
+		name     string
+		filename Filename
+		want     string
+	}{
+		{"OGG", FILENAME_OGG, "data.ogg"},
+		{"FLAC", FILENAME_FLAC, "data.flac"},
+		{"WAVEFORM", FILENAME_WAVEFORM, "waveform.dat"},
+		{"METADATA", FILENAME_METADATA, "metadata.json"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if string(tt.filename) != tt.want {
+				t.Errorf("Filename %s = %v, want %v", tt.name, tt.filename, tt.want)
+			}
+		})
+	}
+}
+
+func TestAssetOptions(t *testing.T) {
+	recorderID := uuid.New()
+	sessionID := uuid.New()
+
+	options := AssetOptions{
+		RecorderID: recorderID,
+		SessionID:  sessionID,
+		Filename:   FILENAME_OGG,
+	}
+
+	if options.RecorderID != recorderID {
+		t.Errorf("AssetOptions.RecorderID = %v, want %v", options.RecorderID, recorderID)
+	}
+	if options.SessionID != sessionID {
+		t.Errorf("AssetOptions.SessionID = %v, want %v", options.SessionID, sessionID)
+	}
+	if options.Filename != FILENAME_OGG {
+		t.Errorf("AssetOptions.Filename = %v, want %v", options.Filename, FILENAME_OGG)
+	}
+}
+
+func TestSigningOptions(t *testing.T) {
+	options := SigningOptions{
+		Expires:          time.Hour,
+		Download:         true,
+		DownloadFilename: "test.ogg",
+	}
+
+	if options.Expires != time.Hour {
+		t.Errorf("SigningOptions.Expires = %v, want %v", options.Expires, time.Hour)
+	}
+	if !options.Download {
+		t.Error("SigningOptions.Download = false, want true")
+	}
+	if options.DownloadFilename != "test.ogg" {
+		t.Errorf("SigningOptions.DownloadFilename = %v, want %v", options.DownloadFilename, "test.ogg")
+	}
+}

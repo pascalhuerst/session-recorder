@@ -1,5 +1,5 @@
 # Web Interface Dockerfile
-FROM node:18-alpine AS builder
+FROM node:24-alpine AS builder
 
 # Set working directory
 WORKDIR /build
@@ -28,7 +28,7 @@ COPY web/libs/session-waveform/tsconfig*.json ./libs/session-waveform/
 COPY web/libs/session-waveform/vite.config.ts ./libs/session-waveform/
 
 # Install web dependencies (including workspace dependencies)
-RUN npm ci
+RUN npm install
 
 # Copy web source code
 COPY web/src/ ./src/

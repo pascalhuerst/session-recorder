@@ -1,5 +1,5 @@
 # Protocol Generation Dockerfile
-FROM node:18-alpine AS protocols
+FROM node:24-alpine AS protocols
 
 # Install protoc, make, go and grpc plugins
 RUN apk add --no-cache protobuf protobuf-dev make go grpc grpc-dev
@@ -11,7 +11,7 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
-RUN npm ci
+RUN npm install
 
 # Install Go protobuf plugins
 RUN go install google.golang.org/protobuf/cmd/protoc-gen-go@latest

@@ -62,8 +62,8 @@ const removeToast = (id: string) => {
 
 .toast {
   pointer-events: auto;
-  padding: var(--size-3);
-  border-radius: var(--radius-md);
+  padding: var(--size-2);
+  border-radius: var(--radius-xs);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   border: 1px solid;
   background: white;
@@ -71,7 +71,7 @@ const removeToast = (id: string) => {
 }
 
 .toast--success {
-  border-color: #10b981;
+  border-color: var(--color-purple-500);
   background: #f0fdf4;
 }
 
@@ -101,7 +101,7 @@ const removeToast = (id: string) => {
 }
 
 .toast--success .toast__icon {
-  color: #10b981;
+  color: var(--color-purple-500);
 }
 
 .toast--error .toast__icon {
@@ -118,7 +118,7 @@ const removeToast = (id: string) => {
 
 .toast__message {
   flex: 1;
-  font-size: var(--scale-2);
+  font-size: var(--scale-1);
   color: var(--color-grey-900);
 }
 

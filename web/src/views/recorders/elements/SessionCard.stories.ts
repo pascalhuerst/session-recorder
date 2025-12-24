@@ -31,12 +31,22 @@
  *   When the user clicks on the title
  *   Then the title becomes editable
  *   And on blur, the name is saved
+ *
+ * Scenario: Collapsed by default
+ *   Given a session card
+ *   When the card renders
+ *   Then the card should be collapsed (only header and overview visible)
+ *
+ * Scenario: Expand session card
+ *   Given a collapsed session card
+ *   When the user clicks the expand toggle
+ *   Then the card should expand to show zoomview and segments
  */
 
 import type { Meta, StoryObj } from '@storybook/vue3';
-import { within, expect } from '@storybook/test';
+import { within, expect, userEvent } from '@storybook/test';
 
-// Mock component since real SessionCard requires WaveformEditor and complex setup
+// Mock component since real SessionCard requires WaveformView and complex setup
 const MockSessionCard = {
   name: 'MockSessionCard',
   props: {
@@ -56,6 +66,7 @@ const MockSessionCard = {
   data() {
     return {
       isEditing: false,
+      isExpanded: false,
     };
   },
   computed: {
@@ -77,6 +88,9 @@ const MockSessionCard = {
     },
   },
   methods: {
+    toggleExpanded() {
+      this.isExpanded = !this.isExpanded;
+    },
     startEditing() {
       this.isEditing = true;
     },
@@ -96,8 +110,19 @@ const MockSessionCard = {
     },
   },
   template: `
-    <div class="card">
+    <div class="card" :class="{ expanded: isExpanded }">
       <div class="header">
+        <button
+          class="expand-toggle"
+          :class="{ expanded: isExpanded }"
+          @click="toggleExpanded"
+          :aria-expanded="isExpanded"
+          aria-label="Toggle session details"
+        >
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M6 4L10 8L6 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
         <span
           class="title"
           :class="{ editing: isEditing }"
@@ -113,8 +138,18 @@ const MockSessionCard = {
           </div>
         </div>
       </div>
-      <div class="waveform-placeholder" style="height: 120px; background: linear-gradient(to right, #e0e0e0, #f5f5f5, #e0e0e0); border-radius: 4px; display: flex; align-items: center; justify-content: center; color: #666;">
-        Waveform Editor
+      <div class="waveform-container">
+        <div class="overview" style="height: 80px; background: linear-gradient(to right, #e0e0e0, #f5f5f5, #e0e0e0); display: flex; align-items: center; justify-content: center; color: #666;">
+          Overview
+        </div>
+        <div v-if="isExpanded" class="details">
+          <div class="zoomview" style="height: 100px; background: linear-gradient(to right, #d0d0d0, #e5e5e5, #d0d0d0); display: flex; align-items: center; justify-content: center; color: #666;">
+            Zoomview
+          </div>
+          <div class="segments" style="padding: 8px; background: #f9f9f9; color: #666;">
+            Segments
+          </div>
+        </div>
       </div>
     </div>
   `,
@@ -151,7 +186,7 @@ const meta: Meta = {
 export default meta;
 type Story = StoryObj;
 
-// Default session card
+// Default session card (collapsed by default)
 export const Default: Story = {
   args: {
     session: createMockSession(),
@@ -164,8 +199,49 @@ export const Default: Story = {
     // Check title
     await expect(canvas.getByText('Untitled #1')).toBeInTheDocument();
 
-    // Check waveform placeholder
-    await expect(canvas.getByText('Waveform Editor')).toBeInTheDocument();
+    // Check overview is visible
+    await expect(canvas.getByText('Overview')).toBeInTheDocument();
+
+    // Collapsed by default - zoomview and segments should not be visible
+    await expect(canvas.queryByText('Zoomview')).not.toBeInTheDocument();
+    await expect(canvas.queryByText('Segments')).not.toBeInTheDocument();
+
+    // Check expand toggle button exists
+    const toggleButton = canvas.getByRole('button', { name: 'Toggle session details' });
+    await expect(toggleButton).toBeInTheDocument();
+    await expect(toggleButton).toHaveAttribute('aria-expanded', 'false');
+  },
+};
+
+// Expand/collapse interaction
+export const ExpandCollapse: Story = {
+  args: {
+    session: createMockSession(),
+    recorderId: 'recorder-1',
+    index: 1,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const toggleButton = canvas.getByRole('button', { name: 'Toggle session details' });
+
+    // Initially collapsed
+    await expect(canvas.queryByText('Zoomview')).not.toBeInTheDocument();
+    await expect(toggleButton).toHaveAttribute('aria-expanded', 'false');
+
+    // Click to expand
+    await userEvent.click(toggleButton);
+
+    // Now expanded - zoomview and segments should be visible
+    await expect(canvas.getByText('Zoomview')).toBeInTheDocument();
+    await expect(canvas.getByText('Segments')).toBeInTheDocument();
+    await expect(toggleButton).toHaveAttribute('aria-expanded', 'true');
+
+    // Click to collapse again
+    await userEvent.click(toggleButton);
+
+    // Back to collapsed
+    await expect(canvas.queryByText('Zoomview')).not.toBeInTheDocument();
+    await expect(toggleButton).toHaveAttribute('aria-expanded', 'false');
   },
 };
 
@@ -319,12 +395,16 @@ export const RenameInteraction: Story = {
     // Check title is contenteditable
     await expect(title).toHaveAttribute('contenteditable', 'true');
 
-    // Focus to start editing
-    title.focus();
+    // Click to focus and start editing (uses userEvent for proper event handling)
+    await userEvent.click(title);
+
+    // Wait for Vue reactivity and verify editing class
+    await new Promise((resolve) => setTimeout(resolve, 100));
     await expect(title).toHaveClass('editing');
 
-    // Blur to save
-    title.blur();
+    // Click outside to blur and save
+    await userEvent.click(canvasElement);
+    await new Promise((resolve) => setTimeout(resolve, 100));
     await expect(title).not.toHaveClass('editing');
   },
 };

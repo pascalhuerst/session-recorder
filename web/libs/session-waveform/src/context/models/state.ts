@@ -34,6 +34,7 @@ export const peaksModuleSchema = z.object({
   theme: themeSchema,
   audioUrls: z.array(audioUrlSchema).nonempty(),
   waveformUrl: z.string().url().optional(),
+  expanded: z.boolean().default(true),
   player: z
     .object({
       isPlaying: z.boolean().default(false),

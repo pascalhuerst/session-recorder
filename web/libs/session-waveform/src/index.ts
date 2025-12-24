@@ -1,5 +1,6 @@
 import EmptyScreen from './lib/display/EmptyScreen.vue';
 import WaveformEditor from './waveform/WaveformEditor.vue';
+import WaveformView from './waveform/WaveformView.vue';
 import Button from './lib/controls/Button.vue';
 import Modal from './lib/disclosure/Modal.vue';
 import { useConfirmation } from './lib/disclosure/useConfirmation';
@@ -10,7 +11,7 @@ import {
   type PeaksContext,
 } from './context/usePeaksContext';
 
-export { EmptyScreen, WaveformEditor, Button, Modal, useConfirmation };
+export { EmptyScreen, WaveformEditor, WaveformView, Button, Modal, useConfirmation };
 export * from './setup';
 export {
   usePeaksContext,

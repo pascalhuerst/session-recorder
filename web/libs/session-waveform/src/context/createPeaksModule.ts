@@ -21,6 +21,7 @@ export interface Events {
   segmentRemoved: (segmentId: string) => void;
   amplitudeScaleChanged: (scale: number) => void;
   zoomLevelChanged: (seconds: number) => void;
+  expandedChanged: (expanded: boolean) => void;
 }
 
 export interface Commands {
@@ -38,6 +39,7 @@ export interface Commands {
   renderSegment: (segmentId: string) => void;
   setAmplitudeScale: (scale: number) => void;
   setZoomLevel: (seconds: number) => void;
+  setExpanded: (expanded: boolean) => void;
 }
 
 export const createPeaksModule = (props: {

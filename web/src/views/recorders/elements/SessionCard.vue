@@ -5,7 +5,7 @@ import { useDateFormat } from '@vueuse/core';
 import {
   createPeaksContext,
   providePeaksContext,
-  WaveformEditor,
+  WaveformView,
 } from '@session-recorder/session-waveform';
 import { integrateSegments } from '../../../grpc/integrateSegments';
 import { setName } from '../../../grpc/procedures/setName';
@@ -19,6 +19,7 @@ const props = defineProps<{
 }>();
 
 const titleRef = ref<HTMLElement | null>(null);
+const waveformRef = ref<InstanceType<typeof WaveformView> | null>(null);
 const isEditing = ref(false);
 const editedName = ref('');
 
@@ -120,6 +121,7 @@ const ctx = createPeaksContext({
         type: 'audio/flac',
       },
     ],
+    expanded: false,
     permissions: {
       create: false,
       update: true,
@@ -136,11 +138,44 @@ const ctx = createPeaksContext({
 
 providePeaksContext(ctx);
 integrateSegments(props.session, ctx);
+
+// Track expanded state for UI
+const isExpanded = ref(false);
+ctx.eventEmitter.on('expandedChanged', (expanded) => {
+  isExpanded.value = expanded;
+});
+
+const toggleExpanded = () => {
+  waveformRef.value?.toggleExpanded();
+};
 </script>
 
 <template>
-  <div class="card">
+  <div class="card" :class="{ expanded: isExpanded }">
     <div class="header">
+      <button
+        class="expand-toggle"
+        :class="{ expanded: isExpanded }"
+        :aria-expanded="isExpanded"
+        aria-label="Toggle session details"
+        @click="toggleExpanded"
+      >
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 16 16"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M6 4L10 8L6 12"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          />
+        </svg>
+      </button>
       <span
         ref="titleRef"
         class="title"
@@ -162,7 +197,7 @@ integrateSegments(props.session, ctx);
       </div>
     </div>
 
-    <WaveformEditor />
+    <WaveformView ref="waveformRef" />
   </div>
 </template>
 
@@ -177,40 +212,36 @@ integrateSegments(props.session, ctx);
 .header {
   width: 100%;
   padding: var(--size-1);
+  display: flex;
+  align-items: center;
+  gap: var(--size-2);
 }
 
 .title {
-  font-size: var(--scale-3);
-  font-weight: var(--weight-medium);
-  cursor: text;
+  font-size: var(--scale-2);
+  font-weight: var(--weight-semibold);
   border-radius: var(--radius-xs);
-  padding: var(--size-1) var(--size-2);
-  margin: calc(-1 * var(--size-1)) calc(-1 * var(--size-2));
-  outline: none;
-  border: 1px solid transparent;
+  cursor: text;
+  outline: 1px solid transparent;
+  outline-offset: var(--size-1);
   transition: background-color 0.15s ease, border-color 0.15s ease,
     box-shadow 0.15s ease;
 }
 
 .title:hover {
-  background-color: var(--color-grey-50);
-  border-color: var(--color-grey-200);
+  outline-color: var(--color-grey-200);
 }
 
 .title:focus,
 .title.editing {
-  background-color: white;
-  border-color: var(--color-purple-500);
-  box-shadow: 0 0 0 3px
-    color-mix(in srgb, var(--color-purple-300) 25%, transparent);
+  outline-color: var(--color-purple-500);
 }
 
 .metadata {
-  top: 0;
-  left: 0;
+  margin-left: auto;
   display: flex;
   flex-wrap: nowrap;
-  align-items: baseline;
+  align-items: center;
   gap: var(--size-2);
   font-size: var(--scale-1);
 }
@@ -221,7 +252,27 @@ integrateSegments(props.session, ctx);
   color: var(--color-grey-500);
 }
 
-.menu {
-  margin-left: auto;
+.expand-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--size-5);
+  height: var(--size-5);
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: var(--radius-xs);
+  color: var(--color-grey-500);
+  transition: transform 0.2s ease, color 0.15s ease, background-color 0.15s ease;
+}
+
+.expand-toggle:hover {
+  background-color: var(--color-grey-100);
+  color: var(--color-grey-700);
+}
+
+.expand-toggle.expanded {
+  transform: rotate(90deg);
 }
 </style>

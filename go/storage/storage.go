@@ -44,6 +44,7 @@ type Storage interface {
 
 	DeleteSession(ctx context.Context, recorderID, sessionID uuid.UUID) error
 	SetKeepSession(ctx context.Context, recorderID, sessionID uuid.UUID, keep bool) error
+	SetName(ctx context.Context, recorderID, sessionID uuid.UUID, name string) error
 
 	isSessionClosed(ctx context.Context, recorderID, sessionID uuid.UUID) bool
 	//CloseSession(ctx context.Context, RecorderID, SessionID uuid.UUID) error

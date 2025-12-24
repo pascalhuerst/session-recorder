@@ -15,6 +15,22 @@
  *   Given the card renders
  *   When the menu is visible
  *   Then keep/delete/download actions should be available
+ *
+ * Scenario: Display session name
+ *   Given a session with a name
+ *   When the card renders
+ *   Then the session name should be displayed
+ *
+ * Scenario: Display fallback for unnamed session
+ *   Given a session without a name
+ *   When the card renders
+ *   Then "Untitled #N" should be displayed
+ *
+ * Scenario: Rename session via contenteditable
+ *   Given a session card
+ *   When the user clicks on the title
+ *   Then the title becomes editable
+ *   And on blur, the name is saved
  */
 
 import type { Meta, StoryObj } from '@storybook/vue3';
@@ -37,13 +53,17 @@ const MockSessionCard = {
       required: true,
     },
   },
+  data() {
+    return {
+      isEditing: false,
+    };
+  },
   computed: {
+    displayName() {
+      return this.session.name || `Untitled #${this.index}`;
+    },
     displayDate() {
       const { startedAt } = this.session;
-      const format =
-        startedAt.getFullYear() === new Date().getFullYear()
-          ? 'ddd, MMM D, HH:mm'
-          : 'MMM D, YYYY HH:mm';
 
       const options: Intl.DateTimeFormatOptions =
         startedAt.getFullYear() === new Date().getFullYear()
@@ -56,10 +76,36 @@ const MockSessionCard = {
       };
     },
   },
+  methods: {
+    startEditing() {
+      this.isEditing = true;
+    },
+    saveTitle() {
+      this.isEditing = false;
+      // In the real component, this would call setName API
+    },
+    onKeydown(event: KeyboardEvent) {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        (event.target as HTMLElement).blur();
+      } else if (event.key === 'Escape') {
+        event.preventDefault();
+        this.isEditing = false;
+        (event.target as HTMLElement).blur();
+      }
+    },
+  },
   template: `
     <div class="card">
       <div class="header">
-        <span class="title">Untitled #{{ index }}</span>
+        <span
+          class="title"
+          :class="{ editing: isEditing }"
+          contenteditable="true"
+          @focus="startEditing"
+          @blur="saveTitle"
+          @keydown="onKeydown"
+        >{{ displayName }}</span>
         <div class="metadata">
           <time class="timestamp" :datetime="displayDate.iso">{{ displayDate.formatted }}</time>
           <div class="menu">
@@ -79,6 +125,7 @@ const createMockSession = (overrides = {}) => ({
   id: 'session-1',
   startedAt: new Date('2024-03-15T14:30:00'),
   expiresAt: new Date('2024-04-15T14:30:00'),
+  name: '',
   keep: false,
   segments: [],
   inlineFiles: {
@@ -228,6 +275,82 @@ export const SessionList: Story = {
         }),
         index: i + 1,
       }));
+      return { sessions };
+    },
+    template: `
+      <div style="display: flex; flex-direction: column; gap: 2rem; max-width: 800px;">
+        <MockSessionCard
+          v-for="s in sessions"
+          :key="s.session.id"
+          :session="s.session"
+          recorderId="recorder-1"
+          :index="s.index"
+        />
+      </div>
+    `,
+  }),
+};
+
+// Session with a custom name
+export const NamedSession: Story = {
+  args: {
+    session: createMockSession({ name: 'Morning Recording' }),
+    recorderId: 'recorder-1',
+    index: 1,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    // Should display the custom name instead of "Untitled #1"
+    await expect(canvas.getByText('Morning Recording')).toBeInTheDocument();
+  },
+};
+
+// Rename interaction - title becomes editable on focus
+export const RenameInteraction: Story = {
+  args: {
+    session: createMockSession({ name: 'Original Name' }),
+    recorderId: 'recorder-1',
+    index: 1,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const title = canvas.getByText('Original Name');
+
+    // Check title is contenteditable
+    await expect(title).toHaveAttribute('contenteditable', 'true');
+
+    // Focus to start editing
+    title.focus();
+    await expect(title).toHaveClass('editing');
+
+    // Blur to save
+    title.blur();
+    await expect(title).not.toHaveClass('editing');
+  },
+};
+
+// Mixed named and unnamed sessions
+export const MixedSessionList: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    // Named sessions display their names
+    await expect(canvas.getByText('Interview Recording')).toBeInTheDocument();
+    await expect(canvas.getByText('Podcast Episode 5')).toBeInTheDocument();
+
+    // Unnamed sessions display fallback
+    await expect(canvas.getByText('Untitled #2')).toBeInTheDocument();
+    await expect(canvas.getByText('Untitled #4')).toBeInTheDocument();
+  },
+  render: () => ({
+    components: { MockSessionCard },
+    setup() {
+      const sessions = [
+        { session: createMockSession({ id: 's1', name: 'Interview Recording' }), index: 1 },
+        { session: createMockSession({ id: 's2', name: '' }), index: 2 },
+        { session: createMockSession({ id: 's3', name: 'Podcast Episode 5' }), index: 3 },
+        { session: createMockSession({ id: 's4' }), index: 4 },
+      ];
       return { sessions };
     },
     template: `

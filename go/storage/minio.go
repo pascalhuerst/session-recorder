@@ -340,6 +340,48 @@ func (m *Minio) SetKeepSession(ctx context.Context, recorderID, sessionID uuid.U
 		return err
 	}
 
+	// Update in-memory cache
+	m.system.Recorders[recorderID].Sessions[sessionID] = session
+
+	return nil
+}
+
+func (m *Minio) SetName(ctx context.Context, recorderID, sessionID uuid.UUID, name string) error {
+	m.dataLock.Lock()
+	defer m.dataLock.Unlock()
+
+	if _, ok := m.system.Recorders[recorderID]; !ok {
+		log.Warn().
+			Stringer("recorder-id", recorderID).
+			Msg("No recorder with this id")
+
+		return fmt.Errorf("no recorder with this id")
+	}
+
+	if _, ok := m.system.Recorders[recorderID].Sessions[sessionID]; !ok {
+		log.Warn().
+			Stringer("recorder-id", recorderID).
+			Stringer("session-id", sessionID).
+			Msg("No session with this id")
+
+		return fmt.Errorf("no session with this id")
+	}
+
+	session := m.system.Recorders[recorderID].Sessions[sessionID]
+	session.Name = name
+
+	if err := m.putSessionMetadata(ctx, recorderID, sessionID, &session); err != nil {
+		log.Err(err).
+			Stringer("recorder-id", recorderID).
+			Stringer("session-id", sessionID).
+			Msg("Cannot put session metadata")
+
+		return err
+	}
+
+	// Update in-memory cache
+	m.system.Recorders[recorderID].Sessions[sessionID] = session
+
 	return nil
 }
 

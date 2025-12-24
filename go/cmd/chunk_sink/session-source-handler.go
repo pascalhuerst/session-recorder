@@ -291,5 +291,34 @@ func (h *SessionSourceHandler) setKeepSession(ctx context.Context, request *sspb
 }
 
 func (h *SessionSourceHandler) setName(ctx context.Context, request *sspb.SetNameRequest) (*cmpb.Respone, error) {
-	return noSuccess, nil
+	recorderID, sessionID, err := parseIDs(request.RecorderID, request.SessionID)
+	if err != nil {
+		log.Err(err).Str("recorder-id", request.RecorderID).Str("session-id", request.SessionID).Msg("Cannot parse IDs")
+
+		return noSuccess, err
+	}
+
+	if err := h.sessionStorage.SetName(ctx, recorderID, sessionID, request.Name); err != nil {
+		log.Err(err).Str("session-id", request.SessionID).Msg("Cannot set session name")
+
+		return noSuccess, err
+	}
+
+	session, err := h.sessionStorage.GetSession(recorderID, sessionID)
+	if err != nil {
+		log.Err(err).Str("session-id", request.SessionID).Msg("Cannot get session")
+
+		return noSuccess, err
+	}
+
+	h.sessionUpdateCh <- &sspb.Session{
+		ID: session.ID.String(),
+		Info: &sspb.Session_Updated{
+			Updated: newSessionInfo(ctx, h, &session),
+		},
+	}
+
+	log.Info().Str("session-id", request.SessionID).Str("name", request.Name).Msg("Set session name")
+
+	return success, nil
 }

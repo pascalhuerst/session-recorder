@@ -6,6 +6,25 @@ import (
 	"testing"
 )
 
+/**
+ * Test Plan: Sox Audio Conversion
+ *
+ * Scenario: Convert raw audio to OGG format
+ *   Given raw PCM audio data and sox is available
+ *   When CreateAudioFile is called with "ogg" format
+ *   Then a valid OGG buffer is returned with OggS magic header
+ *
+ * Scenario: Convert raw audio to FLAC format
+ *   Given raw PCM audio data and sox is available
+ *   When CreateAudioFile is called with "flac" format
+ *   Then a valid FLAC buffer is returned with fLaC magic header
+ *
+ * Scenario: Handle small input samples
+ *   Given minimal audio samples and sox is available
+ *   When CreateAudioFile is called
+ *   Then a valid output buffer is returned
+ */
+
 func soxAvailable() bool {
 	_, err := exec.LookPath("/usr/bin/sox")
 	return err == nil

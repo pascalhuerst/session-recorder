@@ -6,6 +6,30 @@ import (
 	"testing"
 )
 
+/**
+ * Test Plan: Storage Utilities
+ *
+ * Scenario: MultiCloser closes all resources successfully
+ *   Given multiple io.Closer instances with no errors
+ *   When Close() is called on the MultiCloser
+ *   Then all closers are closed and no error is returned
+ *
+ * Scenario: MultiCloser handles individual close errors
+ *   Given multiple io.Closer instances where one returns an error
+ *   When Close() is called on the MultiCloser
+ *   Then all closers are still closed and the error is returned
+ *
+ * Scenario: MultiCloser aggregates multiple errors
+ *   Given multiple io.Closer instances where several return errors
+ *   When Close() is called on the MultiCloser
+ *   Then all closers are closed and a combined error is returned
+ *
+ * Scenario: makeReaders creates tee'd readers
+ *   Given a request for N readers
+ *   When makeReaders is called
+ *   Then N readers are returned that all receive the same data
+ */
+
 // mockCloser is a test helper that implements io.Closer
 type mockCloser struct {
 	err    error

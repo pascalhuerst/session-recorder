@@ -5,6 +5,30 @@ import (
 	"testing"
 )
 
+/**
+ * Test Plan: mDNS Service Tracker
+ *
+ * Scenario: Format IPv4 service address
+ *   Given a ServiceAddress with an IPv4 address and port
+ *   When String() is called
+ *   Then the address is formatted as "ip:port"
+ *
+ * Scenario: Format IPv6 service address
+ *   Given a ServiceAddress with an IPv6 address and port
+ *   When String() is called
+ *   Then the address is formatted as "[ip]:port"
+ *
+ * Scenario: Format IPv4-mapped IPv6 address
+ *   Given a ServiceAddress with an IPv4-mapped IPv6 address
+ *   When String() is called
+ *   Then the address is formatted as IPv4 "ip:port"
+ *
+ * Scenario: Compare service addresses for equality
+ *   Given two ServiceAddress instances
+ *   When equal() is called
+ *   Then true is returned only if IP, port, interface, and service name match
+ */
+
 func TestServiceAddress_String_IPv4(t *testing.T) {
 	sa := ServiceAddress{
 		IP:          net.ParseIP("192.168.1.100"),

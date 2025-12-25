@@ -8,6 +8,30 @@ import (
 	"github.com/google/uuid"
 )
 
+/**
+ * Test Plan: Storage Types
+ *
+ * Scenario: Session serialization roundtrip
+ *   Given a Session struct with all fields populated
+ *   When marshaled to JSON and unmarshaled back
+ *   Then all fields are preserved correctly
+ *
+ * Scenario: Recorder serialization roundtrip
+ *   Given a Recorder struct with ID and name
+ *   When marshaled to JSON and unmarshaled back
+ *   Then all fields are preserved correctly
+ *
+ * Scenario: Segment serialization roundtrip
+ *   Given a Segment struct with all fields
+ *   When marshaled to JSON and unmarshaled back
+ *   Then all fields are preserved correctly
+ *
+ * Scenario: String representations
+ *   Given a System/Session/Recorder struct
+ *   When String() is called
+ *   Then a non-empty string representation is returned
+ */
+
 func TestSession_Serialization(t *testing.T) {
 	sessionID := uuid.New()
 	recorderID := uuid.New()

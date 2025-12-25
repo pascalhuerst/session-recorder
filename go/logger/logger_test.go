@@ -7,6 +7,35 @@ import (
 	"github.com/rs/zerolog"
 )
 
+/**
+ * Test Plan: Logger Setup
+ *
+ * Scenario: Default log level is info
+ *   Given no RECORDER_LOG_LEVEL environment variable
+ *   When Setup() is called
+ *   Then global log level is set to InfoLevel
+ *
+ * Scenario: Log level from environment variable
+ *   Given RECORDER_LOG_LEVEL is set to "debug"/"warn"/"error"
+ *   When Setup() is called
+ *   Then global log level is set to the corresponding level
+ *
+ * Scenario: JSON format configuration
+ *   Given RECORDER_LOG_FORMAT is set to "json"
+ *   When Setup() is called
+ *   Then time format is set for JSON output
+ *
+ * Scenario: Console format configuration
+ *   Given RECORDER_LOG_FORMAT is set to "console"
+ *   When Setup() is called
+ *   Then console writer is configured (no panic)
+ *
+ * Scenario: Color configuration options
+ *   Given RECORDER_LOG_COLOR is set to "on"/"off"/"auto"
+ *   When Setup() is called
+ *   Then appropriate color settings are applied (no panic)
+ */
+
 func clearEnvVars() {
 	os.Unsetenv("RECORDER_LOG_LEVEL")
 	os.Unsetenv("RECORDER_LOG_FORMAT")

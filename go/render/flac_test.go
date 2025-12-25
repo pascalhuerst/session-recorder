@@ -5,6 +5,25 @@ import (
 	"testing"
 )
 
+/**
+ * Test Plan: FLAC Encoding
+ *
+ * Scenario: Encode valid raw audio to FLAC
+ *   Given raw PCM audio data (s16le, 2ch, 48kHz)
+ *   When Flac() is called
+ *   Then a valid FLAC buffer is returned with fLaC magic header
+ *
+ * Scenario: Handle empty input gracefully
+ *   Given an empty byte slice as input
+ *   When Flac() is called
+ *   Then a valid FLAC buffer with headers is returned (no panic)
+ *
+ * Scenario: Encode small audio samples
+ *   Given minimal stereo 16-bit samples
+ *   When Flac() is called
+ *   Then a valid FLAC buffer is returned with fLaC magic header
+ */
+
 func TestFlac_ValidInput(t *testing.T) {
 	// Use embedded test data from waveform_test.go
 	raw := bytes.NewReader(rawTestAudio)

@@ -8,6 +8,36 @@ import (
 	sspb "github.com/pascalhuerst/session-recorder/protocols/go/sessionsource"
 )
 
+/**
+ * Test Plan: SessionSource gRPC Server
+ *
+ * Scenario: Create new server with config
+ *   Given a SessionSourceServerConfig with name and version
+ *   When NewSessionSourceServer is called
+ *   Then a non-nil server is returned with the config set
+ *
+ * Scenario: RPC methods without callbacks
+ *   Given a server with no callbacks configured
+ *   When SetKeepSession/DeleteSession/SetName/CutSession is called
+ *   Then a success response is returned (no-op behavior)
+ *
+ * Scenario: RPC methods with callbacks
+ *   Given a server with callbacks configured
+ *   When SetKeepSession/DeleteSession/SetName/CutSession is called
+ *   Then the callback is invoked with the request data
+ *   And the callback response is returned
+ *
+ * Scenario: Segment operations
+ *   Given a server configured
+ *   When CreateSegment/DeleteSegment/RenderSegment/UpdateSegment is called
+ *   Then a response is returned (stub implementations)
+ *
+ * Scenario: Streaming methods without callbacks
+ *   Given a server with no streaming callbacks
+ *   When StreamRecorders/StreamSessions is called
+ *   Then nil is returned (no-op)
+ */
+
 func TestNewSessionSourceServer(t *testing.T) {
 	config := &SessionSourceServerConfig{
 		Name:    "Test Server",

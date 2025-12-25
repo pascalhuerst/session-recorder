@@ -7,6 +7,30 @@ import (
 	"github.com/google/uuid"
 )
 
+/**
+ * Test Plan: MinIO Storage
+ *
+ * Scenario: Handle invalid endpoint gracefully
+ *   Given an invalid endpoint format
+ *   When NewMinioStorage is called
+ *   Then either an error is returned or a struct is created that fails on connect
+ *
+ * Scenario: Handle empty credentials
+ *   Given empty access key and secret key
+ *   When NewMinioStorage is called
+ *   Then the storage struct is created (validation deferred to connect)
+ *
+ * Scenario: Set session timeout
+ *   Given a valid Minio storage instance
+ *   When SetSessionTimeout is called with a duration
+ *   Then the session timeout is updated
+ *
+ * Scenario: Session state transitions
+ *   Given session state enum values
+ *   When comparing states
+ *   Then the correct state values are returned
+ */
+
 func TestNewMinioStorage_InvalidEndpoint(t *testing.T) {
 	// Test with invalid endpoint - should still create the struct
 	// but fail when trying to connect

@@ -5,6 +5,30 @@ import (
 	"testing"
 )
 
+/**
+ * Test Plan: Environment Variable Utilities
+ *
+ * Scenario: Get existing environment variable
+ *   Given an environment variable is set with a value
+ *   When Get() is called with that variable name
+ *   Then the value is returned with no error
+ *
+ * Scenario: Get non-existing environment variable
+ *   Given an environment variable is not set
+ *   When Get() is called with that variable name
+ *   Then an empty string and ErrVarNotSet error are returned
+ *
+ * Scenario: Get empty environment variable
+ *   Given an environment variable is set to empty string
+ *   When Get() is called with that variable name
+ *   Then an empty string and ErrVarNotSet error are returned
+ *
+ * Scenario: MustGet existing variable
+ *   Given an environment variable is set with a value
+ *   When MustGet() is called with that variable name
+ *   Then the value is returned (no panic)
+ */
+
 func TestGet_ExistingVar(t *testing.T) {
 	const testVar = "TEST_GET_EXISTING_VAR"
 	const testValue = "test_value"

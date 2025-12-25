@@ -10,6 +10,42 @@ import (
 	cmpb "github.com/pascalhuerst/session-recorder/protocols/go/common"
 )
 
+/**
+ * Test Plan: ChunkSink gRPC Server
+ *
+ * Scenario: Create new server with config
+ *   Given a ChunkSinkServerConfig with name and version
+ *   When NewChunkSinkServer is called
+ *   Then a non-nil server is returned with initialized maps
+ *
+ * Scenario: SetRecorderStatus without callback
+ *   Given a server with no OnRecorderStatusCB
+ *   When SetRecorderStatus is called
+ *   Then a success response is returned
+ *
+ * Scenario: SetRecorderStatus with callback
+ *   Given a server with OnRecorderStatusCB configured
+ *   When SetRecorderStatus is called
+ *   Then the callback is invoked with the status
+ *   And the result reflects callback success/failure
+ *
+ * Scenario: SetChunks without callback
+ *   Given a server with no OnChunksCB
+ *   When SetChunks is called
+ *   Then a success response is returned
+ *
+ * Scenario: SetChunks with callback
+ *   Given a server with OnChunksCB configured
+ *   When SetChunks is called
+ *   Then the callback is invoked with the chunks
+ *   And the result reflects callback success/failure
+ *
+ * Scenario: CutSession without active connection
+ *   Given a server with no active recorder connections
+ *   When CutSession is called with a recorder ID
+ *   Then an error is returned indicating no connection
+ */
+
 func TestNewChunkSinkServer(t *testing.T) {
 	config := &ChunkSinkServerConfig{
 		Name:    "Test Server",

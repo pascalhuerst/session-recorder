@@ -6,14 +6,13 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/pascalhuerst/session-recorder/broadcast"
 	"github.com/pascalhuerst/session-recorder/grpc"
 	"github.com/pascalhuerst/session-recorder/logger"
 	"github.com/pascalhuerst/session-recorder/mdns"
 	"github.com/pascalhuerst/session-recorder/storage"
 	"github.com/pascalhuerst/session-recorder/utils"
 	"github.com/rs/zerolog/log"
-
-	sspb "github.com/pascalhuerst/session-recorder/protocols/go/sessionsource"
 )
 
 const (
@@ -70,10 +69,12 @@ func main() {
 		hostname = "unknown_hostname_" + uuid.NewString()
 	}
 
-	var recorderUpdateCh chan *sspb.Recorder = make(chan *sspb.Recorder)
-	var sessionUpdateCh chan *sspb.Session = make(chan *sspb.Session)
+	// Create broadcasters for fan-out to multiple clients
+	// Buffer size of 10 provides headroom for slower consumers
+	recorderBroadcaster := broadcast.NewRecorderBroadcaster(10)
+	sessionBroadcaster := broadcast.NewSessionBroadcaster(10)
 
-	chunkSinkHandler := NewChunkSinkHandler(sessionStorage, recorderUpdateCh)
+	chunkSinkHandler := NewChunkSinkHandler(sessionStorage, recorderBroadcaster)
 
 	chunkSinkServer := grpc.NewChunkSinkServer(&grpc.ChunkSinkServerConfig{
 		Name:               hostname,
@@ -82,7 +83,7 @@ func main() {
 		OnChunksCB:         chunkSinkHandler.setChunks,
 	})
 
-	sessionSourceHandler := NewSessionSourceHandler(sessionStorage, chunkSinkServer, recorderUpdateCh, sessionUpdateCh)
+	sessionSourceHandler := NewSessionSourceHandler(sessionStorage, chunkSinkServer, recorderBroadcaster, sessionBroadcaster)
 
 	sessionSourceServer := grpc.NewSessionSourceServer(&grpc.SessionSourceServerConfig{
 		Name:              hostname,

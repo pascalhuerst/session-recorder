@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/pascalhuerst/session-recorder/broadcast"
 	"github.com/pascalhuerst/session-recorder/grpc"
 	cmpb "github.com/pascalhuerst/session-recorder/protocols/go/common"
 	sspb "github.com/pascalhuerst/session-recorder/protocols/go/sessionsource"
@@ -23,23 +24,23 @@ var (
 )
 
 type SessionSourceHandler struct {
-	sessionStorage   storage.Storage
-	chunkSinkServer  *grpc.ChunkSinkServer
-	recorderUpdateCh chan *sspb.Recorder
-	sessionUpdateCh  chan *sspb.Session
+	sessionStorage      storage.Storage
+	chunkSinkServer     *grpc.ChunkSinkServer
+	recorderBroadcaster *broadcast.RecorderBroadcaster
+	sessionBroadcaster  *broadcast.SessionBroadcaster
 }
 
 func NewSessionSourceHandler(
 	sessionStorage storage.Storage,
 	chunkSinkServer *grpc.ChunkSinkServer,
-	recorderUpdateCh chan *sspb.Recorder,
-	sessionUpdateCh chan *sspb.Session,
+	recorderBroadcaster *broadcast.RecorderBroadcaster,
+	sessionBroadcaster *broadcast.SessionBroadcaster,
 ) *SessionSourceHandler {
 	h := &SessionSourceHandler{
-		sessionStorage:   sessionStorage,
-		chunkSinkServer:  chunkSinkServer,
-		recorderUpdateCh: recorderUpdateCh,
-		sessionUpdateCh:  sessionUpdateCh,
+		sessionStorage:      sessionStorage,
+		chunkSinkServer:     chunkSinkServer,
+		recorderBroadcaster: recorderBroadcaster,
+		sessionBroadcaster:  sessionBroadcaster,
 	}
 
 	// Register callback for session state changes (RECORDING, PROCESSING, FINISHED)
@@ -155,12 +156,12 @@ func (h *SessionSourceHandler) onSessionStateChanged(session *storage.Session, p
 		Str("new-state", session.State.String()).
 		Msg("Session state changed")
 
-	h.sessionUpdateCh <- &sspb.Session{
+	h.sessionBroadcaster.Broadcast(&sspb.Session{
 		ID: session.ID.String(),
 		Info: &sspb.Session_Updated{
 			Updated: newSessionInfo(context.Background(), h, session),
 		},
-	}
+	})
 }
 
 // Called after a session has been closed and rendered by storage. Setup above in the constructor
@@ -168,20 +169,32 @@ func (h *SessionSourceHandler) onSessionClosed(session *storage.Session) {
 	log.Debug().Interface("session", session).Msg("Session closed")
 
 	// This is now handled by onSessionStateChanged, but kept for backwards compatibility
-	h.sessionUpdateCh <- &sspb.Session{
+	h.sessionBroadcaster.Broadcast(&sspb.Session{
 		ID: session.ID.String(),
 		Info: &sspb.Session_Updated{
 			Updated: newSessionInfo(context.Background(), h, session),
 		},
-	}
+	})
 }
 
 func (h *SessionSourceHandler) streamRecorders(ctx context.Context, request *sspb.StreamRecordersRequest, server sspb.SessionSource_StreamRecordersServer) error {
+	// Subscribe to recorder updates
+	updateCh, unsubscribe := h.recorderBroadcaster.Subscribe()
+	defer unsubscribe()
+
 	recorders := h.sessionStorage.GetRecorders()
 
 	for _, recorder := range recorders {
-		if err := server.SendMsg(
-			&sspb.Recorder{
+		// Try to get cached status from broadcaster first
+		cachedStatus := h.recorderBroadcaster.GetCachedStatus(recorder.ID.String())
+
+		var recorderMsg *sspb.Recorder
+		if cachedStatus != nil {
+			// Use cached status (has real signal/RMS data)
+			recorderMsg = cachedStatus
+		} else {
+			// No cached status, send with UNKNOWN
+			recorderMsg = &sspb.Recorder{
 				RecorderID:   recorder.ID.String(),
 				RecorderName: recorder.Name,
 				Info: &sspb.Recorder_Status{
@@ -193,21 +206,26 @@ func (h *SessionSourceHandler) streamRecorders(ctx context.Context, request *ssp
 						Clipping:     false,
 					},
 				},
-			},
-		); err != nil {
+			}
+		}
+
+		if err := server.SendMsg(recorderMsg); err != nil {
 			log.Err(err).Msg("Cannot send recorder data")
 		}
 	}
 
 	for {
 		select {
-		case recorder := <-h.recorderUpdateCh:
+		case recorder, ok := <-updateCh:
+			if !ok {
+				// Channel closed, subscriber was removed
+				return nil
+			}
 			if err := server.SendMsg(recorder); err != nil {
 				log.Err(err).Msg("Cannot send recorder data")
 			}
 		case <-ctx.Done():
 			log.Debug().Msg("Done streaming recorders")
-
 			return nil
 		}
 	}
@@ -219,9 +237,12 @@ func (h *SessionSourceHandler) streamSessions(ctx context.Context, request *sspb
 	recorderID, err := uuid.Parse(request.RecorderID)
 	if err != nil {
 		log.Err(err).Str("recorder-id", request.RecorderID).Msg("Cannot parse recorder ID")
-
 		return err
 	}
+
+	// Subscribe to session updates
+	updateCh, unsubscribe := h.sessionBroadcaster.Subscribe()
+	defer unsubscribe()
 
 	sessions := h.sessionStorage.GetSessions(recorderID)
 
@@ -241,13 +262,16 @@ func (h *SessionSourceHandler) streamSessions(ctx context.Context, request *sspb
 
 	for {
 		select {
-		case session := <-h.sessionUpdateCh:
+		case session, ok := <-updateCh:
+			if !ok {
+				// Channel closed, subscriber was removed
+				return nil
+			}
 			if err := server.SendMsg(session); err != nil {
 				log.Err(err).Msg("Cannot send session data")
 			}
 		case <-ctx.Done():
 			log.Debug().Msg("Done streaming sessions")
-
 			return nil
 		}
 	}
@@ -299,10 +323,10 @@ func (h *SessionSourceHandler) deleteSession(ctx context.Context, request *sspb.
 		return noSuccess, err
 	}
 
-	h.sessionUpdateCh <- &sspb.Session{
+	h.sessionBroadcaster.Broadcast(&sspb.Session{
 		ID:   sessionID.String(),
 		Info: &sspb.Session_Removed{Removed: &sspb.SessionRemoved{}},
-	}
+	})
 
 	return success, nil
 }
@@ -328,12 +352,12 @@ func (h *SessionSourceHandler) setKeepSession(ctx context.Context, request *sspb
 		return noSuccess, err
 	}
 
-	h.sessionUpdateCh <- &sspb.Session{
+	h.sessionBroadcaster.Broadcast(&sspb.Session{
 		ID: session.ID.String(),
 		Info: &sspb.Session_Updated{
 			Updated: newSessionInfo(ctx, h, &session),
 		},
-	}
+	})
 
 	log.Info().Str("session-id", request.SessionID).Bool("keep", request.Keep).Msg("Set keep session")
 
@@ -361,12 +385,12 @@ func (h *SessionSourceHandler) setName(ctx context.Context, request *sspb.SetNam
 		return noSuccess, err
 	}
 
-	h.sessionUpdateCh <- &sspb.Session{
+	h.sessionBroadcaster.Broadcast(&sspb.Session{
 		ID: session.ID.String(),
 		Info: &sspb.Session_Updated{
 			Updated: newSessionInfo(ctx, h, &session),
 		},
-	}
+	})
 
 	log.Info().Str("session-id", request.SessionID).Str("name", request.Name).Msg("Set session name")
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
+	"github.com/pascalhuerst/session-recorder/broadcast"
 	cspb "github.com/pascalhuerst/session-recorder/protocols/go/chunksink"
 	cmpb "github.com/pascalhuerst/session-recorder/protocols/go/common"
 	sspb "github.com/pascalhuerst/session-recorder/protocols/go/sessionsource"
@@ -13,14 +14,14 @@ import (
 )
 
 type ChunkSinkHandler struct {
-	recorderUpdateCh chan *sspb.Recorder
-	sessionStorage   storage.Storage
+	recorderBroadcaster *broadcast.RecorderBroadcaster
+	sessionStorage      storage.Storage
 }
 
-func NewChunkSinkHandler(sessionStorage storage.Storage, recorderUpdateCh chan *sspb.Recorder) *ChunkSinkHandler {
+func NewChunkSinkHandler(sessionStorage storage.Storage, recorderBroadcaster *broadcast.RecorderBroadcaster) *ChunkSinkHandler {
 	return &ChunkSinkHandler{
-		sessionStorage:   sessionStorage,
-		recorderUpdateCh: recorderUpdateCh,
+		sessionStorage:      sessionStorage,
+		recorderBroadcaster: recorderBroadcaster,
 	}
 }
 
@@ -29,22 +30,19 @@ func (h *ChunkSinkHandler) setRecorderStatus(ctx context.Context, status *cmpb.R
 	recorderID, err := uuid.Parse(status.RecorderID)
 	if err != nil {
 		log.Err(err).Str("recorder-id", status.RecorderID).Msg("Cannot parse recorder ID")
-
 		return err
 	}
 
 	h.sessionStorage.EnsureRecorderExists(ctx, recorderID, status.RecorderName)
 
-	select {
-	case h.recorderUpdateCh <- &sspb.Recorder{
+	// Broadcast to all connected clients (non-blocking, with per-subscriber buffer)
+	h.recorderBroadcaster.Broadcast(&sspb.Recorder{
 		RecorderID:   recorderID.String(),
 		RecorderName: status.RecorderName,
 		Info: &sspb.Recorder_Status{
 			Status: status,
 		},
-	}:
-	default:
-	}
+	})
 
 	return nil
 }

@@ -69,6 +69,17 @@ export const setupPeaksModule = ({
       waitForDimensions(elements.zoomview),
     ]);
 
+    // Skip initialization if containers still have no dimensions (e.g., still hidden)
+    if (
+      !hasVisibleDimensions(elements.overview) ||
+      !hasVisibleDimensions(elements.zoomview)
+    ) {
+      console.warn(
+        'Peaks.js initialization skipped: containers have no visible dimensions'
+      );
+      return;
+    }
+
     const options = {
       overview: {
         container: elements.overview,

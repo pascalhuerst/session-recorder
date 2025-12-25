@@ -63,10 +63,14 @@ export const useSessionsStore = defineStore('sessions', () => {
 
   const sortedSessions = computed(() => {
     return sessions.value.sort((a, b) => {
-      return (
-        new Date(b.finishedAt ?? 0).getTime() -
-        new Date(a.finishedAt ?? 0).getTime()
-      );
+      // Recording/processing sessions (no finishedAt) go to top
+      if (!a.finishedAt && b.finishedAt) return -1;
+      if (a.finishedAt && !b.finishedAt) return 1;
+      if (!a.finishedAt && !b.finishedAt) {
+        // Both in-progress - sort by startedAt descending
+        return b.startedAt.getTime() - a.startedAt.getTime();
+      }
+      return b.finishedAt.getTime() - a.finishedAt.getTime();
     });
   });
 

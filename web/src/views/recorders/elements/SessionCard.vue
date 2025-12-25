@@ -1,6 +1,10 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue';
 import SessionMenu from './SessionMenu.vue';
+import SessionStateIndicator from './SessionStateIndicator.vue';
+import SessionCardRecording from './SessionCardRecording.vue';
+import SessionCardProcessing from './SessionCardProcessing.vue';
+import SessionCardError from './SessionCardError.vue';
 import { useDateFormat } from '@vueuse/core';
 import {
   createPeaksContext,
@@ -23,6 +27,9 @@ const waveformRef = ref<InstanceType<typeof WaveformView> | null>(null);
 const isEditing = ref(false);
 const editedName = ref('');
 
+// Only allow editing for finished sessions
+const canEdit = computed(() => props.session.state === 'finished');
+
 const displayName = computed(() => {
   return props.session.name || `Untitled #${props.index}`;
 });
@@ -40,6 +47,8 @@ const displayDate = computed(() => {
 });
 
 const startEditing = () => {
+  if (!canEdit.value) return;
+
   isEditing.value = true;
   editedName.value = props.session.name || '';
 
@@ -108,52 +117,62 @@ const onKeydown = (event: KeyboardEvent) => {
   }
 };
 
-const ctx = createPeaksContext({
-  initialState: {
-    waveformUrl: props.session.inlineFiles.waveform,
-    audioUrls: [
-      {
-        src: props.session.inlineFiles.ogg,
-        type: 'audio/ogg',
-      },
-      {
-        src: props.session.inlineFiles.flac,
-        type: 'audio/flac',
-      },
-    ],
-    expanded: false,
-    permissions: {
-      create: false,
-      update: true,
-      delete: true,
-    },
-    segments: props.session.segments.map((s) => ({
-      id: s.id,
-      labelText: s.name,
-      startTime: s.timeStart.getTime(),
-      endTime: s.timeEnd.getTime(),
-    })),
-  },
-});
-
-providePeaksContext(ctx);
-integrateSegments(props.session, ctx);
+// Only create waveform context for finished sessions with files
+const isFinished = computed(() => props.session.state === 'finished');
+const hasWaveformFiles = computed(() => !!props.session.inlineFiles);
 
 // Track expanded state for UI
 const isExpanded = ref(false);
-ctx.eventEmitter.on('expandedChanged', (expanded) => {
-  isExpanded.value = expanded;
-});
 
 const toggleExpanded = () => {
   waveformRef.value?.toggleExpanded();
 };
+
+// Create peaks context only for finished sessions with files
+if (isFinished.value && hasWaveformFiles.value && props.session.inlineFiles) {
+  const ctx = createPeaksContext({
+    initialState: {
+      waveformUrl: props.session.inlineFiles.waveform,
+      audioUrls: [
+        {
+          src: props.session.inlineFiles.ogg,
+          type: 'audio/ogg',
+        },
+        {
+          src: props.session.inlineFiles.flac,
+          type: 'audio/flac',
+        },
+      ],
+      expanded: false,
+      permissions: {
+        create: false,
+        update: true,
+        delete: true,
+      },
+      segments: props.session.segments.map((s) => ({
+        id: s.id,
+        labelText: s.name,
+        startTime: s.timeStart.getTime(),
+        endTime: s.timeEnd.getTime(),
+      })),
+    },
+  });
+
+  providePeaksContext(ctx);
+  integrateSegments(props.session, ctx);
+
+  ctx.eventEmitter.on('expandedChanged', (expanded) => {
+    isExpanded.value = expanded;
+  });
+}
 </script>
 
 <template>
-  <div class="card" :class="{ expanded: isExpanded }">
+  <div class="card" :class="[session.state, { expanded: isExpanded }]">
     <div class="header">
+      <!-- Show expand toggle only for finished sessions -->
       <button
+        v-if="isFinished"
         class="expand-toggle"
         :class="{ expanded: isExpanded }"
         :aria-expanded="isExpanded"
@@ -176,11 +195,15 @@ const toggleExpanded = () => {
           />
         </svg>
       </button>
+
+      <!-- Show state indicator for non-finished sessions -->
+      <SessionStateIndicator v-else :state="session.state" />
+
       <span
         ref="titleRef"
         class="title"
-        :class="{ editing: isEditing }"
-        contenteditable="true"
+        :class="{ editing: isEditing, readonly: !canEdit }"
+        :contenteditable="canEdit"
         @focus="startEditing"
         @blur="saveTitle"
         @keydown="onKeydown"
@@ -191,13 +214,28 @@ const toggleExpanded = () => {
         <time class="timestamp" :datetime="displayDate.iso"
           >{{ displayDate.formatted }}
         </time>
-        <div class="menu">
+        <div v-if="isFinished" class="menu">
           <SessionMenu :session="session" :recorder-id="recorderId" />
         </div>
       </div>
     </div>
 
-    <WaveformView ref="waveformRef" />
+    <!-- State-specific content -->
+    <SessionCardRecording
+      v-if="session.state === 'recording'"
+      :session="session"
+      :recorder-id="recorderId"
+    />
+    <SessionCardProcessing
+      v-else-if="session.state === 'processing'"
+      :session="session"
+    />
+    <SessionCardError
+      v-else-if="session.state === 'error'"
+      :session="session"
+      :recorder-id="recorderId"
+    />
+    <WaveformView v-else-if="isFinished && hasWaveformFiles" ref="waveformRef" />
   </div>
 </template>
 
@@ -235,6 +273,14 @@ const toggleExpanded = () => {
 .title:focus,
 .title.editing {
   outline-color: var(--color-purple-500);
+}
+
+.title.readonly {
+  cursor: default;
+}
+
+.title.readonly:hover {
+  outline-color: transparent;
 }
 
 .metadata {

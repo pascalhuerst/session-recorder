@@ -8,7 +8,37 @@ import (
 	"github.com/google/uuid"
 )
 
+// SessionState represents the lifecycle state of a session
+type SessionState int32
+
+const (
+	SessionStateUnknown    SessionState = 0
+	SessionStateRecording  SessionState = 1
+	SessionStateFinished   SessionState = 2
+	SessionStateProcessing SessionState = 3
+	SessionStateError      SessionState = 4
+)
+
+func (s SessionState) String() string {
+	switch s {
+	case SessionStateRecording:
+		return "RECORDING"
+	case SessionStateProcessing:
+		return "PROCESSING"
+	case SessionStateFinished:
+		return "FINISHED"
+	case SessionStateError:
+		return "ERROR"
+	default:
+		return "UNKNOWN"
+	}
+}
+
+// OnSessionClosedCb is called when a session finishes rendering (legacy callback)
 type OnSessionClosedCb func(session *Session)
+
+// OnSessionStateChangedCb is called when a session's state changes
+type OnSessionStateChangedCb func(session *Session, previousState SessionState)
 
 type Filename string
 
@@ -51,6 +81,7 @@ type Storage interface {
 	//CloseOpenSessions(ctx context.Context, RecorderID uuid.UUID) error
 
 	RegisterOnSessionClosedCallback(cb OnSessionClosedCb) error
+	RegisterOnSessionStateChangedCallback(cb OnSessionStateChangedCb) error
 
 	GetPresignedURL(ctx context.Context, asset AssetOptions, options SigningOptions) (string, error)
 }
@@ -101,25 +132,25 @@ type Session struct {
 	EndTime   time.Time     `json:"end_time"`
 	Duration  time.Duration `json:"duration"`
 
-	IsClosed bool `json:"is_closed"`
-	Keep     bool `json:"keep"`
+	// State replaces IsClosed - tracks full lifecycle state
+	State        SessionState `json:"state"`
+	ErrorMessage string       `json:"error_message,omitempty"`
+	Keep         bool         `json:"keep"`
+
+	// IsClosed is deprecated, kept for backward compatibility with existing metadata
+	IsClosed bool `json:"is_closed,omitempty"`
 
 	// key: segment id
 	Segments map[uuid.UUID]Segment `json:"segments"`
 }
 
 func (s Session) String() string {
-	strClosed := " open "
-	if s.IsClosed {
-		strClosed = "closed"
+	strKeep := ""
+	if s.Keep {
+		strKeep = " keep"
 	}
 
-	strKeep := "keep"
-	if !s.Keep {
-		strKeep = ""
-	}
-
-	return fmt.Sprintf("    %s [%s] (%v) %s [%s]\n", s.Name, strClosed, s.Duration, strKeep, s.ID)
+	return fmt.Sprintf("    %s [%s] (%v)%s [%s]\n", s.Name, s.State.String(), s.Duration, strKeep, s.ID)
 }
 
 type Segment struct {

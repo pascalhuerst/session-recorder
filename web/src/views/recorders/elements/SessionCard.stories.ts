@@ -41,10 +41,35 @@
  *   Given a collapsed session card
  *   When the user clicks the expand toggle
  *   Then the card should expand to show zoomview and segments
+ *
+ * Scenario: Recording state
+ *   Given a session in recording state
+ *   When the card renders
+ *   Then show pulsing recording indicator and elapsed timer
+ *
+ * Scenario: Processing state
+ *   Given a session in processing state
+ *   When the card renders
+ *   Then show processing spinner
+ *
+ * Scenario: Error state
+ *   Given a session in error state
+ *   When the card renders
+ *   Then show error message and delete button
  */
 
 import type { Meta, StoryObj } from '@storybook/vue3';
 import { within, expect, userEvent } from '@storybook/test';
+
+import type { SessionState } from '../../../types';
+
+// State configuration for indicator
+const stateConfig: Record<SessionState, { text: string; class: string }> = {
+  recording: { text: 'Recording', class: 'is-recording' },
+  processing: { text: 'Processing', class: 'is-processing' },
+  finished: { text: 'Ready', class: 'is-finished' },
+  error: { text: 'Error', class: 'is-error' },
+};
 
 // Mock component since real SessionCard requires WaveformView and complex setup
 const MockSessionCard = {
@@ -67,6 +92,7 @@ const MockSessionCard = {
     return {
       isEditing: false,
       isExpanded: false,
+      now: new Date(),
     };
   },
   computed: {
@@ -86,12 +112,39 @@ const MockSessionCard = {
         formatted: startedAt.toLocaleDateString('en-US', options),
       };
     },
+    isFinished() {
+      return this.session.state === 'finished';
+    },
+    canEdit() {
+      return this.session.state === 'finished';
+    },
+    stateIndicator() {
+      return stateConfig[this.session.state as SessionState];
+    },
+    elapsedTime() {
+      const diff = this.now.getTime() - this.session.startedAt.getTime();
+      const seconds = Math.floor(diff / 1000);
+      const minutes = Math.floor(seconds / 60);
+      const pad = (n: number) => n.toString().padStart(2, '0');
+      return `${pad(minutes)}:${pad(seconds % 60)}`;
+    },
+  },
+  mounted() {
+    if (this.session.state === 'recording') {
+      this._timer = setInterval(() => {
+        this.now = new Date();
+      }, 1000);
+    }
+  },
+  beforeUnmount() {
+    if (this._timer) clearInterval(this._timer);
   },
   methods: {
     toggleExpanded() {
       this.isExpanded = !this.isExpanded;
     },
     startEditing() {
+      if (!this.canEdit) return;
       this.isEditing = true;
     },
     saveTitle() {
@@ -110,9 +163,11 @@ const MockSessionCard = {
     },
   },
   template: `
-    <div class="card" :class="{ expanded: isExpanded }">
+    <div class="card" :class="[session.state, { expanded: isExpanded }]">
       <div class="header">
+        <!-- Expand toggle for finished sessions -->
         <button
+          v-if="isFinished"
           class="expand-toggle"
           :class="{ expanded: isExpanded }"
           @click="toggleExpanded"
@@ -123,22 +178,56 @@ const MockSessionCard = {
             <path d="M6 4L10 8L6 12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </button>
+
+        <!-- State indicator for non-finished sessions -->
+        <div v-else :class="['state-indicator', stateIndicator.class]">
+          <span class="indicator" />
+          <span class="state-text">{{ stateIndicator.text }}</span>
+        </div>
+
         <span
           class="title"
-          :class="{ editing: isEditing }"
-          contenteditable="true"
+          :class="{ editing: isEditing, readonly: !canEdit }"
+          :contenteditable="canEdit"
           @focus="startEditing"
           @blur="saveTitle"
           @keydown="onKeydown"
         >{{ displayName }}</span>
         <div class="metadata">
           <time class="timestamp" :datetime="displayDate.iso">{{ displayDate.formatted }}</time>
-          <div class="menu">
+          <div v-if="isFinished" class="menu">
             <button class="menu-button">⋮</button>
           </div>
         </div>
       </div>
-      <div class="waveform-container">
+
+      <!-- Recording state content -->
+      <div v-if="session.state === 'recording'" class="recording-content">
+        <div class="waveform-placeholder">
+          <div class="wave-animation">
+            <span class="bar" v-for="i in 20" :key="i" :style="{ animationDelay: i * 0.1 + 's' }" />
+          </div>
+        </div>
+        <div class="controls">
+          <span class="elapsed-time">{{ elapsedTime }}</span>
+          <button class="cut-button">Cut Session</button>
+        </div>
+      </div>
+
+      <!-- Processing state content -->
+      <div v-else-if="session.state === 'processing'" class="processing-content">
+        <div class="spinner" />
+        <p class="message">Processing audio...</p>
+      </div>
+
+      <!-- Error state content -->
+      <div v-else-if="session.state === 'error'" class="error-content">
+        <p class="error-message">{{ session.errorMessage || 'An error occurred' }}</p>
+        <button class="delete-button">Delete Session</button>
+      </div>
+
+      <!-- Finished state content -->
+      <div v-else class="waveform-container">
         <div class="overview" style="height: 80px; background: linear-gradient(to right, #e0e0e0, #f5f5f5, #e0e0e0); display: flex; align-items: center; justify-content: center; color: #666;">
           Overview
         </div>
@@ -156,12 +245,15 @@ const MockSessionCard = {
 };
 
 // Mock session data
-const createMockSession = (overrides = {}) => ({
+const createMockSession = (overrides: Record<string, unknown> = {}) => ({
   id: 'session-1',
   startedAt: new Date('2024-03-15T14:30:00'),
+  finishedAt: new Date('2024-03-15T15:30:00'),
   expiresAt: new Date('2024-04-15T14:30:00'),
   name: '',
   keep: false,
+  state: 'finished' as SessionState,
+  errorMessage: undefined,
   segments: [],
   inlineFiles: {
     waveform: '/mock/waveform.dat',
@@ -430,6 +522,149 @@ export const MixedSessionList: Story = {
         { session: createMockSession({ id: 's2', name: '' }), index: 2 },
         { session: createMockSession({ id: 's3', name: 'Podcast Episode 5' }), index: 3 },
         { session: createMockSession({ id: 's4' }), index: 4 },
+      ];
+      return { sessions };
+    },
+    template: `
+      <div style="display: flex; flex-direction: column; gap: 2rem; max-width: 800px;">
+        <MockSessionCard
+          v-for="s in sessions"
+          :key="s.session.id"
+          :session="s.session"
+          recorderId="recorder-1"
+          :index="s.index"
+        />
+      </div>
+    `,
+  }),
+};
+
+// Recording state session
+export const Recording: Story = {
+  args: {
+    session: createMockSession({
+      state: 'recording',
+      finishedAt: null,
+      expiresAt: null,
+      inlineFiles: null,
+      downloadFiles: null,
+      startedAt: new Date(Date.now() - 125000), // Started ~2 minutes ago
+    }),
+    recorderId: 'recorder-1',
+    index: 1,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    // Check recording indicator is visible
+    await expect(canvas.getByText('Recording')).toBeInTheDocument();
+
+    // Check cut session button exists
+    await expect(canvas.getByText('Cut Session')).toBeInTheDocument();
+
+    // No expand toggle for recording sessions
+    await expect(canvas.queryByRole('button', { name: 'Toggle session details' })).not.toBeInTheDocument();
+  },
+};
+
+// Processing state session
+export const Processing: Story = {
+  args: {
+    session: createMockSession({
+      state: 'processing',
+      finishedAt: null,
+      expiresAt: null,
+    }),
+    recorderId: 'recorder-1',
+    index: 1,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    // Check processing indicator is visible
+    await expect(canvas.getByText('Processing')).toBeInTheDocument();
+
+    // Check processing message
+    await expect(canvas.getByText('Processing audio...')).toBeInTheDocument();
+  },
+};
+
+// Error state session
+export const Error: Story = {
+  args: {
+    session: createMockSession({
+      state: 'error',
+      errorMessage: 'Failed to process audio: codec not supported',
+    }),
+    recorderId: 'recorder-1',
+    index: 1,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    // Check error indicator is visible
+    await expect(canvas.getByText('Error')).toBeInTheDocument();
+
+    // Check error message
+    await expect(canvas.getByText('Failed to process audio: codec not supported')).toBeInTheDocument();
+
+    // Check delete button exists
+    await expect(canvas.getByText('Delete Session')).toBeInTheDocument();
+  },
+};
+
+// Mixed state session list
+export const MixedStateList: Story = {
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    // Check all states are represented
+    await expect(canvas.getByText('Recording')).toBeInTheDocument();
+    await expect(canvas.getByText('Processing')).toBeInTheDocument();
+    await expect(canvas.getByText('Error')).toBeInTheDocument();
+    await expect(canvas.getByText('Overview')).toBeInTheDocument(); // Finished session
+  },
+  render: () => ({
+    components: { MockSessionCard },
+    setup() {
+      const sessions = [
+        {
+          session: createMockSession({
+            id: 's1',
+            name: 'Active Recording',
+            state: 'recording',
+            finishedAt: null,
+            inlineFiles: null,
+            startedAt: new Date(Date.now() - 60000),
+          }),
+          index: 1,
+        },
+        {
+          session: createMockSession({
+            id: 's2',
+            name: 'Being Processed',
+            state: 'processing',
+            finishedAt: null,
+          }),
+          index: 2,
+        },
+        {
+          session: createMockSession({
+            id: 's3',
+            name: 'Completed Session',
+            state: 'finished',
+          }),
+          index: 3,
+        },
+        {
+          session: createMockSession({
+            id: 's4',
+            name: 'Failed Session',
+            state: 'error',
+            errorMessage: 'Audio codec not supported',
+          }),
+          index: 4,
+        },
       ];
       return { sessions };
     },

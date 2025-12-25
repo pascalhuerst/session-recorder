@@ -1,11 +1,11 @@
 import {
   type SegmentInfo,
   type SessionInfo,
-  SessionState,
+  SessionState as ProtoSessionState,
   StreamSessionRequest,
 } from '@session-recorder/protocols/ts/sessionsource';
 import { sessionSourceClient } from '../sessionSourceClient';
-import type { Segment, Session } from '../../types';
+import type { Segment, Session, SessionState } from '../../types';
 import { Timestamp } from '@session-recorder/protocols/ts/google/protobuf/timestamp';
 import { Duration } from '@session-recorder/protocols/ts/google/protobuf/duration';
 
@@ -38,11 +38,28 @@ const fromFactory = <T>(factory: Factory<T>): T => {
   }, {} as T);
 };
 
+const mapSessionState = (protoState: ProtoSessionState): SessionState => {
+  switch (protoState) {
+    case ProtoSessionState.RECORDING:
+      return 'recording';
+    case ProtoSessionState.PROCESSING:
+      return 'processing';
+    case ProtoSessionState.FINISHED:
+      return 'finished';
+    case ProtoSessionState.ERROR:
+      return 'error';
+    default:
+      return 'recording';
+  }
+};
+
 export const normalizeSession = (id: string, info: SessionInfo): Session => {
   return fromFactory<Session>({
     id: () => id,
     name: () => info.name,
     keep: () => info.keep,
+    state: () => mapSessionState(info.state),
+    errorMessage: () => info.errorMessage || undefined,
     startedAt: () => {
       if (!info.timeCreated) {
         throw new Error('Missing startsAt');
@@ -51,33 +68,27 @@ export const normalizeSession = (id: string, info: SessionInfo): Session => {
     },
     finishedAt: () => {
       if (!info.timeFinished) {
-        throw new Error('Missing finishedAt');
+        return null;
       }
       return Timestamp.toDate(info.timeFinished);
     },
     expiresAt: () => {
       if (!info.timeFinished || !info.lifetime) {
-        throw new Error('Missing time info');
+        return null;
       }
       const finishedAt = Timestamp.toDate(info.timeFinished);
       const expiresAt = addDurationToDate(finishedAt, info.lifetime);
       return expiresAt;
     },
     inlineFiles: () => {
-      if (!info.inlineFiles) {
-        throw new Error('Missing inlineFiles');
-      }
-      return info.inlineFiles;
+      return info.inlineFiles || null;
     },
     downloadFiles: () => {
-      if (!info.downloadFiles) {
-        throw new Error('Missing downloadFiles');
-      }
-      return info.downloadFiles;
+      return info.downloadFiles || null;
     },
     segments: () => {
       if (!info.segments) {
-        throw new Error('Missing segments');
+        return [];
       }
       return info.segments
         .map((s) => {
@@ -140,10 +151,6 @@ export const streamSessions = (args: {
         switch (response.info.oneofKind) {
           case 'updated': {
             if ('updated' in response.info) {
-              if (response.info.updated.state !== SessionState.FINISHED) {
-                break;
-              }
-
               try {
                 const session = normalizeSession(
                   response.iD,

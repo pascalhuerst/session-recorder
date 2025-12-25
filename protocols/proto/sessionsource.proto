@@ -56,6 +56,8 @@ enum SessionState {
 	SESSION_STATE_UNKNOWN = 0;
 	SESSION_STATE_RECORDING = 1;
 	SESSION_STATE_FINISHED = 2;
+	SESSION_STATE_PROCESSING = 3;
+	SESSION_STATE_ERROR = 4;
 }
 
 message SessionInfo {
@@ -78,6 +80,8 @@ message SessionInfo {
 
 	Files inlineFiles = 11;
 	Files downloadFiles = 12;
+
+	string errorMessage = 13;
 }
 
 message SessionRemoved {}

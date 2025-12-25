@@ -42,6 +42,14 @@ func NewSessionSourceHandler(
 		sessionUpdateCh:  sessionUpdateCh,
 	}
 
+	// Register callback for session state changes (RECORDING, PROCESSING, FINISHED)
+	sessionStorage.RegisterOnSessionStateChangedCallback(
+		func(session *storage.Session, previousState storage.SessionState) {
+			h.onSessionStateChanged(session, previousState)
+		},
+	)
+
+	// Keep legacy callback for backwards compatibility
 	sessionStorage.RegisterOnSessionClosedCallback(
 		func(session *storage.Session) {
 			h.onSessionClosed(session)
@@ -49,6 +57,22 @@ func NewSessionSourceHandler(
 	)
 
 	return h
+}
+
+// mapSessionState converts storage.SessionState to proto SessionState
+func mapSessionState(state storage.SessionState) sspb.SessionState {
+	switch state {
+	case storage.SessionStateRecording:
+		return sspb.SessionState_SESSION_STATE_RECORDING
+	case storage.SessionStateProcessing:
+		return sspb.SessionState_SESSION_STATE_PROCESSING
+	case storage.SessionStateFinished:
+		return sspb.SessionState_SESSION_STATE_FINISHED
+	case storage.SessionStateError:
+		return sspb.SessionState_SESSION_STATE_ERROR
+	default:
+		return sspb.SessionState_SESSION_STATE_UNKNOWN
+	}
 }
 
 func getFileURL(ctx context.Context, h *SessionSourceHandler, session *storage.Session, filename storage.Filename, download bool) string {
@@ -87,27 +111,54 @@ func getFileURL(ctx context.Context, h *SessionSourceHandler, session *storage.S
 }
 
 func newSessionInfo(ctx context.Context, h *SessionSourceHandler, session *storage.Session) *sspb.SessionInfo {
-	getURL := func(filename storage.Filename, download bool) string {
-		return getFileURL(ctx, h, session, filename, download)
-	}
-
-	return &sspb.SessionInfo{
+	info := &sspb.SessionInfo{
 		TimeCreated:  timestamppb.New(session.StartTime),
-		TimeFinished: timestamppb.New(session.EndTime),
 		Lifetime:     durationpb.New(defaultLifetime), //TODO: This info needs to be stored in the session
 		Name:         session.Name,
 		Keep:         session.Keep,
-		State:        sspb.SessionState_SESSION_STATE_FINISHED,
+		State:        mapSessionState(session.State),
+		ErrorMessage: session.ErrorMessage,
 		Segments:     []*sspb.Segment{},
-		InlineFiles: &sspb.SessionInfo_Files{
+	}
+
+	// Only set TimeFinished for finished sessions
+	if session.State == storage.SessionStateFinished && !session.EndTime.IsZero() {
+		info.TimeFinished = timestamppb.New(session.EndTime)
+	}
+
+	// Only add file URLs for finished sessions (files exist only after rendering)
+	if session.State == storage.SessionStateFinished {
+		getURL := func(filename storage.Filename, download bool) string {
+			return getFileURL(ctx, h, session, filename, download)
+		}
+
+		info.InlineFiles = &sspb.SessionInfo_Files{
 			Ogg:      getURL(storage.FILENAME_OGG, false),
 			Flac:     getURL(storage.FILENAME_FLAC, false),
 			Waveform: getURL(storage.FILENAME_WAVEFORM, false),
-		},
-		DownloadFiles: &sspb.SessionInfo_Files{
+		}
+		info.DownloadFiles = &sspb.SessionInfo_Files{
 			Ogg:      getURL(storage.FILENAME_OGG, true),
 			Flac:     getURL(storage.FILENAME_FLAC, true),
 			Waveform: getURL(storage.FILENAME_WAVEFORM, true),
+		}
+	}
+
+	return info
+}
+
+// onSessionStateChanged is called when a session's state changes (RECORDING, PROCESSING, FINISHED)
+func (h *SessionSourceHandler) onSessionStateChanged(session *storage.Session, previousState storage.SessionState) {
+	log.Debug().
+		Str("session-id", session.ID.String()).
+		Str("previous-state", previousState.String()).
+		Str("new-state", session.State.String()).
+		Msg("Session state changed")
+
+	h.sessionUpdateCh <- &sspb.Session{
+		ID: session.ID.String(),
+		Info: &sspb.Session_Updated{
+			Updated: newSessionInfo(context.Background(), h, session),
 		},
 	}
 }
@@ -116,7 +167,7 @@ func newSessionInfo(ctx context.Context, h *SessionSourceHandler, session *stora
 func (h *SessionSourceHandler) onSessionClosed(session *storage.Session) {
 	log.Debug().Interface("session", session).Msg("Session closed")
 
-	// TODO: Refine this
+	// This is now handled by onSessionStateChanged, but kept for backwards compatibility
 	h.sessionUpdateCh <- &sspb.Session{
 		ID: session.ID.String(),
 		Info: &sspb.Session_Updated{
@@ -174,18 +225,17 @@ func (h *SessionSourceHandler) streamSessions(ctx context.Context, request *sspb
 
 	sessions := h.sessionStorage.GetSessions(recorderID)
 
+	// Stream all sessions regardless of state (RECORDING, PROCESSING, FINISHED, ERROR)
 	for _, session := range sessions {
-		if session.IsClosed {
-			if err := server.SendMsg(
-				&sspb.Session{
-					ID: session.ID.String(),
-					Info: &sspb.Session_Updated{
-						Updated: newSessionInfo(ctx, h, &session),
-					},
+		if err := server.SendMsg(
+			&sspb.Session{
+				ID: session.ID.String(),
+				Info: &sspb.Session_Updated{
+					Updated: newSessionInfo(ctx, h, &session),
 				},
-			); err != nil {
-				log.Err(err).Msg("Cannot send session data")
-			}
+			},
+		); err != nil {
+			log.Err(err).Msg("Cannot send session data")
 		}
 	}
 

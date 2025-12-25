@@ -28,8 +28,7 @@ export const installViewControls = ({
       if (expanded) {
         // Expanding: need to create zoomview
         if (zoomviewContainer) {
-          const { theme } = state.get();
-          peaks.views.createZoomview(zoomviewContainer, theme.zoomviewTheme);
+          peaks.views.createZoomview(zoomviewContainer);
           isExpanded = true;
           eventEmitter.emit('expandedChanged', true);
         }

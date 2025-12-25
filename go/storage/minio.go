@@ -89,8 +89,9 @@ type Minio struct {
 	chunks   map[uuid.UUID]*minioChunk
 	dataLock sync.Mutex
 
-	onSessionClosedCb OnSessionClosedCb
-	cbLock            sync.Mutex
+	onSessionClosedCb       OnSessionClosedCb
+	onSessionStateChangedCb OnSessionStateChangedCb
+	cbLock                  sync.Mutex
 }
 
 func NewMinioStorage(endpoint, publicEndpoint, accessKey, secretKey string) (*Minio, error) {
@@ -203,6 +204,31 @@ func (m *Minio) Start(ctx context.Context) error {
 				continue
 			}
 
+			// Migration: Convert legacy IsClosed to State
+			if sessionMetadata.State == SessionStateUnknown {
+				if sessionMetadata.IsClosed {
+					sessionMetadata.State = SessionStateFinished
+				} else if m.isSessionClosed(ctx, recorderID, sessionID) {
+					// No chunks folder means it was already rendered
+					sessionMetadata.State = SessionStateFinished
+				} else {
+					// Has chunks folder, still recording
+					sessionMetadata.State = SessionStateRecording
+				}
+				// Save migrated state
+				if err := m.putSessionMetadata(ctx, recorderID, sessionID, sessionMetadata); err != nil {
+					log.Warn().
+						Err(err).
+						Stringer("session-id", sessionID).
+						Msg("Cannot save migrated session metadata")
+				} else {
+					log.Info().
+						Stringer("session-id", sessionID).
+						Str("state", sessionMetadata.State.String()).
+						Msg("Migrated legacy session state")
+				}
+			}
+
 			m.system.Recorders[recorderID].Sessions[sessionID] = *sessionMetadata
 		}
 
@@ -225,6 +251,24 @@ func (m *Minio) RegisterOnSessionClosedCallback(cb OnSessionClosedCb) error {
 	return nil
 }
 
+func (m *Minio) RegisterOnSessionStateChangedCallback(cb OnSessionStateChangedCb) error {
+	m.cbLock.Lock()
+	defer m.cbLock.Unlock()
+
+	m.onSessionStateChangedCb = cb
+
+	return nil
+}
+
+// notifyStateChange calls the state changed callback if registered
+func (m *Minio) notifyStateChange(session *Session, previousState SessionState) {
+	if m.onSessionStateChangedCb != nil {
+		m.cbLock.Lock()
+		m.onSessionStateChangedCb(session, previousState)
+		m.cbLock.Unlock()
+	}
+}
+
 func (m *Minio) initSession(ctx context.Context, recorderID, sessionID uuid.UUID, timeCreated time.Time) {
 	log.Info().
 		Stringer("recorder-id", recorderID).
@@ -243,6 +287,7 @@ func (m *Minio) initSession(ctx context.Context, recorderID, sessionID uuid.UUID
 		StartTime:  timeCreated,
 		EndTime:    time.Time{},
 		Duration:   0,
+		State:      SessionStateRecording,
 		IsClosed:   false,
 		Keep:       false,
 		Segments:   make(map[uuid.UUID]Segment),
@@ -253,7 +298,11 @@ func (m *Minio) initSession(ctx context.Context, recorderID, sessionID uuid.UUID
 			Stringer("recorder-id", recorderID).
 			Stringer("session-id", sessionID).
 			Msg("Cannot put session metadata")
+		return
 	}
+
+	// Notify about new recording session
+	m.notifyStateChange(&session, SessionStateUnknown)
 }
 
 func (m *Minio) initRecorder(ctx context.Context, recorderID uuid.UUID, recorderName string) {
@@ -569,17 +618,13 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 	sm, err := m.getSessionMetadata(ctx, recorderID, sessionID)
 	if err != nil {
 		log.Err(err).Msg("Cannot get session metadata")
-	} else {
-		sm.Duration = time.Duration(durationSeconds) * time.Second
-		sm.EndTime = sm.StartTime.Add(sm.Duration)
-		sm.IsClosed = true
-
-		m.dataLock.Lock()
-		if err = m.putSessionMetadata(ctx, recorderID, sessionID, sm); err != nil {
-			log.Err(err).Msg("Cannot put session metadata")
-		}
-		m.dataLock.Unlock()
+		return fmt.Errorf("cannot get session metadata: %w", err)
 	}
+
+	previousState := sm.State
+	sm.Duration = time.Duration(durationSeconds) * time.Second
+	sm.EndTime = sm.StartTime.Add(sm.Duration)
+	// Don't set to FINISHED yet - wait for rendering to complete
 
 	var rawData *minio.Object
 	if rawData, err = m.client.GetObject(ctx, bucketName, dst.Object, minio.GetObjectOptions{}); err != nil {
@@ -684,13 +729,35 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 	})
 
 	if err := eg.Wait(); err != nil {
+		// Set state to ERROR on rendering failure
+		sm.State = SessionStateError
+		sm.ErrorMessage = err.Error()
+		m.dataLock.Lock()
+		if putErr := m.putSessionMetadata(ctx, recorderID, sessionID, sm); putErr != nil {
+			log.Err(putErr).Msg("Cannot update session state to ERROR")
+		}
+		m.dataLock.Unlock()
+		m.notifyStateChange(sm, previousState)
 		return err
 	}
+
+	// Rendering succeeded - set state to FINISHED
+	sm.State = SessionStateFinished
+	sm.IsClosed = true
+	m.dataLock.Lock()
+	if err := m.putSessionMetadata(ctx, recorderID, sessionID, sm); err != nil {
+		log.Err(err).Msg("Cannot put session metadata")
+	}
+	m.dataLock.Unlock()
 
 	if err := m.client.RemoveObject(ctx, bucketName, chunksPrefix, minio.RemoveObjectOptions{ForceDelete: true}); err != nil {
 		log.Err(err).Str("object", chunksPrefix).Msg("Cannot remove object")
 	}
 
+	// Notify state change to FINISHED
+	m.notifyStateChange(sm, previousState)
+
+	// Legacy callback for backward compatibility
 	if m.onSessionClosedCb != nil {
 		m.cbLock.Lock()
 		m.onSessionClosedCb(sm)
@@ -964,6 +1031,19 @@ func (m *Minio) closeSession(ctx context.Context, recorderID, sessionID uuid.UUI
 		if err := m.flushChunks(ctx, recorderID, sessionID, chunk); err != nil {
 			return fmt.Errorf("cannot flush session: %w", err)
 		}
+	}
+
+	// Update state to PROCESSING before rendering
+	sm, err := m.getSessionMetadata(ctx, recorderID, sessionID)
+	if err == nil {
+		previousState := sm.State
+		sm.State = SessionStateProcessing
+		m.dataLock.Lock()
+		if err := m.putSessionMetadata(ctx, recorderID, sessionID, sm); err != nil {
+			log.Err(err).Msg("Cannot update session state to PROCESSING")
+		}
+		m.dataLock.Unlock()
+		m.notifyStateChange(sm, previousState)
 	}
 
 	if err := m.renderSession(ctx, recorderID, sessionID); err != nil {

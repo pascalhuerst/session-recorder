@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onUnmounted } from 'vue';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import { Button } from '@session-recorder/session-waveform';
 import type { Session } from '@/types';
@@ -8,18 +8,23 @@ defineProps<{
   session: Session;
 }>();
 
-// Canvas-based static waveform
+// Canvas-based animated waveform
 const canvasRef = ref<HTMLCanvasElement | null>(null);
+let animationId: number | null = null;
 
-// Generate test waveform data (simulated audio samples)
-const sampleCount = 200;
-const waveformData = Array.from({ length: sampleCount }, (_, i) => {
-  // Create varied base amplitudes using multiple sine waves
-  const base = 0.3 + Math.sin(i * 0.1) * 0.15 + Math.sin(i * 0.05) * 0.1;
-  return base;
+// Generate base waveform data (simulated audio samples)
+const sampleCount = 10000;
+const baseWaveformData = Array.from({ length: sampleCount }, (_, i) => {
+  // Create varied base amplitudes with clearer peaks
+  const base = 0.25;
+  const peak1 = Math.sin(i * 0.08) * 0.2;
+  const peak2 = Math.sin(i * 0.03) * 0.15;
+  const peak3 = Math.sin(i * 0.15) * 0.1;
+  const detail = Math.sin(i * 0.5) * 0.05;
+  return Math.max(0.08, base + peak1 + peak2 + peak3 + detail);
 });
 
-const drawWaveform = () => {
+const drawWaveform = (time: number) => {
   const canvas = canvasRef.value;
   if (!canvas) return;
 
@@ -31,41 +36,80 @@ const drawWaveform = () => {
   const height = canvas.clientHeight;
 
   // Set canvas resolution for sharp rendering
-  canvas.width = width * dpr;
-  canvas.height = height * dpr;
-  ctx.scale(dpr, dpr);
-
-  const barWidth = 3;
-  const gap = 2;
-  const totalBarWidth = barWidth + gap;
-  const barCount = Math.floor(width / totalBarWidth);
-  const centerY = height / 2;
-  const maxBarHeight = height * 0.8;
-
-  // Create gradient for bars (muted/grey for processing state)
-  const gradient = ctx.createLinearGradient(0, 0, 0, height);
-  gradient.addColorStop(0, 'rgba(156, 163, 175, 0.7)');   // grey-400
-  gradient.addColorStop(0.5, 'rgba(107, 114, 128, 0.8)'); // grey-500
-  gradient.addColorStop(1, 'rgba(156, 163, 175, 0.7)');   // grey-400
-
-  ctx.fillStyle = gradient;
-
-  for (let i = 0; i < barCount; i++) {
-    const dataIndex = Math.floor((i / barCount) * sampleCount);
-    const amplitude = waveformData[dataIndex];
-    const barHeight = Math.max(4, amplitude * maxBarHeight);
-    const x = i * totalBarWidth;
-    const y = centerY - barHeight / 2;
-
-    // Draw rounded bar
-    ctx.beginPath();
-    ctx.roundRect(x, y, barWidth, barHeight, barWidth / 2);
-    ctx.fill();
+  if (canvas.width !== width * dpr || canvas.height !== height * dpr) {
+    canvas.width = width * dpr;
+    canvas.height = height * dpr;
+    ctx.scale(dpr, dpr);
   }
+
+  // Clear canvas (white background)
+  ctx.clearRect(0, 0, width, height);
+
+  const centerY = height / 2;
+  const maxAmplitudeHeight = height * 0.4;
+
+  // Disabled grey waveform for processing state
+  ctx.fillStyle = '#c4c9d4';
+
+  const pointCount = Math.floor(width);
+
+  // Draw filled waveform path with dancing animation
+  ctx.beginPath();
+
+  // Forward pass: draw top edge from left to right
+  for (let i = 0; i < pointCount; i++) {
+    const dataIndex = Math.floor((i / pointCount) * sampleCount);
+    const baseAmplitude = baseWaveformData[dataIndex];
+
+    // Add dancing effect: multiple waves at different speeds
+    const dance =
+      Math.sin(time * 0.002 + i * 0.05) * 0.08 +
+      Math.sin(time * 0.003 + i * 0.03) * 0.05 +
+      Math.sin(time * 0.001 + i * 0.08) * 0.03;
+
+    const amplitude = Math.max(0.05, baseAmplitude + dance);
+    const x = i + 0.5;
+    const y = centerY - amplitude * maxAmplitudeHeight + 0.5;
+
+    if (i === 0) {
+      ctx.moveTo(x, y);
+    } else {
+      ctx.lineTo(x, y);
+    }
+  }
+
+  // Reverse pass: draw bottom edge from right to left
+  for (let i = pointCount - 1; i >= 0; i--) {
+    const dataIndex = Math.floor((i / pointCount) * sampleCount);
+    const baseAmplitude = baseWaveformData[dataIndex];
+
+    // Same dancing effect for symmetry
+    const dance =
+      Math.sin(time * 0.002 + i * 0.05) * 0.08 +
+      Math.sin(time * 0.003 + i * 0.03) * 0.05 +
+      Math.sin(time * 0.001 + i * 0.08) * 0.03;
+
+    const amplitude = Math.max(0.05, baseAmplitude + dance);
+    const x = i + 0.5;
+    const y = centerY + amplitude * maxAmplitudeHeight + 0.5;
+
+    ctx.lineTo(x, y);
+  }
+
+  ctx.closePath();
+  ctx.fill();
+
+  animationId = requestAnimationFrame(drawWaveform);
 };
 
 onMounted(() => {
-  drawWaveform();
+  animationId = requestAnimationFrame(drawWaveform);
+});
+
+onUnmounted(() => {
+  if (animationId !== null) {
+    cancelAnimationFrame(animationId);
+  }
 });
 </script>
 

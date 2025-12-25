@@ -23,6 +23,9 @@ const { awaitConfirmation, modalProps } = useConfirmation();
 
 const displayExpiryDate = computed(() => {
   const { expiresAt } = props.session;
+  if (!expiresAt) {
+    return null;
+  }
   const format =
     expiresAt.getFullYear() === new Date().getFullYear()
       ? 'ddd, MMM D, HH:mm'
@@ -72,7 +75,7 @@ const onDelete = () => {
 
 <template>
   <div class="menu">
-    <template v-if="!session.keep">
+    <template v-if="!session.keep && displayExpiryDate">
       <div class="balance">Kept until {{ displayExpiryDate.formatted }}</div>
       <Button size="xs" @click="onKeep">
         <font-awesome-icon icon="fa-solid fa-heart"></font-awesome-icon>

@@ -1,6 +1,7 @@
 package broadcast
 
 import (
+	"context"
 	"sync"
 	"testing"
 	"time"
@@ -17,6 +18,8 @@ import (
  * - GetAllCachedStatuses: Returns all cached statuses
  * - Multiple recorders: Each recorder's status is cached separately
  * - Concurrent access: Thread-safe operations
+ * - Timeout: Stale recorders transition to NO_SIGNAL after timeout
+ * - Timeout Reset: Fresh updates reset the timeout timer
  */
 
 func makeRecorder(id, name string, signalStatus cmpb.SignalStatus) *sspb.Recorder {
@@ -263,5 +266,142 @@ func TestRecorderBroadcaster_Concurrent(t *testing.T) {
 		if count != numMessages {
 			t.Errorf("subscriber %d received %d messages, want %d", i, count, numMessages)
 		}
+	}
+}
+
+func TestRecorderBroadcaster_Timeout_StaleRecorderBecomesNoSignal(t *testing.T) {
+	b := NewRecorderBroadcaster(5)
+	b.SetStatusTimeout(50 * time.Millisecond)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	b.Start(ctx)
+
+	ch, unsub := b.Subscribe()
+	defer unsub()
+
+	// Broadcast a SIGNAL status
+	recorder := makeRecorder("rec-1", "Recorder 1", cmpb.SignalStatus_SIGNAL)
+	b.Broadcast(recorder)
+
+	// Drain the initial broadcast
+	select {
+	case <-ch:
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("timeout waiting for initial broadcast")
+	}
+
+	// Wait for timeout to trigger (50ms timeout + 3s check interval is too long)
+	// Instead, directly call checkStaleRecorders after waiting
+	time.Sleep(60 * time.Millisecond)
+	b.checkStaleRecorders()
+
+	// Should receive NO_SIGNAL broadcast
+	select {
+	case msg := <-ch:
+		status, ok := msg.Info.(*sspb.Recorder_Status)
+		if !ok {
+			t.Fatal("expected Recorder_Status info")
+		}
+		if status.Status.SignalStatus != cmpb.SignalStatus_NO_SIGNAL {
+			t.Errorf("SignalStatus = %v, want NO_SIGNAL", status.Status.SignalStatus)
+		}
+	case <-time.After(100 * time.Millisecond):
+		t.Error("timeout waiting for NO_SIGNAL broadcast")
+	}
+
+	// Cached status should also be NO_SIGNAL
+	cached := b.GetCachedStatus("rec-1")
+	if cached == nil {
+		t.Fatal("cached status is nil")
+	}
+	status, ok := cached.Info.(*sspb.Recorder_Status)
+	if !ok {
+		t.Fatal("expected Recorder_Status info")
+	}
+	if status.Status.SignalStatus != cmpb.SignalStatus_NO_SIGNAL {
+		t.Errorf("cached SignalStatus = %v, want NO_SIGNAL", status.Status.SignalStatus)
+	}
+}
+
+func TestRecorderBroadcaster_Timeout_AlreadyNoSignalNotBroadcastAgain(t *testing.T) {
+	b := NewRecorderBroadcaster(5)
+	b.SetStatusTimeout(50 * time.Millisecond)
+
+	ch, unsub := b.Subscribe()
+	defer unsub()
+
+	// Broadcast a NO_SIGNAL status
+	recorder := makeRecorder("rec-1", "Recorder 1", cmpb.SignalStatus_NO_SIGNAL)
+	b.Broadcast(recorder)
+
+	// Drain the initial broadcast
+	select {
+	case <-ch:
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("timeout waiting for initial broadcast")
+	}
+
+	// Wait for timeout
+	time.Sleep(60 * time.Millisecond)
+	b.checkStaleRecorders()
+
+	// Should NOT receive another broadcast (already NO_SIGNAL)
+	select {
+	case <-ch:
+		t.Error("should not broadcast again for already NO_SIGNAL recorder")
+	case <-time.After(50 * time.Millisecond):
+		// Expected: no message
+	}
+}
+
+func TestRecorderBroadcaster_Timeout_FreshUpdateResetsTimer(t *testing.T) {
+	b := NewRecorderBroadcaster(5)
+	b.SetStatusTimeout(100 * time.Millisecond)
+
+	ch, unsub := b.Subscribe()
+	defer unsub()
+
+	// Broadcast SIGNAL status
+	recorder := makeRecorder("rec-1", "Recorder 1", cmpb.SignalStatus_SIGNAL)
+	b.Broadcast(recorder)
+
+	// Drain initial broadcast
+	select {
+	case <-ch:
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("timeout waiting for initial broadcast")
+	}
+
+	// Wait 60ms (not enough for 100ms timeout)
+	time.Sleep(60 * time.Millisecond)
+
+	// Send another update (should reset timer)
+	b.Broadcast(recorder)
+
+	// Drain the second broadcast
+	select {
+	case <-ch:
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("timeout waiting for second broadcast")
+	}
+
+	// Wait another 60ms and check - should still be SIGNAL
+	time.Sleep(60 * time.Millisecond)
+	b.checkStaleRecorders()
+
+	// Should NOT receive NO_SIGNAL (timer was reset)
+	select {
+	case <-ch:
+		t.Error("should not timeout yet, timer was reset")
+	case <-time.After(50 * time.Millisecond):
+		// Expected: no timeout message
+	}
+
+	// Cached status should still be SIGNAL
+	cached := b.GetCachedStatus("rec-1")
+	status := cached.Info.(*sspb.Recorder_Status)
+	if status.Status.SignalStatus != cmpb.SignalStatus_SIGNAL {
+		t.Errorf("SignalStatus = %v, want SIGNAL", status.Status.SignalStatus)
 	}
 }

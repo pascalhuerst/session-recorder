@@ -72,6 +72,7 @@ func main() {
 	// Create broadcasters for fan-out to multiple clients
 	// Buffer size of 10 provides headroom for slower consumers
 	recorderBroadcaster := broadcast.NewRecorderBroadcaster(10)
+	recorderBroadcaster.Start(ctx)
 	sessionBroadcaster := broadcast.NewSessionBroadcaster(10)
 	audioBroadcaster := broadcast.NewAudioBroadcaster(10)
 

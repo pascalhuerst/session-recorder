@@ -332,8 +332,10 @@ func (m *Minio) checkAndCloseStaleSession(ctx context.Context) {
 				if err := m.putSessionMetadata(ctx, recorderID, chunk.sessionID, sm); err != nil {
 					log.Err(err).Msg("Cannot update session state to PROCESSING")
 				}
+				// Create a copy for the callback to avoid races with concurrent modifications
+				sessionCopy := *sm
 				// Notify outside lock to avoid deadlock
-				go m.notifyStateChange(sm, previousState)
+				go m.notifyStateChange(&sessionCopy, previousState)
 			}
 
 			// Remove from tracking maps
@@ -605,8 +607,10 @@ func (m *Minio) SafeChunks(ctx context.Context, recorderID, sessionID uuid.UUID,
 			if err := m.putSessionMetadata(ctx, recorderID, oldSessionID, sm); err != nil {
 				log.Err(err).Msg("Cannot update session state to PROCESSING")
 			}
+			// Create a copy for the callback to avoid races with concurrent modifications
+			sessionCopy := *sm
 			// Notify outside lock to avoid deadlock (we're already holding dataLock)
-			go m.notifyStateChange(sm, previousState)
+			go m.notifyStateChange(&sessionCopy, previousState)
 		}
 
 		// Now process the old session asynchronously (flush + render)

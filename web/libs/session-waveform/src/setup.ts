@@ -22,12 +22,14 @@ import { faCheckCircle } from '@fortawesome/free-solid-svg-icons/faCheckCircle';
 import { faExclamationCircle } from '@fortawesome/free-solid-svg-icons/faExclamationCircle';
 import { faExclamationTriangle } from '@fortawesome/free-solid-svg-icons/faExclamationTriangle';
 import { faInfoCircle } from '@fortawesome/free-solid-svg-icons/faInfoCircle';
+import { faStop } from '@fortawesome/free-solid-svg-icons/faStop';
 
 export const setup = () => {
   library.add(
     faTimes,
     faPlay,
     faPause,
+    faStop,
     faMicrochip,
     faWaveSquare,
     faTrash,

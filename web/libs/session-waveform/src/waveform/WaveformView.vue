@@ -106,15 +106,18 @@ const minHeight = computed(() => (isExpanded.value ? props.height : 80));
 
 .expanded-content {
   /* Normal state - visible */
+  width: 100%;
 }
 
 .expanded-content.collapsed {
   /*
-    Hide visually but keep in layout with dimensions for Peaks.js.
-    Using height:0 + overflow:hidden to collapse space while
-    keeping the inner elements with their natural dimensions.
+    Hide visually but keep dimensions for Peaks.js initialization.
+    Position absolute takes it out of flow (no layout impact when collapsed),
+    width: 100% ensures it gets parent width, visibility: hidden hides it.
   */
-  height: 0;
-  overflow: hidden;
+  position: absolute;
+  width: 100%;
+  visibility: hidden;
+  pointer-events: none;
 }
 </style>

@@ -1,19 +1,17 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue';
+import { computed, ref, onMounted, onUnmounted } from 'vue';
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import SessionMenu from './SessionMenu.vue';
-import SessionStateIndicator from './SessionStateIndicator.vue';
+import StatusIndicator from './StatusIndicator.vue';
 import SessionCardRecording from './SessionCardRecording.vue';
 import SessionCardProcessing from './SessionCardProcessing.vue';
 import SessionCardError from './SessionCardError.vue';
+import SessionCardFinished from './SessionCardFinished.vue';
+import { Button } from '@session-recorder/session-waveform';
 import { useDateFormat } from '@vueuse/core';
-import {
-  createPeaksContext,
-  providePeaksContext,
-  WaveformView,
-} from '@session-recorder/session-waveform';
-import { integrateSegments } from '../../../grpc/integrateSegments';
-import { setName } from '../../../grpc/procedures/setName';
+import { cutSession } from '../../../grpc/procedures/cutSession';
 import { toastService } from '../../../services/Toaster/ToastService';
+import { setName } from '../../../grpc/procedures/setName';
 import type { Session } from '@/types';
 
 const props = defineProps<{
@@ -23,12 +21,12 @@ const props = defineProps<{
 }>();
 
 const titleRef = ref<HTMLElement | null>(null);
-const waveformRef = ref<InstanceType<typeof WaveformView> | null>(null);
+const finishedCardRef = ref<InstanceType<typeof SessionCardFinished> | null>(null);
 const isEditing = ref(false);
 const editedName = ref('');
 
-// Only allow editing for finished sessions
-const canEdit = computed(() => props.session.state === 'finished');
+// Allow editing for recording, processing, and finished sessions
+const canEdit = computed(() => props.session.state !== 'error');
 
 const displayName = computed(() => {
   return props.session.name || `Untitled #${props.index}`;
@@ -45,6 +43,58 @@ const displayDate = computed(() => {
     formatted: useDateFormat(startedAt, format).value,
   };
 });
+
+// State checks
+const isRecording = computed(() => props.session.state === 'recording');
+const isProcessing = computed(() => props.session.state === 'processing');
+const now = ref(new Date());
+let interval: ReturnType<typeof setInterval> | undefined;
+
+onMounted(() => {
+  if (isRecording.value) {
+    interval = setInterval(() => {
+      now.value = new Date();
+    }, 1000);
+  }
+});
+
+onUnmounted(() => {
+  if (interval) {
+    clearInterval(interval);
+  }
+});
+
+const elapsedTime = computed(() => {
+  if (!isRecording.value) return '';
+  const diff = now.value.getTime() - props.session.startedAt.getTime();
+  const seconds = Math.floor(diff / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+
+  const pad = (n: number) => n.toString().padStart(2, '0');
+
+  if (hours > 0) {
+    return `${pad(hours)}:${pad(minutes % 60)}:${pad(seconds % 60)}`;
+  }
+  return `${pad(minutes)}:${pad(seconds % 60)}`;
+});
+
+const isCutting = ref(false);
+
+const handleCutSession = async () => {
+  if (isCutting.value) return;
+  isCutting.value = true;
+
+  try {
+    await cutSession({ recorderID: props.recorderId });
+    toastService.success('Session cut successfully');
+  } catch (error) {
+    console.error('Failed to cut session:', error);
+    toastService.error('Failed to cut session');
+  } finally {
+    isCutting.value = false;
+  }
+};
 
 const startEditing = () => {
   if (!canEdit.value) return;
@@ -121,50 +171,12 @@ const onKeydown = (event: KeyboardEvent) => {
 const isFinished = computed(() => props.session.state === 'finished');
 const hasWaveformFiles = computed(() => !!props.session.inlineFiles);
 
-// Track expanded state for UI
-const isExpanded = ref(false);
+// Track expanded state for UI - get from child component
+const isExpanded = computed(() => finishedCardRef.value?.isExpanded ?? false);
 
 const toggleExpanded = () => {
-  waveformRef.value?.toggleExpanded();
+  finishedCardRef.value?.toggleExpanded();
 };
-
-// Create peaks context only for finished sessions with files
-if (isFinished.value && hasWaveformFiles.value && props.session.inlineFiles) {
-  const ctx = createPeaksContext({
-    initialState: {
-      waveformUrl: props.session.inlineFiles.waveform,
-      audioUrls: [
-        {
-          src: props.session.inlineFiles.ogg,
-          type: 'audio/ogg',
-        },
-        {
-          src: props.session.inlineFiles.flac,
-          type: 'audio/flac',
-        },
-      ],
-      expanded: false,
-      permissions: {
-        create: false,
-        update: true,
-        delete: true,
-      },
-      segments: props.session.segments.map((s) => ({
-        id: s.id,
-        labelText: s.name,
-        startTime: s.timeStart.getTime(),
-        endTime: s.timeEnd.getTime(),
-      })),
-    },
-  });
-
-  providePeaksContext(ctx);
-  integrateSegments(props.session, ctx);
-
-  ctx.eventEmitter.on('expandedChanged', (expanded) => {
-    isExpanded.value = expanded;
-  });
-}
 </script>
 
 <template>
@@ -196,9 +208,6 @@ if (isFinished.value && hasWaveformFiles.value && props.session.inlineFiles) {
         </svg>
       </button>
 
-      <!-- Show state indicator for non-finished sessions -->
-      <SessionStateIndicator v-else :state="session.state" />
-
       <span
         ref="titleRef"
         class="title"
@@ -210,13 +219,20 @@ if (isFinished.value && hasWaveformFiles.value && props.session.inlineFiles) {
         >{{ displayName }}</span
       >
 
+      <!-- Show status indicator for recording/processing sessions -->
+      <StatusIndicator v-if="isRecording" :is-recording="true" />
+      <StatusIndicator v-else-if="isProcessing" :is-processing="true" />
+
+      <!-- Elapsed time for recording sessions -->
+      <span v-if="isRecording" class="elapsed-time">{{ elapsedTime }}</span>
+
       <div class="metadata">
-        <time class="timestamp" :datetime="displayDate.iso"
-          >{{ displayDate.formatted }}
-        </time>
-        <div v-if="isFinished" class="menu">
-          <SessionMenu :session="session" :recorder-id="recorderId" />
-        </div>
+        <time class="timestamp" :datetime="displayDate.iso">{{ displayDate.formatted }}</time>
+      </div>
+
+      <!-- Actions -->
+      <div class="actions">
+        <SessionMenu v-if="isFinished" :session="session" :recorder-id="recorderId" />
       </div>
     </div>
 
@@ -235,7 +251,12 @@ if (isFinished.value && hasWaveformFiles.value && props.session.inlineFiles) {
       :session="session"
       :recorder-id="recorderId"
     />
-    <WaveformView v-else-if="isFinished && hasWaveformFiles" ref="waveformRef" />
+    <SessionCardFinished
+      v-else-if="isFinished && hasWaveformFiles"
+      ref="finishedCardRef"
+      :session="session"
+      :recorder-id="recorderId"
+    />
   </div>
 </template>
 
@@ -283,6 +304,13 @@ if (isFinished.value && hasWaveformFiles.value && props.session.inlineFiles) {
   outline-color: transparent;
 }
 
+.elapsed-time {
+  font-family: monospace;
+  font-size: var(--scale-1);
+  font-weight: var(--weight-semibold);
+  color: var(--color-red-500);
+}
+
 .metadata {
   margin-left: auto;
   display: flex;
@@ -296,6 +324,12 @@ if (isFinished.value && hasWaveformFiles.value && props.session.inlineFiles) {
   font-size: var(--scale-0);
   font-weight: var(--weight-normal);
   color: var(--color-grey-500);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--size-1);
 }
 
 .expand-toggle {

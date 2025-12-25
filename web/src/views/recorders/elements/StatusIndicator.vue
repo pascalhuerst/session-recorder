@@ -1,15 +1,30 @@
 <script setup lang="ts">
-defineProps<{
+import { computed } from 'vue';
+
+const props = defineProps<{
   isRecording?: boolean;
+  isProcessing?: boolean;
 }>();
+
+const label = computed(() => {
+  if (props.isRecording) return 'rec';
+  if (props.isProcessing) return 'processing';
+  return 'off';
+});
+
+const stateClass = computed(() => {
+  if (props.isRecording) return 'is-recording';
+  if (props.isProcessing) return 'is-processing';
+  return '';
+});
 </script>
 
 <template>
   <div class="status">
-    <span :class="['text', { 'is-recording': isRecording }]">
-      {{ isRecording ? 'rec' : 'off' }}
+    <span :class="['text', stateClass]">
+      {{ label }}
     </span>
-    <span :class="['indicator', { 'is-recording': isRecording }]" />
+    <span :class="['indicator', stateClass]" />
   </div>
 </template>
 
@@ -43,6 +58,24 @@ defineProps<{
 
 .text.is-recording {
   color: var(--color-red-500);
+}
+
+.text.is-processing {
+  color: var(--color-grey-500);
+}
+
+.indicator.is-processing {
+  animation: spin 1.5s linear infinite;
+  background: var(--color-grey-500);
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes pulse {

@@ -75,6 +75,12 @@ type minioChunk struct {
 	buffer    *bytes.Buffer
 }
 
+// Default session timeout - if no chunks arrive for this duration, the session is automatically closed
+const DefaultSessionTimeout = 30 * time.Second
+
+// Session timeout check interval
+const sessionTimeoutCheckInterval = 5 * time.Second
+
 type Minio struct {
 	system *System
 
@@ -86,8 +92,12 @@ type Minio struct {
 	client *minio.Client
 
 	// Key is recorder ID
-	chunks   map[uuid.UUID]*minioChunk
-	dataLock sync.Mutex
+	chunks        map[uuid.UUID]*minioChunk
+	lastChunkTime map[uuid.UUID]time.Time // Track when each recorder last received chunks
+	dataLock      sync.Mutex
+
+	sessionTimeout time.Duration
+	stopTimeout    chan struct{}
 
 	onSessionClosedCb       OnSessionClosedCb
 	onSessionStateChangedCb OnSessionStateChangedCb
@@ -110,7 +120,16 @@ func NewMinioStorage(endpoint, publicEndpoint, accessKey, secretKey string) (*Mi
 		secretLey:      secretKey,
 		client:         c,
 		chunks:         make(map[uuid.UUID]*minioChunk),
+		lastChunkTime:  make(map[uuid.UUID]time.Time),
+		sessionTimeout: DefaultSessionTimeout,
+		stopTimeout:    make(chan struct{}),
 	}, nil
+}
+
+// SetSessionTimeout configures the session timeout duration.
+// Sessions that don't receive chunks for this duration are automatically closed.
+func (m *Minio) SetSessionTimeout(timeout time.Duration) {
+	m.sessionTimeout = timeout
 }
 
 func (m *Minio) makeSureBucketExists(ctx context.Context) error {
@@ -239,7 +258,113 @@ func (m *Minio) Start(ctx context.Context) error {
 		}
 	}
 
+	// Start the session timeout checker
+	go m.runSessionTimeoutChecker(ctx)
+
 	return nil
+}
+
+// Stop stops the session timeout checker goroutine
+func (m *Minio) Stop() {
+	close(m.stopTimeout)
+}
+
+// runSessionTimeoutChecker periodically checks for stale sessions and closes them
+func (m *Minio) runSessionTimeoutChecker(ctx context.Context) {
+	ticker := time.NewTicker(sessionTimeoutCheckInterval)
+	defer ticker.Stop()
+
+	log.Info().
+		Dur("timeout", m.sessionTimeout).
+		Dur("check-interval", sessionTimeoutCheckInterval).
+		Msg("Session timeout checker started")
+
+	for {
+		select {
+		case <-m.stopTimeout:
+			log.Info().Msg("Session timeout checker stopped")
+			return
+		case <-ctx.Done():
+			log.Info().Msg("Session timeout checker stopped (context cancelled)")
+			return
+		case <-ticker.C:
+			m.checkAndCloseStaleSession(ctx)
+		}
+	}
+}
+
+// checkAndCloseStaleSession checks for sessions that haven't received chunks recently and closes them
+func (m *Minio) checkAndCloseStaleSession(ctx context.Context) {
+	m.dataLock.Lock()
+
+	now := time.Now()
+	var staleRecorders []struct {
+		recorderID uuid.UUID
+		sessionID  uuid.UUID
+		chunk      minioChunk
+	}
+
+	for recorderID, chunk := range m.chunks {
+		lastTime, ok := m.lastChunkTime[recorderID]
+		if !ok {
+			continue
+		}
+
+		if now.Sub(lastTime) > m.sessionTimeout {
+			log.Warn().
+				Stringer("recorder-id", recorderID).
+				Stringer("session-id", chunk.sessionID).
+				Dur("since-last-chunk", now.Sub(lastTime)).
+				Msg("Session timed out, closing")
+
+			staleRecorders = append(staleRecorders, struct {
+				recorderID uuid.UUID
+				sessionID  uuid.UUID
+				chunk      minioChunk
+			}{recorderID, chunk.sessionID, *chunk})
+
+			// Synchronously transition to PROCESSING
+			sm, err := m.getSessionMetadata(ctx, recorderID, chunk.sessionID)
+			if err == nil && sm.State == SessionStateRecording {
+				previousState := sm.State
+				sm.State = SessionStateProcessing
+				if err := m.putSessionMetadata(ctx, recorderID, chunk.sessionID, sm); err != nil {
+					log.Err(err).Msg("Cannot update session state to PROCESSING")
+				}
+				// Notify outside lock to avoid deadlock
+				go m.notifyStateChange(sm, previousState)
+			}
+
+			// Remove from tracking maps
+			delete(m.chunks, recorderID)
+			delete(m.lastChunkTime, recorderID)
+		}
+	}
+
+	m.dataLock.Unlock()
+
+	// Process stale sessions asynchronously (outside the lock)
+	for _, stale := range staleRecorders {
+		go func(recorderID, sessionID uuid.UUID, chunk minioChunk) {
+			log.Info().
+				Stringer("recorder-id", recorderID).
+				Stringer("session-id", sessionID).
+				Msg("Closing timed-out session")
+
+			if err := m.closeSessionAsync(context.Background(), recorderID, sessionID, &chunk); err != nil {
+				log.Err(err).
+					Stringer("recorder-id", recorderID).
+					Stringer("session-id", sessionID).
+					Msg("Cannot close timed-out session")
+				return
+			}
+
+			log.Info().
+				Stringer("recorder-id", recorderID).
+				Stringer("session-id", sessionID).
+				Msg("Timed-out session closed")
+		}(stale.recorderID, stale.sessionID, stale.chunk)
+	}
 }
 
 func (m *Minio) RegisterOnSessionClosedCallback(cb OnSessionClosedCb) error {
@@ -274,6 +399,9 @@ func (m *Minio) initSession(ctx context.Context, recorderID, sessionID uuid.UUID
 		Stringer("recorder-id", recorderID).
 		Stringer("session-id", sessionID).
 		Msg("Creating new session")
+
+	// Before creating a new session, ensure all previous sessions are closed
+	m.closeIntermediateSessions(ctx, recorderID)
 
 	m.chunks[recorderID] = &minioChunk{
 		number:    0,
@@ -438,6 +566,9 @@ func (m *Minio) SafeChunks(ctx context.Context, recorderID, sessionID uuid.UUID,
 	m.dataLock.Lock()
 	defer m.dataLock.Unlock()
 
+	// Track when we last received chunks from this recorder
+	m.lastChunkTime[recorderID] = time.Now()
+
 	if _, ok := m.system.Recorders[recorderID]; !ok {
 		log.Warn().Stringer("recorder-id", recorderID).Msg("No recorder with this id")
 
@@ -453,12 +584,28 @@ func (m *Minio) SafeChunks(ctx context.Context, recorderID, sessionID uuid.UUID,
 	// If we have a new sessionID, we need to close the old one
 	// This creates a copy of the last chunk, initSession below resets the chunks
 	if chunk.sessionID != sessionID {
+		oldSessionID := chunk.sessionID
+
+		// Synchronously transition old session to PROCESSING before starting new session
+		// This ensures only one session per recorder can be in RECORDING state at a time
+		sm, err := m.getSessionMetadata(ctx, recorderID, oldSessionID)
+		if err == nil && sm.State == SessionStateRecording {
+			previousState := sm.State
+			sm.State = SessionStateProcessing
+			if err := m.putSessionMetadata(ctx, recorderID, oldSessionID, sm); err != nil {
+				log.Err(err).Msg("Cannot update session state to PROCESSING")
+			}
+			// Notify outside lock to avoid deadlock (we're already holding dataLock)
+			go m.notifyStateChange(sm, previousState)
+		}
+
+		// Now process the old session asynchronously (flush + render)
 		go func(recorderID uuid.UUID, lastChunk minioChunk) {
 			sessionID := lastChunk.sessionID
 
 			log.Info().Stringer("recorder-id", recorderID).Stringer("session-id", sessionID).Msg("Closing session")
 
-			if err := m.closeSession(context.Background(), recorderID, sessionID, &lastChunk); err != nil {
+			if err := m.closeSessionAsync(context.Background(), recorderID, sessionID, &lastChunk); err != nil {
 				log.Err(err).Stringer("recorder-id", recorderID).Stringer("session-id", sessionID).Msg("Cannot close session")
 
 				return
@@ -1017,11 +1164,60 @@ func (m *Minio) closeSessions(ctx context.Context, recorderID uuid.UUID) error {
 		}
 	}
 
-	log.Debug().Stringer("recorder-id", recorderID).Msg("Closeed all sessions for recorder")
+	log.Debug().Stringer("recorder-id", recorderID).Msg("Closed all sessions for recorder")
 
 	return nil
 }
 
+// closeIntermediateSessions finds all sessions in RECORDING or PROCESSING state for a recorder
+// and transitions them to be processed. This is called when a new session starts to ensure
+// no sessions are left in an intermediate state.
+func (m *Minio) closeIntermediateSessions(ctx context.Context, recorderID uuid.UUID) {
+	recorder, ok := m.system.Recorders[recorderID]
+	if !ok {
+		return
+	}
+
+	for sessionID, session := range recorder.Sessions {
+		if session.State == SessionStateRecording || session.State == SessionStateProcessing {
+			log.Info().
+				Stringer("recorder-id", recorderID).
+				Stringer("session-id", sessionID).
+				Str("state", session.State.String()).
+				Msg("Found session in intermediate state, closing")
+
+			// Transition to PROCESSING if still RECORDING
+			if session.State == SessionStateRecording {
+				previousState := session.State
+				session.State = SessionStateProcessing
+				if err := m.putSessionMetadata(ctx, recorderID, sessionID, &session); err != nil {
+					log.Err(err).Msg("Cannot update session state to PROCESSING")
+					continue
+				}
+				m.system.Recorders[recorderID].Sessions[sessionID] = session
+				go m.notifyStateChange(&session, previousState)
+			}
+
+			// Kick off async rendering
+			go func(recorderID, sessionID uuid.UUID) {
+				if err := m.closeSessionAsync(context.Background(), recorderID, sessionID, nil); err != nil {
+					log.Err(err).
+						Stringer("recorder-id", recorderID).
+						Stringer("session-id", sessionID).
+						Msg("Cannot close intermediate session")
+					return
+				}
+				log.Info().
+					Stringer("recorder-id", recorderID).
+					Stringer("session-id", sessionID).
+					Msg("Intermediate session closed")
+			}(recorderID, sessionID)
+		}
+	}
+}
+
+// closeSession handles full session closing including state transition.
+// Used at startup when processing sessions that may still be in RECORDING state.
 func (m *Minio) closeSession(ctx context.Context, recorderID, sessionID uuid.UUID, chunk *minioChunk) error {
 	if m.isSessionClosed(ctx, recorderID, sessionID) {
 		return nil
@@ -1035,7 +1231,7 @@ func (m *Minio) closeSession(ctx context.Context, recorderID, sessionID uuid.UUI
 
 	// Update state to PROCESSING before rendering
 	sm, err := m.getSessionMetadata(ctx, recorderID, sessionID)
-	if err == nil {
+	if err == nil && sm.State == SessionStateRecording {
 		previousState := sm.State
 		sm.State = SessionStateProcessing
 		m.dataLock.Lock()
@@ -1046,6 +1242,30 @@ func (m *Minio) closeSession(ctx context.Context, recorderID, sessionID uuid.UUI
 		m.notifyStateChange(sm, previousState)
 	}
 
+	if err := m.renderSession(ctx, recorderID, sessionID); err != nil {
+		return fmt.Errorf("cannot render session: %w", err)
+	}
+
+	log.Debug().Stringer("recorder-id", recorderID).Stringer("session-id", sessionID).Msg("Session closed")
+
+	return nil
+}
+
+// closeSessionAsync handles session closing when state was already transitioned to PROCESSING.
+// Used when a new session starts and we need to finish processing the previous session.
+func (m *Minio) closeSessionAsync(ctx context.Context, recorderID, sessionID uuid.UUID, chunk *minioChunk) error {
+	if m.isSessionClosed(ctx, recorderID, sessionID) {
+		return nil
+	}
+
+	if chunk != nil {
+		if err := m.flushChunks(ctx, recorderID, sessionID, chunk); err != nil {
+			return fmt.Errorf("cannot flush session: %w", err)
+		}
+	}
+
+	// State transition to PROCESSING was already done synchronously in SafeChunks
+	// Proceed directly to rendering
 	if err := m.renderSession(ctx, recorderID, sessionID); err != nil {
 		return fmt.Errorf("cannot render session: %w", err)
 	}

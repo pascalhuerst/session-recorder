@@ -28,6 +28,7 @@ type SessionSourceHandler struct {
 	chunkSinkServer     *grpc.ChunkSinkServer
 	recorderBroadcaster *broadcast.RecorderBroadcaster
 	sessionBroadcaster  *broadcast.SessionBroadcaster
+	audioBroadcaster    *broadcast.AudioBroadcaster
 }
 
 func NewSessionSourceHandler(
@@ -35,12 +36,14 @@ func NewSessionSourceHandler(
 	chunkSinkServer *grpc.ChunkSinkServer,
 	recorderBroadcaster *broadcast.RecorderBroadcaster,
 	sessionBroadcaster *broadcast.SessionBroadcaster,
+	audioBroadcaster *broadcast.AudioBroadcaster,
 ) *SessionSourceHandler {
 	h := &SessionSourceHandler{
 		sessionStorage:      sessionStorage,
 		chunkSinkServer:     chunkSinkServer,
 		recorderBroadcaster: recorderBroadcaster,
 		sessionBroadcaster:  sessionBroadcaster,
+		audioBroadcaster:    audioBroadcaster,
 	}
 
 	// Register callback for session state changes (RECORDING, PROCESSING, FINISHED)
@@ -54,6 +57,13 @@ func NewSessionSourceHandler(
 	sessionStorage.RegisterOnSessionClosedCallback(
 		func(session *storage.Session) {
 			h.onSessionClosed(session)
+		},
+	)
+
+	// Register callback for audio chunk streaming
+	sessionStorage.RegisterOnAudioChunkCallback(
+		func(recorderID, sessionID uuid.UUID, samples []int16, chunkNumber int, timestamp time.Time) {
+			h.onAudioChunk(recorderID, sessionID, samples, chunkNumber, timestamp)
 		},
 	)
 
@@ -175,6 +185,52 @@ func (h *SessionSourceHandler) onSessionClosed(session *storage.Session) {
 			Updated: newSessionInfo(context.Background(), h, session),
 		},
 	})
+}
+
+// onAudioChunk is called when audio samples are received. Broadcasts to audio subscribers.
+func (h *SessionSourceHandler) onAudioChunk(recorderID, sessionID uuid.UUID, samples []int16, chunkNumber int, timestamp time.Time) {
+	// Convert int16 samples to int32 for proto (proto doesn't have int16)
+	int32Samples := make([]int32, len(samples))
+	for i, s := range samples {
+		int32Samples[i] = int32(s)
+	}
+
+	h.audioBroadcaster.Broadcast(&sspb.AudioChunk{
+		SessionID:   sessionID.String(),
+		Samples:     int32Samples,
+		ChunkNumber: uint32(chunkNumber),
+		Timestamp:   timestamppb.New(timestamp),
+	})
+}
+
+func (h *SessionSourceHandler) streamSessionAudio(ctx context.Context, request *sspb.StreamSessionAudioRequest, server sspb.SessionSource_StreamSessionAudioServer) error {
+	log.Debug().Str("session-id", request.SessionID).Msg("Streaming session audio")
+
+	requestedSessionID := request.SessionID
+
+	// Subscribe to audio updates
+	updateCh, unsubscribe := h.audioBroadcaster.Subscribe()
+	defer unsubscribe()
+
+	for {
+		select {
+		case chunk, ok := <-updateCh:
+			if !ok {
+				// Channel closed, subscriber was removed
+				return nil
+			}
+			// Filter by session ID
+			if chunk.SessionID == requestedSessionID {
+				if err := server.Send(chunk); err != nil {
+					log.Err(err).Msg("Cannot send audio chunk")
+					return err
+				}
+			}
+		case <-ctx.Done():
+			log.Debug().Str("session-id", request.SessionID).Msg("Done streaming session audio")
+			return nil
+		}
+	}
 }
 
 func (h *SessionSourceHandler) streamRecorders(ctx context.Context, request *sspb.StreamRecordersRequest, server sspb.SessionSource_StreamRecordersServer) error {

@@ -40,6 +40,9 @@ type OnSessionClosedCb func(session *Session)
 // OnSessionStateChangedCb is called when a session's state changes
 type OnSessionStateChangedCb func(session *Session, previousState SessionState)
 
+// OnAudioChunkCb is called when audio samples are received for streaming
+type OnAudioChunkCb func(recorderID, sessionID uuid.UUID, samples []int16, chunkNumber int, timestamp time.Time)
+
 type Filename string
 
 const (
@@ -82,6 +85,7 @@ type Storage interface {
 
 	RegisterOnSessionClosedCallback(cb OnSessionClosedCb) error
 	RegisterOnSessionStateChangedCallback(cb OnSessionStateChangedCb) error
+	RegisterOnAudioChunkCallback(cb OnAudioChunkCb) error
 
 	GetPresignedURL(ctx context.Context, asset AssetOptions, options SigningOptions) (string, error)
 }

@@ -73,6 +73,7 @@ func main() {
 	// Buffer size of 10 provides headroom for slower consumers
 	recorderBroadcaster := broadcast.NewRecorderBroadcaster(10)
 	sessionBroadcaster := broadcast.NewSessionBroadcaster(10)
+	audioBroadcaster := broadcast.NewAudioBroadcaster(10)
 
 	chunkSinkHandler := NewChunkSinkHandler(sessionStorage, recorderBroadcaster)
 
@@ -83,17 +84,18 @@ func main() {
 		OnChunksCB:         chunkSinkHandler.setChunks,
 	})
 
-	sessionSourceHandler := NewSessionSourceHandler(sessionStorage, chunkSinkServer, recorderBroadcaster, sessionBroadcaster)
+	sessionSourceHandler := NewSessionSourceHandler(sessionStorage, chunkSinkServer, recorderBroadcaster, sessionBroadcaster, audioBroadcaster)
 
 	sessionSourceServer := grpc.NewSessionSourceServer(&grpc.SessionSourceServerConfig{
-		Name:              hostname,
-		Version:           version,
-		StreamRecordersCB: sessionSourceHandler.streamRecorders,
-		StreamSessionsCB:  sessionSourceHandler.streamSessions,
-		DeleteSessionCB:   sessionSourceHandler.deleteSession,
-		SetKeepSessionCB:  sessionSourceHandler.setKeepSession,
-		SetNameCB:         sessionSourceHandler.setName,
-		CutSessionCB:      sessionSourceHandler.cutSession,
+		Name:                 hostname,
+		Version:              version,
+		StreamRecordersCB:    sessionSourceHandler.streamRecorders,
+		StreamSessionsCB:     sessionSourceHandler.streamSessions,
+		StreamSessionAudioCB: sessionSourceHandler.streamSessionAudio,
+		DeleteSessionCB:      sessionSourceHandler.deleteSession,
+		SetKeepSessionCB:     sessionSourceHandler.setKeepSession,
+		SetNameCB:            sessionSourceHandler.setName,
+		CutSessionCB:         sessionSourceHandler.cutSession,
 	})
 
 	port, err := grpc.StartProtocolServer(sessionSourceServer, mdnsServer, sessionSourceService, sessionSourcePort)

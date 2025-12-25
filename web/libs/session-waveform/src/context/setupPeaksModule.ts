@@ -111,8 +111,17 @@ export const setupPeaksModule = ({
 
     Peaks.init(options, function (err, peaks) {
       if (err || !peaks) {
+        // When scrolling fast, containers may lose dimensions before Peaks.js
+        // completes async initialization (XHR for waveform data). This is expected
+        // and not an error - the component was simply unmounted during loading.
+        const isContainerError =
+          err instanceof Error &&
+          err.message.includes('must be visible and have non-zero width');
+        if (isContainerError) {
+          return;
+        }
         console.error(err);
-        throw err;
+        return;
       }
 
       eventEmitter.emit('ready', peaks);

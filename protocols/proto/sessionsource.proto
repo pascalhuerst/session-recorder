@@ -142,10 +142,22 @@ message CutSessionRequest {
 	string recorderID = 1;
 }
 
+message StreamSessionAudioRequest {
+	string sessionID = 1;
+}
+
+message AudioChunk {
+	string sessionID = 1;
+	repeated int32 samples = 2;
+	uint32 chunkNumber = 3;
+	google.protobuf.Timestamp timestamp = 4;
+}
+
 service SessionSource {
 	// Stream
 	rpc StreamRecorders(StreamRecordersRequest) returns (stream Recorder);
 	rpc StreamSessions(StreamSessionRequest) returns (stream Session);
+	rpc StreamSessionAudio(StreamSessionAudioRequest) returns (stream AudioChunk);
 
 	// Unary
 	rpc SetKeepSession(SetKeepSessionRequest) returns (common.Respone);

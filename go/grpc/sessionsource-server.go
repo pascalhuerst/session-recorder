@@ -14,6 +14,7 @@ import (
 
 type StreamSessionsCB func(ctx context.Context, request *sspb.StreamSessionRequest, server sspb.SessionSource_StreamSessionsServer) error
 type StreamRecordersCB func(ctx context.Context, request *sspb.StreamRecordersRequest, server sspb.SessionSource_StreamRecordersServer) error
+type StreamSessionAudioCB func(ctx context.Context, request *sspb.StreamSessionAudioRequest, server sspb.SessionSource_StreamSessionAudioServer) error
 type DeleteSessionCB func(ctx context.Context, request *sspb.DeleteSessionRequest) (*cmpb.Respone, error)
 type SetKeepSessionCB func(ctx context.Context, request *sspb.SetKeepSessionRequest) (*cmpb.Respone, error)
 type SetNameCB func(ctx context.Context, request *sspb.SetNameRequest) (*cmpb.Respone, error)
@@ -25,12 +26,13 @@ type SessionSourceServerConfig struct {
 	Name    string
 	Version string
 
-	StreamRecordersCB StreamRecordersCB
-	StreamSessionsCB  StreamSessionsCB
-	DeleteSessionCB   DeleteSessionCB
-	SetKeepSessionCB  SetKeepSessionCB
-	SetNameCB         SetNameCB
-	CutSessionCB      CutSessionCB
+	StreamRecordersCB    StreamRecordersCB
+	StreamSessionsCB     StreamSessionsCB
+	StreamSessionAudioCB StreamSessionAudioCB
+	DeleteSessionCB      DeleteSessionCB
+	SetKeepSessionCB     SetKeepSessionCB
+	SetNameCB            SetNameCB
+	CutSessionCB         CutSessionCB
 }
 
 type SessionSourceServer struct {
@@ -70,6 +72,14 @@ func (s *SessionSourceServer) StreamRecorders(request *sspb.StreamRecordersReque
 func (s *SessionSourceServer) StreamSessions(request *sspb.StreamSessionRequest, server sspb.SessionSource_StreamSessionsServer) error {
 	if s.config.StreamSessionsCB != nil {
 		return s.config.StreamSessionsCB(server.Context(), request, server)
+	}
+
+	return nil
+}
+
+func (s *SessionSourceServer) StreamSessionAudio(request *sspb.StreamSessionAudioRequest, server sspb.SessionSource_StreamSessionAudioServer) error {
+	if s.config.StreamSessionAudioCB != nil {
+		return s.config.StreamSessionAudioCB(server.Context(), request, server)
 	}
 
 	return nil

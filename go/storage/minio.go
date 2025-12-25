@@ -101,6 +101,7 @@ type Minio struct {
 
 	onSessionClosedCb       OnSessionClosedCb
 	onSessionStateChangedCb OnSessionStateChangedCb
+	onAudioChunkCb          OnAudioChunkCb
 	cbLock                  sync.Mutex
 }
 
@@ -385,6 +386,15 @@ func (m *Minio) RegisterOnSessionStateChangedCallback(cb OnSessionStateChangedCb
 	return nil
 }
 
+func (m *Minio) RegisterOnAudioChunkCallback(cb OnAudioChunkCb) error {
+	m.cbLock.Lock()
+	defer m.cbLock.Unlock()
+
+	m.onAudioChunkCb = cb
+
+	return nil
+}
+
 // notifyStateChange calls the state changed callback if registered
 func (m *Minio) notifyStateChange(session *Session, previousState SessionState) {
 	if m.onSessionStateChangedCb != nil {
@@ -619,6 +629,11 @@ func (m *Minio) SafeChunks(ctx context.Context, recorderID, sessionID uuid.UUID,
 	}
 
 	binary.Write(chunk.buffer, binary.LittleEndian, samples)
+
+	// Broadcast audio samples for real-time streaming
+	if m.onAudioChunkCb != nil {
+		m.onAudioChunkCb(recorderID, sessionID, samples, chunk.number, timeCreated)
+	}
 
 	log.Debug().
 		Stringer("recorder-id", recorderID).

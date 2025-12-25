@@ -26,7 +26,7 @@ Run envoy in docker container: (You might have to adapt the config)
 
 ```
 cd grpc-web-proxy
-docker-compose up envoy
+docker compose up envoy
 ```
 
 ##### Setup .env

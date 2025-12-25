@@ -9,10 +9,10 @@ echo "🛑 Stopping Session Recorder development environment..."
 
 # Stop services using dedicated development compose file
 echo "🔧 Stopping MinIO and Envoy services..."
-docker-compose -f docker-compose.dev.yml down
+docker compose -f docker-compose.dev.yml down
 
 echo "🧹 Cleaning up..."
-docker-compose -f docker-compose.dev.yml down --volumes --remove-orphans
+docker compose -f docker-compose.dev.yml down --volumes --remove-orphans
 
 echo ""
 echo "✅ Development environment stopped!"

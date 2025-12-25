@@ -13,7 +13,7 @@ mkdir -p ./data/minio
 
 # Start services using dedicated development compose file
 echo "🔧 Starting MinIO and Envoy services..."
-docker-compose -f docker-compose.dev.yml up -d
+docker compose -f docker-compose.dev.yml up -d
 
 echo "⏳ Waiting for services to be ready..."
 
@@ -53,4 +53,4 @@ echo "   • Web Interface:    http://localhost:4200"
 echo "   • gRPC-Web Proxy:   http://localhost:8080"
 echo ""
 echo "🛑 To stop services: ./stop-dev.sh"
-echo "📝 To view logs: docker-compose -f docker-compose.dev.yml logs -f"
+echo "📝 To view logs: docker compose -f docker-compose.dev.yml logs -f"

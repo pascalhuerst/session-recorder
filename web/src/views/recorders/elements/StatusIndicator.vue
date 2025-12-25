@@ -21,10 +21,10 @@ const stateClass = computed(() => {
 
 <template>
   <div class="status">
+    <span :class="['indicator', stateClass]" />
     <span :class="['text', stateClass]">
       {{ label }}
     </span>
-    <span :class="['indicator', stateClass]" />
   </div>
 </template>
 
@@ -65,17 +65,8 @@ const stateClass = computed(() => {
 }
 
 .indicator.is-processing {
-  animation: spin 1.5s linear infinite;
+  animation: pulse-grey 6s infinite;
   background: var(--color-grey-500);
-}
-
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 @keyframes pulse {
@@ -97,6 +88,28 @@ const stateClass = computed(() => {
   75% {
     transform: scale(1);
     box-shadow: 0 0 0 4px rgba(213, 63, 140, 0.2);
+  }
+}
+
+@keyframes pulse-grey {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(107, 114, 128, 0.4);
+  }
+
+  25% {
+    transform: scale(1);
+    box-shadow: 0 0 0 4px rgba(107, 114, 128, 0.2);
+  }
+
+  50% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(107, 114, 128, 0.4);
+  }
+
+  75% {
+    transform: scale(1);
+    box-shadow: 0 0 0 4px rgba(107, 114, 128, 0.2);
   }
 }
 </style>

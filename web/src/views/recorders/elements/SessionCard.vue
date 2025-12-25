@@ -7,9 +7,10 @@ import SessionCardRecording from './SessionCardRecording.vue';
 import SessionCardProcessing from './SessionCardProcessing.vue';
 import SessionCardError from './SessionCardError.vue';
 import SessionCardFinished from './SessionCardFinished.vue';
-import { Button } from '@session-recorder/session-waveform';
+import { Button, Modal, useConfirmation } from '@session-recorder/session-waveform';
 import { useDateFormat } from '@vueuse/core';
 import { cutSession } from '../../../grpc/procedures/cutSession';
+import { deleteSession } from '../../../grpc/procedures/deleteSession';
 import { toastService } from '../../../services/Toaster/ToastService';
 import { setName } from '../../../grpc/procedures/setName';
 import type { Session } from '@/types';
@@ -177,6 +178,27 @@ const isExpanded = computed(() => finishedCardRef.value?.isExpanded ?? false);
 const toggleExpanded = () => {
   finishedCardRef.value?.toggleExpanded();
 };
+
+// Delete confirmation for processing sessions
+const { awaitConfirmation, modalProps } = useConfirmation();
+
+const onDeleteProcessing = () => {
+  awaitConfirmation().then(({ isConfirmed }) => {
+    if (isConfirmed) {
+      deleteSession({
+        recorderId: props.recorderId,
+        sessionId: props.session.id,
+      })
+        .then(() => {
+          toastService.success('Session deleted successfully');
+        })
+        .catch((error) => {
+          console.error('Failed to delete session:', error);
+          toastService.error('Failed to delete session');
+        });
+    }
+  });
+};
 </script>
 
 <template>
@@ -232,6 +254,14 @@ const toggleExpanded = () => {
 
       <!-- Actions -->
       <div class="actions">
+        <Button
+          v-if="isProcessing"
+          size="xs"
+          @click="onDeleteProcessing"
+        >
+          <font-awesome-icon icon="fa-solid fa-trash" />
+          Delete
+        </Button>
         <SessionMenu v-if="isFinished" :session="session" :recorder-id="recorderId" />
       </div>
     </div>
@@ -257,6 +287,22 @@ const toggleExpanded = () => {
       :session="session"
       :recorder-id="recorderId"
     />
+
+    <!-- Delete confirmation modal for processing sessions -->
+    <Modal :open="modalProps.open.value" @close="modalProps.onClose">
+      <template #header>Are you sure?</template>
+      <template #body>
+        You are about to permanently delete a session that is still processing.
+      </template>
+      <template #footer>
+        <Button @click="modalProps.onConfirm" variant="ghost" color="neutral">
+          Delete
+        </Button>
+        <Button @click="modalProps.onClose" variant="solid" color="primary">
+          Keep
+        </Button>
+      </template>
+    </Modal>
   </div>
 </template>
 

@@ -8,7 +8,6 @@ import (
 	"github.com/pascalhuerst/session-recorder/protocols/go/common"
 	cmpb "github.com/pascalhuerst/session-recorder/protocols/go/common"
 	sspb "github.com/pascalhuerst/session-recorder/protocols/go/sessionsource"
-	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
 )
 
@@ -19,6 +18,11 @@ type DeleteSessionCB func(ctx context.Context, request *sspb.DeleteSessionReques
 type SetKeepSessionCB func(ctx context.Context, request *sspb.SetKeepSessionRequest) (*cmpb.Respone, error)
 type SetNameCB func(ctx context.Context, request *sspb.SetNameRequest) (*cmpb.Respone, error)
 type CutSessionCB func(ctx context.Context, request *sspb.CutSessionRequest) (*cmpb.Respone, error)
+
+type CreateSegmentCB func(ctx context.Context, request *sspb.CreateSegmentRequest) (*cmpb.Respone, error)
+type UpdateSegmentCB func(ctx context.Context, request *sspb.UpdateSegmentRequest) (*cmpb.Respone, error)
+type DeleteSegmentCB func(ctx context.Context, request *sspb.DeleteSegmentRequest) (*cmpb.Respone, error)
+type RenderSegmentCB func(ctx context.Context, request *sspb.RenderSegmentRequest) (*cmpb.Respone, error)
 
 var noSuccess = &cmpb.Respone{Success: true}
 
@@ -33,6 +37,11 @@ type SessionSourceServerConfig struct {
 	SetKeepSessionCB     SetKeepSessionCB
 	SetNameCB            SetNameCB
 	CutSessionCB         CutSessionCB
+
+	CreateSegmentCB CreateSegmentCB
+	UpdateSegmentCB UpdateSegmentCB
+	DeleteSegmentCB DeleteSegmentCB
+	RenderSegmentCB RenderSegmentCB
 }
 
 type SessionSourceServer struct {
@@ -118,25 +127,33 @@ func (s *SessionSourceServer) CutSession(ctx context.Context, in *sspb.CutSessio
 
 // Segment API
 func (s *SessionSourceServer) CreateSegment(ctx context.Context, in *sspb.CreateSegmentRequest) (*common.Respone, error) {
-	log.Warn().Str("session-id", in.GetSessionID()).Msg("CreateSegment not implemented")
+	if s.config.CreateSegmentCB != nil {
+		return s.config.CreateSegmentCB(ctx, in)
+	}
 
 	return noSuccess, nil
 }
 
 func (s *SessionSourceServer) DeleteSegment(ctx context.Context, in *sspb.DeleteSegmentRequest) (*common.Respone, error) {
-	log.Warn().Str("session-id", in.GetSessionID()).Msg("DeleteSegment not implemented")
+	if s.config.DeleteSegmentCB != nil {
+		return s.config.DeleteSegmentCB(ctx, in)
+	}
 
 	return noSuccess, nil
 }
 
 func (s *SessionSourceServer) RenderSegment(ctx context.Context, in *sspb.RenderSegmentRequest) (*common.Respone, error) {
-	log.Warn().Str("session-id", in.GetSessionID()).Msg("RenderSegment not implemented")
+	if s.config.RenderSegmentCB != nil {
+		return s.config.RenderSegmentCB(ctx, in)
+	}
 
 	return noSuccess, nil
 }
 
 func (s *SessionSourceServer) UpdateSegment(ctx context.Context, in *sspb.UpdateSegmentRequest) (*common.Respone, error) {
-	log.Warn().Str("session-id", in.GetSessionID()).Msg("UpdateSegment not implemented")
+	if s.config.UpdateSegmentCB != nil {
+		return s.config.UpdateSegmentCB(ctx, in)
+	}
 
 	return noSuccess, nil
 }

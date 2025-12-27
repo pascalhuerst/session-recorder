@@ -128,10 +128,12 @@ func TestSegment_Serialization(t *testing.T) {
 	segmentID := uuid.New()
 
 	original := Segment{
-		ID:         segmentID,
-		Comment:    "Test comment",
-		StartPoint: 100,
-		EndPoint:   500,
+		ID:           segmentID,
+		Comment:      "Test comment",
+		StartPoint:   100,
+		EndPoint:     500,
+		State:        SegmentStateFinished,
+		ErrorMessage: "",
 	}
 
 	// Marshal to JSON
@@ -161,6 +163,86 @@ func TestSegment_Serialization(t *testing.T) {
 	}
 	if decoded.EndPoint != original.EndPoint {
 		t.Errorf("Segment.EndPoint = %v, want %v", decoded.EndPoint, original.EndPoint)
+	}
+	if decoded.State != original.State {
+		t.Errorf("Segment.State = %v, want %v", decoded.State, original.State)
+	}
+}
+
+func TestSegmentState_String(t *testing.T) {
+	tests := []struct {
+		state    SegmentState
+		expected string
+	}{
+		{SegmentStateUnknown, "UNKNOWN"},
+		{SegmentStateQueued, "QUEUED"},
+		{SegmentStateRendering, "RENDERING"},
+		{SegmentStateFinished, "FINISHED"},
+		{SegmentStateError, "ERROR"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.expected, func(t *testing.T) {
+			if got := tt.state.String(); got != tt.expected {
+				t.Errorf("SegmentState.String() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestSessionState_String(t *testing.T) {
+	tests := []struct {
+		state    SessionState
+		expected string
+	}{
+		{SessionStateUnknown, "UNKNOWN"},
+		{SessionStateRecording, "RECORDING"},
+		{SessionStateProcessing, "PROCESSING"},
+		{SessionStateFinished, "FINISHED"},
+		{SessionStateError, "ERROR"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.expected, func(t *testing.T) {
+			if got := tt.state.String(); got != tt.expected {
+				t.Errorf("SessionState.String() = %v, want %v", got, tt.expected)
+			}
+		})
+	}
+}
+
+func TestSegment_WithErrorMessage(t *testing.T) {
+	segmentID := uuid.New()
+
+	original := Segment{
+		ID:           segmentID,
+		Comment:      "Failed segment",
+		StartPoint:   100,
+		EndPoint:     500,
+		State:        SegmentStateError,
+		ErrorMessage: "sox encoding failed",
+	}
+
+	// Marshal to JSON
+	data, err := json.Marshal(original)
+	if err != nil {
+		t.Errorf("json.Marshal() error = %v", err)
+		return
+	}
+
+	// Unmarshal back
+	var decoded Segment
+	err = json.Unmarshal(data, &decoded)
+	if err != nil {
+		t.Errorf("json.Unmarshal() error = %v", err)
+		return
+	}
+
+	if decoded.State != SegmentStateError {
+		t.Errorf("Segment.State = %v, want %v", decoded.State, SegmentStateError)
+	}
+	if decoded.ErrorMessage != original.ErrorMessage {
+		t.Errorf("Segment.ErrorMessage = %v, want %v", decoded.ErrorMessage, original.ErrorMessage)
 	}
 }
 

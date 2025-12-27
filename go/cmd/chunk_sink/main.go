@@ -97,6 +97,10 @@ func main() {
 		SetKeepSessionCB:     sessionSourceHandler.setKeepSession,
 		SetNameCB:            sessionSourceHandler.setName,
 		CutSessionCB:         sessionSourceHandler.cutSession,
+		CreateSegmentCB:      sessionSourceHandler.createSegment,
+		UpdateSegmentCB:      sessionSourceHandler.updateSegment,
+		DeleteSegmentCB:      sessionSourceHandler.deleteSegment,
+		RenderSegmentCB:      sessionSourceHandler.renderSegment,
 	})
 
 	port, err := grpc.StartProtocolServer(sessionSourceServer, mdnsServer, sessionSourceService, sessionSourcePort)

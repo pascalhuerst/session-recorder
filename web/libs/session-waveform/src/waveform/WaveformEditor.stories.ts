@@ -29,6 +29,7 @@ import {
   createPeaksContext,
   providePeaksContext,
 } from '../context/usePeaksContext';
+import { intToChar } from '../context/installSegmentsControls';
 
 const meta: Meta = {
   title: 'Lib/Waveform/WaveformEditor',
@@ -149,8 +150,8 @@ export const ManySegments: StoryObj = {
   render: createRender({
     segments: Array.from({ length: 10 }, (_, i) => ({
       id: `${i + 1}`,
-      startIndex: String.fromCharCode(65 + i * 2),
-      endIndex: String.fromCharCode(66 + i * 2),
+      startIndex: intToChar(i * 2),
+      endIndex: intToChar(i * 2 + 1),
       startTime: i * 10,
       endTime: (i + 1) * 10,
       labelText: `Segment ${i + 1}`,

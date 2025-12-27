@@ -19,3 +19,5 @@ export {
   providePeaksContext,
   type PeaksContext,
 };
+export { getSegmentColor } from './lib/utils/segmentColors';
+export { intToChar } from './context/installSegmentsControls';

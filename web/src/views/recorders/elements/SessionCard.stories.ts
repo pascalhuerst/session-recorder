@@ -414,8 +414,63 @@ export const WithSegments: Story = {
   args: {
     session: createMockSession({
       segments: [
-        { id: 'seg-1', name: 'Intro', timeStart: new Date(0), timeEnd: new Date(30000) },
-        { id: 'seg-2', name: 'Main', timeStart: new Date(30000), timeEnd: new Date(120000) },
+        {
+          id: 'seg-1',
+          name: 'Intro',
+          timeStart: new Date(0),
+          timeEnd: new Date(30000),
+          state: 'finished' as const,
+          downloadFiles: { ogg: '/seg1.ogg', flac: '/seg1.flac' },
+        },
+        {
+          id: 'seg-2',
+          name: 'Main',
+          timeStart: new Date(30000),
+          timeEnd: new Date(120000),
+          state: 'finished' as const,
+          downloadFiles: { ogg: '/seg2.ogg', flac: '/seg2.flac' },
+        },
+      ],
+    }),
+    recorderId: 'recorder-1',
+    index: 1,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByText('Untitled #1')).toBeInTheDocument();
+  },
+};
+
+// Session with segments in various states
+export const WithSegmentStates: Story = {
+  args: {
+    session: createMockSession({
+      segments: [
+        {
+          id: 'seg-1',
+          name: 'Rendering segment',
+          timeStart: new Date(0),
+          timeEnd: new Date(30000),
+          state: 'rendering' as const,
+          downloadFiles: null,
+        },
+        {
+          id: 'seg-2',
+          name: 'Failed segment',
+          timeStart: new Date(30000),
+          timeEnd: new Date(60000),
+          state: 'error' as const,
+          errorMessage: 'sox encoding failed',
+          downloadFiles: null,
+        },
+        {
+          id: 'seg-3',
+          name: 'Complete segment',
+          timeStart: new Date(60000),
+          timeEnd: new Date(120000),
+          state: 'finished' as const,
+          downloadFiles: { ogg: '/seg3.ogg', flac: '/seg3.flac' },
+        },
       ],
     }),
     recorderId: 'recorder-1',

@@ -1304,7 +1304,7 @@ func (m *Minio) GetPresignedURL(ctx context.Context, asset AssetOptions, signing
 		if signedFilename == "" {
 			signedFilename = string(asset.Filename)
 		}
-		values.Set("response-content-disposition", fmt.Sprintf("attachment; Filename=%s", signedFilename))
+		values.Set("response-content-disposition", fmt.Sprintf("attachment; filename=\"%s\"", signedFilename))
 	}
 
 	presignedURL, err := m.client.PresignedGetObject(ctx, bucketName, objectName, signing.Expires, values)
@@ -1315,4 +1315,415 @@ func (m *Minio) GetPresignedURL(ctx context.Context, asset AssetOptions, signing
 	publicUrl := strings.Replace(presignedURL.String(), m.endpoint, m.publicEndpoint, 1)
 
 	return publicUrl, nil
+}
+
+func (m *Minio) GetSegmentPresignedURL(ctx context.Context, asset SegmentAssetOptions, signing SigningOptions) (string, error) {
+	objectName := fmt.Sprintf("%s/sessions/%s/segments/%s/%s",
+		asset.RecorderID.String(), asset.SessionID.String(), asset.SegmentID.String(), asset.Filename)
+
+	values := make(url.Values)
+
+	if signing.Download {
+		signedFilename := signing.DownloadFilename
+		if signedFilename == "" {
+			signedFilename = string(asset.Filename)
+		}
+		values.Set("response-content-disposition", fmt.Sprintf("attachment; filename=\"%s\"", signedFilename))
+	}
+
+	presignedURL, err := m.client.PresignedGetObject(ctx, bucketName, objectName, signing.Expires, values)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate presigned URL: %w", err)
+	}
+
+	publicUrl := strings.Replace(presignedURL.String(), m.endpoint, m.publicEndpoint, 1)
+
+	return publicUrl, nil
+}
+
+func (m *Minio) CreateSegment(ctx context.Context, recorderID, sessionID, segmentID uuid.UUID, segment Segment) error {
+	m.dataLock.Lock()
+	defer m.dataLock.Unlock()
+
+	if _, ok := m.system.Recorders[recorderID]; !ok {
+		return fmt.Errorf("no recorder with id %s", recorderID)
+	}
+
+	session, ok := m.system.Recorders[recorderID].Sessions[sessionID]
+	if !ok {
+		return fmt.Errorf("no session with id %s", sessionID)
+	}
+
+	if session.Segments == nil {
+		session.Segments = make(map[uuid.UUID]Segment)
+	}
+
+	segment.ID = segmentID
+	session.Segments[segmentID] = segment
+
+	if err := m.putSessionMetadata(ctx, recorderID, sessionID, &session); err != nil {
+		return fmt.Errorf("cannot update session metadata: %w", err)
+	}
+
+	log.Info().
+		Stringer("recorder-id", recorderID).
+		Stringer("session-id", sessionID).
+		Stringer("segment-id", segmentID).
+		Msg("Created segment")
+
+	return nil
+}
+
+func (m *Minio) UpdateSegment(ctx context.Context, recorderID, sessionID, segmentID uuid.UUID, segment Segment) error {
+	m.dataLock.Lock()
+	defer m.dataLock.Unlock()
+
+	if _, ok := m.system.Recorders[recorderID]; !ok {
+		return fmt.Errorf("no recorder with id %s", recorderID)
+	}
+
+	session, ok := m.system.Recorders[recorderID].Sessions[sessionID]
+	if !ok {
+		return fmt.Errorf("no session with id %s", sessionID)
+	}
+
+	existingSegment, ok := session.Segments[segmentID]
+	if !ok {
+		return fmt.Errorf("no segment with id %s", segmentID)
+	}
+
+	segment.ID = segmentID
+
+	// Check if start or end time changed on a rendered segment
+	timeChanged := segment.StartPoint != existingSegment.StartPoint || segment.EndPoint != existingSegment.EndPoint
+	wasRendered := existingSegment.State == SegmentStateFinished
+
+	if timeChanged && wasRendered {
+		// Delete rendered files since times changed
+		segmentPrefix := fmt.Sprintf("%s/sessions/%s/segments/%s/", recorderID, sessionID, segmentID)
+
+		// List and remove all segment files
+		objectCh := m.client.ListObjects(ctx, bucketName, minio.ListObjectsOptions{Prefix: segmentPrefix, Recursive: true})
+		for obj := range objectCh {
+			if obj.Err != nil {
+				log.Warn().Err(obj.Err).Str("prefix", segmentPrefix).Msg("Error listing segment files")
+				continue
+			}
+			if err := m.client.RemoveObject(ctx, bucketName, obj.Key, minio.RemoveObjectOptions{}); err != nil {
+				log.Warn().Err(err).Str("object", obj.Key).Msg("Cannot remove segment file")
+			}
+		}
+
+		// Reset state to unknown so user can re-render
+		segment.State = SegmentStateUnknown
+		segment.ErrorMessage = ""
+
+		log.Info().
+			Stringer("recorder-id", recorderID).
+			Stringer("session-id", sessionID).
+			Stringer("segment-id", segmentID).
+			Msg("Segment times changed, removed rendered files and reset state")
+	} else {
+		// Preserve state if not explicitly set
+		if segment.State == SegmentStateUnknown {
+			segment.State = existingSegment.State
+		}
+	}
+
+	session.Segments[segmentID] = segment
+
+	if err := m.putSessionMetadata(ctx, recorderID, sessionID, &session); err != nil {
+		return fmt.Errorf("cannot update session metadata: %w", err)
+	}
+
+	log.Info().
+		Stringer("recorder-id", recorderID).
+		Stringer("session-id", sessionID).
+		Stringer("segment-id", segmentID).
+		Msg("Updated segment")
+
+	return nil
+}
+
+func (m *Minio) DeleteSegment(ctx context.Context, recorderID, sessionID, segmentID uuid.UUID) error {
+	m.dataLock.Lock()
+	defer m.dataLock.Unlock()
+
+	if _, ok := m.system.Recorders[recorderID]; !ok {
+		return fmt.Errorf("no recorder with id %s", recorderID)
+	}
+
+	session, ok := m.system.Recorders[recorderID].Sessions[sessionID]
+	if !ok {
+		return fmt.Errorf("no session with id %s", sessionID)
+	}
+
+	if _, ok := session.Segments[segmentID]; !ok {
+		return fmt.Errorf("no segment with id %s", segmentID)
+	}
+
+	delete(session.Segments, segmentID)
+
+	if err := m.putSessionMetadata(ctx, recorderID, sessionID, &session); err != nil {
+		return fmt.Errorf("cannot update session metadata: %w", err)
+	}
+
+	// Delete rendered segment files if they exist
+	segmentPrefix := fmt.Sprintf("%s/sessions/%s/segments/%s", recorderID, sessionID, segmentID)
+	if err := m.client.RemoveObject(ctx, bucketName, segmentPrefix, minio.RemoveObjectOptions{ForceDelete: true}); err != nil {
+		log.Warn().Err(err).Str("prefix", segmentPrefix).Msg("Cannot remove segment files")
+	}
+
+	log.Info().
+		Stringer("recorder-id", recorderID).
+		Stringer("session-id", sessionID).
+		Stringer("segment-id", segmentID).
+		Msg("Deleted segment")
+
+	return nil
+}
+
+func (m *Minio) SetSegmentState(ctx context.Context, recorderID, sessionID, segmentID uuid.UUID, state SegmentState) error {
+	m.dataLock.Lock()
+	defer m.dataLock.Unlock()
+
+	if _, ok := m.system.Recorders[recorderID]; !ok {
+		return fmt.Errorf("no recorder with id %s", recorderID)
+	}
+
+	session, ok := m.system.Recorders[recorderID].Sessions[sessionID]
+	if !ok {
+		return fmt.Errorf("no session with id %s", sessionID)
+	}
+
+	segment, ok := session.Segments[segmentID]
+	if !ok {
+		return fmt.Errorf("no segment with id %s", segmentID)
+	}
+
+	segment.State = state
+	session.Segments[segmentID] = segment
+
+	if err := m.putSessionMetadata(ctx, recorderID, sessionID, &session); err != nil {
+		return fmt.Errorf("cannot update session metadata: %w", err)
+	}
+
+	log.Debug().
+		Stringer("recorder-id", recorderID).
+		Stringer("session-id", sessionID).
+		Stringer("segment-id", segmentID).
+		Stringer("state", state).
+		Msg("Set segment state")
+
+	return nil
+}
+
+func (m *Minio) RenderSegment(ctx context.Context, recorderID, sessionID, segmentID uuid.UUID) error {
+	// Get session and segment info
+	m.dataLock.Lock()
+	if _, ok := m.system.Recorders[recorderID]; !ok {
+		m.dataLock.Unlock()
+		return fmt.Errorf("no recorder with id %s", recorderID)
+	}
+
+	session, ok := m.system.Recorders[recorderID].Sessions[sessionID]
+	if !ok {
+		m.dataLock.Unlock()
+		return fmt.Errorf("no session with id %s", sessionID)
+	}
+
+	segment, ok := session.Segments[segmentID]
+	if !ok {
+		m.dataLock.Unlock()
+		return fmt.Errorf("no segment with id %s", segmentID)
+	}
+
+	// Set state to RENDERING
+	segment.State = SegmentStateRendering
+	segment.ErrorMessage = ""
+	session.Segments[segmentID] = segment
+
+	if err := m.putSessionMetadata(ctx, recorderID, sessionID, &session); err != nil {
+		m.dataLock.Unlock()
+		return fmt.Errorf("cannot update session metadata: %w", err)
+	}
+	m.dataLock.Unlock()
+
+	// Notify about state change
+	m.notifyStateChange(&session, session.State)
+
+	log.Info().
+		Stringer("recorder-id", recorderID).
+		Stringer("session-id", sessionID).
+		Stringer("segment-id", segmentID).
+		Int64("start", segment.StartPoint).
+		Int64("end", segment.EndPoint).
+		Msg("Rendering segment")
+
+	// Validate segment range before starting render
+	if segment.EndPoint <= segment.StartPoint {
+		errMsg := fmt.Sprintf("invalid segment range: start=%d end=%d (zero or negative duration)", segment.StartPoint, segment.EndPoint)
+		log.Error().
+			Stringer("segment-id", segmentID).
+			Int64("start", segment.StartPoint).
+			Int64("end", segment.EndPoint).
+			Msg("Segment has invalid range")
+		m.setSegmentError(ctx, recorderID, sessionID, segmentID, errMsg)
+		return fmt.Errorf(errMsg)
+	}
+
+	// Get the raw audio file
+	rawDataObjectName := fmt.Sprintf("%s/sessions/%s/data.raw", recorderID, sessionID)
+	log.Info().Stringer("segment-id", segmentID).Str("object", rawDataObjectName).Msg("Fetching raw audio for segment")
+	rawData, err := m.client.GetObject(ctx, bucketName, rawDataObjectName, minio.GetObjectOptions{})
+	if err != nil {
+		m.setSegmentError(ctx, recorderID, sessionID, segmentID, fmt.Sprintf("cannot get raw audio: %v", err))
+		return fmt.Errorf("cannot get raw audio: %w", err)
+	}
+	log.Info().Stringer("segment-id", segmentID).Msg("Got raw audio handle, starting encoding")
+
+	// Setup readers for parallel encoding
+	readers, writer, closer := makeReaders(2)
+	eg, egCtx := errgroup.WithContext(ctx)
+
+	// Copy raw data to multiple readers
+	eg.Go(func() error {
+		defer closer.Close()
+		log.Info().Stringer("segment-id", segmentID).Msg("Starting raw audio copy to encoders")
+		n, err := io.Copy(writer, rawData)
+		log.Info().Stringer("segment-id", segmentID).Int64("bytes", n).Err(err).Msg("Raw audio copy complete")
+		// Ignore closed pipe errors - this is expected when sox finishes early
+		// (sox only reads what it needs for the trim, then closes the pipe)
+		if err != nil && (strings.Contains(err.Error(), "closed pipe") || strings.Contains(err.Error(), "broken pipe")) {
+			log.Debug().Stringer("segment-id", segmentID).Msg("Pipe closed by encoder (expected)")
+			return nil
+		}
+		return err
+	})
+
+	// Encode to OGG
+	eg.Go(func() error {
+		log.Info().Stringer("segment-id", segmentID).Msg("Starting OGG encoding")
+		oggBuffer, err := render.ClipAndEncodeOgg(readers[0], segment.StartPoint, segment.EndPoint)
+		// Close the pipe reader to unblock the copy goroutine
+		// (sox only reads what it needs, leaving the rest unread)
+		if rc, ok := readers[0].(io.Closer); ok {
+			rc.Close()
+		}
+		if err != nil {
+			log.Error().Stringer("segment-id", segmentID).Err(err).Msg("OGG encoding failed")
+			return fmt.Errorf("cannot encode segment to OGG: %w", err)
+		}
+		log.Info().Stringer("segment-id", segmentID).Int("size", oggBuffer.Len()).Msg("OGG encoding complete")
+
+		oggObject := fmt.Sprintf("%s/sessions/%s/segments/%s/%s", recorderID, sessionID, segmentID, SEGMENT_FILENAME_OGG)
+		if _, err := m.client.PutObject(egCtx, bucketName, oggObject, oggBuffer, int64(oggBuffer.Len()), minio.PutObjectOptions{}); err != nil {
+			log.Error().Stringer("segment-id", segmentID).Err(err).Msg("OGG upload failed")
+			return fmt.Errorf("cannot upload OGG: %w", err)
+		}
+
+		log.Info().
+			Stringer("segment-id", segmentID).
+			Int("size", oggBuffer.Len()).
+			Msg("Segment OGG uploaded")
+
+		return nil
+	})
+
+	// Encode to FLAC
+	eg.Go(func() error {
+		log.Info().Stringer("segment-id", segmentID).Msg("Starting FLAC encoding")
+		flacBuffer, err := render.ClipAndEncodeFlac(readers[1], segment.StartPoint, segment.EndPoint)
+		// Close the pipe reader to unblock the copy goroutine
+		// (sox only reads what it needs, leaving the rest unread)
+		if rc, ok := readers[1].(io.Closer); ok {
+			rc.Close()
+		}
+		if err != nil {
+			log.Error().Stringer("segment-id", segmentID).Err(err).Msg("FLAC encoding failed")
+			return fmt.Errorf("cannot encode segment to FLAC: %w", err)
+		}
+		log.Info().Stringer("segment-id", segmentID).Int("size", flacBuffer.Len()).Msg("FLAC encoding complete")
+
+		flacObject := fmt.Sprintf("%s/sessions/%s/segments/%s/%s", recorderID, sessionID, segmentID, SEGMENT_FILENAME_FLAC)
+		if _, err := m.client.PutObject(egCtx, bucketName, flacObject, flacBuffer, int64(flacBuffer.Len()), minio.PutObjectOptions{}); err != nil {
+			log.Error().Stringer("segment-id", segmentID).Err(err).Msg("FLAC upload failed")
+			return fmt.Errorf("cannot upload FLAC: %w", err)
+		}
+
+		log.Info().
+			Stringer("segment-id", segmentID).
+			Int("size", flacBuffer.Len()).
+			Msg("Segment FLAC uploaded")
+
+		return nil
+	})
+
+	log.Info().Stringer("segment-id", segmentID).Msg("Waiting for segment encoding to complete")
+	if err := eg.Wait(); err != nil {
+		log.Error().Stringer("segment-id", segmentID).Err(err).Msg("Segment encoding errgroup failed")
+		m.setSegmentError(ctx, recorderID, sessionID, segmentID, err.Error())
+		return err
+	}
+	log.Info().Stringer("segment-id", segmentID).Msg("Segment encoding completed successfully")
+
+	// Set state to FINISHED
+	m.dataLock.Lock()
+	session = m.system.Recorders[recorderID].Sessions[sessionID]
+	segment = session.Segments[segmentID]
+	segment.State = SegmentStateFinished
+	segment.ErrorMessage = ""
+	session.Segments[segmentID] = segment
+
+	if err := m.putSessionMetadata(ctx, recorderID, sessionID, &session); err != nil {
+		m.dataLock.Unlock()
+		return fmt.Errorf("cannot update session metadata: %w", err)
+	}
+	m.dataLock.Unlock()
+
+	// Notify about state change
+	m.notifyStateChange(&session, session.State)
+
+	log.Info().
+		Stringer("recorder-id", recorderID).
+		Stringer("session-id", sessionID).
+		Stringer("segment-id", segmentID).
+		Msg("Segment rendering complete")
+
+	return nil
+}
+
+func (m *Minio) setSegmentError(ctx context.Context, recorderID, sessionID, segmentID uuid.UUID, errorMsg string) {
+	m.dataLock.Lock()
+	defer m.dataLock.Unlock()
+
+	if _, ok := m.system.Recorders[recorderID]; !ok {
+		return
+	}
+
+	session, ok := m.system.Recorders[recorderID].Sessions[sessionID]
+	if !ok {
+		return
+	}
+
+	segment, ok := session.Segments[segmentID]
+	if !ok {
+		return
+	}
+
+	segment.State = SegmentStateError
+	segment.ErrorMessage = errorMsg
+	session.Segments[segmentID] = segment
+
+	if err := m.putSessionMetadata(ctx, recorderID, sessionID, &session); err != nil {
+		log.Err(err).Msg("Cannot update segment state to ERROR")
+	}
+
+	// Notify about state change
+	go m.notifyStateChange(&session, session.State)
+
+	log.Error().
+		Stringer("segment-id", segmentID).
+		Str("error", errorMsg).
+		Msg("Segment rendering failed")
 }

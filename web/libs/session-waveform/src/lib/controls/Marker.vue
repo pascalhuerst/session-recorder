@@ -1,12 +1,13 @@
 <script setup lang="ts">
 defineProps<{
   index: string;
+  color?: string;
 }>();
 </script>
 
 <template>
   <div class="marker">
-    <div class="badge">
+    <div class="badge" :style="color ? { backgroundColor: color } : undefined">
       {{ index }}
     </div>
     <div>
@@ -26,11 +27,13 @@ defineProps<{
 .badge {
   width: var(--size-6);
   height: var(--size-6);
+  flex-shrink: 0;
+  aspect-ratio: 1;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-xs);
-  background-color: var(--color-pink-700);
+  background-color: var(--color-grey-500, #6b7280);
   color: white;
   font-size: var(--scale-0);
   font-weight: var(--weight-bold);

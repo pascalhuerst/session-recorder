@@ -1,8 +1,19 @@
+export type SegmentState = 'unknown' | 'queued' | 'rendering' | 'finished' | 'error';
+
+export interface SegmentFiles {
+  ogg: string;
+  flac: string;
+}
+
 export interface Segment {
   id: string;
   timeStart: Date;
   timeEnd: Date;
   name: string;
+  state: SegmentState;
+  errorMessage?: string;
+  inlineFiles: SegmentFiles | null;
+  downloadFiles: SegmentFiles | null;
 }
 
 export interface SessionInfo_Files {

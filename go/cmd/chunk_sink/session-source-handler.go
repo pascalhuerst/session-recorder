@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -23,12 +24,16 @@ var (
 	noSuccess = &cmpb.Respone{Success: false}
 )
 
+// Maximum concurrent segment renders to avoid resource exhaustion
+const maxConcurrentRenders = 2
+
 type SessionSourceHandler struct {
 	sessionStorage      storage.Storage
 	chunkSinkServer     *grpc.ChunkSinkServer
 	recorderBroadcaster *broadcast.RecorderBroadcaster
 	sessionBroadcaster  *broadcast.SessionBroadcaster
 	audioBroadcaster    *broadcast.AudioBroadcaster
+	renderSemaphore     chan struct{} // Limits concurrent segment renders
 }
 
 func NewSessionSourceHandler(
@@ -44,6 +49,7 @@ func NewSessionSourceHandler(
 		recorderBroadcaster: recorderBroadcaster,
 		sessionBroadcaster:  sessionBroadcaster,
 		audioBroadcaster:    audioBroadcaster,
+		renderSemaphore:     make(chan struct{}, maxConcurrentRenders),
 	}
 
 	// Register callback for session state changes (RECORDING, PROCESSING, FINISHED)
@@ -86,6 +92,22 @@ func mapSessionState(state storage.SessionState) sspb.SessionState {
 	}
 }
 
+// mapSegmentState converts storage.SegmentState to proto SegmentState
+func mapSegmentState(state storage.SegmentState) sspb.SegmentState {
+	switch state {
+	case storage.SegmentStateQueued:
+		return sspb.SegmentState_SEGMENT_STATE_QUEUED
+	case storage.SegmentStateRendering:
+		return sspb.SegmentState_SEGMENT_STATE_RENDERING
+	case storage.SegmentStateFinished:
+		return sspb.SegmentState_SEGMENT_STATE_FINISHED
+	case storage.SegmentStateError:
+		return sspb.SegmentState_SEGMENT_STATE_ERROR
+	default:
+		return sspb.SegmentState_SEGMENT_STATE_UNKNOWN
+	}
+}
+
 func getFileURL(ctx context.Context, h *SessionSourceHandler, session *storage.Session, filename storage.Filename, download bool) string {
 	// Create URL-friendly session name
 	urlFriendlyName := strings.ReplaceAll(session.Name, " ", "_")
@@ -115,6 +137,46 @@ func getFileURL(ctx context.Context, h *SessionSourceHandler, session *storage.S
 
 	if err != nil {
 		log.Error().Str("filename", string(filename)).Err(err).Msg("Failed to get presigned URL for fileURL")
+		return ""
+	}
+
+	return fileURL
+}
+
+func getSegmentFileURL(ctx context.Context, h *SessionSourceHandler, session *storage.Session, segment *storage.Segment, filename storage.Filename, download bool) string {
+	// Create URL-friendly segment name
+	urlFriendlyName := strings.ReplaceAll(segment.Comment, " ", "_")
+	urlFriendlyName = regexp.MustCompile(`[^a-zA-Z0-9_-]`).ReplaceAllString(urlFriendlyName, "")
+	if urlFriendlyName == "" {
+		urlFriendlyName = "segment"
+	}
+
+	// Get file extension from filename
+	ext := filepath.Ext(string(filename))
+
+	// Construct download filename
+	downloadFilename := urlFriendlyName + ext
+
+	fileURL, err := h.sessionStorage.GetSegmentPresignedURL(
+		ctx,
+		storage.SegmentAssetOptions{
+			RecorderID: session.RecorderID,
+			SessionID:  session.ID,
+			SegmentID:  segment.ID,
+			Filename:   filename,
+		},
+		storage.SigningOptions{
+			Expires:          time.Hour * 24,
+			Download:         download,
+			DownloadFilename: downloadFilename,
+		})
+
+	if err != nil {
+		log.Error().
+			Str("filename", string(filename)).
+			Stringer("segment-id", segment.ID).
+			Err(err).
+			Msg("Failed to get presigned URL for segment file")
 		return ""
 	}
 
@@ -153,6 +215,39 @@ func newSessionInfo(ctx context.Context, h *SessionSourceHandler, session *stora
 			Flac:     getURL(storage.FILENAME_FLAC, true),
 			Waveform: getURL(storage.FILENAME_WAVEFORM, true),
 		}
+	}
+
+	// Add segments with their file URLs
+	for segmentID, segment := range session.Segments {
+		segmentInfo := &sspb.SegmentInfo{
+			TimeStart:    timestamppb.New(session.StartTime.Add(time.Duration(segment.StartPoint) * time.Second / 48000)),
+			TimeEnd:      timestamppb.New(session.StartTime.Add(time.Duration(segment.EndPoint) * time.Second / 48000)),
+			Name:         segment.Comment,
+			State:        mapSegmentState(segment.State),
+			ErrorMessage: segment.ErrorMessage,
+		}
+
+		// Only add file URLs for finished segments
+		if segment.State == storage.SegmentStateFinished {
+			segmentCopy := segment
+			segmentCopy.ID = segmentID
+
+			segmentInfo.InlineFiles = &sspb.SegmentInfo_Files{
+				Ogg:  getSegmentFileURL(ctx, h, session, &segmentCopy, storage.SEGMENT_FILENAME_OGG, false),
+				Flac: getSegmentFileURL(ctx, h, session, &segmentCopy, storage.SEGMENT_FILENAME_FLAC, false),
+			}
+			segmentInfo.DownloadFiles = &sspb.SegmentInfo_Files{
+				Ogg:  getSegmentFileURL(ctx, h, session, &segmentCopy, storage.SEGMENT_FILENAME_OGG, true),
+				Flac: getSegmentFileURL(ctx, h, session, &segmentCopy, storage.SEGMENT_FILENAME_FLAC, true),
+			}
+		}
+
+		info.Segments = append(info.Segments, &sspb.Segment{
+			SegmentID: segmentID.String(),
+			Info: &sspb.Segment_Updated{
+				Updated: segmentInfo,
+			},
+		})
 	}
 
 	return info
@@ -365,6 +460,20 @@ func parseIDs(recorderID string, sessionID string) (uuid.UUID, uuid.UUID, error)
 	return recorderIDParsed, sessionIDParsed, nil
 }
 
+func parseSegmentIDs(recorderID, sessionID, segmentID string) (uuid.UUID, uuid.UUID, uuid.UUID, error) {
+	recorderIDParsed, sessionIDParsed, err := parseIDs(recorderID, sessionID)
+	if err != nil {
+		return uuid.Nil, uuid.Nil, uuid.Nil, err
+	}
+
+	segmentIDParsed, err := uuid.Parse(segmentID)
+	if err != nil {
+		return uuid.Nil, uuid.Nil, uuid.Nil, err
+	}
+
+	return recorderIDParsed, sessionIDParsed, segmentIDParsed, nil
+}
+
 func (h *SessionSourceHandler) deleteSession(ctx context.Context, request *sspb.DeleteSessionRequest) (*cmpb.Respone, error) {
 	recorderID, sessionID, err := parseIDs(request.RecorderID, request.SessionID)
 	if err != nil {
@@ -449,6 +558,241 @@ func (h *SessionSourceHandler) setName(ctx context.Context, request *sspb.SetNam
 	})
 
 	log.Info().Str("session-id", request.SessionID).Str("name", request.Name).Msg("Set session name")
+
+	return success, nil
+}
+
+func (h *SessionSourceHandler) createSegment(ctx context.Context, request *sspb.CreateSegmentRequest) (*cmpb.Respone, error) {
+	recorderID, sessionID, segmentID, err := parseSegmentIDs(request.RecorderID, request.SessionID, request.SegmentID)
+	if err != nil {
+		log.Err(err).
+			Str("recorder-id", request.RecorderID).
+			Str("session-id", request.SessionID).
+			Str("segment-id", request.SegmentID).
+			Msg("Cannot parse IDs")
+		return noSuccess, err
+	}
+
+	info := request.GetInfo()
+	if info == nil {
+		return noSuccess, fmt.Errorf("segment info is required")
+	}
+
+	// Frontend sends offset times (seconds into session) as small Unix timestamps.
+	// Convert to sample positions: nanoseconds * 48000 / 1e9 = seconds * 48000
+	segment := storage.Segment{
+		ID:         segmentID,
+		Comment:    info.Name,
+		StartPoint: info.TimeStart.AsTime().UnixNano() * 48000 / 1e9,
+		EndPoint:   info.TimeEnd.AsTime().UnixNano() * 48000 / 1e9,
+		State:      storage.SegmentStateUnknown,
+	}
+
+	if err := h.sessionStorage.CreateSegment(ctx, recorderID, sessionID, segmentID, segment); err != nil {
+		log.Err(err).Str("segment-id", request.SegmentID).Msg("Cannot create segment")
+		return noSuccess, err
+	}
+
+	// Broadcast session update
+	session, err := h.sessionStorage.GetSession(recorderID, sessionID)
+	if err != nil {
+		log.Err(err).Str("session-id", request.SessionID).Msg("Cannot get session")
+		return noSuccess, err
+	}
+
+	h.sessionBroadcaster.Broadcast(&sspb.Session{
+		ID: session.ID.String(),
+		Info: &sspb.Session_Updated{
+			Updated: newSessionInfo(ctx, h, &session),
+		},
+	})
+
+	log.Info().
+		Str("segment-id", request.SegmentID).
+		Str("session-id", request.SessionID).
+		Msg("Created segment")
+
+	return success, nil
+}
+
+func (h *SessionSourceHandler) updateSegment(ctx context.Context, request *sspb.UpdateSegmentRequest) (*cmpb.Respone, error) {
+	recorderID, sessionID, segmentID, err := parseSegmentIDs(request.RecorderID, request.SessionID, request.SegmentID)
+	if err != nil {
+		log.Err(err).
+			Str("recorder-id", request.RecorderID).
+			Str("session-id", request.SessionID).
+			Str("segment-id", request.SegmentID).
+			Msg("Cannot parse IDs")
+		return noSuccess, err
+	}
+
+	info := request.GetInfo()
+	if info == nil {
+		return noSuccess, fmt.Errorf("segment info is required")
+	}
+
+	// Frontend sends offset times (seconds into session) as small Unix timestamps.
+	// Convert to sample positions: nanoseconds * 48000 / 1e9 = seconds * 48000
+	segment := storage.Segment{
+		ID:         segmentID,
+		Comment:    info.Name,
+		StartPoint: info.TimeStart.AsTime().UnixNano() * 48000 / 1e9,
+		EndPoint:   info.TimeEnd.AsTime().UnixNano() * 48000 / 1e9,
+	}
+
+	if err := h.sessionStorage.UpdateSegment(ctx, recorderID, sessionID, segmentID, segment); err != nil {
+		log.Err(err).Str("segment-id", request.SegmentID).Msg("Cannot update segment")
+		return noSuccess, err
+	}
+
+	// Broadcast session update
+	session, err := h.sessionStorage.GetSession(recorderID, sessionID)
+	if err != nil {
+		log.Err(err).Str("session-id", request.SessionID).Msg("Cannot get session")
+		return noSuccess, err
+	}
+
+	h.sessionBroadcaster.Broadcast(&sspb.Session{
+		ID: session.ID.String(),
+		Info: &sspb.Session_Updated{
+			Updated: newSessionInfo(ctx, h, &session),
+		},
+	})
+
+	log.Info().
+		Str("segment-id", request.SegmentID).
+		Str("session-id", request.SessionID).
+		Msg("Updated segment")
+
+	return success, nil
+}
+
+func (h *SessionSourceHandler) deleteSegment(ctx context.Context, request *sspb.DeleteSegmentRequest) (*cmpb.Respone, error) {
+	recorderID, sessionID, segmentID, err := parseSegmentIDs(request.RecorderID, request.SessionID, request.SegmentID)
+	if err != nil {
+		log.Err(err).
+			Str("recorder-id", request.RecorderID).
+			Str("session-id", request.SessionID).
+			Str("segment-id", request.SegmentID).
+			Msg("Cannot parse IDs")
+		return noSuccess, err
+	}
+
+	if err := h.sessionStorage.DeleteSegment(ctx, recorderID, sessionID, segmentID); err != nil {
+		log.Err(err).Str("segment-id", request.SegmentID).Msg("Cannot delete segment")
+		return noSuccess, err
+	}
+
+	// Broadcast session update
+	session, err := h.sessionStorage.GetSession(recorderID, sessionID)
+	if err != nil {
+		log.Err(err).Str("session-id", request.SessionID).Msg("Cannot get session")
+		return noSuccess, err
+	}
+
+	h.sessionBroadcaster.Broadcast(&sspb.Session{
+		ID: session.ID.String(),
+		Info: &sspb.Session_Updated{
+			Updated: newSessionInfo(ctx, h, &session),
+		},
+	})
+
+	log.Info().
+		Str("segment-id", request.SegmentID).
+		Str("session-id", request.SessionID).
+		Msg("Deleted segment")
+
+	return success, nil
+}
+
+func (h *SessionSourceHandler) renderSegment(ctx context.Context, request *sspb.RenderSegmentRequest) (*cmpb.Respone, error) {
+	recorderID, sessionID, segmentID, err := parseSegmentIDs(request.RecorderID, request.SessionID, request.SegmentID)
+	if err != nil {
+		log.Err(err).
+			Str("recorder-id", request.RecorderID).
+			Str("session-id", request.SessionID).
+			Str("segment-id", request.SegmentID).
+			Msg("Cannot parse IDs")
+		return noSuccess, err
+	}
+
+	// Set segment state to QUEUED immediately
+	if err := h.sessionStorage.SetSegmentState(ctx, recorderID, sessionID, segmentID, storage.SegmentStateQueued); err != nil {
+		log.Err(err).
+			Str("segment-id", segmentID.String()).
+			Msg("Cannot set segment state to queued")
+		return noSuccess, err
+	}
+
+	// Broadcast queued state to UI
+	session, err := h.sessionStorage.GetSession(recorderID, sessionID)
+	if err != nil {
+		log.Err(err).Str("session-id", sessionID.String()).Msg("Cannot get session after queuing")
+		return noSuccess, err
+	}
+
+	h.sessionBroadcaster.Broadcast(&sspb.Session{
+		ID: session.ID.String(),
+		Info: &sspb.Session_Updated{
+			Updated: newSessionInfo(ctx, h, &session),
+		},
+	})
+
+	log.Info().
+		Str("segment-id", request.SegmentID).
+		Str("session-id", request.SessionID).
+		Msg("Segment queued for rendering")
+
+	// Start rendering asynchronously with concurrency control
+	go func() {
+		// Acquire semaphore slot (blocks if max concurrent renders reached)
+		h.renderSemaphore <- struct{}{}
+		defer func() { <-h.renderSemaphore }()
+
+		log.Debug().
+			Str("segment-id", segmentID.String()).
+			Int("queue-size", len(h.renderSemaphore)).
+			Msg("Acquired render slot, starting render")
+
+		// Set state to RENDERING and broadcast before starting work
+		if err := h.sessionStorage.SetSegmentState(context.Background(), recorderID, sessionID, segmentID, storage.SegmentStateRendering); err != nil {
+			log.Err(err).Str("segment-id", segmentID.String()).Msg("Cannot set segment state to rendering")
+		}
+		if session, err := h.sessionStorage.GetSession(recorderID, sessionID); err == nil {
+			h.sessionBroadcaster.Broadcast(&sspb.Session{
+				ID: session.ID.String(),
+				Info: &sspb.Session_Updated{
+					Updated: newSessionInfo(context.Background(), h, &session),
+				},
+			})
+		}
+
+		if err := h.sessionStorage.RenderSegment(context.Background(), recorderID, sessionID, segmentID); err != nil {
+			log.Err(err).
+				Str("segment-id", segmentID.String()).
+				Msg("Cannot render segment")
+			return
+		}
+
+		// Broadcast session update after rendering completes
+		session, err := h.sessionStorage.GetSession(recorderID, sessionID)
+		if err != nil {
+			log.Err(err).Str("session-id", sessionID.String()).Msg("Cannot get session after render")
+			return
+		}
+
+		h.sessionBroadcaster.Broadcast(&sspb.Session{
+			ID: session.ID.String(),
+			Info: &sspb.Session_Updated{
+				Updated: newSessionInfo(context.Background(), h, &session),
+			},
+		})
+
+		log.Info().
+			Str("segment-id", segmentID.String()).
+			Str("session-id", sessionID.String()).
+			Msg("Segment rendered")
+	}()
 
 	return success, nil
 }

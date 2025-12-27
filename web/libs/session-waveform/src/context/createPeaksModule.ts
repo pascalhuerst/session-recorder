@@ -19,6 +19,7 @@ export interface Events {
     segment: Segment
   ) => void;
   segmentRemoved: (segmentId: string) => void;
+  segmentsBulkDeleted: (count: number) => void;
   amplitudeScaleChanged: (scale: number) => void;
   zoomLevelChanged: (seconds: number) => void;
   expandedChanged: (expanded: boolean) => void;

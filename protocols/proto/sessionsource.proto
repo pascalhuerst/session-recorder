@@ -31,6 +31,7 @@ enum SegmentState {
 	SEGMENT_STATE_RENDERING = 1;
 	SEGMENT_STATE_FINISHED = 2;
 	SEGMENT_STATE_ERROR = 3;
+	SEGMENT_STATE_QUEUED = 4;
 }
 
 message SegmentInfo {
@@ -39,6 +40,14 @@ message SegmentInfo {
 
 	string name = 3;
 	SegmentState state = 4;
+
+	message Files {
+		string ogg = 1;
+		string flac = 2;
+	}
+	Files inlineFiles = 5;
+	Files downloadFiles = 6;
+	string errorMessage = 7;
 }
 
 message SegmentRemoved {}

@@ -57,7 +57,9 @@ const removeToast = (id: string) => {
   flex-direction: column;
   gap: var(--size-2);
   max-width: 400px;
+  max-height: 600px;
   pointer-events: none;
+  overflow: hidden;
 }
 
 .toast {
@@ -72,7 +74,7 @@ const removeToast = (id: string) => {
 
 .toast--success {
   border-color: var(--color-purple-500);
-  background: #f0fdf4;
+  background: #efeaf8ff;
 }
 
 .toast--error {

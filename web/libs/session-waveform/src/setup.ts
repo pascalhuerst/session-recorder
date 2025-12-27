@@ -23,6 +23,8 @@ import { faExclamationCircle } from '@fortawesome/free-solid-svg-icons/faExclama
 import { faExclamationTriangle } from '@fortawesome/free-solid-svg-icons/faExclamationTriangle';
 import { faInfoCircle } from '@fortawesome/free-solid-svg-icons/faInfoCircle';
 import { faStop } from '@fortawesome/free-solid-svg-icons/faStop';
+import { faCheck } from '@fortawesome/free-solid-svg-icons/faCheck';
+import { faRedo } from '@fortawesome/free-solid-svg-icons/faRedo';
 
 export const setup = () => {
   library.add(
@@ -30,6 +32,7 @@ export const setup = () => {
     faPlay,
     faPause,
     faStop,
+    faCheck,
     faMicrochip,
     faWaveSquare,
     faTrash,
@@ -48,6 +51,7 @@ export const setup = () => {
     faCheckCircle,
     faExclamationCircle,
     faExclamationTriangle,
-    faInfoCircle
+    faInfoCircle,
+    faRedo
   );
 };

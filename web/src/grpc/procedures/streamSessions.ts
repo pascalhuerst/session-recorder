@@ -2,10 +2,11 @@ import {
   type SegmentInfo,
   type SessionInfo,
   SessionState as ProtoSessionState,
+  SegmentState as ProtoSegmentState,
   StreamSessionRequest,
 } from '@session-recorder/protocols/ts/sessionsource';
 import { sessionSourceClient } from '../sessionSourceClient';
-import type { Segment, Session, SessionState } from '../../types';
+import type { Segment, SegmentState, Session, SessionState } from '../../types';
 import { Timestamp } from '@session-recorder/protocols/ts/google/protobuf/timestamp';
 import { Duration } from '@session-recorder/protocols/ts/google/protobuf/duration';
 
@@ -50,6 +51,21 @@ const mapSessionState = (protoState: ProtoSessionState): SessionState => {
       return 'error';
     default:
       return 'recording';
+  }
+};
+
+const mapSegmentState = (protoState: ProtoSegmentState): SegmentState => {
+  switch (protoState) {
+    case ProtoSegmentState.QUEUED:
+      return 'queued';
+    case ProtoSegmentState.RENDERING:
+      return 'rendering';
+    case ProtoSegmentState.FINISHED:
+      return 'finished';
+    case ProtoSegmentState.ERROR:
+      return 'error';
+    default:
+      return 'unknown';
   }
 };
 
@@ -100,7 +116,8 @@ export const normalizeSession = (id: string, info: SessionInfo): Session => {
             }
           }
         })
-        .filter(Boolean);
+        .filter(Boolean)
+        .sort((a, b) => a.timeStart.getTime() - b.timeStart.getTime());
     },
   });
 };
@@ -109,6 +126,8 @@ export const normalizeSegment = (id: string, info: SegmentInfo): Segment => {
   return fromFactory<Segment>({
     id: () => id,
     name: () => info.name,
+    state: () => mapSegmentState(info.state),
+    errorMessage: () => info.errorMessage || undefined,
     timeStart: () => {
       if ('timeStart' in info) {
         return Timestamp.toDate(info.timeStart);
@@ -120,6 +139,12 @@ export const normalizeSegment = (id: string, info: SegmentInfo): Segment => {
         return Timestamp.toDate(info.timeEnd);
       }
       throw new Error('Missing timeEnd');
+    },
+    inlineFiles: () => {
+      return info.inlineFiles || null;
+    },
+    downloadFiles: () => {
+      return info.downloadFiles || null;
     },
   });
 };

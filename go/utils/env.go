@@ -33,3 +33,10 @@ func Get(name string) (string, error) {
 
 	return strings.Clone(s), nil
 }
+
+func GetEnvOrDefault(name string, defaultValue string) string {
+	if v, err := Get(name); err == nil {
+		return v
+	}
+	return defaultValue
+}

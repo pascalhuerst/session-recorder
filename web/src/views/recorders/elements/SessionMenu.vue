@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import {
   Button,
@@ -8,9 +8,11 @@ import {
 } from '@session-recorder/session-waveform';
 import { setKeepSession } from '../../../grpc/procedures/setKeepSession';
 import { deleteSession } from '../../../grpc/procedures/deleteSession';
+import { shareSession } from '../../../grpc/procedures/shareSession';
 import type { Session } from '../../../types';
 import { useDateFormat } from '@vueuse/core';
 import { toastService } from '../../../services/Toaster/ToastService';
+import ShareModal from '../../../components/ShareModal.vue';
 
 // @todo: break this down and make composable
 
@@ -20,6 +22,13 @@ const props = defineProps<{
 }>();
 
 const { awaitConfirmation, modalProps } = useConfirmation();
+
+const showShareModal = ref(false);
+const isSharing = ref(false);
+
+const sessionName = computed(() => {
+  return props.session.name || 'Untitled Recording';
+});
 
 const displayExpiryDate = computed(() => {
   const { expiresAt } = props.session;
@@ -71,6 +80,32 @@ const onDelete = () => {
     }
   });
 };
+
+const onShare = () => {
+  showShareModal.value = true;
+};
+
+const onShareConfirm = async (email: string) => {
+  isSharing.value = true;
+  try {
+    await shareSession({
+      recorderId: props.recorderId,
+      sessionId: props.session.id,
+      recipientEmail: email,
+    });
+    toastService.success(`Download link sent to ${email}`);
+    showShareModal.value = false;
+  } catch (error) {
+    console.error('Failed to share session:', error);
+    toastService.error('Failed to send email. Please try again.');
+  } finally {
+    isSharing.value = false;
+  }
+};
+
+const onShareClose = () => {
+  showShareModal.value = false;
+};
 </script>
 
 <template>
@@ -85,6 +120,10 @@ const onDelete = () => {
     <Button size="xs" @click="onDelete">
       <font-awesome-icon icon="fa-solid fa-trash"></font-awesome-icon>
       Delete
+    </Button>
+    <Button size="xs" @click="onShare">
+      <font-awesome-icon icon="fa-solid fa-share"></font-awesome-icon>
+      Share
     </Button>
     <Button
       size="xs"
@@ -113,6 +152,14 @@ const onDelete = () => {
       </Button>
     </template>
   </Modal>
+
+  <ShareModal
+    :open="showShareModal"
+    :item-name="sessionName"
+    :is-loading="isSharing"
+    @close="onShareClose"
+    @share="onShareConfirm"
+  />
 </template>
 
 <style scoped>

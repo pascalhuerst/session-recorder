@@ -151,6 +151,19 @@ message CutSessionRequest {
 	string recorderID = 1;
 }
 
+message ShareSessionRequest {
+	string recorderID = 1;
+	string sessionID = 2;
+	string recipientEmail = 3;
+}
+
+message ShareSegmentRequest {
+	string recorderID = 1;
+	string sessionID = 2;
+	string segmentID = 3;
+	string recipientEmail = 4;
+}
+
 message StreamSessionAudioRequest {
 	string sessionID = 1;
 }
@@ -179,4 +192,7 @@ service SessionSource {
 	rpc UpdateSegment(UpdateSegmentRequest) returns (common.Respone);
 
 	rpc CutSession(CutSessionRequest) returns (common.Respone);
+
+	rpc ShareSession(ShareSessionRequest) returns (common.Respone);
+	rpc ShareSegment(ShareSegmentRequest) returns (common.Respone);
 }

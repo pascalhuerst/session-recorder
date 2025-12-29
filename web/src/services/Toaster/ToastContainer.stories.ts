@@ -28,7 +28,7 @@
  */
 
 import type { Meta, StoryObj } from '@storybook/vue3';
-import { ref, reactive } from 'vue';
+import { ref } from 'vue';
 import { userEvent, within, expect } from '@storybook/test';
 
 // Mock component since real ToastContainer uses a singleton service
@@ -208,7 +208,6 @@ export const DismissInteraction: Story = {
 // Multiple toasts stacked
 export const MultipleStacked: Story = {
   play: async ({ canvasElement }) => {
-    const canvas = within(canvasElement);
     const toasts = canvasElement.querySelectorAll('.toast');
     await expect(toasts.length).toBe(5);
   },

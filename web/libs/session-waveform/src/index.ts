@@ -3,6 +3,7 @@ import WaveformEditor from './waveform/WaveformEditor.vue';
 import WaveformView from './waveform/WaveformView.vue';
 import Button from './lib/controls/Button.vue';
 import Modal from './lib/disclosure/Modal.vue';
+import TextInput from './lib/forms/TextInput.vue';
 import { useConfirmation } from './lib/disclosure/useConfirmation';
 import {
   createPeaksContext,
@@ -11,7 +12,7 @@ import {
   type PeaksContext,
 } from './context/usePeaksContext';
 
-export { EmptyScreen, WaveformEditor, WaveformView, Button, Modal, useConfirmation };
+export { EmptyScreen, WaveformEditor, WaveformView, Button, Modal, TextInput, useConfirmation };
 export * from './setup';
 export {
   usePeaksContext,

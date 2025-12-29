@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/pascalhuerst/session-recorder/broadcast"
+	"github.com/pascalhuerst/session-recorder/email"
 	"github.com/pascalhuerst/session-recorder/grpc"
 	"github.com/pascalhuerst/session-recorder/logger"
 	"github.com/pascalhuerst/session-recorder/mdns"
@@ -85,7 +86,25 @@ func main() {
 		OnChunksCB:         chunkSinkHandler.setChunks,
 	})
 
-	sessionSourceHandler := NewSessionSourceHandler(sessionStorage, chunkSinkServer, recorderBroadcaster, sessionBroadcaster, audioBroadcaster)
+	// Create email sender if SMTP config is provided
+	var emailSender *email.Sender
+	smtpHost := os.Getenv("SMTP_HOST")
+	if smtpHost != "" {
+		emailConfig := email.Config{
+			Host:     smtpHost,
+			Port:     utils.GetEnvOrDefault("SMTP_PORT", "587"),
+			Username: os.Getenv("SMTP_USERNAME"),
+			Password: os.Getenv("SMTP_PASSWORD"),
+			From:     utils.GetEnvOrDefault("SMTP_FROM", "noreply@session-recorder.local"),
+			FromName: utils.GetEnvOrDefault("SMTP_FROM_NAME", "Session Recorder"),
+		}
+		emailSender = email.NewSender(emailConfig)
+		log.Info().Str("host", smtpHost).Msg("Email sharing enabled")
+	} else {
+		log.Warn().Msg("Email sharing disabled (SMTP_HOST not set)")
+	}
+
+	sessionSourceHandler := NewSessionSourceHandler(sessionStorage, chunkSinkServer, recorderBroadcaster, sessionBroadcaster, audioBroadcaster, emailSender)
 
 	sessionSourceServer := grpc.NewSessionSourceServer(&grpc.SessionSourceServerConfig{
 		Name:                 hostname,
@@ -101,6 +120,8 @@ func main() {
 		UpdateSegmentCB:      sessionSourceHandler.updateSegment,
 		DeleteSegmentCB:      sessionSourceHandler.deleteSegment,
 		RenderSegmentCB:      sessionSourceHandler.renderSegment,
+		ShareSessionCB:       sessionSourceHandler.shareSession,
+		ShareSegmentCB:       sessionSourceHandler.shareSegment,
 	})
 
 	port, err := grpc.StartProtocolServer(sessionSourceServer, mdnsServer, sessionSourceService, sessionSourcePort)

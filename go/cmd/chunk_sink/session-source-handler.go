@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/pascalhuerst/session-recorder/broadcast"
+	"github.com/pascalhuerst/session-recorder/email"
 	"github.com/pascalhuerst/session-recorder/grpc"
 	cmpb "github.com/pascalhuerst/session-recorder/protocols/go/common"
 	sspb "github.com/pascalhuerst/session-recorder/protocols/go/sessionsource"
@@ -33,6 +34,7 @@ type SessionSourceHandler struct {
 	recorderBroadcaster *broadcast.RecorderBroadcaster
 	sessionBroadcaster  *broadcast.SessionBroadcaster
 	audioBroadcaster    *broadcast.AudioBroadcaster
+	emailSender         *email.Sender
 	renderSemaphore     chan struct{} // Limits concurrent segment renders
 }
 
@@ -42,6 +44,7 @@ func NewSessionSourceHandler(
 	recorderBroadcaster *broadcast.RecorderBroadcaster,
 	sessionBroadcaster *broadcast.SessionBroadcaster,
 	audioBroadcaster *broadcast.AudioBroadcaster,
+	emailSender *email.Sender,
 ) *SessionSourceHandler {
 	h := &SessionSourceHandler{
 		sessionStorage:      sessionStorage,
@@ -49,6 +52,7 @@ func NewSessionSourceHandler(
 		recorderBroadcaster: recorderBroadcaster,
 		sessionBroadcaster:  sessionBroadcaster,
 		audioBroadcaster:    audioBroadcaster,
+		emailSender:         emailSender,
 		renderSemaphore:     make(chan struct{}, maxConcurrentRenders),
 	}
 
@@ -793,6 +797,149 @@ func (h *SessionSourceHandler) renderSegment(ctx context.Context, request *sspb.
 			Str("session-id", sessionID.String()).
 			Msg("Segment rendered")
 	}()
+
+	return success, nil
+}
+
+func (h *SessionSourceHandler) shareSession(ctx context.Context, request *sspb.ShareSessionRequest) (*cmpb.Respone, error) {
+	recorderID, sessionID, err := parseIDs(request.RecorderID, request.SessionID)
+	if err != nil {
+		log.Err(err).
+			Str("recorder-id", request.RecorderID).
+			Str("session-id", request.SessionID).
+			Msg("Cannot parse IDs")
+		return noSuccess, err
+	}
+
+	session, err := h.sessionStorage.GetSession(recorderID, sessionID)
+	if err != nil {
+		log.Err(err).Str("session-id", request.SessionID).Msg("Cannot get session")
+		return noSuccess, err
+	}
+
+	// Only allow sharing finished sessions
+	if session.State != storage.SessionStateFinished {
+		log.Warn().
+			Str("session-id", request.SessionID).
+			Str("state", session.State.String()).
+			Msg("Cannot share session that is not finished")
+		return noSuccess, fmt.Errorf("session is not finished")
+	}
+
+	// Check if email sender is configured
+	if h.emailSender == nil {
+		log.Error().Msg("Email sender is not configured")
+		return noSuccess, fmt.Errorf("email sharing is not configured")
+	}
+
+	// Generate a presigned URL for the FLAC file with 7-day expiry
+	downloadURL := getFileURL(ctx, h, &session, storage.FILENAME_FLAC, true)
+	if downloadURL == "" {
+		log.Error().Str("session-id", request.SessionID).Msg("Cannot generate download URL")
+		return noSuccess, fmt.Errorf("cannot generate download URL")
+	}
+
+	// Get a friendly session name
+	sessionName := session.Name
+	if sessionName == "" {
+		sessionName = "Untitled Recording"
+	}
+
+	// Send the email
+	err = h.emailSender.SendShareEmail(email.ShareEmailData{
+		RecipientEmail: request.RecipientEmail,
+		SessionName:    sessionName,
+		DownloadURL:    downloadURL,
+		ExpiresIn:      "24 hours",
+	})
+	if err != nil {
+		log.Err(err).
+			Str("session-id", request.SessionID).
+			Str("recipient", request.RecipientEmail).
+			Msg("Cannot send share email")
+		return noSuccess, fmt.Errorf("failed to send email: %w", err)
+	}
+
+	log.Info().
+		Str("session-id", request.SessionID).
+		Str("recipient", request.RecipientEmail).
+		Msg("Session shared via email")
+
+	return success, nil
+}
+
+func (h *SessionSourceHandler) shareSegment(ctx context.Context, request *sspb.ShareSegmentRequest) (*cmpb.Respone, error) {
+	recorderID, sessionID, segmentID, err := parseSegmentIDs(request.RecorderID, request.SessionID, request.SegmentID)
+	if err != nil {
+		log.Err(err).
+			Str("recorder-id", request.RecorderID).
+			Str("session-id", request.SessionID).
+			Str("segment-id", request.SegmentID).
+			Msg("Cannot parse IDs")
+		return noSuccess, err
+	}
+
+	session, err := h.sessionStorage.GetSession(recorderID, sessionID)
+	if err != nil {
+		log.Err(err).Str("session-id", request.SessionID).Msg("Cannot get session")
+		return noSuccess, err
+	}
+
+	segment, ok := session.Segments[segmentID]
+	if !ok {
+		log.Err(err).Str("segment-id", request.SegmentID).Msg("Segment not found")
+		return noSuccess, fmt.Errorf("segment not found")
+	}
+
+	// Only allow sharing rendered segments
+	if segment.State != storage.SegmentStateFinished {
+		log.Warn().
+			Str("segment-id", request.SegmentID).
+			Str("state", segment.State.String()).
+			Msg("Cannot share segment that is not rendered")
+		return noSuccess, fmt.Errorf("segment is not rendered")
+	}
+
+	// Check if email sender is configured
+	if h.emailSender == nil {
+		log.Error().Msg("Email sender is not configured")
+		return noSuccess, fmt.Errorf("email sharing is not configured")
+	}
+
+	// Generate a presigned URL for the segment FLAC file
+	segmentCopy := segment
+	segmentCopy.ID = segmentID
+	downloadURL := getSegmentFileURL(ctx, h, &session, &segmentCopy, storage.SEGMENT_FILENAME_FLAC, true)
+	if downloadURL == "" {
+		log.Error().Str("segment-id", request.SegmentID).Msg("Cannot generate download URL")
+		return noSuccess, fmt.Errorf("cannot generate download URL")
+	}
+
+	// Get a friendly segment name
+	segmentName := segment.Comment
+	if segmentName == "" {
+		segmentName = "Segment"
+	}
+
+	// Send the email
+	err = h.emailSender.SendShareEmail(email.ShareEmailData{
+		RecipientEmail: request.RecipientEmail,
+		SessionName:    segmentName,
+		DownloadURL:    downloadURL,
+		ExpiresIn:      "24 hours",
+	})
+	if err != nil {
+		log.Err(err).
+			Str("segment-id", request.SegmentID).
+			Str("recipient", request.RecipientEmail).
+			Msg("Cannot send share email")
+		return noSuccess, fmt.Errorf("failed to send email: %w", err)
+	}
+
+	log.Info().
+		Str("segment-id", request.SegmentID).
+		Str("recipient", request.RecipientEmail).
+		Msg("Segment shared via email")
 
 	return success, nil
 }

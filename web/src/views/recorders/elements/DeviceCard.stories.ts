@@ -88,6 +88,7 @@ type Story = StoryObj<typeof meta>;
 // Idle recorder
 export const Idle: Story = {
   args: {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     recorder: mockIdleRecorder as any,
     isSelected: false,
   },
@@ -105,6 +106,7 @@ export const Idle: Story = {
 // Recording state
 export const Recording: Story = {
   args: {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     recorder: mockRecordingRecorder as any,
     isSelected: false,
   },
@@ -119,6 +121,7 @@ export const Recording: Story = {
 // Selected state
 export const Selected: Story = {
   args: {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     recorder: mockIdleRecorder as any,
     isSelected: true,
   },
@@ -131,6 +134,7 @@ export const Selected: Story = {
 // Long name (truncation)
 export const LongName: Story = {
   args: {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     recorder: mockLongNameRecorder as any,
     isSelected: false,
   },
@@ -143,6 +147,7 @@ export const LongName: Story = {
 // Hover interaction
 export const HoverInteraction: Story = {
   args: {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     recorder: mockIdleRecorder as any,
     isSelected: false,
   },
@@ -211,6 +216,7 @@ export const InSidebarContext: Story = {
 // Click interaction
 export const ClickInteraction: Story = {
   args: {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     recorder: mockIdleRecorder as any,
     isSelected: false,
   },

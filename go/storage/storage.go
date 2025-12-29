@@ -3,6 +3,7 @@ package storage
 import (
 	"context"
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/google/uuid"
@@ -124,6 +125,12 @@ type Storage interface {
 	RegisterOnAudioChunkCallback(cb OnAudioChunkCb) error
 
 	GetPresignedURL(ctx context.Context, asset AssetOptions, options SigningOptions) (string, error)
+
+	// GetSessionFileReader returns a reader for a session file
+	GetSessionFileReader(ctx context.Context, asset AssetOptions) (io.ReadCloser, int64, error)
+
+	// GetSegmentFileReader returns a reader for a segment file
+	GetSegmentFileReader(ctx context.Context, asset SegmentAssetOptions) (io.ReadCloser, int64, error)
 
 	// Segment operations
 	CreateSegment(ctx context.Context, recorderID, sessionID, segmentID uuid.UUID, segment Segment) error

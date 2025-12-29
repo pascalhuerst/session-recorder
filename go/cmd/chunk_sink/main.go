@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/pascalhuerst/session-recorder/broadcast"
 	"github.com/pascalhuerst/session-recorder/email"
+	"github.com/pascalhuerst/session-recorder/fileshare"
 	"github.com/pascalhuerst/session-recorder/grpc"
 	"github.com/pascalhuerst/session-recorder/logger"
 	"github.com/pascalhuerst/session-recorder/mdns"
@@ -104,7 +105,14 @@ func main() {
 		log.Warn().Msg("Email sharing disabled (SMTP_HOST not set)")
 	}
 
-	sessionSourceHandler := NewSessionSourceHandler(sessionStorage, chunkSinkServer, recorderBroadcaster, sessionBroadcaster, audioBroadcaster, emailSender)
+	// Create file sharer based on environment configuration
+	fileSharer, err := fileshare.NewFileSharer(sessionStorage)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Cannot create file sharer. Giving up")
+		return
+	}
+
+	sessionSourceHandler := NewSessionSourceHandler(sessionStorage, chunkSinkServer, recorderBroadcaster, sessionBroadcaster, audioBroadcaster, emailSender, fileSharer)
 
 	sessionSourceServer := grpc.NewSessionSourceServer(&grpc.SessionSourceServerConfig{
 		Name:                 hostname,

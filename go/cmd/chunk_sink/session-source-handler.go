@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/pascalhuerst/session-recorder/broadcast"
 	"github.com/pascalhuerst/session-recorder/email"
+	"github.com/pascalhuerst/session-recorder/fileshare"
 	"github.com/pascalhuerst/session-recorder/grpc"
 	cmpb "github.com/pascalhuerst/session-recorder/protocols/go/common"
 	sspb "github.com/pascalhuerst/session-recorder/protocols/go/sessionsource"
@@ -35,6 +36,7 @@ type SessionSourceHandler struct {
 	sessionBroadcaster  *broadcast.SessionBroadcaster
 	audioBroadcaster    *broadcast.AudioBroadcaster
 	emailSender         *email.Sender
+	fileSharer          fileshare.FileSharer
 	renderSemaphore     chan struct{} // Limits concurrent segment renders
 }
 
@@ -45,6 +47,7 @@ func NewSessionSourceHandler(
 	sessionBroadcaster *broadcast.SessionBroadcaster,
 	audioBroadcaster *broadcast.AudioBroadcaster,
 	emailSender *email.Sender,
+	fileSharer fileshare.FileSharer,
 ) *SessionSourceHandler {
 	h := &SessionSourceHandler{
 		sessionStorage:      sessionStorage,
@@ -53,6 +56,7 @@ func NewSessionSourceHandler(
 		sessionBroadcaster:  sessionBroadcaster,
 		audioBroadcaster:    audioBroadcaster,
 		emailSender:         emailSender,
+		fileSharer:          fileSharer,
 		renderSemaphore:     make(chan struct{}, maxConcurrentRenders),
 	}
 
@@ -832,25 +836,41 @@ func (h *SessionSourceHandler) shareSession(ctx context.Context, request *sspb.S
 		return noSuccess, fmt.Errorf("email sharing is not configured")
 	}
 
-	// Generate a presigned URL for the FLAC file with 7-day expiry
-	downloadURL := getFileURL(ctx, h, &session, storage.FILENAME_FLAC, true)
-	if downloadURL == "" {
-		log.Error().Str("session-id", request.SessionID).Msg("Cannot generate download URL")
-		return noSuccess, fmt.Errorf("cannot generate download URL")
-	}
-
 	// Get a friendly session name
 	sessionName := session.Name
 	if sessionName == "" {
 		sessionName = "Untitled Recording"
 	}
 
+	// Generate download filename
+	urlFriendlyName := strings.ReplaceAll(sessionName, " ", "_")
+	urlFriendlyName = regexp.MustCompile(`[^a-zA-Z0-9_-]`).ReplaceAllString(urlFriendlyName, "")
+	dateStr := session.StartTime.Format("2006-01-02_15-04-05")
+	downloadFilename := urlFriendlyName + "_" + dateStr + ".flac"
+
+	// Generate a download URL for the FLAC file
+	shareResult, err := h.fileSharer.ShareSessionFile(ctx,
+		storage.AssetOptions{
+			RecorderID: session.RecorderID,
+			SessionID:  session.ID,
+			Filename:   storage.FILENAME_FLAC,
+		},
+		storage.SigningOptions{
+			Expires:          time.Hour * 24 * 7, // 7 days
+			Download:         true,
+			DownloadFilename: downloadFilename,
+		})
+	if err != nil {
+		log.Err(err).Str("session-id", request.SessionID).Msg("Cannot generate download URL")
+		return noSuccess, fmt.Errorf("cannot generate download URL: %w", err)
+	}
+
 	// Send the email
 	err = h.emailSender.SendShareEmail(email.ShareEmailData{
 		RecipientEmail: request.RecipientEmail,
 		SessionName:    sessionName,
-		DownloadURL:    downloadURL,
-		ExpiresIn:      "24 hours",
+		DownloadURL:    shareResult.URL,
+		ExpiresAt:      shareResult.ExpiresAt,
 	})
 	if err != nil {
 		log.Err(err).
@@ -906,27 +926,42 @@ func (h *SessionSourceHandler) shareSegment(ctx context.Context, request *sspb.S
 		return noSuccess, fmt.Errorf("email sharing is not configured")
 	}
 
-	// Generate a presigned URL for the segment FLAC file
-	segmentCopy := segment
-	segmentCopy.ID = segmentID
-	downloadURL := getSegmentFileURL(ctx, h, &session, &segmentCopy, storage.SEGMENT_FILENAME_FLAC, true)
-	if downloadURL == "" {
-		log.Error().Str("segment-id", request.SegmentID).Msg("Cannot generate download URL")
-		return noSuccess, fmt.Errorf("cannot generate download URL")
-	}
-
 	// Get a friendly segment name
 	segmentName := segment.Comment
 	if segmentName == "" {
 		segmentName = "Segment"
 	}
 
+	// Generate download filename
+	urlFriendlyName := strings.ReplaceAll(segmentName, " ", "_")
+	urlFriendlyName = regexp.MustCompile(`[^a-zA-Z0-9_-]`).ReplaceAllString(urlFriendlyName, "")
+	dateStr := session.StartTime.Format("2006-01-02_15-04-05")
+	downloadFilename := urlFriendlyName + "_" + dateStr + ".flac"
+
+	// Generate a download URL for the segment FLAC file
+	shareResult, err := h.fileSharer.ShareSegmentFile(ctx,
+		storage.SegmentAssetOptions{
+			RecorderID: session.RecorderID,
+			SessionID:  session.ID,
+			SegmentID:  segmentID,
+			Filename:   storage.SEGMENT_FILENAME_FLAC,
+		},
+		storage.SigningOptions{
+			Expires:          time.Hour * 24 * 7, // 7 days
+			Download:         true,
+			DownloadFilename: downloadFilename,
+		})
+	if err != nil {
+		log.Err(err).Str("segment-id", request.SegmentID).Msg("Cannot generate download URL")
+		return noSuccess, fmt.Errorf("cannot generate download URL: %w", err)
+	}
+
 	// Send the email
 	err = h.emailSender.SendShareEmail(email.ShareEmailData{
 		RecipientEmail: request.RecipientEmail,
 		SessionName:    segmentName,
-		DownloadURL:    downloadURL,
-		ExpiresIn:      "24 hours",
+		DownloadURL:    shareResult.URL,
+		ExpiresAt:      shareResult.ExpiresAt,
 	})
 	if err != nil {
 		log.Err(err).

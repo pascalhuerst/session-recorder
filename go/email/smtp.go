@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"net/smtp"
 	"strings"
+	"time"
 )
 
 // Config holds SMTP configuration
@@ -33,7 +34,7 @@ type ShareEmailData struct {
 	RecipientEmail string
 	SessionName    string
 	DownloadURL    string
-	ExpiresIn      string
+	ExpiresAt      time.Time
 }
 
 const shareEmailTemplate = `<!DOCTYPE html>
@@ -61,7 +62,7 @@ const shareEmailTemplate = `<!DOCTYPE html>
         <a href="{{.DownloadURL}}" class="button">Download Recording</a>
       </p>
       <p style="font-size: 14px; color: #6b7280;">
-        This link will expire in {{.ExpiresIn}}.
+        This link expires on {{.ExpiresAt.Format "January 2, 2006 at 3:04 PM"}}.
       </p>
     </div>
     <div class="footer">

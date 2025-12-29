@@ -3,6 +3,7 @@ package email
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 /**
@@ -51,11 +52,12 @@ func TestNewSender(t *testing.T) {
 }
 
 func TestShareEmailData(t *testing.T) {
+	expiresAt := time.Now().Add(24 * time.Hour)
 	data := ShareEmailData{
 		RecipientEmail: "recipient@example.com",
 		SessionName:    "Test Recording",
 		DownloadURL:    "https://example.com/download/abc123",
-		ExpiresIn:      "24 hours",
+		ExpiresAt:      expiresAt,
 	}
 
 	if data.RecipientEmail != "recipient@example.com" {
@@ -67,8 +69,8 @@ func TestShareEmailData(t *testing.T) {
 	if data.DownloadURL != "https://example.com/download/abc123" {
 		t.Errorf("DownloadURL = %v, want https://example.com/download/abc123", data.DownloadURL)
 	}
-	if data.ExpiresIn != "24 hours" {
-		t.Errorf("ExpiresIn = %v, want 24 hours", data.ExpiresIn)
+	if !data.ExpiresAt.Equal(expiresAt) {
+		t.Errorf("ExpiresAt = %v, want %v", data.ExpiresAt, expiresAt)
 	}
 }
 
@@ -80,8 +82,8 @@ func TestShareEmailTemplate(t *testing.T) {
 	if !strings.Contains(shareEmailTemplate, "{{.DownloadURL}}") {
 		t.Error("Template missing {{.DownloadURL}} placeholder")
 	}
-	if !strings.Contains(shareEmailTemplate, "{{.ExpiresIn}}") {
-		t.Error("Template missing {{.ExpiresIn}} placeholder")
+	if !strings.Contains(shareEmailTemplate, ".ExpiresAt") {
+		t.Error("Template missing ExpiresAt placeholder")
 	}
 	if !strings.Contains(shareEmailTemplate, "Download Recording") {
 		t.Error("Template missing 'Download Recording' button text")

@@ -2,42 +2,63 @@
 import { ref, computed } from 'vue';
 import { Modal, Button, TextInput } from '@session-recorder/session-waveform';
 
-const props = defineProps<{
+defineProps<{
   open: boolean;
   itemName: string;
-  isLoading?: boolean;
 }>();
 
 const emit = defineEmits<{
   (event: 'close'): void;
-  (event: 'share', email: string): void;
+  (event: 'share', emails: string[]): void;
 }>();
 
-const email = ref('');
+const emailInput = ref('');
 const error = ref('');
 
-const isValidEmail = computed(() => {
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email.value);
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const parsedEmails = computed(() => {
+  return emailInput.value
+    .split(/[,;]/)
+    .map((e) => e.trim())
+    .filter((e) => e !== '');
 });
 
+const validEmails = computed(() => {
+  return parsedEmails.value.filter((e) => emailRegex.test(e));
+});
+
+const invalidEmails = computed(() => {
+  return parsedEmails.value.filter((e) => !emailRegex.test(e));
+});
+
+const hasInput = computed(() => emailInput.value.trim() !== '');
+
 const canSubmit = computed(() => {
-  return email.value.trim() !== '' && isValidEmail.value && !props.isLoading;
+  return (
+    hasInput.value &&
+    validEmails.value.length > 0 &&
+    invalidEmails.value.length === 0
+  );
 });
 
 function handleClose() {
-  email.value = '';
+  emailInput.value = '';
   error.value = '';
   emit('close');
 }
 
 function handleSubmit() {
-  if (!isValidEmail.value) {
-    error.value = 'Please enter a valid email address';
+  if (invalidEmails.value.length > 0) {
+    error.value = `Invalid email: ${invalidEmails.value.join(', ')}`;
+    return;
+  }
+  if (validEmails.value.length === 0) {
+    error.value = 'Please enter at least one email address';
     return;
   }
   error.value = '';
-  emit('share', email.value);
+  emit('share', validEmails.value);
 }
 
 function handleKeydown(event: KeyboardEvent) {
@@ -58,32 +79,36 @@ function handleKeydown(event: KeyboardEvent) {
         </p>
 
         <div class="field">
-          <label for="recipient-email">Recipient Email</label>
+          <label for="recipient-email">Recipient Email(s)</label>
           <TextInput
             id="recipient-email"
-            v-model="email"
-            type="email"
-            placeholder="Enter email address"
+            v-model="emailInput"
+            type="text"
+            placeholder="Email addresses"
             size="lg"
-            :disabled="isLoading"
             @keydown="handleKeydown"
           />
+          <span class="hint">Use comma or semicolon to separate emails</span>
           <span v-if="error" class="error">{{ error }}</span>
+          <span v-else-if="validEmails.length > 1" class="hint">
+            {{ validEmails.length }} recipients
+          </span>
         </div>
       </div>
     </template>
 
     <template #footer>
-      <Button size="md" @click="handleClose" :disabled="isLoading">
+      <Button size="md" @click="handleClose">
         Cancel
       </Button>
       <Button
         size="md"
-        variant="primary"
+        variant="solid"
+        color="primary"
         @click="handleSubmit"
         :disabled="!canSubmit"
       >
-        {{ isLoading ? 'Sending...' : 'Send' }}
+        Send
       </Button>
     </template>
   </Modal>
@@ -114,6 +139,11 @@ function handleKeydown(event: KeyboardEvent) {
 
 .error {
   color: var(--color-red-500);
+  font-size: var(--scale-0);
+}
+
+.hint {
+  color: var(--color-grey-500);
   font-size: var(--scale-0);
 }
 </style>

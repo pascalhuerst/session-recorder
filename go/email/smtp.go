@@ -46,7 +46,7 @@ const shareEmailTemplate = `<!DOCTYPE html>
     .container { max-width: 600px; margin: 0 auto; padding: 20px; }
     .header { background: #7c3aed; color: white; padding: 20px; border-radius: 8px 8px 0 0; }
     .content { background: #f9fafb; padding: 20px; border: 1px solid #e5e7eb; }
-    .button { display: inline-block; background: #7c3aed; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; }
+    .button { display: inline-block; background: #7c3aed; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: 600; }
     .footer { padding: 20px; font-size: 12px; color: #6b7280; }
   </style>
 </head>
@@ -59,7 +59,7 @@ const shareEmailTemplate = `<!DOCTYPE html>
       <p>A session recording has been shared with you:</p>
       <p><strong>{{.SessionName}}</strong></p>
       <p style="margin: 24px 0;">
-        <a href="{{.DownloadURL}}" class="button">Download Recording</a>
+        <a href="{{.DownloadURL}}" class="button" style="color: #ffffff !important; text-decoration: none;">Download Recording</a>
       </p>
       <p style="font-size: 14px; color: #6b7280;">
         This link expires on {{.ExpiresAt.Format "January 2, 2006 at 3:04 PM"}}.

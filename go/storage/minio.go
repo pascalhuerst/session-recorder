@@ -1604,7 +1604,7 @@ func (m *Minio) RenderSegment(ctx context.Context, recorderID, sessionID, segmen
 			Int64("end", segment.EndPoint).
 			Msg("Segment has invalid range")
 		m.setSegmentError(ctx, recorderID, sessionID, segmentID, errMsg)
-		return fmt.Errorf(errMsg)
+		return fmt.Errorf("%s", errMsg)
 	}
 
 	// Get the raw audio file

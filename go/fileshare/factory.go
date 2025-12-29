@@ -12,15 +12,15 @@ import (
 type ShareMethod string
 
 const (
-	ShareMethodDirect ShareMethod = "direct"
-	ShareMethodS3Copy ShareMethod = "s3_copy"
-	ShareMethodFileIO ShareMethod = "fileio"
+	ShareMethodDirect  ShareMethod = "direct"
+	ShareMethodS3Copy  ShareMethod = "s3_copy"
+	ShareMethodDropbox ShareMethod = "dropbox"
 )
 
 // NewFileSharer creates a FileSharer based on environment configuration.
 //
 // Environment variables:
-//   - FILE_SHARE_METHOD: "direct" (default), "s3_copy", or "fileio"
+//   - FILE_SHARE_METHOD: "direct" (default), "s3_copy", or "dropbox"
 //
 // For s3_copy method:
 //   - FILE_SHARE_S3_ENDPOINT: S3 endpoint
@@ -30,8 +30,9 @@ const (
 //   - FILE_SHARE_S3_BUCKET: Bucket name (default: "shared-files")
 //   - FILE_SHARE_S3_USE_SSL: Use SSL (default: "true")
 //
-// For fileio method:
-//   - FILE_SHARE_FILEIO_ENDPOINT: file.io endpoint (default: "https://file.io")
+// For dropbox method:
+//   - FILE_SHARE_DROPBOX_ACCESS_TOKEN: Dropbox API access token
+//   - FILE_SHARE_DROPBOX_FOLDER: Folder path in Dropbox (default: "/SessionRecorder")
 func NewFileSharer(s FileStorage) (FileSharer, error) {
 	method := ShareMethod(strings.ToLower(getEnv("FILE_SHARE_METHOD", "direct")))
 
@@ -44,9 +45,9 @@ func NewFileSharer(s FileStorage) (FileSharer, error) {
 		log.Info().Msg("Using S3 copy for file sharing")
 		return newS3CopySharer(s)
 
-	case ShareMethodFileIO:
-		log.Info().Msg("Using file.io for file sharing")
-		return newFileIOSharer(s), nil
+	case ShareMethodDropbox:
+		log.Info().Msg("Using Dropbox for file sharing")
+		return newDropboxSharer(s), nil
 
 	default:
 		return nil, fmt.Errorf("unknown file share method: %s", method)
@@ -81,12 +82,13 @@ func newS3CopySharer(s FileStorage) (*CopyS3Sharer, error) {
 	return NewCopyS3Sharer(s, config)
 }
 
-func newFileIOSharer(s FileStorage) *FileIOSharer {
-	config := FileIOSharerConfig{
-		Endpoint: getEnv("FILE_SHARE_FILEIO_ENDPOINT", "https://file.io"),
+func newDropboxSharer(s FileStorage) *DropboxSharer {
+	config := DropboxConfig{
+		AccessToken: os.Getenv("FILE_SHARE_DROPBOX_ACCESS_TOKEN"),
+		FolderPath:  getEnv("FILE_SHARE_DROPBOX_FOLDER", "/SessionRecorder"),
 	}
 
-	return NewFileIOSharer(s, config)
+	return NewDropboxSharer(s, config)
 }
 
 func getEnv(key, defaultValue string) string {

@@ -24,7 +24,6 @@ const props = defineProps<{
 const { awaitConfirmation, modalProps } = useConfirmation();
 
 const showShareModal = ref(false);
-const isSharing = ref(false);
 
 const sessionName = computed(() => {
   return props.session.name || 'Untitled Recording';
@@ -85,22 +84,26 @@ const onShare = () => {
   showShareModal.value = true;
 };
 
-const onShareConfirm = async (email: string) => {
-  isSharing.value = true;
-  try {
-    await shareSession({
-      recorderId: props.recorderId,
-      sessionId: props.session.id,
-      recipientEmail: email,
+const onShareConfirm = (emails: string[]) => {
+  const recipientText = emails.length === 1 ? emails[0] : `${emails.length} recipients`;
+
+  // Close dialog immediately and show info toast
+  showShareModal.value = false;
+  toastService.info(`Sending download link to ${recipientText}...`);
+
+  // Send in background
+  shareSession({
+    recorderId: props.recorderId,
+    sessionId: props.session.id,
+    recipientEmails: emails,
+  })
+    .then(() => {
+      toastService.success(`Download link sent to ${recipientText}`);
+    })
+    .catch((error) => {
+      console.error('Failed to share session:', error);
+      toastService.error('Failed to send email. Please try again.');
     });
-    toastService.success(`Download link sent to ${email}`);
-    showShareModal.value = false;
-  } catch (error) {
-    console.error('Failed to share session:', error);
-    toastService.error('Failed to send email. Please try again.');
-  } finally {
-    isSharing.value = false;
-  }
 };
 
 const onShareClose = () => {
@@ -156,7 +159,6 @@ const onShareClose = () => {
   <ShareModal
     :open="showShareModal"
     :item-name="sessionName"
-    :is-loading="isSharing"
     @close="onShareClose"
     @share="onShareConfirm"
   />

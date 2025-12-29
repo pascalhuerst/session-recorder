@@ -5,14 +5,14 @@ export const shareSegment = async (args: {
   recorderId: string;
   sessionId: string;
   segmentId: string;
-  recipientEmail: string;
+  recipientEmails: string[];
 }) => {
-  const request: ShareSegmentRequest = {
+  const request = ShareSegmentRequest.create({
     recorderID: args.recorderId,
     sessionID: args.sessionId,
     segmentID: args.segmentId,
-    recipientEmail: args.recipientEmail,
-  };
+    recipientEmails: args.recipientEmails,
+  });
 
   const call = await sessionSourceClient.shareSegment(request);
   return call.response;

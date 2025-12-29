@@ -6,10 +6,10 @@
  *   When NewFileSharer is called with a storage instance
  *   Then a DirectS3Sharer is returned
  *
- * Scenario: Factory creates FileIOSharer when configured
- *   Given FILE_SHARE_METHOD is set to "fileio"
+ * Scenario: Factory creates DropboxSharer when configured
+ *   Given FILE_SHARE_METHOD is set to "dropbox"
  *   When NewFileSharer is called with a storage instance
- *   Then a FileIOSharer is returned
+ *   Then a DropboxSharer is returned
  *
  * Scenario: Factory returns error for unknown method
  *   Given FILE_SHARE_METHOD is set to an unknown value
@@ -91,8 +91,8 @@ func TestNewFileSharer_ExplicitDirect(t *testing.T) {
 	}
 }
 
-func TestNewFileSharer_FileIO(t *testing.T) {
-	os.Setenv("FILE_SHARE_METHOD", "fileio")
+func TestNewFileSharer_Dropbox(t *testing.T) {
+	os.Setenv("FILE_SHARE_METHOD", "dropbox")
 	defer os.Unsetenv("FILE_SHARE_METHOD")
 
 	mock := &mockFileStorage{}
@@ -102,8 +102,8 @@ func TestNewFileSharer_FileIO(t *testing.T) {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if _, ok := sharer.(*FileIOSharer); !ok {
-		t.Errorf("expected FileIOSharer, got %T", sharer)
+	if _, ok := sharer.(*DropboxSharer); !ok {
+		t.Errorf("expected DropboxSharer, got %T", sharer)
 	}
 }
 

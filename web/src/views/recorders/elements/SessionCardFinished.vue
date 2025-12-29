@@ -75,7 +75,6 @@ integrateSegments(props.session, props.recorderId, ctx);
 
 // Share segment modal state
 const showShareModal = ref(false);
-const isSharing = ref(false);
 const sharingSegmentId = ref<string | null>(null);
 
 const sharingSegmentName = computed(() => {
@@ -95,26 +94,31 @@ const onShareClose = () => {
   sharingSegmentId.value = null;
 };
 
-const onShareConfirm = async (email: string) => {
+const onShareConfirm = (emails: string[]) => {
   if (!sharingSegmentId.value) return;
 
-  isSharing.value = true;
-  try {
-    await shareSegment({
-      recorderId: props.recorderId,
-      sessionId: props.session.id,
-      segmentId: sharingSegmentId.value,
-      recipientEmail: email,
+  const segmentId = sharingSegmentId.value;
+  const recipientText = emails.length === 1 ? emails[0] : `${emails.length} recipients`;
+
+  // Close dialog immediately and show info toast
+  showShareModal.value = false;
+  sharingSegmentId.value = null;
+  toastService.info(`Sending download link to ${recipientText}...`);
+
+  // Send in background
+  shareSegment({
+    recorderId: props.recorderId,
+    sessionId: props.session.id,
+    segmentId: segmentId,
+    recipientEmails: emails,
+  })
+    .then(() => {
+      toastService.success(`Download link sent to ${recipientText}`);
+    })
+    .catch((error) => {
+      console.error('Failed to share segment:', error);
+      toastService.error('Failed to send email. Please try again.');
     });
-    toastService.success(`Download link sent to ${email}`);
-    showShareModal.value = false;
-    sharingSegmentId.value = null;
-  } catch (error) {
-    console.error('Failed to share segment:', error);
-    toastService.error('Failed to send email. Please try again.');
-  } finally {
-    isSharing.value = false;
-  }
 };
 
 // Sync segment state changes from session to peaks context
@@ -168,7 +172,6 @@ defineExpose({
   <ShareModal
     :open="showShareModal"
     :item-name="sharingSegmentName"
-    :is-loading="isSharing"
     @close="onShareClose"
     @share="onShareConfirm"
   />

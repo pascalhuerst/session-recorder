@@ -1,16 +1,23 @@
 <script setup lang="ts">
 import Button from '../../lib/controls/Button.vue';
+import Checkbox from '../../lib/controls/Checkbox.vue';
 import Marker from '../../lib/controls/Marker.vue';
 import { usePeaksContext } from '../../context/usePeaksContext';
 import TextInput from '../../lib/forms/TextInput.vue';
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import { parseTimeFromSeconds } from '../../lib/utils/parseTimeFromSeconds';
 import { parseSecondsFromTime } from '../../lib/utils/parseSecondsFromTime';
 import type { Segment } from '../../context/models/state';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
+import { toSolidColor } from '../../lib/utils/segmentColors';
 
 const props = defineProps<{
   segment: Segment;
+  selected: boolean;
+}>();
+
+const emit = defineEmits<{
+  'toggle-selection': [];
 }>();
 
 const { commandEmitter, state } = usePeaksContext();
@@ -59,18 +66,72 @@ const maxPlayTime = computed(() => {
 const canUpdate = computed(() => {
   return permissions.value.update && !props.segment.deleted;
 });
-const canDelete = computed(() => {
-  return permissions.value.delete && !props.segment.deleted;
+
+// Segment duration formatted
+const segmentDuration = computed(() => {
+  const durationSeconds = props.segment.endTime - props.segment.startTime;
+  const parsed = parseTimeFromSeconds(durationSeconds);
+  return `${parsed.minutes}:${parsed.seconds}`;
 });
+
+// Segment color (solid version for markers)
+const segmentColor = computed(() =>
+  props.segment.color ? toSolidColor(props.segment.color) : undefined
+);
+
+// FLAC render URL
+const flacRender = computed(() =>
+  props.segment.renders.find((r) => r.type === 'audio/flac')
+);
+const hasRenderedAudio = computed(
+  () => props.segment.state === 'finished' && flacRender.value
+);
+
+// Audio playback for rendered segments
+const audioRef = ref<HTMLAudioElement | null>(null);
+const isPlaying = ref(false);
+
+const togglePlayback = () => {
+  if (!audioRef.value) return;
+
+  if (isPlaying.value) {
+    audioRef.value.pause();
+  } else {
+    audioRef.value.play();
+  }
+};
+
+const onAudioPlay = () => {
+  isPlaying.value = true;
+};
+
+const onAudioPause = () => {
+  isPlaying.value = false;
+};
+
+const onAudioEnded = () => {
+  isPlaying.value = false;
+};
 </script>
 
 <template>
   <tr
     @click="() => commandEmitter.emit('seek', segment.startTime)"
-    :class="['row', { 'row--deleted': segment.deleted }]"
+    :class="['row', { 'row--deleted': segment.deleted, 'row--selected': selected }]"
   >
-    <td>
-      <Marker :index="segment.startIndex">
+    <!-- Checkbox -->
+    <td class="cell-checkbox" @click.stop>
+      <Checkbox
+        :modelValue="selected"
+        :disabled="segment.deleted"
+        size="sm"
+        @update:modelValue="emit('toggle-selection')"
+      />
+    </td>
+
+    <!-- Start Time -->
+    <td class="cell-time">
+      <Marker :index="segment.startIndex" :color="segmentColor">
         <template v-if="canUpdate">
           <TextInput
             type="time"
@@ -80,6 +141,8 @@ const canDelete = computed(() => {
             :max="maxPlayTime"
             size="sm"
             variant="ghost"
+            @focus="() => commandEmitter.emit('seek', segment.startTime)"
+            @click.stop
           />
         </template>
         <template v-else>
@@ -87,8 +150,10 @@ const canDelete = computed(() => {
         </template>
       </Marker>
     </td>
-    <td>
-      <Marker :index="segment.endIndex">
+
+    <!-- End Time -->
+    <td class="cell-time">
+      <Marker :index="segment.endIndex" :color="segmentColor">
         <template v-if="canUpdate">
           <TextInput
             type="time"
@@ -98,6 +163,8 @@ const canDelete = computed(() => {
             :max="maxPlayTime"
             size="sm"
             variant="ghost"
+            @focus="() => commandEmitter.emit('seek', segment.endTime)"
+            @click.stop
           />
         </template>
         <template v-else>
@@ -105,47 +172,90 @@ const canDelete = computed(() => {
         </template>
       </Marker>
     </td>
-    <td>
+
+    <!-- Label -->
+    <td class="cell-label">
       <template v-if="canUpdate">
-        <TextInput v-model="segmentLabel" size="sm" variant="ghost" />
+        <TextInput v-model="segmentLabel" size="sm" variant="ghost" @click.stop />
       </template>
       <template v-else>
         {{ segment.labelText }}
       </template>
     </td>
-    <td>
-      <div class="buttons">
-        <template v-if="segment.renders.length">
-          <template v-for="render in segment.renders" :key="render.src">
-            <Button tag-name="a" size="xs" color="primary" :href="render.src">
-              <font-awesome-icon
-                icon="fa-solid fa-download"
-              ></font-awesome-icon>
-              {{ render.type.split('/').at(-1) }}
-            </Button>
-          </template>
+
+    <!-- Actions -->
+    <td class="cell-actions">
+      <div class="actions">
+        <!-- Queued state: show queued indicator -->
+        <template v-if="segment.state === 'queued'">
+          <div class="status-indicator status-indicator--queued">
+            <span class="status-dot"></span>
+            <span class="status-text">queued</span>
+          </div>
         </template>
 
-        <template v-else>
+        <!-- Rendering state: show processing indicator -->
+        <template v-else-if="segment.state === 'rendering'">
+          <div class="status-indicator status-indicator--processing">
+            <span class="status-dot"></span>
+            <span class="status-text">processing</span>
+          </div>
+        </template>
+
+        <!-- Error state: show error and retry button -->
+        <template v-else-if="segment.state === 'error'">
+          <span class="error-indicator" :title="segment.errorMessage">
+            <font-awesome-icon
+              icon="fa-solid fa-exclamation-triangle"
+            ></font-awesome-icon>
+            Error
+          </span>
           <Button
             size="xs"
             variant="solid"
-            @click="() => commandEmitter.emit('renderSegment', segment.id)"
+            @click.stop="() => commandEmitter.emit('renderSegment', segment.id)"
           >
-            <font-awesome-icon icon="fa-solid fa-music"></font-awesome-icon>
-            Render
+            <font-awesome-icon icon="fa-solid fa-redo"></font-awesome-icon>
+            Retry
           </Button>
         </template>
 
-        <Button
-          v-if="canDelete"
-          size="xs"
-          variant="ghost"
-          @click="() => commandEmitter.emit('removeSegment', segment.id)"
-        >
-          <font-awesome-icon icon="fa-solid fa-trash"></font-awesome-icon>
-          Remove
-        </Button>
+        <!-- Ready/Finished state: show play button and duration -->
+        <template v-else>
+          <template v-if="hasRenderedAudio">
+            <audio
+              ref="audioRef"
+              :src="flacRender!.src"
+              @play="onAudioPlay"
+              @pause="onAudioPause"
+              @ended="onAudioEnded"
+            />
+            <span class="duration">{{ segmentDuration }}</span>
+            <Button
+              size="xs"
+              shape="square"
+              variant="ghost"
+              color="primary"
+              @click.stop="togglePlayback"
+              :disabled="segment.deleted"
+            >
+              <font-awesome-icon v-if="isPlaying" icon="fa-solid fa-pause" />
+              <font-awesome-icon v-else icon="fa-solid fa-play" />
+            </Button>
+            <Button
+              tag-name="a"
+              size="xs"
+              shape="square"
+              variant="ghost"
+              color="primary"
+              :href="flacRender!.src"
+              download
+              @click.stop
+            >
+              <font-awesome-icon icon="fa-solid fa-download"></font-awesome-icon>
+            </Button>
+          </template>
+        </template>
       </div>
     </td>
   </tr>
@@ -156,10 +266,110 @@ const canDelete = computed(() => {
   opacity: 0.5;
 }
 
-.buttons {
+.row--selected {
+  background-color: var(--color-purple-50, #f5f3ff);
+}
+
+.row:hover:not(.row--deleted) {
+  background-color: var(--color-grey-50, #f9fafb);
+}
+
+.row--selected:hover {
+  background-color: var(--color-purple-100, #ede9fe);
+}
+
+.cell-checkbox {
+  width: 40px;
+}
+
+.cell-checkbox :deep(label) {
   display: flex;
-  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+}
+
+.cell-time {
+  width: 140px;
+}
+
+.cell-label {
+  /* flexible width */
+}
+
+.cell-actions {
+  width: 160px;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: var(--size-2);
+}
+
+.duration {
+  font-size: var(--scale-0);
+  color: var(--color-grey-600);
+  font-variant-numeric: tabular-nums;
+}
+
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: var(--size-1);
+}
+
+.status-dot {
+  width: var(--size-2);
+  height: var(--size-2);
+  border-radius: 50%;
+  background: var(--color-grey-400);
+}
+
+.status-indicator--queued .status-dot {
+  background: var(--color-purple-400, #a78bfa);
+  animation: pulse-purple 2s infinite;
+}
+
+.status-indicator--processing .status-dot {
+  background: var(--color-grey-500);
+  animation: pulse-grey 2s infinite;
+}
+
+.status-text {
+  font-size: var(--scale-00);
+  font-weight: bold;
+  text-transform: uppercase;
+  color: var(--color-grey-500);
+}
+
+@keyframes pulse-grey {
+  0%, 100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(107, 114, 128, 0.4);
+  }
+  50% {
+    transform: scale(1);
+    box-shadow: 0 0 0 4px rgba(107, 114, 128, 0.2);
+  }
+}
+
+@keyframes pulse-purple {
+  0%, 100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(167, 139, 250, 0.4);
+  }
+  50% {
+    transform: scale(1);
+    box-shadow: 0 0 0 4px rgba(167, 139, 250, 0.2);
+  }
+}
+
+.error-indicator {
+  display: inline-flex;
+  align-items: center;
   gap: 0.25rem;
+  color: var(--color-error, #ef4444);
+  font-size: 0.875rem;
 }
 </style>
 

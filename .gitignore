@@ -1,3 +1,9 @@
+# AI Assistant Starter (symlinked from ../ai-assistant-starter)
+CLAUDE.md
+.ai-assistant
+.ai-project
+.claude/commands
+
 # IDE
 .idea
 .vscode

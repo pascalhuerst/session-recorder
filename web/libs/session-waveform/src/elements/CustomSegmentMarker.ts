@@ -1,6 +1,7 @@
 import { type CreateSegmentMarkerOptions } from 'peaks.js';
 import Konva from 'konva';
 import type { createEventEmitter } from '../lib/app/createEventEmitter';
+import { toSolidColor } from '../lib/utils/segmentColors';
 
 type Services = {
   eventEmitter: ReturnType<typeof createEventEmitter>;
@@ -12,10 +13,15 @@ export class CustomSegmentMarker {
   private _handle?: Konva.Rect;
   private _index?: Konva.Text;
   private _line?: Konva.Line;
+  private _solidColor: string;
 
   constructor(options: CreateSegmentMarkerOptions, services: Services) {
     this._options = options;
     this._services = services;
+    // Use segment.color as the source of truth (our custom property)
+    // Fall back to options.color if segment.color is not available
+    const segmentColor = (options.segment as any).color ?? options.color;
+    this._solidColor = toSolidColor(segmentColor as string);
   }
 
   init(group: Konva.Group) {
@@ -32,7 +38,7 @@ export class CustomSegmentMarker {
       width: 24,
       height: 24,
       cornerRadius: isStart ? [0, 4, 4, 0] : [4, 0, 0, 4],
-      fill: this._options.color as string,
+      fill: this._solidColor,
     });
 
     this._index = new Konva.Text({
@@ -49,7 +55,7 @@ export class CustomSegmentMarker {
 
     this._line = new Konva.Line({
       points: [0.5, 0, 0.5, height], // x1, y1, x2, y2
-      stroke: this._options.color as string,
+      stroke: this._solidColor,
       strokeWidth: 1,
     });
 
@@ -65,9 +71,8 @@ export class CustomSegmentMarker {
     });
 
     this._handle.on('mouseleave', () => {
-      const defaultColor = this._options.color as string;
-      this._handle?.fill(defaultColor);
-      this._line?.stroke(defaultColor);
+      this._handle?.fill(this._solidColor);
+      this._line?.stroke(this._solidColor);
       layer.draw();
     });
   }
@@ -79,23 +84,15 @@ export class CustomSegmentMarker {
     this._line?.points([0.5, 0, 0.5, height]);
   }
 
-  update(options: any) {
-    if (this._options.segment.id) {
-      this._services.eventEmitter.emit(
-        'segmentUpdated',
-        this._options.segment.id,
-        options,
-        { ...this._options.segment, ...options }
-      );
-    }
+  update(_options: any) {
+    // Note: segmentUpdated is emitted by the updateSegment command handler
+    // in installSegmentsControls.ts for programmatic updates, and by the
+    // segments.dragend handler for drag updates. We don't emit here to avoid
+    // duplicate events during drag (which calls update() on every mouse move).
   }
 
   destroy() {
-    if (this._options.segment.id) {
-      this._services.eventEmitter.emit(
-        'segmentRemoved',
-        this._options.segment.id
-      );
-    }
+    // Note: segmentRemoved is emitted by the segments.remove event handler
+    // in installSegmentsControls.ts, so we don't emit it here
   }
 }

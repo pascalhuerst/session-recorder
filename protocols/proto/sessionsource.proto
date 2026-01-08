@@ -31,6 +31,7 @@ enum SegmentState {
 	SEGMENT_STATE_RENDERING = 1;
 	SEGMENT_STATE_FINISHED = 2;
 	SEGMENT_STATE_ERROR = 3;
+	SEGMENT_STATE_QUEUED = 4;
 }
 
 message SegmentInfo {
@@ -39,6 +40,14 @@ message SegmentInfo {
 
 	string name = 3;
 	SegmentState state = 4;
+
+	message Files {
+		string ogg = 1;
+		string flac = 2;
+	}
+	Files inlineFiles = 5;
+	Files downloadFiles = 6;
+	string errorMessage = 7;
 }
 
 message SegmentRemoved {}
@@ -56,6 +65,8 @@ enum SessionState {
 	SESSION_STATE_UNKNOWN = 0;
 	SESSION_STATE_RECORDING = 1;
 	SESSION_STATE_FINISHED = 2;
+	SESSION_STATE_PROCESSING = 3;
+	SESSION_STATE_ERROR = 4;
 }
 
 message SessionInfo {
@@ -78,6 +89,8 @@ message SessionInfo {
 
 	Files inlineFiles = 11;
 	Files downloadFiles = 12;
+
+	string errorMessage = 13;
 }
 
 message SessionRemoved {}
@@ -138,10 +151,22 @@ message CutSessionRequest {
 	string recorderID = 1;
 }
 
+message StreamSessionAudioRequest {
+	string sessionID = 1;
+}
+
+message AudioChunk {
+	string sessionID = 1;
+	repeated int32 samples = 2;
+	uint32 chunkNumber = 3;
+	google.protobuf.Timestamp timestamp = 4;
+}
+
 service SessionSource {
 	// Stream
 	rpc StreamRecorders(StreamRecordersRequest) returns (stream Recorder);
 	rpc StreamSessions(StreamSessionRequest) returns (stream Session);
+	rpc StreamSessionAudio(StreamSessionAudioRequest) returns (stream AudioChunk);
 
 	// Unary
 	rpc SetKeepSession(SetKeepSessionRequest) returns (common.Respone);

@@ -6,14 +6,13 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/pascalhuerst/session-recorder/broadcast"
 	"github.com/pascalhuerst/session-recorder/grpc"
 	"github.com/pascalhuerst/session-recorder/logger"
 	"github.com/pascalhuerst/session-recorder/mdns"
 	"github.com/pascalhuerst/session-recorder/storage"
 	"github.com/pascalhuerst/session-recorder/utils"
 	"github.com/rs/zerolog/log"
-
-	sspb "github.com/pascalhuerst/session-recorder/protocols/go/sessionsource"
 )
 
 const (
@@ -70,10 +69,14 @@ func main() {
 		hostname = "unknown_hostname_" + uuid.NewString()
 	}
 
-	var recorderUpdateCh chan *sspb.Recorder = make(chan *sspb.Recorder)
-	var sessionUpdateCh chan *sspb.Session = make(chan *sspb.Session)
+	// Create broadcasters for fan-out to multiple clients
+	// Buffer size of 10 provides headroom for slower consumers
+	recorderBroadcaster := broadcast.NewRecorderBroadcaster(10)
+	recorderBroadcaster.Start(ctx)
+	sessionBroadcaster := broadcast.NewSessionBroadcaster(10)
+	audioBroadcaster := broadcast.NewAudioBroadcaster(10)
 
-	chunkSinkHandler := NewChunkSinkHandler(sessionStorage, recorderUpdateCh)
+	chunkSinkHandler := NewChunkSinkHandler(sessionStorage, recorderBroadcaster)
 
 	chunkSinkServer := grpc.NewChunkSinkServer(&grpc.ChunkSinkServerConfig{
 		Name:               hostname,
@@ -82,17 +85,22 @@ func main() {
 		OnChunksCB:         chunkSinkHandler.setChunks,
 	})
 
-	sessionSourceHandler := NewSessionSourceHandler(sessionStorage, chunkSinkServer, recorderUpdateCh, sessionUpdateCh)
+	sessionSourceHandler := NewSessionSourceHandler(sessionStorage, chunkSinkServer, recorderBroadcaster, sessionBroadcaster, audioBroadcaster)
 
 	sessionSourceServer := grpc.NewSessionSourceServer(&grpc.SessionSourceServerConfig{
-		Name:              hostname,
-		Version:           version,
-		StreamRecordersCB: sessionSourceHandler.streamRecorders,
-		StreamSessionsCB:  sessionSourceHandler.streamSessions,
-		DeleteSessionCB:   sessionSourceHandler.deleteSession,
-		SetKeepSessionCB:  sessionSourceHandler.setKeepSession,
-		SetNameCB:         sessionSourceHandler.setName,
-		CutSessionCB:      sessionSourceHandler.cutSession,
+		Name:                 hostname,
+		Version:              version,
+		StreamRecordersCB:    sessionSourceHandler.streamRecorders,
+		StreamSessionsCB:     sessionSourceHandler.streamSessions,
+		StreamSessionAudioCB: sessionSourceHandler.streamSessionAudio,
+		DeleteSessionCB:      sessionSourceHandler.deleteSession,
+		SetKeepSessionCB:     sessionSourceHandler.setKeepSession,
+		SetNameCB:            sessionSourceHandler.setName,
+		CutSessionCB:         sessionSourceHandler.cutSession,
+		CreateSegmentCB:      sessionSourceHandler.createSegment,
+		UpdateSegmentCB:      sessionSourceHandler.updateSegment,
+		DeleteSegmentCB:      sessionSourceHandler.deleteSegment,
+		RenderSegmentCB:      sessionSourceHandler.renderSegment,
 	})
 
 	port, err := grpc.StartProtocolServer(sessionSourceServer, mdnsServer, sessionSourceService, sessionSourcePort)

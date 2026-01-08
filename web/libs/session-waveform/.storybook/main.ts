@@ -1,9 +1,12 @@
 import type { StorybookConfig } from '@storybook/vue3-vite';
 
 const config: StorybookConfig = {
-  stories: ['../src/**/*.stories.@(js|jsx|ts|tsx|mdx)'],
+  stories: [
+    '../src/**/*.stories.@(js|jsx|ts|tsx|mdx)',
+    '../../../src/**/*.stories.@(js|jsx|ts|tsx|mdx)',
+  ],
   staticDirs: ['../public'],
-  addons: ['@storybook/addon-essentials'],
+  addons: ['@storybook/addon-essentials', '@storybook/addon-interactions'],
   framework: {
     name: '@storybook/vue3-vite',
     options: {

@@ -15,3 +15,10 @@ chunk_sink:
 
 clean:
 	cd bin && rm -f ${BINARIES}
+
+test:
+	${GO} test -v -race ./...
+
+test-coverage:
+	${GO} test -v -race -coverprofile=coverage.out ./...
+	${GO} tool cover -html=coverage.out -o coverage.html

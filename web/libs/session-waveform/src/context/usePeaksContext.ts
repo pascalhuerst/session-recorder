@@ -2,6 +2,7 @@ import { inject, provide } from 'vue';
 import { installZoomControls } from './installZoomControls';
 import { installAmplitudeControls } from './installAmplitudeControls';
 import { installPlayerControls } from './installPlayerControls';
+import { installViewControls } from './installViewControls';
 import { createPeaksModule } from './createPeaksModule';
 import { installSegmentsControls } from './installSegmentsControls';
 import { peaksModuleSchema } from './models/state';
@@ -23,6 +24,7 @@ export const createPeaksContext = (props: {
   installAmplitudeControls(module);
   installPlayerControls(module);
   installSegmentsControls(module);
+  installViewControls(module);
 
   return module;
 };

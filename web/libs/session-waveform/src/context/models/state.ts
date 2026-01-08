@@ -12,6 +12,14 @@ export const permissionsSchema = z.object({
   delete: z.boolean(),
 });
 
+export const segmentStateSchema = z.enum([
+  'unknown',
+  'queued',
+  'rendering',
+  'finished',
+  'error',
+]);
+
 export const segmentSchema = z.object({
   id: z.string(),
   startTime: z.number(),
@@ -22,6 +30,8 @@ export const segmentSchema = z.object({
   startIndex: z.string(),
   endIndex: z.string(),
   deleted: z.boolean().optional(),
+  state: segmentStateSchema.optional(),
+  errorMessage: z.string().optional(),
   renders: z.array(
     z.object({
       type: z.string(),
@@ -34,6 +44,7 @@ export const peaksModuleSchema = z.object({
   theme: themeSchema,
   audioUrls: z.array(audioUrlSchema).nonempty(),
   waveformUrl: z.string().url().optional(),
+  expanded: z.boolean().default(true),
   player: z
     .object({
       isPlaying: z.boolean().default(false),

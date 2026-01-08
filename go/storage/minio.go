@@ -1341,6 +1341,41 @@ func (m *Minio) GetSegmentPresignedURL(ctx context.Context, asset SegmentAssetOp
 	return publicUrl, nil
 }
 
+func (m *Minio) GetSessionFileReader(ctx context.Context, asset AssetOptions) (io.ReadCloser, int64, error) {
+	objectName := fmt.Sprintf("%s/sessions/%s/%s", asset.RecorderID.String(), asset.SessionID.String(), asset.Filename)
+
+	obj, err := m.client.GetObject(ctx, bucketName, objectName, minio.GetObjectOptions{})
+	if err != nil {
+		return nil, 0, fmt.Errorf("cannot get object: %w", err)
+	}
+
+	info, err := obj.Stat()
+	if err != nil {
+		obj.Close()
+		return nil, 0, fmt.Errorf("cannot stat object: %w", err)
+	}
+
+	return obj, info.Size, nil
+}
+
+func (m *Minio) GetSegmentFileReader(ctx context.Context, asset SegmentAssetOptions) (io.ReadCloser, int64, error) {
+	objectName := fmt.Sprintf("%s/sessions/%s/segments/%s/%s",
+		asset.RecorderID.String(), asset.SessionID.String(), asset.SegmentID.String(), asset.Filename)
+
+	obj, err := m.client.GetObject(ctx, bucketName, objectName, minio.GetObjectOptions{})
+	if err != nil {
+		return nil, 0, fmt.Errorf("cannot get object: %w", err)
+	}
+
+	info, err := obj.Stat()
+	if err != nil {
+		obj.Close()
+		return nil, 0, fmt.Errorf("cannot stat object: %w", err)
+	}
+
+	return obj, info.Size, nil
+}
+
 func (m *Minio) CreateSegment(ctx context.Context, recorderID, sessionID, segmentID uuid.UUID, segment Segment) error {
 	m.dataLock.Lock()
 	defer m.dataLock.Unlock()
@@ -1569,7 +1604,7 @@ func (m *Minio) RenderSegment(ctx context.Context, recorderID, sessionID, segmen
 			Int64("end", segment.EndPoint).
 			Msg("Segment has invalid range")
 		m.setSegmentError(ctx, recorderID, sessionID, segmentID, errMsg)
-		return fmt.Errorf(errMsg)
+		return fmt.Errorf("%s", errMsg)
 	}
 
 	// Get the raw audio file

@@ -9,7 +9,6 @@ import SessionCardError from './SessionCardError.vue';
 import SessionCardFinished from './SessionCardFinished.vue';
 import { Button, Modal, useConfirmation } from '@session-recorder/session-waveform';
 import { useDateFormat } from '@vueuse/core';
-import { cutSession } from '../../../grpc/procedures/cutSession';
 import { deleteSession } from '../../../grpc/procedures/deleteSession';
 import { toastService } from '../../../services/Toaster/ToastService';
 import { setName } from '../../../grpc/procedures/setName';
@@ -79,23 +78,6 @@ const elapsedTime = computed(() => {
   }
   return `${pad(minutes)}:${pad(seconds % 60)}`;
 });
-
-const isCutting = ref(false);
-
-const handleCutSession = async () => {
-  if (isCutting.value) return;
-  isCutting.value = true;
-
-  try {
-    await cutSession({ recorderID: props.recorderId });
-    toastService.success('Session cut successfully');
-  } catch (error) {
-    console.error('Failed to cut session:', error);
-    toastService.error('Failed to cut session');
-  } finally {
-    isCutting.value = false;
-  }
-};
 
 const startEditing = () => {
   if (!canEdit.value) return;

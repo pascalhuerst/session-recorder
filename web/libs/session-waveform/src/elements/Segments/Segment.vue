@@ -243,6 +243,17 @@ const onAudioEnded = () => {
               <font-awesome-icon v-else icon="fa-solid fa-play" />
             </Button>
             <Button
+              size="xs"
+              shape="square"
+              variant="ghost"
+              color="primary"
+              @click.stop="() => commandEmitter.emit('shareSegment', segment.id)"
+              :disabled="segment.deleted"
+              title="Share via email"
+            >
+              <font-awesome-icon icon="fa-solid fa-share"></font-awesome-icon>
+            </Button>
+            <Button
               tag-name="a"
               size="xs"
               shape="square"

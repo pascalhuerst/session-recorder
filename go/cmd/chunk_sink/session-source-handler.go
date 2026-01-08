@@ -10,6 +10,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/pascalhuerst/session-recorder/broadcast"
+	"github.com/pascalhuerst/session-recorder/email"
+	"github.com/pascalhuerst/session-recorder/fileshare"
 	"github.com/pascalhuerst/session-recorder/grpc"
 	cmpb "github.com/pascalhuerst/session-recorder/protocols/go/common"
 	sspb "github.com/pascalhuerst/session-recorder/protocols/go/sessionsource"
@@ -33,6 +35,8 @@ type SessionSourceHandler struct {
 	recorderBroadcaster *broadcast.RecorderBroadcaster
 	sessionBroadcaster  *broadcast.SessionBroadcaster
 	audioBroadcaster    *broadcast.AudioBroadcaster
+	emailSender         *email.Sender
+	fileSharer          fileshare.FileSharer
 	renderSemaphore     chan struct{} // Limits concurrent segment renders
 }
 
@@ -42,6 +46,8 @@ func NewSessionSourceHandler(
 	recorderBroadcaster *broadcast.RecorderBroadcaster,
 	sessionBroadcaster *broadcast.SessionBroadcaster,
 	audioBroadcaster *broadcast.AudioBroadcaster,
+	emailSender *email.Sender,
+	fileSharer fileshare.FileSharer,
 ) *SessionSourceHandler {
 	h := &SessionSourceHandler{
 		sessionStorage:      sessionStorage,
@@ -49,6 +55,8 @@ func NewSessionSourceHandler(
 		recorderBroadcaster: recorderBroadcaster,
 		sessionBroadcaster:  sessionBroadcaster,
 		audioBroadcaster:    audioBroadcaster,
+		emailSender:         emailSender,
+		fileSharer:          fileSharer,
 		renderSemaphore:     make(chan struct{}, maxConcurrentRenders),
 	}
 
@@ -793,6 +801,240 @@ func (h *SessionSourceHandler) renderSegment(ctx context.Context, request *sspb.
 			Str("session-id", sessionID.String()).
 			Msg("Segment rendered")
 	}()
+
+	return success, nil
+}
+
+func (h *SessionSourceHandler) shareSession(ctx context.Context, request *sspb.ShareSessionRequest) (*cmpb.Respone, error) {
+	log.Debug().
+		Str("recorder-id", request.RecorderID).
+		Str("session-id", request.SessionID).
+		Int("recipient-count", len(request.RecipientEmails)).
+		Strs("recipients", request.RecipientEmails).
+		Msg("Share session request received")
+
+	recorderID, sessionID, err := parseIDs(request.RecorderID, request.SessionID)
+	if err != nil {
+		log.Err(err).
+			Str("recorder-id", request.RecorderID).
+			Str("session-id", request.SessionID).
+			Msg("Cannot parse IDs")
+		return noSuccess, err
+	}
+
+	session, err := h.sessionStorage.GetSession(recorderID, sessionID)
+	if err != nil {
+		log.Err(err).Str("session-id", request.SessionID).Msg("Cannot get session")
+		return noSuccess, err
+	}
+
+	// Only allow sharing finished sessions
+	if session.State != storage.SessionStateFinished {
+		log.Warn().
+			Str("session-id", request.SessionID).
+			Str("state", session.State.String()).
+			Msg("Cannot share session that is not finished")
+		return noSuccess, fmt.Errorf("session is not finished")
+	}
+
+	// Check if email sender is configured
+	if h.emailSender == nil {
+		log.Error().Msg("Email sender is not configured")
+		return noSuccess, fmt.Errorf("email sharing is not configured")
+	}
+
+	// Get a friendly session name
+	sessionName := session.Name
+	if sessionName == "" {
+		sessionName = "Untitled Recording"
+	}
+
+	// Generate download filename
+	urlFriendlyName := strings.ReplaceAll(sessionName, " ", "_")
+	urlFriendlyName = regexp.MustCompile(`[^a-zA-Z0-9_-]`).ReplaceAllString(urlFriendlyName, "")
+	dateStr := session.StartTime.Format("2006-01-02_15-04-05")
+	downloadFilename := urlFriendlyName + "_" + dateStr + ".flac"
+
+	log.Debug().
+		Str("session-id", request.SessionID).
+		Str("download-filename", downloadFilename).
+		Msg("Generating shareable download URL")
+
+	// Generate a download URL for the FLAC file
+	shareResult, err := h.fileSharer.ShareSessionFile(ctx,
+		storage.AssetOptions{
+			RecorderID: session.RecorderID,
+			SessionID:  session.ID,
+			Filename:   storage.FILENAME_FLAC,
+		},
+		storage.SigningOptions{
+			Expires:          time.Hour * 24 * 7, // 7 days
+			Download:         true,
+			DownloadFilename: downloadFilename,
+		})
+	if err != nil {
+		log.Err(err).Str("session-id", request.SessionID).Msg("Cannot generate download URL")
+		return noSuccess, fmt.Errorf("cannot generate download URL: %w", err)
+	}
+
+	log.Debug().
+		Str("session-id", request.SessionID).
+		Str("download-url", shareResult.URL).
+		Time("expires-at", shareResult.ExpiresAt).
+		Msg("Shareable download URL generated")
+
+	// Send emails to all recipients
+	sentCount := 0
+	for _, recipient := range request.RecipientEmails {
+		// Skip empty recipients
+		recipient = strings.TrimSpace(recipient)
+		if recipient == "" {
+			log.Warn().
+				Str("session-id", request.SessionID).
+				Msg("Skipping empty recipient email")
+			continue
+		}
+
+		err = h.emailSender.SendShareEmail(email.ShareEmailData{
+			RecipientEmail: recipient,
+			SessionName:    sessionName,
+			DownloadURL:    shareResult.URL,
+			ExpiresAt:      shareResult.ExpiresAt,
+		})
+		if err != nil {
+			log.Err(err).
+				Str("session-id", request.SessionID).
+				Str("recipient", recipient).
+				Msg("Cannot send share email")
+			return noSuccess, fmt.Errorf("failed to send email to %s: %w", recipient, err)
+		}
+
+		sentCount++
+		log.Info().
+			Str("session-id", request.SessionID).
+			Str("recipient", recipient).
+			Msg("Session shared via email")
+	}
+
+	if sentCount == 0 {
+		log.Error().
+			Str("session-id", request.SessionID).
+			Int("recipient-count", len(request.RecipientEmails)).
+			Msg("No valid recipient emails provided")
+		return noSuccess, fmt.Errorf("no valid recipient emails provided")
+	}
+
+	return success, nil
+}
+
+func (h *SessionSourceHandler) shareSegment(ctx context.Context, request *sspb.ShareSegmentRequest) (*cmpb.Respone, error) {
+	recorderID, sessionID, segmentID, err := parseSegmentIDs(request.RecorderID, request.SessionID, request.SegmentID)
+	if err != nil {
+		log.Err(err).
+			Str("recorder-id", request.RecorderID).
+			Str("session-id", request.SessionID).
+			Str("segment-id", request.SegmentID).
+			Msg("Cannot parse IDs")
+		return noSuccess, err
+	}
+
+	session, err := h.sessionStorage.GetSession(recorderID, sessionID)
+	if err != nil {
+		log.Err(err).Str("session-id", request.SessionID).Msg("Cannot get session")
+		return noSuccess, err
+	}
+
+	segment, ok := session.Segments[segmentID]
+	if !ok {
+		log.Err(err).Str("segment-id", request.SegmentID).Msg("Segment not found")
+		return noSuccess, fmt.Errorf("segment not found")
+	}
+
+	// Only allow sharing rendered segments
+	if segment.State != storage.SegmentStateFinished {
+		log.Warn().
+			Str("segment-id", request.SegmentID).
+			Str("state", segment.State.String()).
+			Msg("Cannot share segment that is not rendered")
+		return noSuccess, fmt.Errorf("segment is not rendered")
+	}
+
+	// Check if email sender is configured
+	if h.emailSender == nil {
+		log.Error().Msg("Email sender is not configured")
+		return noSuccess, fmt.Errorf("email sharing is not configured")
+	}
+
+	// Get a friendly segment name
+	segmentName := segment.Comment
+	if segmentName == "" {
+		segmentName = "Segment"
+	}
+
+	// Generate download filename
+	urlFriendlyName := strings.ReplaceAll(segmentName, " ", "_")
+	urlFriendlyName = regexp.MustCompile(`[^a-zA-Z0-9_-]`).ReplaceAllString(urlFriendlyName, "")
+	dateStr := session.StartTime.Format("2006-01-02_15-04-05")
+	downloadFilename := urlFriendlyName + "_" + dateStr + ".flac"
+
+	// Generate a download URL for the segment FLAC file
+	shareResult, err := h.fileSharer.ShareSegmentFile(ctx,
+		storage.SegmentAssetOptions{
+			RecorderID: session.RecorderID,
+			SessionID:  session.ID,
+			SegmentID:  segmentID,
+			Filename:   storage.SEGMENT_FILENAME_FLAC,
+		},
+		storage.SigningOptions{
+			Expires:          time.Hour * 24 * 7, // 7 days
+			Download:         true,
+			DownloadFilename: downloadFilename,
+		})
+	if err != nil {
+		log.Err(err).Str("segment-id", request.SegmentID).Msg("Cannot generate download URL")
+		return noSuccess, fmt.Errorf("cannot generate download URL: %w", err)
+	}
+
+	// Send emails to all recipients
+	sentCount := 0
+	for _, recipient := range request.RecipientEmails {
+		// Skip empty recipients
+		recipient = strings.TrimSpace(recipient)
+		if recipient == "" {
+			log.Warn().
+				Str("segment-id", request.SegmentID).
+				Msg("Skipping empty recipient email")
+			continue
+		}
+
+		err = h.emailSender.SendShareEmail(email.ShareEmailData{
+			RecipientEmail: recipient,
+			SessionName:    segmentName,
+			DownloadURL:    shareResult.URL,
+			ExpiresAt:      shareResult.ExpiresAt,
+		})
+		if err != nil {
+			log.Err(err).
+				Str("segment-id", request.SegmentID).
+				Str("recipient", recipient).
+				Msg("Cannot send share email")
+			return noSuccess, fmt.Errorf("failed to send email to %s: %w", recipient, err)
+		}
+
+		sentCount++
+		log.Info().
+			Str("segment-id", request.SegmentID).
+			Str("recipient", recipient).
+			Msg("Segment shared via email")
+	}
+
+	if sentCount == 0 {
+		log.Error().
+			Str("segment-id", request.SegmentID).
+			Int("recipient-count", len(request.RecipientEmails)).
+			Msg("No valid recipient emails provided")
+		return noSuccess, fmt.Errorf("no valid recipient emails provided")
+	}
 
 	return success, nil
 }

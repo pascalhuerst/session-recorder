@@ -23,13 +23,8 @@
  */
 
 import type { Meta, StoryObj } from '@storybook/vue3';
-import { within, expect, userEvent } from '@storybook/test';
+import { within, expect } from '@storybook/test';
 import DevicePicker from './DevicePicker.vue';
-
-// Mock router
-const mockRouter = {
-  push: () => {},
-};
 
 // Mock recorder data
 const createMockRecorder = (id: string, name: string, isRecording = false) => ({
@@ -75,6 +70,7 @@ type Story = StoryObj<typeof meta>;
 // Default with recorders
 export const Default: Story = {
   args: {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     recorders: mockRecordersMap as any,
     selectedRecorderId: undefined,
   },
@@ -91,6 +87,7 @@ export const Default: Story = {
 // With selected recorder
 export const WithSelection: Story = {
   args: {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     recorders: mockRecordersMap as any,
     selectedRecorderId: 'recorder-2',
   },
@@ -109,6 +106,7 @@ export const WithSelection: Story = {
 // Empty state
 export const Empty: Story = {
   args: {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     recorders: new Map() as any,
     selectedRecorderId: undefined,
   },
@@ -123,6 +121,7 @@ export const SingleRecorder: Story = {
   args: {
     recorders: new Map([
       ['recorder-1', createMockRecorder('recorder-1', 'Only Recorder')],
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     ]) as any,
     selectedRecorderId: 'recorder-1',
   },
@@ -164,6 +163,7 @@ export const ManyRecorders: Story = {
 // Click interaction
 export const ClickInteraction: Story = {
   args: {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     recorders: mockRecordersMap as any,
     selectedRecorderId: 'recorder-1',
   },

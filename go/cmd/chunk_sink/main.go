@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -30,16 +32,54 @@ var (
 	version string
 )
 
+// buildEndpoint constructs an endpoint string from host and port.
+// If host is empty, falls back to extracting from fallbackEndpoint.
+// If port is 0, falls back to the port from fallbackEndpoint.
+func buildEndpoint(host string, port int, fallbackEndpoint string) string {
+	// Parse fallback to get defaults
+	fallbackHost := fallbackEndpoint
+	fallbackPort := ""
+	if idx := strings.LastIndex(fallbackEndpoint, ":"); idx != -1 {
+		fallbackHost = fallbackEndpoint[:idx]
+		fallbackPort = fallbackEndpoint[idx+1:]
+	}
+
+	// Use provided values or fallback
+	if host == "" {
+		host = fallbackHost
+	}
+	if port == 0 && fallbackPort != "" {
+		return host + ":" + fallbackPort
+	}
+	if port != 0 {
+		return fmt.Sprintf("%s:%d", host, port)
+	}
+	return host
+}
+
 func main() {
 	// CLI flags with env var fallback
 	chunkSinkPort := flag.Int("chunk-sink-port", utils.GetIntWithDefault("CHUNK_SINK_PORT", defaultChunkSinkPort), "Port for ChunkSink gRPC service (env: CHUNK_SINK_PORT)")
 	sessionSourcePort := flag.Int("session-source-port", utils.GetIntWithDefault("SESSION_SOURCE_PORT", defaultSessionSourcePort), "Port for SessionSource gRPC service (env: SESSION_SOURCE_PORT)")
-	s3Endpoint := flag.String("s3-endpoint", utils.GetWithDefault("S3_ENDPOINT", "localhost:9000"), "S3/MinIO internal endpoint (env: S3_ENDPOINT)")
-	s3LocalEndpoint := flag.String("s3-local-endpoint", utils.GetWithDefault("S3_LOCAL_ENDPOINT", ""), "S3 endpoint for UI URLs, browser-accessible (env: S3_LOCAL_ENDPOINT, default: s3-endpoint)")
-	s3PublicEndpoint := flag.String("s3-public-endpoint", utils.GetWithDefault("S3_PUBLIC_ENDPOINT", ""), "S3 endpoint for email sharing URLs, externally-accessible (env: S3_PUBLIC_ENDPOINT, default: s3-local-endpoint)")
+
+	// S3/MinIO configuration
+	s3Endpoint := flag.String("s3-endpoint", utils.GetWithDefault("S3_ENDPOINT", "localhost:9000"), "S3/MinIO internal endpoint host:port (env: S3_ENDPOINT)")
 	s3AccessKey := flag.String("s3-access-key", utils.GetWithDefault("S3_ACCESS_KEY", ""), "S3 access key (env: S3_ACCESS_KEY)")
 	s3SecretKey := flag.String("s3-secret-key", utils.GetWithDefault("S3_SECRET_KEY", ""), "S3 secret key (env: S3_SECRET_KEY)")
+
+	// Local endpoint configuration (for UI/browser URLs)
+	s3LocalHost := flag.String("s3-local-host", utils.GetWithDefault("S3_LOCAL_HOST", ""), "S3 host for UI URLs (env: S3_LOCAL_HOST, default: s3-endpoint host)")
+	s3LocalPort := flag.Int("s3-local-port", utils.GetIntWithDefault("S3_LOCAL_PORT", 0), "S3 port for UI URLs (env: S3_LOCAL_PORT, default: s3-endpoint port)")
+
+	// Public endpoint configuration (for email sharing URLs)
+	s3PublicHost := flag.String("s3-public-host", utils.GetWithDefault("S3_PUBLIC_HOST", ""), "S3 host for email sharing URLs (env: S3_PUBLIC_HOST, default: s3-local-host)")
+	s3PublicPort := flag.Int("s3-public-port", utils.GetIntWithDefault("S3_PUBLIC_PORT", 0), "S3 port for email sharing URLs (env: S3_PUBLIC_PORT, default: s3-local-port)")
+
 	flag.Parse()
+
+	// Build endpoint strings from host:port configuration
+	s3LocalEndpoint := buildEndpoint(*s3LocalHost, *s3LocalPort, *s3Endpoint)
+	s3PublicEndpoint := buildEndpoint(*s3PublicHost, *s3PublicPort, s3LocalEndpoint)
 
 	// Validate required fields
 	if *s3AccessKey == "" || *s3SecretKey == "" {
@@ -52,7 +92,7 @@ func main() {
 
 	log.Info().Msg("Setting up storage server")
 
-	minio, err := storage.NewMinioStorage(*s3Endpoint, *s3LocalEndpoint, *s3PublicEndpoint, *s3AccessKey, *s3SecretKey)
+	minio, err := storage.NewMinioStorage(*s3Endpoint, s3LocalEndpoint, s3PublicEndpoint, *s3AccessKey, *s3SecretKey)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Cannot create storage. Giving up")
 

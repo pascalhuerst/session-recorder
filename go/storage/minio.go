@@ -963,11 +963,16 @@ func (m *Minio) FindRecorderIDs(ctx context.Context) ([]uuid.UUID, error) {
 		}
 
 		idString, _ := strings.CutSuffix(object.Key, "/")
+		if idString == "" {
+			continue
+		}
+
 		recorderID, err := uuid.Parse(idString)
 		if err != nil {
-			log.Err(err).Str("recorder-id", object.Key).Msg("Cannot parse recorder ID")
-
-			return nil, err
+			log.Warn().
+				Str("object", object.Key).
+				Msg("Skipping non-recorder object while scanning")
+			continue
 		}
 
 		recorders = append(recorders, recorderID)
@@ -1024,13 +1029,22 @@ func (m *Minio) readSessionIDs(ctx context.Context, recorderID uuid.UUID) ([]uui
 		}
 
 		tokens := strings.Split(object.Key, "/")
+		if len(tokens) < 3 {
+			continue
+		}
+
 		idString := tokens[2]
+		if idString == "" {
+			continue
+		}
 
 		sessionID, err := uuid.Parse(idString)
 		if err != nil {
-			log.Err(err).Str("session-id", object.Key).Msg("Cannot parse session ID")
-
-			return nil, err
+			log.Warn().
+				Err(err).
+				Str("object", object.Key).
+				Msg("Skipping non-session object while scanning")
+			continue
 		}
 
 		sessions[sessionID] = struct{}{}
@@ -1123,7 +1137,24 @@ func (m *Minio) putSessionMetadata(ctx context.Context, recorderID, sessionID uu
 		return fmt.Errorf("cannot put object: %w", err)
 	}
 
-	m.system.Recorders[recorderID].Sessions[sessionID] = *session
+	if m.system.Recorders == nil {
+		m.system.Recorders = make(map[uuid.UUID]Recorder)
+	}
+
+	recorder, ok := m.system.Recorders[recorderID]
+	if !ok {
+		recorder = Recorder{
+			ID:       recorderID,
+			Sessions: make(map[uuid.UUID]Session),
+		}
+	}
+
+	if recorder.Sessions == nil {
+		recorder.Sessions = make(map[uuid.UUID]Session)
+	}
+
+	recorder.Sessions[sessionID] = *session
+	m.system.Recorders[recorderID] = recorder
 
 	return nil
 }
@@ -1140,6 +1171,10 @@ func (m *Minio) putRecorderMetadata(ctx context.Context, recorderID uuid.UUID, r
 	_, err = m.client.PutObject(ctx, bucketName, objectName, buffer, int64(buffer.Len()), minio.PutObjectOptions{})
 	if err != nil {
 		return fmt.Errorf("cannot put object: %w", err)
+	}
+
+	if m.system.Recorders == nil {
+		m.system.Recorders = make(map[uuid.UUID]Recorder)
 	}
 
 	m.system.Recorders[recorderID] = *recorder

@@ -1,4 +1,4 @@
-import { computed, onBeforeMount, onBeforeUnmount, ref } from 'vue';
+import { computed, onBeforeUnmount, ref } from 'vue';
 import { Recorder } from '@session-recorder/protocols/ts/sessionsource';
 import { useRoute, useRouter } from 'vue-router';
 import { defineStore } from 'pinia';

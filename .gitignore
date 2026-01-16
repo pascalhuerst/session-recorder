@@ -4,6 +4,9 @@ CLAUDE.md
 .ai-project
 .claude/commands
 
+# Local development notes (contains sensitive env values)
+DEV.md
+
 # IDE
 .idea
 .vscode

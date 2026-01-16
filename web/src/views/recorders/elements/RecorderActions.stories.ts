@@ -19,7 +19,7 @@
 
 import type { Meta, StoryObj } from '@storybook/vue3';
 import { within, expect, userEvent } from '@storybook/test';
-import { ref, computed } from 'vue';
+import { ref } from 'vue';
 import { Button } from '@session-recorder/session-waveform';
 
 // Mock component since real one depends on Pinia store and gRPC

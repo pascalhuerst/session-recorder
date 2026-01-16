@@ -3,5 +3,7 @@
 </script>
 
 <template>
-  <!-- Recorder actions removed - Cut button is now on session cards -->
+  <div>
+    <!-- Recorder actions removed - Cut button is now on session cards -->
+  </div>
 </template>

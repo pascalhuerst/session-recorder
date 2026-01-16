@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { ref, watch, computed } from 'vue';
 import {
   createPeaksContext,
   providePeaksContext,
@@ -8,6 +8,9 @@ import {
   intToChar,
 } from '@session-recorder/session-waveform';
 import { integrateSegments } from '../../../grpc/integrateSegments';
+import { shareSegment } from '../../../grpc/procedures/shareSegment';
+import { toastService } from '../../../services/Toaster/ToastService';
+import ShareModal from '../../../components/ShareModal.vue';
 import type { Session } from '@/types';
 
 const props = defineProps<{
@@ -70,6 +73,54 @@ const ctx = createPeaksContext({
 providePeaksContext(ctx);
 integrateSegments(props.session, props.recorderId, ctx);
 
+// Share segment modal state
+const showShareModal = ref(false);
+const sharingSegmentId = ref<string | null>(null);
+
+const sharingSegmentName = computed(() => {
+  if (!sharingSegmentId.value) return 'Segment';
+  const segment = props.session.segments.find((s) => s.id === sharingSegmentId.value);
+  return segment?.name || 'Segment';
+});
+
+// Handle share segment command from the waveform library
+ctx.commandEmitter.on('shareSegment', (segmentId: string) => {
+  sharingSegmentId.value = segmentId;
+  showShareModal.value = true;
+});
+
+const onShareClose = () => {
+  showShareModal.value = false;
+  sharingSegmentId.value = null;
+};
+
+const onShareConfirm = (emails: string[]) => {
+  if (!sharingSegmentId.value) return;
+
+  const segmentId = sharingSegmentId.value;
+  const recipientText = emails.length === 1 ? emails[0] : `${emails.length} recipients`;
+
+  // Close dialog immediately and show info toast
+  showShareModal.value = false;
+  sharingSegmentId.value = null;
+  toastService.info(`Sending download link to ${recipientText}...`);
+
+  // Send in background
+  shareSegment({
+    recorderId: props.recorderId,
+    sessionId: props.session.id,
+    segmentId: segmentId,
+    recipientEmails: emails,
+  })
+    .then(() => {
+      toastService.success(`Download link sent to ${recipientText}`);
+    })
+    .catch((error) => {
+      console.error('Failed to share segment:', error);
+      toastService.error('Failed to send email. Please try again.');
+    });
+};
+
 // Sync segment state changes from session to peaks context
 // This is needed because the peaks context has its own copy of segments
 // and needs to be updated when the backend broadcasts state changes
@@ -117,4 +168,11 @@ defineExpose({
 
 <template>
   <WaveformView ref="waveformRef" />
+
+  <ShareModal
+    :open="showShareModal"
+    :item-name="sharingSegmentName"
+    @close="onShareClose"
+    @share="onShareConfirm"
+  />
 </template>

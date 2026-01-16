@@ -24,6 +24,9 @@ type UpdateSegmentCB func(ctx context.Context, request *sspb.UpdateSegmentReques
 type DeleteSegmentCB func(ctx context.Context, request *sspb.DeleteSegmentRequest) (*cmpb.Respone, error)
 type RenderSegmentCB func(ctx context.Context, request *sspb.RenderSegmentRequest) (*cmpb.Respone, error)
 
+type ShareSessionCB func(ctx context.Context, request *sspb.ShareSessionRequest) (*cmpb.Respone, error)
+type ShareSegmentCB func(ctx context.Context, request *sspb.ShareSegmentRequest) (*cmpb.Respone, error)
+
 var noSuccess = &cmpb.Respone{Success: true}
 
 type SessionSourceServerConfig struct {
@@ -42,6 +45,9 @@ type SessionSourceServerConfig struct {
 	UpdateSegmentCB UpdateSegmentCB
 	DeleteSegmentCB DeleteSegmentCB
 	RenderSegmentCB RenderSegmentCB
+
+	ShareSessionCB ShareSessionCB
+	ShareSegmentCB ShareSegmentCB
 }
 
 type SessionSourceServer struct {
@@ -153,6 +159,22 @@ func (s *SessionSourceServer) RenderSegment(ctx context.Context, in *sspb.Render
 func (s *SessionSourceServer) UpdateSegment(ctx context.Context, in *sspb.UpdateSegmentRequest) (*common.Respone, error) {
 	if s.config.UpdateSegmentCB != nil {
 		return s.config.UpdateSegmentCB(ctx, in)
+	}
+
+	return noSuccess, nil
+}
+
+func (s *SessionSourceServer) ShareSession(ctx context.Context, in *sspb.ShareSessionRequest) (*common.Respone, error) {
+	if s.config.ShareSessionCB != nil {
+		return s.config.ShareSessionCB(ctx, in)
+	}
+
+	return noSuccess, nil
+}
+
+func (s *SessionSourceServer) ShareSegment(ctx context.Context, in *sspb.ShareSegmentRequest) (*common.Respone, error) {
+	if s.config.ShareSegmentCB != nil {
+		return s.config.ShareSegmentCB(ctx, in)
 	}
 
 	return noSuccess, nil

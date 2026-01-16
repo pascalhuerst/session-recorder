@@ -1,4 +1,3 @@
-import type { AudioChunk } from '@session-recorder/protocols/ts/sessionsource';
 import { sessionSourceClient } from '../sessionSourceClient';
 
 export type AudioChunkMessage = {

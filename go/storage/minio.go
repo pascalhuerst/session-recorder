@@ -85,7 +85,8 @@ type Minio struct {
 	system *System
 
 	endpoint       string
-	publicEndpoint string
+	localEndpoint  string // For URLs consumed by UI (browser-accessible)
+	publicEndpoint string // For URLs shared externally (email downloads)
 	accessKey      string
 	secretLey      string
 
@@ -105,7 +106,7 @@ type Minio struct {
 	cbLock                  sync.Mutex
 }
 
-func NewMinioStorage(endpoint, publicEndpoint, accessKey, secretKey string) (*Minio, error) {
+func NewMinioStorage(endpoint, localEndpoint, publicEndpoint, accessKey, secretKey string) (*Minio, error) {
 	c, err := minio.New(endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(accessKey, secretKey, ""),
 		Secure: false,
@@ -114,8 +115,18 @@ func NewMinioStorage(endpoint, publicEndpoint, accessKey, secretKey string) (*Mi
 		return nil, fmt.Errorf("cannot create minio client: %w", err)
 	}
 
+	// If localEndpoint not specified, default to endpoint
+	if localEndpoint == "" {
+		localEndpoint = endpoint
+	}
+	// If publicEndpoint not specified, default to localEndpoint
+	if publicEndpoint == "" {
+		publicEndpoint = localEndpoint
+	}
+
 	return &Minio{
 		endpoint:       endpoint,
+		localEndpoint:  localEndpoint,
 		publicEndpoint: publicEndpoint,
 		accessKey:      accessKey,
 		secretLey:      secretKey,
@@ -1312,9 +1323,14 @@ func (m *Minio) GetPresignedURL(ctx context.Context, asset AssetOptions, signing
 		return "", fmt.Errorf("failed to generate presigned URL: %w", err)
 	}
 
-	publicUrl := strings.Replace(presignedURL.String(), m.endpoint, m.publicEndpoint, 1)
+	// Choose endpoint based on signing options
+	targetEndpoint := m.localEndpoint
+	if signing.Endpoint == EndpointPublic {
+		targetEndpoint = m.publicEndpoint
+	}
+	signedUrl := strings.Replace(presignedURL.String(), m.endpoint, targetEndpoint, 1)
 
-	return publicUrl, nil
+	return signedUrl, nil
 }
 
 func (m *Minio) GetSegmentPresignedURL(ctx context.Context, asset SegmentAssetOptions, signing SigningOptions) (string, error) {
@@ -1336,9 +1352,14 @@ func (m *Minio) GetSegmentPresignedURL(ctx context.Context, asset SegmentAssetOp
 		return "", fmt.Errorf("failed to generate presigned URL: %w", err)
 	}
 
-	publicUrl := strings.Replace(presignedURL.String(), m.endpoint, m.publicEndpoint, 1)
+	// Choose endpoint based on signing options
+	targetEndpoint := m.localEndpoint
+	if signing.Endpoint == EndpointPublic {
+		targetEndpoint = m.publicEndpoint
+	}
+	signedUrl := strings.Replace(presignedURL.String(), m.endpoint, targetEndpoint, 1)
 
-	return publicUrl, nil
+	return signedUrl, nil
 }
 
 func (m *Minio) GetSessionFileReader(ctx context.Context, asset AssetOptions) (io.ReadCloser, int64, error) {

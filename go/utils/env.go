@@ -3,6 +3,7 @@ package utils
 import (
 	"errors"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/rs/zerolog/log"
@@ -34,8 +35,28 @@ func Get(name string) (string, error) {
 	return strings.Clone(s), nil
 }
 
-func GetEnvOrDefault(name string, defaultValue string) string {
+func GetWithDefault(name, defaultValue string) string {
 	if v, err := Get(name); err == nil {
+		return v
+	}
+	return defaultValue
+}
+
+// GetEnvOrDefault is an alias for GetWithDefault for backwards compatibility
+func GetEnvOrDefault(name string, defaultValue string) string {
+	return GetWithDefault(name, defaultValue)
+}
+
+func GetInt(name string) (int, error) {
+	s, err := Get(name)
+	if err != nil {
+		return 0, err
+	}
+	return strconv.Atoi(s)
+}
+
+func GetIntWithDefault(name string, defaultValue int) int {
+	if v, err := GetInt(name); err == nil {
 		return v
 	}
 	return defaultValue

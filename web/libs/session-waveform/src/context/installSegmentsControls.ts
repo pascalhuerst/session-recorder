@@ -61,7 +61,9 @@ export const installSegmentsControls = ({
     // Try to show the entire segment in the zoomview
     const zoomview = peaksInstance.views.getView('zoomview');
     if (zoomview) {
-      const viewDuration = zoomview.getEndTime() - zoomview.getStartTime();
+      // Use type assertion - these methods exist at runtime but aren't in type definitions
+      const zv = zoomview as unknown as { getStartTime(): number; getEndTime(): number };
+      const viewDuration = zv.getEndTime() - zv.getStartTime();
       const segmentDuration = segment.endTime - segment.startTime;
 
       if (segmentDuration <= viewDuration) {

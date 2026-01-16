@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"flag"
 	"os"
 	"time"
 
@@ -18,11 +19,11 @@ import (
 )
 
 const (
-	chunkSinkPort        = 8779
-	chunkSinkService     = "_session-recorder-chunksink._tcp"
-	sessionSourcePort    = 8780
-	sessionSourceService = "_session-recorder-sessionsource._tcp"
-	defaultLifetime      = 4 * 24 * time.Hour
+	defaultChunkSinkPort     = 8779
+	chunkSinkService         = "_session-recorder-chunksink._tcp"
+	defaultSessionSourcePort = 8780
+	sessionSourceService     = "_session-recorder-sessionsource._tcp"
+	defaultLifetime          = 4 * 24 * time.Hour
 )
 
 var (
@@ -30,18 +31,28 @@ var (
 )
 
 func main() {
+	// CLI flags with env var fallback
+	chunkSinkPort := flag.Int("chunk-sink-port", utils.GetIntWithDefault("CHUNK_SINK_PORT", defaultChunkSinkPort), "Port for ChunkSink gRPC service (env: CHUNK_SINK_PORT)")
+	sessionSourcePort := flag.Int("session-source-port", utils.GetIntWithDefault("SESSION_SOURCE_PORT", defaultSessionSourcePort), "Port for SessionSource gRPC service (env: SESSION_SOURCE_PORT)")
+	s3Endpoint := flag.String("s3-endpoint", utils.GetWithDefault("S3_ENDPOINT", "localhost:9000"), "S3/MinIO internal endpoint (env: S3_ENDPOINT)")
+	s3LocalEndpoint := flag.String("s3-local-endpoint", utils.GetWithDefault("S3_LOCAL_ENDPOINT", ""), "S3 endpoint for UI URLs, browser-accessible (env: S3_LOCAL_ENDPOINT, default: s3-endpoint)")
+	s3PublicEndpoint := flag.String("s3-public-endpoint", utils.GetWithDefault("S3_PUBLIC_ENDPOINT", ""), "S3 endpoint for email sharing URLs, externally-accessible (env: S3_PUBLIC_ENDPOINT, default: s3-local-endpoint)")
+	s3AccessKey := flag.String("s3-access-key", utils.GetWithDefault("S3_ACCESS_KEY", ""), "S3 access key (env: S3_ACCESS_KEY)")
+	s3SecretKey := flag.String("s3-secret-key", utils.GetWithDefault("S3_SECRET_KEY", ""), "S3 secret key (env: S3_SECRET_KEY)")
+	flag.Parse()
+
+	// Validate required fields
+	if *s3AccessKey == "" || *s3SecretKey == "" {
+		log.Fatal().Msg("S3_ACCESS_KEY and S3_SECRET_KEY are required (via flags or env vars)")
+	}
+
 	ctx := context.Background()
 
 	logger.Setup()
 
-	s3Endpoint := utils.MustGet("S3_ENDPOINT")
-	s3PublicEndpoint := utils.MustGet("S3_PUBLIC_ENDPOINT")
-	s3AccessKey := utils.MustGet("S3_ACCESS_KEY")
-	s3SecretKey := utils.MustGet("S3_SECRET_KEY")
-
 	log.Info().Msg("Setting up storage server")
 
-	minio, err := storage.NewMinioStorage(s3Endpoint, s3PublicEndpoint, s3AccessKey, s3SecretKey)
+	minio, err := storage.NewMinioStorage(*s3Endpoint, *s3LocalEndpoint, *s3PublicEndpoint, *s3AccessKey, *s3SecretKey)
 	if err != nil {
 		log.Fatal().Err(err).Msg("Cannot create storage. Giving up")
 
@@ -132,7 +143,7 @@ func main() {
 		ShareSegmentCB:       sessionSourceHandler.shareSegment,
 	})
 
-	port, err := grpc.StartProtocolServer(sessionSourceServer, mdnsServer, sessionSourceService, sessionSourcePort)
+	port, err := grpc.StartProtocolServer(sessionSourceServer, mdnsServer, sessionSourceService, uint16(*sessionSourcePort))
 	if err != nil {
 		log.Err(err).Msg("Cannot start session source server")
 
@@ -140,7 +151,7 @@ func main() {
 	}
 	log.Info().Msgf("Session source server is now being served on port %d", port)
 
-	port, err = grpc.StartProtocolServer(chunkSinkServer, mdnsServer, chunkSinkService, chunkSinkPort)
+	port, err = grpc.StartProtocolServer(chunkSinkServer, mdnsServer, chunkSinkService, uint16(*chunkSinkPort))
 	if err != nil {
 		log.Err(err).Msg("Cannot start chunk sink server")
 

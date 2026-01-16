@@ -34,7 +34,7 @@ import (
 func TestNewMinioStorage_InvalidEndpoint(t *testing.T) {
 	// Test with invalid endpoint - should still create the struct
 	// but fail when trying to connect
-	storage, err := NewMinioStorage("invalid:endpoint:format", "public", "access", "secret")
+	storage, err := NewMinioStorage("invalid:endpoint:format", "local", "public", "access", "secret")
 	if err != nil {
 		// Some invalid endpoints may fail at creation time
 		t.Logf("NewMinioStorage() error = %v (expected for invalid endpoint)", err)
@@ -48,7 +48,7 @@ func TestNewMinioStorage_InvalidEndpoint(t *testing.T) {
 
 func TestNewMinioStorage_EmptyCredentials(t *testing.T) {
 	// Test with empty credentials - should still create the struct
-	storage, err := NewMinioStorage("localhost:9000", "localhost:9000", "", "")
+	storage, err := NewMinioStorage("localhost:9000", "localhost:9000", "localhost:9000", "", "")
 	if err != nil {
 		t.Logf("NewMinioStorage() error = %v", err)
 		return

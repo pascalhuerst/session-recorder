@@ -159,25 +159,59 @@ To use Dropbox:
 
 ## Dev Environment
 
+### 1. Start Infrastructure (MinIO + Envoy)
+
 ```bash
-# Start envoy & minio
+# Start
 ./start-dev.sh
 
-# Stop envoy & minio
+# Stop
 ./stop-dev.sh
 ```
 
-```bash
-# Start go Backend
-cd ./go/cmd/chunk_sink
-S3_ENDPOINT=localhost:9000 S3_PUBLIC_ENDPOINT=localhost:9000 S3_ACCESS_KEY=admin S3_SECRET_KEY=password123 \
-SMTP_HOST=<smtp_host> SMTP_PORT=<smtp_port> SMTP_USERNAME=<smtp_username> SMTP_PASSWORD=<smtp_password> SMTP_FROM=<from_email> SMTP_FROM_NAME=<from_name> \
-FILE_SHARE_METHOD=dropbox FILE_SHARE_DROPBOX_ACCESS_TOKEN=<your_token> \
-go run .
-```
+### 2. Build & Start Go Backend
 
 ```bash
-# Start web interface
-cd ./web
+cd go && go build -o bin/chunk-sink ./cmd/chunk_sink && cd ..
+
+./go/bin/chunk-sink \
+  -s3-endpoint=localhost:9000 \
+  -s3-local-endpoint=localhost:9000 \
+  -s3-public-endpoint=<YOUR_PUBLIC_URL> \
+  -s3-access-key=<ACCESS_KEY> \
+  -s3-secret-key=<SECRET_KEY>
+```
+
+#### CLI Flags Reference
+
+| Flag | Env Var | Default | Description |
+|------|---------|---------|-------------|
+| `-chunk-sink-port` | `CHUNK_SINK_PORT` | 8779 | ChunkSink gRPC port |
+| `-session-source-port` | `SESSION_SOURCE_PORT` | 8780 | SessionSource gRPC port |
+| `-s3-endpoint` | `S3_ENDPOINT` | localhost:9000 | MinIO/S3 internal endpoint |
+| `-s3-local-endpoint` | `S3_LOCAL_ENDPOINT` | (s3-endpoint) | S3 endpoint for UI URLs |
+| `-s3-public-endpoint` | `S3_PUBLIC_ENDPOINT` | (s3-local-endpoint) | S3 endpoint for external sharing |
+| `-s3-access-key` | `S3_ACCESS_KEY` | (required) | S3 access key |
+| `-s3-secret-key` | `S3_SECRET_KEY` | (required) | S3 secret key |
+
+### 3. Build & Start Web Interface
+
+```bash
+cd web
+
+# Development mode
 npm start
+
+# Production build
+VITE_GRPC_SERVER_URL=http://localhost:8081 npm run build
+npx serve -l 4200 -s dist/web
+```
+
+### 4. Start Recording Device
+
+```bash
+./cpp/chunk-sink-client/chunk-sink-client \
+  --recorder-id $(uuidgen) \
+  --recorder-name "My Recorder" \
+  --device default
 ```

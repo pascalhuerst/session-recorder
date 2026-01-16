@@ -95,10 +95,21 @@ type SegmentAssetOptions struct {
 	Filename   Filename
 }
 
+// EndpointType specifies which endpoint to use for signed URLs
+type EndpointType int
+
+const (
+	// EndpointLocal uses the local endpoint (for UI/browser consumption)
+	EndpointLocal EndpointType = iota
+	// EndpointPublic uses the public endpoint (for external sharing via email)
+	EndpointPublic
+)
+
 type SigningOptions struct {
 	Expires          time.Duration
 	Download         bool
 	DownloadFilename string
+	Endpoint         EndpointType // Which endpoint to use (default: EndpointLocal)
 }
 
 type Storage interface {

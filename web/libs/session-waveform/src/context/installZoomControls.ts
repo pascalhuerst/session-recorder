@@ -1,12 +1,12 @@
 import type { createPeaksModule } from './createPeaksModule';
-import type Peaks from 'peaks.js';
+import type { PeaksInstance } from 'peaks.js';
 
 export const installZoomControls = ({
   state,
   commandEmitter,
   eventEmitter,
 }: ReturnType<typeof createPeaksModule>) => {
-  let peaksInstance: Peaks.PeaksInstance | null = null;
+  let peaksInstance: PeaksInstance | null = null;
 
   const applyZoom = (seconds: number) => {
     if (!peaksInstance) return;

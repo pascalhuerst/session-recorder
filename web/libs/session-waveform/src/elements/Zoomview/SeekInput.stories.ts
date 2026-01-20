@@ -18,7 +18,7 @@
  */
 
 import type { Meta, StoryObj } from '@storybook/vue3';
-import { userEvent, within, expect } from '@storybook/test';
+import { userEvent, expect } from '@storybook/test';
 import SeekInput from './controls/SeekInput.vue';
 import { createPeaksContext, providePeaksContext } from '../../context/usePeaksContext';
 

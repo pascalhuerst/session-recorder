@@ -32,18 +32,6 @@ const displayName = computed(() => {
   return props.session.name || `Untitled #${props.index}`;
 });
 
-const displayDate = computed(() => {
-  const { startedAt } = props.session;
-  const format =
-    startedAt.getFullYear() === new Date().getFullYear()
-      ? 'ddd, MMM D, HH:mm'
-      : 'MMM D, YYYY HH:mm';
-  return {
-    iso: startedAt.toISOString(),
-    formatted: useDateFormat(startedAt, format).value,
-  };
-});
-
 const timeRange = computed(() => {
   const { startedAt, finishedAt } = props.session;
   const formatTime = (date: Date) => useDateFormat(date, 'HH:mm').value;

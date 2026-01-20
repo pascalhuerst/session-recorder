@@ -14,7 +14,7 @@
 
 import type { Meta, StoryObj } from '@storybook/vue3';
 import { ref } from 'vue';
-import { within, expect } from '@storybook/test';
+import { expect } from '@storybook/test';
 import Audio from './Audio.vue';
 import { createPeaksContext, providePeaksContext } from '../../context/usePeaksContext';
 import { useWaverformLayoutProvider } from '../../waveform/useWaverformLayoutProvider';

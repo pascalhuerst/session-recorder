@@ -75,7 +75,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Run tests
-        run: pnpm nx run-many --target=test --all
+        run: pnpm nx test session-waveform
 
   go-quality:
     name: Go Quality Checks

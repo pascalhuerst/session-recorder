@@ -24,7 +24,7 @@
  */
 
 import type { Meta, StoryObj } from '@storybook/vue3';
-import { within, expect } from '@storybook/test';
+import { expect } from '@storybook/test';
 import VirtualizedItem from './VirtualizedItem.vue';
 
 const meta: Meta<typeof VirtualizedItem> = {

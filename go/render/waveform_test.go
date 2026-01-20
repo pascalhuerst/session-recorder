@@ -6,6 +6,7 @@ import (
 	"crypto/md5"
 	_ "embed"
 	"io"
+	"os/exec"
 	"testing"
 )
 
@@ -35,6 +36,11 @@ var rawTestAudio []byte
 var resultWaveform []byte
 
 func TestCreateOverview(t *testing.T) {
+	// Skip test if audiowaveform is not installed
+	if _, err := exec.LookPath("audiowaveform"); err != nil {
+		t.Skip("audiowaveform not installed, skipping test")
+	}
+
 	type args struct {
 		raw    io.Reader
 		zoom   int

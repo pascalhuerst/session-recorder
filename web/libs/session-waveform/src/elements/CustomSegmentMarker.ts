@@ -84,7 +84,8 @@ export class CustomSegmentMarker {
     this._line?.points([0.5, 0, 0.5, height]);
   }
 
-  update(_options: any) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  update(_options: unknown) {
     // Note: segmentUpdated is emitted by the updateSegment command handler
     // in installSegmentsControls.ts for programmatic updates, and by the
     // segments.dragend handler for drag updates. We don't emit here to avoid

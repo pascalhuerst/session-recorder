@@ -79,7 +79,7 @@ const resetProps = computed(() => {
   transition: all 0.5s;
   border: 1px solid transparent;
 
-  background: var(--color-grey-100);
+  background: var(--bg-tertiary);
 
   padding: 0;
   height: var(--input-height);
@@ -108,18 +108,18 @@ const resetProps = computed(() => {
 }
 
 .input-container.outlined {
-  border-color: var(--color-grey-200);
-  background: var(--color-grey-50);
+  border-color: var(--border-primary);
+  background: var(--bg-secondary);
   border-width: 2px;
 }
 
 .input-container:focus-within {
-  border-color: var(--color-grey-500);
-  background: white;
+  border-color: var(--accent);
+  background: var(--bg-secondary);
 }
 
 .input-container.outlined:focus-within {
-  border-color: var(--color-grey-500);
+  border-color: var(--accent);
 }
 
 .prepend,
@@ -128,7 +128,7 @@ const resetProps = computed(() => {
   flex: none;
   align-items: center;
   justify-content: center;
-  color: var(--color-purple-700);
+  color: var(--accent);
   font-size: calc(var(--input-font-size) * 0.9);
   line-height: var(--input-line-height);
   min-width: calc(var(--input-height) - 4px);
@@ -149,7 +149,7 @@ input {
   padding: 0;
   width: 100%;
   min-width: 0;
-  color: var(--color-grey-800);
+  color: var(--text-primary);
   font-size: var(--input-font-size);
   line-height: var(--input-line-height);
   font-weight: var(--weight-medium);
@@ -173,6 +173,6 @@ input::-webkit-calendar-picker-indicator {
 }
 
 input::placeholder {
-  color: var(--color-grey-500);
+  color: var(--text-muted);
 }
 </style>

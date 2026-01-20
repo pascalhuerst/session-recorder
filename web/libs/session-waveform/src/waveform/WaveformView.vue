@@ -100,8 +100,9 @@ const minHeight = computed(() => (isExpanded.value ? props.height : 80));
 .canvas {
   position: relative;
   width: 100%;
-  border-top: 1px solid var(--color-grey-300);
-  border-bottom: 1px solid var(--color-grey-300);
+  border-top: 1px solid var(--border-primary);
+  border-bottom: 1px solid var(--border-primary);
+  overflow: hidden;
 }
 
 .expanded-content {

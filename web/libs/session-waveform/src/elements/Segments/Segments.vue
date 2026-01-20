@@ -3,6 +3,7 @@ import { usePeaksContext } from '../../context/usePeaksContext';
 import Segment from './Segment.vue';
 import Checkbox from '../../lib/controls/Checkbox.vue';
 import Button from '../../lib/controls/Button.vue';
+import AddSegmentButton from './controls/AddSegmentButton.vue';
 import { computed, ref, watch } from 'vue';
 
 const { state, commandEmitter, eventEmitter } = usePeaksContext();
@@ -105,8 +106,8 @@ watch(
 </script>
 
 <template>
-  <div v-if="selectableSegments.length > 0" class="segments">
-    <table>
+  <div class="segments">
+    <table v-if="selectableSegments.length > 0">
       <colgroup>
         <col class="col-checkbox" />
         <col class="col-time" />
@@ -170,12 +171,21 @@ watch(
         />
       </tbody>
     </table>
+    <div v-if="permissions.create" class="segments__footer">
+      <AddSegmentButton />
+    </div>
   </div>
 </template>
 
 <style scoped>
 .segments {
   position: relative;
+}
+
+.segments__footer {
+  display: flex;
+  justify-content: flex-start;
+  padding: var(--size-2);
 }
 
 table {

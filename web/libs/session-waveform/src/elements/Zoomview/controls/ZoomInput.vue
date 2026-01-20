@@ -13,21 +13,21 @@ const zoomLevel = computed({
     return store.value.zoom.zoomLevel;
   },
   set: (value) => {
-    commandEmitter.emit('setZoomLevel', normalizeZoom(value));
+    commandEmitter.emit('setZoomLevel', Math.max(zoomStep.value, value));
   },
 });
 
 const zoomStep = computed(() => store.value.zoom.zoomStep);
 
-const normalizeZoom = (offset: number) => {
+const applyZoomOffset = (offset: number) => {
   return Math.max(zoomStep.value, zoomLevel.value + offset);
 };
 
 const onZoomOut = () => {
-  commandEmitter.emit('setZoomLevel', normalizeZoom(-1 * zoomStep.value));
+  commandEmitter.emit('setZoomLevel', applyZoomOffset(-1 * zoomStep.value));
 };
 const onZoomIn = () => {
-  commandEmitter.emit('setZoomLevel', normalizeZoom(zoomStep.value));
+  commandEmitter.emit('setZoomLevel', applyZoomOffset(zoomStep.value));
 };
 </script>
 

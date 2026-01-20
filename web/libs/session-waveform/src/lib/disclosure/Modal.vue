@@ -93,6 +93,8 @@ dialog {
   padding: var(--size-6);
   font-size: var(--scale-0);
   border-radius: var(--radius-sm);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
 }
 
 dialog[open] {

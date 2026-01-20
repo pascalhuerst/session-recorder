@@ -278,15 +278,7 @@ const onAudioEnded = () => {
 }
 
 .row--selected {
-  background-color: var(--color-purple-50, #f5f3ff);
-}
-
-.row:hover:not(.row--deleted) {
-  background-color: var(--color-grey-50, #f9fafb);
-}
-
-.row--selected:hover {
-  background-color: var(--color-purple-100, #ede9fe);
+  background-color: var(--bg-selected, var(--accent-subtle));
 }
 
 .cell-checkbox {

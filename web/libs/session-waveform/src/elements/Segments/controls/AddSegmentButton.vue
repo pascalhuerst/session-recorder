@@ -7,7 +7,7 @@ const { commandEmitter } = usePeaksContext();
 
 <template>
   <Button
-    size="sm"
+    size="xs"
     @click="() => commandEmitter.emit('addSegment')"
     class="add-segment-btn"
   >

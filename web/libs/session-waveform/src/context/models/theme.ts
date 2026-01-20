@@ -5,12 +5,12 @@ export const overviewThemeSchema = z
     enablePoints: z.boolean().default(false),
     enableSegments: z.boolean().default(true),
     playheadPadding: z.number().default(0),
-    playheadColor: z.string().default('red'),
-    playedWaveformColor: z.string().default('#6b46c1'),
+    playheadColor: z.string().default('#f43f5e'),
+    playedWaveformColor: z.string().default('#14b8a6'),
     showPlayheadTime: z.boolean().default(true),
-    playheadTextColor: z.string().default('#6b46c1'),
-    playheadBackgroundColor: z.string().default('rgb(107,70,193,0.1)'),
-    waveformColor: z.string().default('#767c89'),
+    playheadTextColor: z.string().default('#14b8a6'),
+    playheadBackgroundColor: z.string().default('rgba(20,184,166,0.15)'),
+    waveformColor: z.string().default('#94a3b8'),
   })
   .default({});
 
@@ -19,15 +19,15 @@ export const zoomviewThemeSchema = z
     enablePoints: z.boolean().default(false),
     enableSegments: z.boolean().default(true),
     playheadPadding: z.number().default(16),
-    playheadColor: z.string().default('#6b46c1'),
-    waveformColor: z.string().default('#a5aab4'),
+    playheadColor: z.string().default('#14b8a6'),
+    waveformColor: z.string().default('#94a3b8'),
     showPlayheadTime: z.boolean().default(true),
-    playedWaveformColor: z.string().default('#bdafe3'),
-    playheadTextColor: z.string().default('#6b46c1'),
+    playedWaveformColor: z.string().default('#5eead4'),
+    playheadTextColor: z.string().default('#14b8a6'),
     segmentOptions: z
       .object({
-        startMarkerColor: z.string().default('#d53f8c'),
-        endMarkerColor: z.string().default('#d53f8c'),
+        startMarkerColor: z.string().default('#f43f5e'),
+        endMarkerColor: z.string().default('#f43f5e'),
       })
       .default({}),
   })

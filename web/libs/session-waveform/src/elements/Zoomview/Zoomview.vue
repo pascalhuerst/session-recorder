@@ -2,16 +2,10 @@
 import SeekInput from './controls/SeekInput.vue';
 import ZoomInput from './controls/ZoomInput.vue';
 import AmplitudeInput from './controls/AmplitudeInput.vue';
-import AddSegmentButton from '../Segments/controls/AddSegmentButton.vue';
 import { useWaverformLayoutProvider } from '../../waveform/useWaverformLayoutProvider';
-import { usePeaksContext } from '../../context/usePeaksContext';
-import { computed } from 'vue';
 
 const { inject } = useWaverformLayoutProvider();
 const { zoomviewRef } = inject();
-
-const { state } = usePeaksContext();
-const permissions = computed(() => state.toRef().value.permissions);
 </script>
 
 <template>
@@ -21,7 +15,6 @@ const permissions = computed(() => state.toRef().value.permissions);
       <SeekInput />
       <ZoomInput />
       <AmplitudeInput />
-      <AddSegmentButton v-if="permissions.create" />
     </div>
   </div>
 </template>
@@ -29,18 +22,19 @@ const permissions = computed(() => state.toRef().value.permissions);
 <style scoped>
 .zoomview {
   position: relative;
-  border-top: 1px solid var(--color-grey-300);
+  border-top: 1px solid var(--border-primary);
   display: flex;
   flex-direction: row;
   flex-wrap: nowrap;
   align-items: stretch;
   width: 100%;
-  height: 260px;
+  height: 120px;
 }
 
 .zoomview__waveform {
   flex: 1;
-  height: 260px;
+  min-width: 0; /* Prevent Firefox overflow */
+  height: 120px;
   position: relative;
 }
 

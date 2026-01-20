@@ -38,11 +38,14 @@ const props = withDefaults(
 <style scoped>
 .button {
   --btn-bg-color: transparent;
-  --btn-bg-color-hover: var(--color-grey-100);
-  --btn-text-color: var(--color-grey-800);
-  --btn-text-color-hover: var(--color-grey-900);
+  --btn-bg-color-hover: var(--bg-hover);
+  --btn-bg-color-active: var(--bg-tertiary);
+  --btn-text-color: var(--text-secondary);
+  --btn-text-color-hover: var(--text-primary);
+  --btn-text-color-active: var(--text-primary);
   --btn-border-color: transparent;
-  --btn-border-color-hover: var(--color-grey-400);
+  --btn-border-color-hover: var(--border-secondary);
+  --btn-border-color-active: var(--border-secondary);
   --btn-padding-y: 0.25rem;
   --btn-padding-x: 1rem;
   --btn-font-size: var(--scale-1);
@@ -97,52 +100,64 @@ const props = withDefaults(
   }
 
   &.is-ghost {
-    --btn-text-color: var(--color-grey-500);
-    --btn-text-color-hover: var(--color-grey-900);
-    --btn-text-color-disabled: #cccccc;
-    --btn-bg-color: var(--color-grey-100);
+    --btn-text-color: var(--text-muted);
+    --btn-text-color-hover: var(--text-primary);
+    --btn-text-color-active: var(--text-primary);
+    --btn-text-color-disabled: var(--text-muted);
+    --btn-bg-color: var(--bg-tertiary);
     &.is-primary {
-      --btn-text-color: var(--color-purple-700);
-      --btn-text-color-hover: var(--color-purple-700);
+      --btn-text-color: var(--accent);
+      --btn-text-color-hover: var(--accent-hover);
+      --btn-text-color-active: var(--accent-active);
     }
   }
 
   &.is-outlined {
-    --btn-text-color: var(--color-grey-900);
-    --btn-text-color-hover: var(--color-black);
-    --btn-border-color: var(--color-grey-500);
-    --btn-border-color-hover: var(--color-grey-600);
-    --btn-bg-color: white;
-    --btn-text-color-disabled: #ccc;
-    --btn-border-color-disabled: #ccc;
-    --btn-bg-color-disabled: #ccc;
+    --btn-text-color: var(--text-primary);
+    --btn-text-color-hover: var(--text-primary);
+    --btn-text-color-active: var(--text-primary);
+    --btn-border-color: var(--border-secondary);
+    --btn-border-color-hover: var(--text-muted);
+    --btn-border-color-active: var(--text-muted);
+    --btn-bg-color: var(--bg-primary);
+    --btn-bg-color-active: var(--bg-secondary);
+    --btn-text-color-disabled: var(--text-muted);
+    --btn-border-color-disabled: var(--border-primary);
+    --btn-bg-color-disabled: var(--bg-tertiary);
 
     &.is-primary {
-      --btn-bg-color-hover: tranparent;
-      --btn-text-color: var(--color-purple-500);
-      --btn-text-color-hover: var(--color-purple-700);
-      --btn-border-color: var(--color-purple-500);
-      --btn-border-color-hover: var(--color-purple-700);
+      --btn-bg-color-hover: transparent;
+      --btn-bg-color-active: var(--accent-subtle);
+      --btn-text-color: var(--accent);
+      --btn-text-color-hover: var(--accent-hover);
+      --btn-text-color-active: var(--accent-active);
+      --btn-border-color: var(--accent);
+      --btn-border-color-hover: var(--accent-hover);
+      --btn-border-color-active: var(--accent-active);
     }
   }
 
   &.is-solid {
-    --btn-text-color: var(--color-grey-900);
-    --btn-text-color-hover: var(--color-grey-900);
-    --btn-border-color: var(--color-grey-200);
-    --btn-bg-color: var(--color-grey-200);
-    --btn-bg-color-hover: var(--color-grey-400);
-    --btn-text-color-disabled: white;
-    --btn-border-color-disabled: #ccc;
-    --btn-bg-color-disabled: #ccc;
+    --btn-text-color: var(--text-primary);
+    --btn-text-color-hover: var(--text-primary);
+    --btn-border-color: var(--border-primary);
+    --btn-bg-color: var(--bg-tertiary);
+    --btn-bg-color-hover: var(--bg-hover);
+    --btn-bg-color-active: var(--bg-secondary);
+    --btn-text-color-disabled: var(--text-muted);
+    --btn-border-color-disabled: var(--border-primary);
+    --btn-bg-color-disabled: var(--bg-tertiary);
 
     &.is-primary {
       --btn-text-color: white;
       --btn-text-color-hover: white;
-      --btn-border-color: var(--color-purple-500);
-      --btn-border-color-hover: var(--color-purple-700);
-      --btn-bg-color: var(--color-purple-500);
-      --btn-bg-color-hover: var(--color-purple-700);
+      --btn-text-color-active: white;
+      --btn-border-color: var(--accent);
+      --btn-border-color-hover: var(--accent-hover);
+      --btn-border-color-active: var(--accent-active);
+      --btn-bg-color: var(--accent);
+      --btn-bg-color-hover: var(--accent-hover);
+      --btn-bg-color-active: var(--accent-active);
     }
   }
 
@@ -156,11 +171,16 @@ const props = withDefaults(
     }
   }
 
-  &:hover,
-  &:active {
+  &:hover {
     color: var(--btn-text-color-hover);
     background-color: var(--btn-bg-color-hover);
     border-color: var(--btn-border-color-hover);
+  }
+
+  &:active {
+    color: var(--btn-text-color-active);
+    background-color: var(--btn-bg-color-active);
+    border-color: var(--btn-border-color-active);
   }
 
   &:focus {

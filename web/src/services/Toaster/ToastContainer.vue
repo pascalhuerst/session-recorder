@@ -68,28 +68,28 @@ const removeToast = (id: string) => {
   border-radius: var(--radius-xs);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   border: 1px solid;
-  background: white;
+  background: var(--bg-primary);
   min-width: 300px;
 }
 
 .toast--success {
-  border-color: var(--color-purple-500);
-  background: #efeaf8ff;
+  border-color: var(--accent);
+  background: var(--accent-subtle);
 }
 
 .toast--error {
-  border-color: #ef4444;
-  background: #fef2f2;
+  border-color: var(--color-red-500);
+  background: var(--bg-secondary);
 }
 
 .toast--warning {
-  border-color: #f59e0b;
-  background: #fffbeb;
+  border-color: var(--color-yellow-500);
+  background: var(--bg-secondary);
 }
 
 .toast--info {
-  border-color: #3b82f6;
-  background: #eff6ff;
+  border-color: var(--color-blue-500);
+  background: var(--bg-secondary);
 }
 
 .toast__content {
@@ -103,25 +103,25 @@ const removeToast = (id: string) => {
 }
 
 .toast--success .toast__icon {
-  color: var(--color-purple-500);
+  color: var(--accent);
 }
 
 .toast--error .toast__icon {
-  color: #ef4444;
+  color: var(--color-red-500);
 }
 
 .toast--warning .toast__icon {
-  color: #f59e0b;
+  color: var(--color-yellow-500);
 }
 
 .toast--info .toast__icon {
-  color: #3b82f6;
+  color: var(--color-blue-500);
 }
 
 .toast__message {
   flex: 1;
   font-size: var(--scale-1);
-  color: var(--color-grey-900);
+  color: var(--text-primary);
 }
 
 .toast__close {
@@ -129,7 +129,7 @@ const removeToast = (id: string) => {
   border: none;
   cursor: pointer;
   padding: var(--size-1);
-  color: var(--color-grey-600);
+  color: var(--text-muted);
   border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
@@ -140,8 +140,8 @@ const removeToast = (id: string) => {
 }
 
 .toast__close:hover {
-  background: var(--color-grey-100);
-  color: var(--color-grey-800);
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 /* Transition animations */

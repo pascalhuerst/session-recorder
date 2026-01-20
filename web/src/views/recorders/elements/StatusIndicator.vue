@@ -37,7 +37,7 @@ const stateClass = computed(() => {
 }
 
 .indicator {
-  background: var(--color-grey-400);
+  background: var(--text-muted);
   border-radius: 50%;
   width: var(--size-2);
   height: var(--size-2);
@@ -53,7 +53,7 @@ const stateClass = computed(() => {
   font-size: var(--size-3);
   font-weight: bold;
   text-transform: uppercase;
-  color: var(--color-grey-400);
+  color: var(--text-muted);
 }
 
 .text.is-recording {
@@ -61,12 +61,12 @@ const stateClass = computed(() => {
 }
 
 .text.is-processing {
-  color: var(--color-grey-500);
+  color: var(--text-secondary);
 }
 
 .indicator.is-processing {
   animation: pulse-grey 6s infinite;
-  background: var(--color-grey-500);
+  background: var(--text-secondary);
 }
 
 @keyframes pulse {

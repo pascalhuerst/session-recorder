@@ -139,8 +139,6 @@ onUnmounted(() => {
   align-items: stretch;
   width: 100%;
   height: 80px;
-  border-top: 1px solid var(--color-grey-300);
-  border-bottom: 1px solid var(--color-grey-300);
 }
 
 .processing-overview > * {
@@ -160,5 +158,7 @@ onUnmounted(() => {
 .waveform-canvas {
   flex: 1;
   height: 80px;
+  border-top: 1px solid var(--border-primary);
+  border-bottom: 1px solid var(--border-primary);
 }
 </style>

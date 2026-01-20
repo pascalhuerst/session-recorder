@@ -28,10 +28,10 @@ const drawPlaceholder = () => {
   ctx.scale(dpr, dpr);
 
   const centerY = height / 2;
-  const maxAmplitudeHeight = height * 0.3;
+  const maxAmplitudeHeight = height * 0.4;
 
-  // Use same slate color as waveforms but more transparent
-  ctx.fillStyle = 'rgba(148, 163, 184, 0.3)';
+  // Subtle placeholder color so error message pops
+  ctx.fillStyle = 'rgba(148, 163, 184, 0.15)';
 
   // Generate a static waveform pattern
   ctx.beginPath();

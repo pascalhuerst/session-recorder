@@ -1,7 +1,5 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
-import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
-import { Button } from '@session-recorder/session-waveform';
 import type { Session } from '@/types';
 
 defineProps<{
@@ -116,18 +114,6 @@ onUnmounted(() => {
 <template>
   <div class="processing-overview">
     <canvas ref="canvasRef" class="waveform-canvas" />
-    <div class="controls">
-      <Button
-        shape="square"
-        size="lg"
-        variant="ghost"
-        color="primary"
-        disabled
-        title="Processing..."
-      >
-        <font-awesome-icon icon="fa-solid fa-stop" />
-      </Button>
-    </div>
   </div>
 </template>
 
@@ -139,20 +125,6 @@ onUnmounted(() => {
   align-items: stretch;
   width: 100%;
   height: 80px;
-}
-
-.processing-overview > * {
-  height: 80px;
-}
-
-.controls {
-  flex: none;
-  width: 80px;
-  height: 80px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
 }
 
 .waveform-canvas {

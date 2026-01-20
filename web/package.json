@@ -64,6 +64,7 @@
     "@vue/eslint-config-typescript": "^12.0.0",
     "@vue/test-utils": "^2.4.4",
     "@vue/tsconfig": "^0.4.0",
+    "concurrently": "^9.1.2",
     "eslint": "^8.56.0",
     "eslint-config-prettier": "^9.0.0",
     "eslint-plugin-vue": "^9.19.2",
@@ -75,8 +76,7 @@
     "vite": "^5.0.10",
     "vite-plugin-dts": "~2.3.0",
     "vitest": "~0.34.6",
-    "vue-tsc": "^1.8.26",
-    "concurrently": "^9.1.2",
+    "vue-tsc": "^3.2.2",
     "wait-on": "^8.0.3"
   }
 }

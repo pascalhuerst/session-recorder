@@ -99,8 +99,8 @@ const drawWaveform = () => {
   const centerY = height / 2;
   const maxAmplitudeHeight = height * 0.4; // Half of 80% since we draw both up and down
 
-  // Purple waveform for recording state (purple-700)
-  ctx.fillStyle = '#7e22ce';
+  // Use same slate grey as the finished session waveforms
+  ctx.fillStyle = '#94a3b8';
 
   const peaksData = peaks.value;
   const peaksLength = peaksData.length;
@@ -111,20 +111,20 @@ const drawWaveform = () => {
     return;
   }
 
-  // Draw from right side, 1 pixel per peak
-  // Peaks grow from right to left, then scroll left when full
-  const startX = width - peaksLength;
+  // Draw from left side, 1 pixel per peak
+  // Peaks grow from left to right, scroll right when full
+  const startX = Math.max(0, peaksLength - width);
 
   // Draw filled waveform path (Peaks.js style)
   ctx.beginPath();
 
   // Forward pass: draw top edge (positive amplitude) from left to right
-  for (let i = 0; i < peaksLength; i++) {
+  for (let i = startX; i < peaksLength; i++) {
     const amplitude = peaksData[i] || 0;
-    const x = startX + i + 0.5;
+    const x = i - startX + 0.5;
     const y = centerY - amplitude * maxAmplitudeHeight + 0.5;
 
-    if (i === 0) {
+    if (i === startX) {
       ctx.moveTo(x, y);
     } else {
       ctx.lineTo(x, y);
@@ -132,9 +132,9 @@ const drawWaveform = () => {
   }
 
   // Reverse pass: draw bottom edge (negative amplitude) from right to left
-  for (let i = peaksLength - 1; i >= 0; i--) {
+  for (let i = peaksLength - 1; i >= startX; i--) {
     const amplitude = peaksData[i] || 0;
-    const x = startX + i + 0.5;
+    const x = i - startX + 0.5;
     const y = centerY + amplitude * maxAmplitudeHeight + 0.5;
 
     ctx.lineTo(x, y);
@@ -203,7 +203,6 @@ watch(
 
 <template>
   <div class="recording-overview">
-    <canvas ref="canvasRef" class="waveform-canvas" />
     <div class="controls">
       <Button
         shape="square"
@@ -217,6 +216,7 @@ watch(
         <font-awesome-icon icon="fa-solid fa-stop" />
       </Button>
     </div>
+    <canvas ref="canvasRef" class="waveform-canvas" />
   </div>
 </template>
 
@@ -228,8 +228,6 @@ watch(
   align-items: stretch;
   width: 100%;
   height: 80px;
-  border-top: 1px solid var(--color-grey-300);
-  border-bottom: 1px solid var(--color-grey-300);
 }
 
 .recording-overview > * {
@@ -248,6 +246,7 @@ watch(
 
 .waveform-canvas {
   flex: 1;
+  min-width: 0; /* Prevent Firefox overflow */
   height: 80px;
 }
 </style>

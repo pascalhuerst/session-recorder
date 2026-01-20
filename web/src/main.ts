@@ -9,6 +9,7 @@ import RecorderView from './views/recorders/views/_recorderId/RecorderView.vue';
 import SessionsView from './views/recorders/views/_recorderId/views/sessions/SessionsView.vue';
 import SessionsIndexView from './views/recorders/views/_recorderId/views/sessions/views/index/SessionsIndexView.vue';
 import { setup } from '@session-recorder/session-waveform';
+import { useThemeStore } from './store/useThemeStore';
 
 const router = createRouter({
   history: createWebHistory(),
@@ -52,8 +53,12 @@ const app = createApp(App);
 
 app.component('font-awesome-icon', FontAwesomeIcon);
 
-app.use(createPinia());
+const pinia = createPinia();
+app.use(pinia);
 app.use(router);
+
+// Initialize theme before mounting
+useThemeStore(pinia);
 
 setup();
 

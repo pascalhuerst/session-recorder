@@ -1340,6 +1340,50 @@ func (m *Minio) closeSessionAsync(ctx context.Context, recorderID, sessionID uui
 	return nil
 }
 
+func (m *Minio) CloseRecordingSession(ctx context.Context, recorderID, sessionID uuid.UUID) error {
+	var chunkCopy *minioChunk
+
+	m.dataLock.Lock()
+	if chunk, ok := m.chunks[recorderID]; ok && chunk.sessionID == sessionID {
+		copyChunk := *chunk
+		chunkCopy = &copyChunk
+		delete(m.chunks, recorderID)
+		delete(m.lastChunkTime, recorderID)
+	}
+	m.dataLock.Unlock()
+
+	sm, err := m.getSessionMetadata(ctx, recorderID, sessionID)
+	if err != nil {
+		return fmt.Errorf("cannot get session metadata: %w", err)
+	}
+
+	if sm.State == SessionStateRecording {
+		previousState := sm.State
+		sm.State = SessionStateProcessing
+		if err := m.putSessionMetadata(ctx, recorderID, sessionID, sm); err != nil {
+			return fmt.Errorf("cannot update session state to PROCESSING: %w", err)
+		}
+		sessionCopy := *sm
+		go m.notifyStateChange(&sessionCopy, previousState)
+	}
+
+	go func(recorderID, sessionID uuid.UUID, chunk *minioChunk) {
+		var chunkArg *minioChunk
+		if chunk != nil {
+			c := *chunk
+			chunkArg = &c
+		}
+		if err := m.closeSessionAsync(context.Background(), recorderID, sessionID, chunkArg); err != nil {
+			log.Err(err).
+				Stringer("recorder-id", recorderID).
+				Stringer("session-id", sessionID).
+				Msg("Cannot close session asynchronously")
+		}
+	}(recorderID, sessionID, chunkCopy)
+
+	return nil
+}
+
 func (m *Minio) GetPresignedURL(ctx context.Context, asset AssetOptions, signing SigningOptions) (string, error) {
 	objectName := fmt.Sprintf("%s/sessions/%s/%s", asset.RecorderID.String(), asset.SessionID.String(), asset.Filename)
 

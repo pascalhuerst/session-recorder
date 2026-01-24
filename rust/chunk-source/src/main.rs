@@ -1,6 +1,6 @@
 use chunk_source::SessionRecorder;
 use env_logger::Env;
-use log::{Level, info};
+use log::{Level, debug, info};
 use std::env;
 use std::io::Write;
 use std::path::Path;
@@ -161,7 +161,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let client_count = recorder.get_client_count().await;
 
         if client_count > 0 {
-            info!(
+            debug!(
                 "Connected to {} server(s), RMS: {:.1}%, Signal: {:?}",
                 client_count, status.rms_percent, status.signal_status
             );

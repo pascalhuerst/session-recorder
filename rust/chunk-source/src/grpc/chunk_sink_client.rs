@@ -8,6 +8,7 @@ use futures_util::StreamExt;
 use log::{error, info, warn};
 use prost_types::Timestamp;
 use ringbuf::traits::{Consumer, Producer};
+use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::time::sleep;
 use tonic::transport::Channel;
@@ -258,7 +259,10 @@ impl ChunkSinkClientService {
     }
 
     /// Start listening for server commands and forward them to parameter channels
-    pub async fn start_command_listener(&mut self) -> Result<(), ChunkSinkError> {
+    pub async fn start_command_listener(
+        &mut self,
+        callback: impl Fn(ServerCommand) + Send + Sync + 'static,
+    ) -> Result<(), ChunkSinkError> {
         let client = self
             .client
             .as_mut()
@@ -271,38 +275,37 @@ impl ChunkSinkClientService {
         let response = client.get_commands(request).await?;
         let mut stream = response.into_inner();
 
-        // Store commands in a simple way that we can check later
         info!("Starting command listener for server commands");
 
-        // Spawn a task to handle the command stream
-        tokio::spawn(async move {
-            while let Some(result) = stream.next().await {
-                match result {
-                    Ok(command) => {
-                        match command.command {
+        let callback = Arc::new(callback);
+
+        tokio::spawn({
+            let callback = Arc::clone(&callback);
+            async move {
+                while let Some(result) = stream.next().await {
+                    match result {
+                        Ok(command) => match command.command {
                             Some(chunksink::command::Command::CmdCutSession(_)) => {
                                 info!("Received CutSession command from server");
-                                // In a real implementation, you would send this to a channel
-                                // or set a flag that can be checked elsewhere
+                                callback(ServerCommand::CutSession);
                             }
                             Some(chunksink::command::Command::Reboot(_)) => {
                                 info!("Received Reboot command from server");
-                                // In a real implementation, you would send this to a channel
-                                // or set a flag that can be checked elsewhere
+                                callback(ServerCommand::Reboot);
                             }
                             None => {
                                 warn!("Received empty command from server");
                                 continue;
                             }
-                        };
-                    }
-                    Err(e) => {
-                        error!("Error receiving command from server: {}", e);
-                        break;
+                        },
+                        Err(e) => {
+                            error!("Error receiving command from server: {}", e);
+                            break;
+                        }
                     }
                 }
+                info!("Command listener stream ended");
             }
-            info!("Command listener stream ended");
         });
 
         Ok(())

@@ -1,13 +1,17 @@
 use crate::audio::{
     alsa::{AudioSettings, configure_input_device},
     callback_thread::start_callback_thread,
-    channels::{AudioChannels, AudioRingBufferConsumer},
+    channels::{
+        AudioChannels, AudioRingBufferConsumer, ParameterChannels, ParameterRingBufferConsumer,
+        ParameterRingBufferProducer, Parameters,
+    },
 };
 use crate::grpc::chunk_sink_client::{
-    AudioChunk, ChunkSinkClientService, ChunkSinkConfig, RecorderStatusInfo, common::SignalStatus,
+    AudioChunk, ChunkSinkClientService, ChunkSinkConfig, RecorderStatusInfo, ServerCommand,
+    common::SignalStatus,
 };
-use log::{error, info, warn};
-use ringbuf::traits::Consumer;
+use log::{debug, error, info, warn};
+use ringbuf::traits::{Consumer, Producer};
 use std::collections::HashMap;
 
 use std::sync::Arc;
@@ -15,7 +19,10 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use std::thread;
 use std::time::{Duration, SystemTime};
-use tokio::sync::Notify;
+use tokio::sync::{
+    Notify,
+    mpsc::{self, Receiver, Sender},
+};
 use tokio::time::{interval, sleep};
 use uuid::Uuid;
 use zeroconf_tokio::prelude::*;
@@ -38,6 +45,10 @@ pub struct SessionRecorder {
     // Status management
     recorder_status: Arc<tokio::sync::Mutex<RecorderStatusInfo>>,
     status_notify: Arc<Notify>,
+    parameter_producer: Arc<tokio::sync::Mutex<ParameterRingBufferProducer>>,
+    parameter_consumer: Option<ParameterRingBufferConsumer>,
+    command_tx: Sender<Parameters>,
+    command_rx: Option<Receiver<Parameters>>,
 
     // Control
     shutdown_signal: Arc<AtomicBool>,
@@ -128,6 +139,11 @@ impl SessionRecorder {
             clipping: false,
         };
 
+        let ParameterChannels { producer, consumer } = ParameterChannels::new(64);
+        let parameter_producer = Arc::new(tokio::sync::Mutex::new(producer));
+        let parameter_consumer = Some(consumer);
+        let (command_tx, command_rx) = mpsc::channel(32);
+
         Self {
             grpc_clients: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
             audio_settings,
@@ -139,6 +155,10 @@ impl SessionRecorder {
             callback_handle: None,
             recorder_status: Arc::new(tokio::sync::Mutex::new(initial_status)),
             status_notify: Arc::new(Notify::new()),
+            parameter_producer,
+            parameter_consumer,
+            command_tx,
+            command_rx: Some(command_rx),
             shutdown_signal: Arc::new(AtomicBool::new(false)),
             discovery_handle: None,
             audio_handle: None,
@@ -149,6 +169,19 @@ impl SessionRecorder {
     /// Start the session recorder
     pub async fn start(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         info!("Starting Session Recorder");
+
+        if let Some(command_rx) = self.command_rx.take() {
+            let parameter_producer = Arc::clone(&self.parameter_producer);
+            tokio::spawn(async move {
+                let mut command_rx = command_rx;
+                while let Some(command) = command_rx.recv().await {
+                    let mut producer = parameter_producer.lock().await;
+                    let _ = producer.push_slice(&[command]);
+                }
+            });
+        } else {
+            warn!("Command receiver not initialized");
+        }
 
         // Start zeroconf service discovery
         self.start_discovery().await?;
@@ -208,12 +241,20 @@ impl SessionRecorder {
 
         let clients = Arc::clone(&self.grpc_clients);
         let shutdown = Arc::clone(&self.shutdown_signal);
+        let command_tx = self.command_tx.clone();
         let recorder_id = self.recorder_id;
         let recorder_name = self.recorder_name.clone();
 
         let handle = tokio::spawn(async move {
-            Self::discovery_task(async_browser, clients, shutdown, recorder_id, recorder_name)
-                .await;
+            Self::discovery_task(
+                async_browser,
+                clients,
+                shutdown,
+                command_tx,
+                recorder_id,
+                recorder_name,
+            )
+            .await;
         });
 
         self.discovery_handle = Some(handle);
@@ -258,6 +299,10 @@ impl SessionRecorder {
             warn!("Audio consumer not initialized");
             return;
         };
+        let Some(parameter_consumer) = self.parameter_consumer.take() else {
+            warn!("Parameter consumer not initialized");
+            return;
+        };
         let clients = Arc::clone(&self.grpc_clients);
         let shutdown = self.shutdown_signal.clone();
         let status = Arc::clone(&self.recorder_status);
@@ -271,6 +316,7 @@ impl SessionRecorder {
         let handle = tokio::spawn(async move {
             Self::audio_processing_task(
                 consumer,
+                parameter_consumer,
                 clients,
                 shutdown,
                 status,
@@ -305,6 +351,7 @@ impl SessionRecorder {
         mut browser: MdnsBrowserAsync,
         clients: Arc<tokio::sync::Mutex<HashMap<String, ClientInfo>>>,
         shutdown: Arc<AtomicBool>,
+        command_tx: Sender<Parameters>,
         recorder_id: Uuid,
         recorder_name: String,
     ) {
@@ -365,6 +412,28 @@ impl SessionRecorder {
                                 Ok(_) => {
                                     info!("Connected to service {} via {}", discovery.name(), url);
 
+                                    let sender = command_tx.clone();
+                                    if let Err(e) = client
+                                        .start_command_listener({
+                                            let sender = sender.clone();
+                                            move |command| match command {
+                                                ServerCommand::CutSession => {
+                                                    if let Err(err) =
+                                                        sender.try_send(Parameters::Cut())
+                                                    {
+                                                        warn!("Failed to queue cut command: {}", err);
+                                                    }
+                                                }
+                                                ServerCommand::Reboot => {
+                                                    warn!("Received Reboot command from server");
+                                                }
+                                            }
+                                        })
+                                        .await
+                                    {
+                                        error!("Failed to start command listener: {}", e);
+                                    }
+
                                     let client_info = ClientInfo::new(
                                         client,
                                         discovery.name().to_string(),
@@ -423,6 +492,7 @@ impl SessionRecorder {
     /// Audio processing background task
     async fn audio_processing_task(
         mut consumer: AudioRingBufferConsumer,
+        mut parameter_consumer: ParameterRingBufferConsumer,
         clients: Arc<tokio::sync::Mutex<HashMap<String, ClientInfo>>>,
         shutdown: Arc<AtomicBool>,
         status: Arc<tokio::sync::Mutex<RecorderStatusInfo>>,
@@ -443,6 +513,34 @@ impl SessionRecorder {
 
         while !shutdown.load(Ordering::Relaxed) {
             interval.tick().await;
+
+            let mut command_buf = [Parameters::Cut(); 8];
+            loop {
+                let count = parameter_consumer.pop_slice(&mut command_buf);
+                if count == 0 {
+                    break;
+                }
+                for &command in command_buf.iter().take(count) {
+                    match command {
+                        Parameters::Cut() => {
+                            let new_session = Uuid::new_v4();
+                            info!("Cut command received; starting new session {}", new_session);
+                            session_id = new_session;
+                            chunk_counter = 0;
+                            status_notify.notify_waiters();
+                        }
+                        Parameters::Shutdown() => {
+                            info!("Shutdown command received via parameter channel");
+                            shutdown.store(true, Ordering::Relaxed);
+                            status_notify.notify_waiters();
+                        }
+                    }
+                }
+            }
+
+            if shutdown.load(Ordering::Relaxed) {
+                break;
+            }
 
             let samples_read = consumer.pop_slice(&mut sample_buffer);
 
@@ -637,7 +735,7 @@ impl SessionRecorder {
             }
 
             if !clients_guard.is_empty() {
-                info!("Status update sent to {} client(s)", clients_guard.len());
+                debug!("Status update sent to {} client(s)", clients_guard.len());
             }
         }
 

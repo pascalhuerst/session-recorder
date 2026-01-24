@@ -15,6 +15,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use std::thread;
 use std::time::{Duration, SystemTime};
+use tokio::sync::Notify;
 use tokio::time::{interval, sleep};
 use uuid::Uuid;
 use zeroconf_tokio::prelude::*;
@@ -36,6 +37,7 @@ pub struct SessionRecorder {
 
     // Status management
     recorder_status: Arc<tokio::sync::Mutex<RecorderStatusInfo>>,
+    status_notify: Arc<Notify>,
 
     // Control
     shutdown_signal: Arc<AtomicBool>,
@@ -136,6 +138,7 @@ impl SessionRecorder {
             detector_succession: sanitized_succession,
             callback_handle: None,
             recorder_status: Arc::new(tokio::sync::Mutex::new(initial_status)),
+            status_notify: Arc::new(Notify::new()),
             shutdown_signal: Arc::new(AtomicBool::new(false)),
             discovery_handle: None,
             audio_handle: None,
@@ -258,6 +261,7 @@ impl SessionRecorder {
         let clients = Arc::clone(&self.grpc_clients);
         let shutdown = self.shutdown_signal.clone();
         let status = Arc::clone(&self.recorder_status);
+        let status_notify = Arc::clone(&self.status_notify);
         let num_channels = self.audio_settings.num_channels as usize;
         let frames_per_chunk = self.audio_settings.period_size as usize;
 
@@ -270,6 +274,7 @@ impl SessionRecorder {
                 clients,
                 shutdown,
                 status,
+                status_notify,
                 num_channels,
                 frames_per_chunk,
                 detector_threshold,
@@ -286,9 +291,10 @@ impl SessionRecorder {
         let clients = Arc::clone(&self.grpc_clients);
         let shutdown = self.shutdown_signal.clone();
         let status = Arc::clone(&self.recorder_status);
+        let status_notify = Arc::clone(&self.status_notify);
 
         let handle = tokio::spawn(async move {
-            Self::status_update_task(clients, shutdown, status).await;
+            Self::status_update_task(clients, shutdown, status, status_notify).await;
         });
 
         self.status_handle = Some(handle);
@@ -420,6 +426,7 @@ impl SessionRecorder {
         clients: Arc<tokio::sync::Mutex<HashMap<String, ClientInfo>>>,
         shutdown: Arc<AtomicBool>,
         status: Arc<tokio::sync::Mutex<RecorderStatusInfo>>,
+        status_notify: Arc<Notify>,
         num_channels: usize,
         frames_per_chunk: usize,
         detector_threshold: f64,
@@ -440,14 +447,6 @@ impl SessionRecorder {
             let samples_read = consumer.pop_slice(&mut sample_buffer);
 
             if samples_read == 0 {
-                let mut status_guard = status.lock().await;
-                status_guard.signal_status = if recording {
-                    SignalStatus::Signal
-                } else {
-                    SignalStatus::NoSignal
-                };
-                status_guard.rms_percent = 0.0;
-                status_guard.clipping = false;
                 continue;
             }
 
@@ -465,15 +464,16 @@ impl SessionRecorder {
                 .iter()
                 .any(|&x| i32::from(x).abs() >= i32::from(i16::MAX));
 
-            let mut transitioned_to_signal = false;
-            let mut transitioned_to_silent = false;
-
             if rms_percent < detector_threshold {
                 if rms_counter > 0 {
                     rms_counter -= 1;
                     if rms_counter == 0 && recording {
                         recording = false;
-                        transitioned_to_silent = true;
+
+                        info!("Detector transitioned to SILENT (rms {:.2}%)", rms_percent);
+                        rms_counter = 0;
+
+                        status_notify.notify_waiters();
                     }
                 }
             } else {
@@ -481,19 +481,15 @@ impl SessionRecorder {
                     rms_counter += 1;
                     if rms_counter >= detector_succession && !recording {
                         recording = true;
-                        transitioned_to_signal = true;
+
+                        info!("Detector transitioned to SIGNAL (rms {:.2}%)", rms_percent);
+                        session_id = Uuid::new_v4();
+                        chunk_counter = 0;
+                        rms_counter = detector_succession;
+
+                        status_notify.notify_waiters();
                     }
                 }
-            }
-
-            if transitioned_to_signal {
-                info!("Detector transitioned to SIGNAL (rms {:.2}%)", rms_percent);
-                session_id = Uuid::new_v4();
-                chunk_counter = 0;
-                rms_counter = detector_succession;
-            } else if transitioned_to_silent {
-                info!("Detector transitioned to SILENT (rms {:.2}%)", rms_percent);
-                rms_counter = 0;
             }
 
             {
@@ -591,13 +587,17 @@ impl SessionRecorder {
         clients: Arc<tokio::sync::Mutex<HashMap<String, ClientInfo>>>,
         shutdown: Arc<AtomicBool>,
         status: Arc<tokio::sync::Mutex<RecorderStatusInfo>>,
+        status_notify: Arc<Notify>,
     ) {
         info!("Status update task started");
 
-        let mut interval = interval(Duration::from_secs(5)); // Update every 5 seconds
+        let mut interval = interval(Duration::from_secs(1)); // Update every second
 
         while !shutdown.load(Ordering::Relaxed) {
-            interval.tick().await;
+            tokio::select! {
+                _ = interval.tick() => {},
+                _ = status_notify.notified() => {},
+            }
 
             let current_status = {
                 let status_guard = status.lock().await;

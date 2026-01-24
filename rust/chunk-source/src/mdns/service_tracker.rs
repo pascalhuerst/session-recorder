@@ -150,18 +150,19 @@ impl ServiceTracker {
 
             // Process mDNS events
             while *is_running.lock().unwrap() {
-                match receiver.recv_timeout(Duration::from_secs(10)) {
+                match receiver.recv_timeout(Duration::from_secs(1)) {
                     Ok(event) => {
                         Self::handle_mdns_event(event, &services, &worker_event_sender);
                     }
                     Err(e) => {
-                        // Normal timeout or disconnection - this is expected behavior
                         let error_msg = e.to_string();
-                        if error_msg.contains("timeout") || error_msg.contains("Timeout") {
+                        if error_msg.contains("timeout") || error_msg.contains("timed out") {
                             continue;
                         } else {
-                            // Any other error (including channel closure) just means we should stop
-                            warn!("mDNS receiver finished (channel disconnected): {}", e);
+                            warn!(
+                                "mDNS receiver finished (channel disconnected): {}",
+                                error_msg
+                            );
                             break;
                         }
                     }

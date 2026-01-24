@@ -19,7 +19,10 @@ pub mod mdns {
     pub mod service_tracker;
 }
 
+pub mod session_recorder;
+
 pub use audio::*;
 pub use grpc::*;
 pub use io::*;
 pub use mdns::*;
+pub use session_recorder::SessionRecorder;

@@ -5,24 +5,10 @@ use anyhow::Result;
 #[derive(Debug, Default, Clone)]
 pub struct AudioSettings {
     pub input_device: String,
-    pub output_device: String,
     pub num_channels: u32,
     pub period_size: u32,
     pub buffer_size: u32,
     pub sample_rate: u32,
-}
-
-pub fn configure_output_device(audio_settings: &AudioSettings) -> Result<PCM> {
-    let playback = PCM::new(&audio_settings.output_device, Direction::Playback, false)
-        .expect("Failed to create output PCM device");
-    configure_pcm(
-        &playback,
-        audio_settings.num_channels,
-        audio_settings.sample_rate,
-        audio_settings.buffer_size,
-        audio_settings.period_size,
-    )?;
-    Ok(playback)
 }
 
 pub fn configure_input_device(audio_settings: &AudioSettings) -> Result<PCM> {
@@ -48,7 +34,7 @@ pub fn configure_pcm(
     let hwp = HwParams::any(pcm)?;
     hwp.set_channels(num_channels)?;
     hwp.set_rate(sample_rate, alsa::ValueOr::Nearest)?;
-    hwp.set_format(Format::S32LE)?;
+    hwp.set_format(Format::S16LE)?;
     hwp.set_access(Access::RWInterleaved)?;
 
     hwp.set_buffer_size_near(buffer_size as i64)?;

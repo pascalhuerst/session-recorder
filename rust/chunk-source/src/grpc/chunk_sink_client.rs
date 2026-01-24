@@ -13,6 +13,8 @@ use tokio::time::sleep;
 use tonic::transport::Channel;
 use tonic::{Request, Status};
 
+use uuid::Uuid;
+
 // Include the generated protobuf code
 pub mod chunksink {
     tonic::include_proto!("chunksink");
@@ -72,7 +74,7 @@ impl From<tonic::codegen::http::uri::InvalidUri> for ChunkSinkError {
 #[derive(Debug, Clone)]
 pub struct ChunkSinkConfig {
     pub server_address: String,
-    pub recorder_id: String,
+    pub recorder_id: Uuid,
     pub recorder_name: String,
     pub connect_timeout: Duration,
     pub request_timeout: Duration,
@@ -86,8 +88,8 @@ impl Default for ChunkSinkConfig {
     fn default() -> Self {
         Self {
             server_address: "http://localhost:50051".to_string(),
-            recorder_id: "default-recorder".to_string(),
-            recorder_name: "Default Recorder".to_string(),
+            recorder_id: Uuid::new_v4(),
+            recorder_name: "Oxidized Default Recorder".to_string(),
             connect_timeout: Duration::from_secs(10),
             request_timeout: Duration::from_secs(5),
             retry_interval: Duration::from_secs(5),
@@ -143,15 +145,15 @@ impl ChunkSinkClientService {
 
     /// Initialize channels for audio and parameter communication
     pub fn initialize_channels(&mut self) {
-        use crate::audio::channels::{AudioChannelPair, ParameterChannelPair};
+        use crate::audio::channels::{AudioChannels, ParameterChannels};
 
         // Create audio channels for chunk data
-        let audio_pair = AudioChannelPair::new(self.config.audio_buffer_size);
-        self.audio_channels = Some(audio_pair.main_channels);
+        let audio_channels = AudioChannels::new(self.config.audio_buffer_size);
+        self.audio_channels = Some(audio_channels);
 
         // Create parameter channels for commands
-        let param_pair = ParameterChannelPair::new(self.config.parameter_buffer_size);
-        self.parameter_channels = Some(param_pair.main_channels);
+        let param_channels = ParameterChannels::new(self.config.parameter_buffer_size);
+        self.parameter_channels = Some(param_channels);
     }
 
     /// Connect to the ChunkSink server
@@ -195,7 +197,7 @@ impl ChunkSinkClientService {
             .ok_or(ChunkSinkError::ClientNotConnected)?;
 
         let request = Request::new(RecorderStatus {
-            recorder_id: self.config.recorder_id.clone(),
+            recorder_id: self.config.recorder_id.to_string(),
             recorder_name: self.config.recorder_name.clone(),
             signal_status: status.signal_status.into(),
             rms_percent: status.rms_percent,
@@ -217,74 +219,6 @@ impl ChunkSinkClientService {
         }
     }
 
-    /// Send audio chunks to the server using audio channels
-    pub async fn process_audio_chunks(&mut self) -> Result<(), ChunkSinkError> {
-        let mut buffer = vec![0.0f32; 1024]; // Chunk size buffer
-        let mut chunk_count = 0u32;
-
-        loop {
-            // Try to read audio data from the channel
-            let samples_read = {
-                let audio_channels =
-                    self.audio_channels
-                        .as_mut()
-                        .ok_or(ChunkSinkError::InvalidData(
-                            "Audio channels not initialized".to_string(),
-                        ))?;
-                audio_channels.output_consumer.pop_slice(&mut buffer)
-            };
-
-            if samples_read > 0 {
-                // Convert f32 to u32 for protobuf transmission
-                // Scale float samples to 32-bit integer range
-                let data: Vec<u32> = buffer[..samples_read]
-                    .iter()
-                    .map(|&sample| {
-                        // Scale from [-1.0, 1.0] to [0, u32::MAX]
-                        let scaled = (sample + 1.0) / 2.0;
-                        (scaled.clamp(0.0, 1.0) * u32::MAX as f32) as u32
-                    })
-                    .collect();
-
-                let chunk = AudioChunk {
-                    session_id: format!("session_{}", chunk_count / 100), // Example session ID
-                    chunk_count,
-                    data,
-                    timestamp: SystemTime::now(),
-                };
-
-                if let Err(e) = self.set_chunks(chunk).await {
-                    error!("Failed to send audio chunk: {}", e);
-                    return Err(e);
-                }
-
-                chunk_count += 1;
-            } else {
-                // No data available, yield control
-                tokio::task::yield_now().await;
-            }
-
-            // Check for shutdown via parameter channels
-            if let Some(ref mut param_channels) = self.parameter_channels {
-                let mut param_buffer = [Parameters::Cut(); 1];
-                if param_channels.input_consumer.pop_slice(&mut param_buffer) > 0 {
-                    match param_buffer[0] {
-                        Parameters::Shutdown() => {
-                            info!("Shutdown signal received, stopping audio processing");
-                            break;
-                        }
-                        Parameters::Cut() => {
-                            info!("Cut signal received");
-                            // Handle cut command if needed
-                        }
-                    }
-                }
-            }
-        }
-
-        Ok(())
-    }
-
     /// Send a single audio chunk to the server
     async fn set_chunks(&mut self, chunk: AudioChunk) -> Result<bool, ChunkSinkError> {
         let client = self
@@ -298,7 +232,7 @@ impl ChunkSinkClientService {
             .map_err(|e| ChunkSinkError::InvalidData(format!("Invalid timestamp: {}", e)))?;
 
         let request = Request::new(Chunks {
-            recorder_id: self.config.recorder_id.clone(),
+            recorder_id: self.config.recorder_id.to_string(),
             session_id: chunk.session_id,
             chunk_count: chunk.chunk_count,
             time_created: Some(Timestamp {
@@ -331,7 +265,7 @@ impl ChunkSinkClientService {
             .ok_or(ChunkSinkError::ClientNotConnected)?;
 
         let request = Request::new(GetCommandRequest {
-            recorder_id: self.config.recorder_id.clone(),
+            recorder_id: self.config.recorder_id.to_string(),
         });
 
         let response = client.get_commands(request).await?;
@@ -381,7 +315,10 @@ impl ChunkSinkClientService {
 
         while attempts < max_attempts {
             match self.connect().await {
-                Ok(_) => return Ok(()),
+                Ok(_) => {
+                    info!("Connected to service {}", self.config.server_address);
+                    return Ok(());
+                }
                 Err(e) => {
                     attempts += 1;
                     if attempts >= max_attempts {
@@ -410,23 +347,6 @@ impl ChunkSinkClientService {
         self.parameter_channels.as_mut()
     }
 
-    /// Send audio data to the gRPC transmission pipeline
-    pub fn send_audio_data(&mut self, data: &[f32]) -> Result<usize, ChunkSinkError> {
-        let audio_channels = self
-            .audio_channels
-            .as_mut()
-            .ok_or(ChunkSinkError::InvalidData(
-                "Audio channels not initialized".to_string(),
-            ))?;
-
-        Ok(audio_channels.input_producer.push_slice(data))
-    }
-
-    /// Helper method to convert audio data before sending
-    pub fn convert_and_send_audio(&mut self, data: &[f32]) -> Result<usize, ChunkSinkError> {
-        self.send_audio_data(data)
-    }
-
     /// Check for incoming parameters/commands
     pub fn receive_parameters(
         &mut self,
@@ -439,7 +359,7 @@ impl ChunkSinkClientService {
                     "Parameter channels not initialized".to_string(),
                 ))?;
 
-        Ok(parameter_channels.input_consumer.pop_slice(buffer))
+        Ok(parameter_channels.consumer.pop_slice(buffer))
     }
 
     /// Send a parameter/command to the parameter channel
@@ -452,7 +372,7 @@ impl ChunkSinkClientService {
                 ))?;
 
         let param_slice = [parameter];
-        Ok(parameter_channels.output_producer.push_slice(&param_slice))
+        Ok(parameter_channels.producer.push_slice(&param_slice))
     }
 
     /// Send recorder status with retry logic
@@ -502,14 +422,18 @@ impl ChunkSinkClientService {
                     attempts += 1;
                     if attempts >= max_attempts {
                         error!(
-                            "Failed to set chunks after {} attempts: {}",
-                            max_attempts, e
+                            "Failed to set chunks after {} attempts for recorder {} ({}): {}",
+                            max_attempts, self.config.recorder_id, self.config.recorder_name, e
                         );
                         return Err(e);
                     }
                     warn!(
-                        "Chunk upload attempt {} failed: {}. Retrying in {:?}...",
-                        attempts, e, self.config.retry_interval
+                        "Chunk upload attempt {} failed for recorder {} ({}): {}. Retrying in {:?}...",
+                        attempts,
+                        self.config.recorder_id,
+                        self.config.recorder_name,
+                        e,
+                        self.config.retry_interval
                     );
                     sleep(self.config.retry_interval).await;
                 }
@@ -555,8 +479,8 @@ mod tests {
     fn test_config_default() {
         let config = ChunkSinkConfig::default();
         assert_eq!(config.server_address, "http://localhost:50051");
-        assert_eq!(config.recorder_id, "default-recorder");
-        assert_eq!(config.recorder_name, "Default Recorder");
+        assert!(!config.recorder_id.is_nil());
+        assert_eq!(config.recorder_name, "Oxidized Default Recorder");
     }
 
     #[test]

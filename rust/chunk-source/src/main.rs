@@ -7,23 +7,27 @@
 //! 4. Status updates to all connected clients
 
 use chunk_source::audio::{
-    alsa::{AudioSettings, configure_input_device, configure_output_device},
+    alsa::{AudioSettings, configure_input_device},
     callback_thread::start_callback_thread,
-    channels::{AudioChannelPair, Parameters},
+    channels::{AudioChannels, AudioRingBufferConsumer},
 };
 use chunk_source::grpc::chunk_sink_client::{
     AudioChunk, ChunkSinkClientService, ChunkSinkConfig, RecorderStatusInfo,
 };
 use chunk_source::mdns::service_tracker::{ServiceEvent, ServiceTracker, ServiceTrackerConfig};
-use log::{error, info, warn};
-use ringbuf::traits::{Consumer, Producer};
+
+use log::{Level, error, info, warn};
+use ringbuf::traits::Consumer;
 use std::collections::HashMap;
+use std::io::Write;
 use std::net::Ipv4Addr;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::{Duration, SystemTime};
+use std::{env, process};
 use tokio::time::interval;
+use uuid::Uuid;
 
 /// Core session recorder that manages all components
 pub struct SessionRecorder {
@@ -36,7 +40,10 @@ pub struct SessionRecorder {
 
     // Audio processing
     audio_settings: AudioSettings,
-    audio_channels: Option<AudioChannelPair>,
+    audio_consumer: Option<AudioRingBufferConsumer>,
+    recorder_id: Uuid,
+    recorder_name: String,
+    session_id: Uuid,
     callback_handle: Option<thread::JoinHandle<()>>,
 
     // Status management
@@ -95,10 +102,16 @@ impl ClientInfo {
 
 impl SessionRecorder {
     /// Create a new session recorder
-    pub fn new() -> Self {
+    pub fn new(recorder_id: Uuid, recorder_name: String) -> Self {
+        let session_id = Uuid::new_v4();
+
+        info!(
+            "Creating new session recorder {} with ID: {} (session {})",
+            recorder_name, recorder_id, session_id
+        );
+
         let audio_settings = AudioSettings {
             input_device: "default".to_string(),
-            output_device: "default".to_string(),
             num_channels: 2,
             period_size: 512,
             buffer_size: 2048,
@@ -116,7 +129,10 @@ impl SessionRecorder {
             service_event_receiver: None,
             grpc_clients: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
             audio_settings,
-            audio_channels: None,
+            audio_consumer: None,
+            recorder_id,
+            recorder_name,
+            session_id,
             callback_handle: None,
             recorder_status: Arc::new(tokio::sync::Mutex::new(initial_status)),
             shutdown_signal: Arc::new(AtomicBool::new(false)),
@@ -133,11 +149,13 @@ impl SessionRecorder {
         // Set up service discovery
         self.setup_service_discovery().await?;
 
+        // Start service discovery before configuring audio
+        self.start_discovery_task().await;
+
         // Set up audio processing
         self.setup_audio_processing().await?;
 
-        // Start background tasks
-        self.start_discovery_task().await;
+        // Start remaining background tasks
         self.start_audio_processing_task().await;
         self.start_status_update_task().await;
 
@@ -188,7 +206,7 @@ impl SessionRecorder {
     /// Set up mDNS service discovery
     async fn setup_service_discovery(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let tracker_config = ServiceTrackerConfig {
-            service_type: "_session-recorder-chunksink._tcp.local.".to_string(),
+            service_type: "_session-recorder-chunksink._tcp".to_string(),
             service_timeout: Duration::from_secs(30),
             cleanup_interval: Duration::from_secs(3),
             max_services: 50,
@@ -208,23 +226,28 @@ impl SessionRecorder {
     async fn setup_audio_processing(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         // Create audio devices
         let capture_pcm = configure_input_device(&self.audio_settings)?;
-        let playback_pcm = configure_output_device(&self.audio_settings)?;
 
-        // Create audio channels
-        let audio_channels = AudioChannelPair::new(self.audio_settings.buffer_size as usize * 4);
+        let buffer_capacity =
+            self.audio_settings.buffer_size as usize * self.audio_settings.num_channels as usize;
+        let mut channels = AudioChannels::new(buffer_capacity);
+        let producer = channels.take_producer().ok_or_else(|| {
+            Box::new(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "failed to acquire audio producer",
+            )) as Box<dyn std::error::Error>
+        })?;
+        let consumer = channels.consumer;
+        self.audio_consumer = Some(consumer);
 
         // Start audio callback thread
         let callback_handle = start_callback_thread(
             self.audio_settings.num_channels as usize,
-            self.audio_settings.num_channels as usize,
             self.audio_settings.period_size as usize,
             Some(capture_pcm),
-            Some(playback_pcm),
-            audio_channels.callback_channels,
             self.shutdown_signal.clone(),
+            producer,
         );
 
-        self.audio_channels = Some(audio_channels);
         self.callback_handle = Some(callback_handle);
 
         info!("Audio processing initialized");
@@ -233,12 +256,35 @@ impl SessionRecorder {
 
     /// Start the service discovery task
     async fn start_discovery_task(&mut self) {
+        if self.service_event_receiver.is_none() {
+            error!("Discovery task requested before service tracker produced a receiver");
+            return;
+        }
+
+        info!("Preparing discovery task startup");
+
         let event_receiver = self.service_event_receiver.take().unwrap();
         let clients = Arc::clone(&self.grpc_clients);
         let shutdown = self.shutdown_signal.clone();
+        let recorder_id = self.recorder_id;
+        let recorder_name = self.recorder_name.clone();
+
+        info!(
+            "Spawning discovery task with recorder_id={} recorder_name={}",
+            recorder_id, recorder_name
+        );
 
         let handle = tokio::spawn(async move {
-            Self::discovery_task(event_receiver, clients, shutdown).await;
+            info!("Discovery task future started");
+            Self::discovery_task(
+                event_receiver,
+                clients,
+                shutdown,
+                recorder_id,
+                recorder_name,
+            )
+            .await;
+            info!("Discovery task future completed");
         });
 
         self.discovery_handle = Some(handle);
@@ -246,13 +292,28 @@ impl SessionRecorder {
 
     /// Start the audio processing task
     async fn start_audio_processing_task(&mut self) {
-        let audio_channels = self.audio_channels.take().unwrap();
+        let Some(consumer) = self.audio_consumer.take() else {
+            warn!("Audio consumer not initialized");
+            return;
+        };
         let clients = Arc::clone(&self.grpc_clients);
         let shutdown = self.shutdown_signal.clone();
         let status = Arc::clone(&self.recorder_status);
+        let num_channels = self.audio_settings.num_channels as usize;
+        let frames_per_chunk = self.audio_settings.period_size as usize;
+        let session_id = self.session_id;
 
         let handle = tokio::spawn(async move {
-            Self::audio_processing_task(audio_channels, clients, shutdown, status).await;
+            Self::audio_processing_task(
+                consumer,
+                clients,
+                shutdown,
+                status,
+                num_channels,
+                frames_per_chunk,
+                session_id,
+            )
+            .await;
         });
 
         self.audio_handle = Some(handle);
@@ -276,12 +337,15 @@ impl SessionRecorder {
         event_receiver: std::sync::mpsc::Receiver<ServiceEvent>,
         clients: Arc<tokio::sync::Mutex<HashMap<String, ClientInfo>>>,
         shutdown: Arc<AtomicBool>,
+        recorder_id: Uuid,
+        recorder_name: String,
     ) {
         info!("Service discovery task started");
 
         while !shutdown.load(Ordering::Relaxed) {
             match event_receiver.recv_timeout(Duration::from_secs(1)) {
                 Ok(event) => {
+                    info!("Discovery task received event: {:?}", event);
                     match event {
                         ServiceEvent::ServiceDiscovered(service_info) => {
                             info!("Discovered service: {}", service_info.instance_name);
@@ -289,11 +353,8 @@ impl SessionRecorder {
                             if let Some(url) = service_info.connection_url() {
                                 let config = ChunkSinkConfig {
                                     server_address: url.clone(),
-                                    recorder_id: format!(
-                                        "recorder-{}",
-                                        gethostname::gethostname().to_string_lossy()
-                                    ),
-                                    recorder_name: "Session Recorder".to_string(),
+                                    recorder_id,
+                                    recorder_name: recorder_name.clone(),
                                     connect_timeout: Duration::from_secs(10),
                                     request_timeout: Duration::from_secs(5),
                                     retry_interval: Duration::from_secs(3),
@@ -349,8 +410,12 @@ impl SessionRecorder {
                         }
                     }
                 }
-                Err(_) => {
-                    // Timeout - normal behavior
+                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                    continue;
+                }
+                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                    error!("Discovery task channel disconnected");
+                    break;
                 }
             }
         }
@@ -360,74 +425,90 @@ impl SessionRecorder {
 
     /// Audio processing background task
     async fn audio_processing_task(
-        audio_channels: AudioChannelPair,
+        mut consumer: AudioRingBufferConsumer,
         clients: Arc<tokio::sync::Mutex<HashMap<String, ClientInfo>>>,
         shutdown: Arc<AtomicBool>,
         status: Arc<tokio::sync::Mutex<RecorderStatusInfo>>,
+        num_channels: usize,
+        frames_per_chunk: usize,
+        session_id: Uuid,
     ) {
         info!("Audio processing task started");
 
-        let mut main_channels = audio_channels.main_channels;
-        let mut audio_buffer = vec![0.0f32; 1024]; // Buffer for audio chunks
+        let mut sample_buffer = vec![0i16; num_channels * frames_per_chunk];
         let mut chunk_counter = 0u32;
         let mut interval = interval(Duration::from_millis(100)); // 10 chunks per second
 
         while !shutdown.load(Ordering::Relaxed) {
             interval.tick().await;
 
-            // Read audio data from the audio pipeline
-            let samples_read = main_channels.output_consumer.pop_slice(&mut audio_buffer);
+            let samples_read = consumer.pop_slice(&mut sample_buffer);
 
             if samples_read > 0 {
-                // Calculate RMS for status
-                let rms = audio_buffer[..samples_read]
+                let rms = sample_buffer[..samples_read]
                     .iter()
-                    .map(|&x| x * x)
-                    .sum::<f32>()
-                    / samples_read as f32;
+                    .map(|&x| {
+                        let normalized = i32::from(x) as f64 / i16::MAX as f64;
+                        normalized * normalized
+                    })
+                    .sum::<f64>()
+                    / samples_read as f64;
                 let rms_percent = (rms.sqrt() * 100.0).min(100.0);
 
-                // Check for clipping
-                let clipping = audio_buffer[..samples_read].iter().any(|&x| x.abs() > 0.95);
+                let clipping = sample_buffer[..samples_read]
+                    .iter()
+                    .any(|&x| i32::from(x).abs() >= i32::from(i16::MAX));
 
-                // Update status
                 {
                     let mut status_guard = status.lock().await;
                     status_guard.signal_status =
                         chunk_source::grpc::chunk_sink_client::common::SignalStatus::Signal;
-                    status_guard.rms_percent = rms_percent as f64;
+                    status_guard.rms_percent = rms_percent;
                     status_guard.clipping = clipping;
                 }
 
-                // Send audio chunks to all connected clients
+                let chunk_template = AudioChunk {
+                    session_id: session_id.to_string(),
+                    chunk_count: chunk_counter,
+                    data: sample_buffer[..samples_read]
+                        .iter()
+                        .map(|&sample| (i32::from(sample) - i32::from(i16::MIN)) as u32)
+                        .collect(),
+                    timestamp: SystemTime::now(),
+                };
+
                 let mut clients_guard = clients.lock().await;
                 let mut failed_clients = Vec::new();
 
                 for (name, client_info) in clients_guard.iter_mut() {
-                    let chunk = AudioChunk {
-                        session_id: format!("session_{}", chunk_counter / 1000),
-                        chunk_count: chunk_counter,
-                        data: audio_buffer[..samples_read]
-                            .iter()
-                            .map(|&sample| {
-                                let scaled = (sample + 1.0) / 2.0;
-                                (scaled.clamp(0.0, 1.0) * u32::MAX as f32) as u32
-                            })
-                            .collect(),
-                        timestamp: SystemTime::now(),
-                    };
+                    if chunk_counter == 0 {
+                        let client_config = client_info.client.config();
+                        warn!(
+                            "Sending first chunk to service {} (recorder_id={}, recorder_name={}, session_id={}, samples={})",
+                            name,
+                            client_config.recorder_id,
+                            client_config.recorder_name,
+                            session_id,
+                            samples_read
+                        );
+                    }
 
-                    match client_info.client.set_chunks(chunk).await {
-                        Ok(_) => {
+                    match client_info
+                        .client
+                        .set_chunks_with_retry(chunk_template.clone())
+                        .await
+                    {
+                        Ok(true) => {
                             client_info.mark_successful_send();
+                        }
+                        Ok(false) => {
+                            warn!("Server reported error for {}", name);
+                            failed_clients.push(name.clone());
                         }
                         Err(e) => {
                             warn!("Failed to send chunk to {}: {}", name, e);
 
-                            // Try next IP address if available
                             if let Some(_next_addr) = client_info.get_next_address() {
-                                // In a more sophisticated implementation, we would
-                                // reconnect using the next address
                                 warn!(
                                     "Could implement reconnection with next address for {}",
                                     name
@@ -439,7 +520,6 @@ impl SessionRecorder {
                     }
                 }
 
-                // Remove failed clients
                 for name in failed_clients {
                     if let Some(mut client_info) = clients_guard.remove(&name) {
                         client_info.client.disconnect().await;
@@ -448,16 +528,7 @@ impl SessionRecorder {
                 }
 
                 chunk_counter += 1;
-
-                // Send processed audio back to the audio pipeline
-                let samples_pushed = main_channels
-                    .input_producer
-                    .push_slice(&audio_buffer[..samples_read]);
-                if samples_pushed != samples_read {
-                    warn!("Could not push all audio samples back to pipeline");
-                }
             } else {
-                // No audio data available
                 let mut status_guard = status.lock().await;
                 status_guard.signal_status =
                     chunk_source::grpc::chunk_sink_client::common::SignalStatus::NoSignal;
@@ -543,12 +614,83 @@ impl SessionRecorder {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize logger
-    env_logger::init();
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
+        .format(|buf, record| {
+            let level_str = match record.level() {
+                Level::Trace => "\x1b[35mTRACE\x1b[0m",
+                Level::Debug => "\x1b[34mDEBUG\x1b[0m",
+                Level::Info => "\x1b[32mINFO\x1b[0m",
+                Level::Warn => "\x1b[33mWARN\x1b[0m",
+                Level::Error => "\x1b[31mERROR\x1b[0m",
+            };
+            let timestamp = buf.timestamp_millis();
+            let file = record.file().unwrap_or("unknown");
+            let line = record.line().unwrap_or(0);
+            writeln!(
+                buf,
+                "{timestamp} [{level}] {file}:{line} - {message}",
+                level = level_str,
+                message = record.args()
+            )
+        })
+        .init();
 
     info!("Starting Session Recorder");
 
+    let mut raw_args = env::args();
+    let program = raw_args
+        .next()
+        .unwrap_or_else(|| "chunk-source".to_string());
+    let usage_msg = format!(
+        "Usage: {} --recorder-id <UUID> --recorder-name <NAME>",
+        program
+    );
+    let mut recorder_id: Option<Uuid> = None;
+    let mut recorder_name: Option<String> = None;
+
+    while let Some(arg) = raw_args.next() {
+        match arg.as_str() {
+            "--recorder-id" => {
+                let value = raw_args.next().unwrap_or_else(|| {
+                    eprintln!("Missing value for --recorder-id");
+                    eprintln!("{}", usage_msg);
+                    process::exit(1);
+                });
+                recorder_id = Some(Uuid::parse_str(&value).unwrap_or_else(|_| {
+                    eprintln!("Invalid UUID passed to --recorder-id");
+                    eprintln!("{}", usage_msg);
+                    process::exit(1);
+                }));
+            }
+            "--recorder-name" => {
+                let value = raw_args.next().unwrap_or_else(|| {
+                    eprintln!("Missing value for --recorder-name");
+                    eprintln!("{}", usage_msg);
+                    process::exit(1);
+                });
+                recorder_name = Some(value);
+            }
+            _ => {
+                eprintln!("Unknown argument: {}", arg);
+                eprintln!("{}", usage_msg);
+                process::exit(1);
+            }
+        }
+    }
+
+    let recorder_id = recorder_id.unwrap_or_else(|| {
+        eprintln!("--recorder-id <UUID> is required");
+        eprintln!("{}", usage_msg);
+        process::exit(1);
+    });
+    let recorder_name = recorder_name.unwrap_or_else(|| {
+        eprintln!("--recorder-name <NAME> is required");
+        eprintln!("{}", usage_msg);
+        process::exit(1);
+    });
+
     // Create and start session recorder
-    let mut recorder = SessionRecorder::new();
+    let mut recorder = SessionRecorder::new(recorder_id, recorder_name);
     recorder.start().await?;
 
     // Set up graceful shutdown

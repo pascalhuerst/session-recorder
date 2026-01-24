@@ -150,7 +150,7 @@ impl ServiceTracker {
 
             // Process mDNS events
             while *is_running.lock().unwrap() {
-                match receiver.recv_timeout(Duration::from_secs(1)) {
+                match receiver.recv_timeout(Duration::from_secs(10)) {
                     Ok(event) => {
                         Self::handle_mdns_event(event, &services, &worker_event_sender);
                     }
@@ -161,7 +161,7 @@ impl ServiceTracker {
                             continue;
                         } else {
                             // Any other error (including channel closure) just means we should stop
-                            debug!("mDNS receiver finished: {}", e);
+                            warn!("mDNS receiver finished (channel disconnected): {}", e);
                             break;
                         }
                     }
@@ -290,7 +290,7 @@ impl ServiceTracker {
                 drop(services_lock);
 
                 if let Err(e) = event_sender.send(event_to_send) {
-                    debug!("Service event send failed: {}", e);
+                    warn!("Service event send failed: {}", e);
                 }
             }
             MdnsServiceEvent::ServiceRemoved(type_name, instance_name) => {
@@ -301,7 +301,7 @@ impl ServiceTracker {
                     drop(services_lock);
 
                     if let Err(e) = event_sender.send(ServiceEvent::ServiceRemoved(instance_name)) {
-                        debug!("Service removed event send failed: {}", e);
+                        warn!("Service removed event send failed: {}", e);
                     }
                 }
             }
@@ -340,7 +340,7 @@ impl ServiceTracker {
             debug!("Removed expired service: {}", instance_name);
 
             if let Err(e) = event_sender.send(ServiceEvent::ServiceRemoved(instance_name)) {
-                debug!("Service removed event send failed: {}", e);
+                warn!("Service removed event send failed: {}", e);
             }
         }
     }

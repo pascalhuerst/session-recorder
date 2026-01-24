@@ -34,14 +34,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         num_channels: 2,
         period_size: 512,
         buffer_size: 2048,
-        sample_rate: 44100,
+        sample_rate: 48000,
     };
 
     // gRPC client configuration
     let grpc_config = ChunkSinkConfig {
         server_address: "http://localhost:50051".to_string(),
-        recorder_id: "audio-recorder-001".to_string(),
-        recorder_name: "Audio Recorder Example".to_string(),
+        recorder_id: "ab406fc5-dd32-4474-ab59-43f119632efe".to_string(),
+        recorder_name: "Rust Audio Recorder Example".to_string(),
         connect_timeout: Duration::from_secs(10),
         request_timeout: Duration::from_secs(5),
         retry_interval: Duration::from_secs(3),
@@ -184,7 +184,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         while !main_shutdown.load(Ordering::Relaxed) {
             // Process audio data from the callback thread
-            let samples_read = main_channels.output_consumer.pop_slice(&mut audio_buffer);
+            let samples_read = main_channels.output.pop_slice(&mut audio_buffer);
 
             if samples_read > 0 {
                 // Apply audio processing here (effects, filters, etc.)
@@ -193,7 +193,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // Send processed audio back to the callback thread
                 let mut attempts = 0;
                 while main_channels
-                    .input_producer
+                    .input
                     .push_slice(&audio_buffer[..samples_read])
                     != samples_read
                     && attempts < 10

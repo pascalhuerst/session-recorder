@@ -1,39 +1,35 @@
 use ringbuf::{HeapRb, traits::*};
 
-type AudioRingBuffer = HeapRb<f32>;
+pub type Sample = i16;
+
+type AudioRingBuffer = HeapRb<Sample>;
 pub type AudioRingBufferConsumer =
     ringbuf::wrap::caching::Caching<std::sync::Arc<AudioRingBuffer>, false, true>;
 pub type AudioRingBufferProducer =
     ringbuf::wrap::caching::Caching<std::sync::Arc<AudioRingBuffer>, true, false>;
 
 pub struct AudioChannels {
-    pub input_producer: AudioRingBufferProducer,
-    pub output_consumer: AudioRingBufferConsumer,
+    producer: Option<AudioRingBufferProducer>,
+    pub consumer: AudioRingBufferConsumer,
 }
 
-pub struct AudioChannelPair {
-    pub callback_channels: AudioChannels,
-    pub main_channels: AudioChannels,
-}
-
-impl AudioChannelPair {
+impl AudioChannels {
     pub fn new(buffer_size: usize) -> Self {
-        let input_rb = HeapRb::<f32>::new(buffer_size);
-        let (input_producer, input_consumer) = input_rb.split();
-
-        let output_rb = HeapRb::<f32>::new(buffer_size);
-        let (output_producer, output_consumer) = output_rb.split();
+        let audio_rb = HeapRb::<Sample>::new(buffer_size);
+        let (audio_producer, audio_consumer) = audio_rb.split();
 
         Self {
-            callback_channels: AudioChannels {
-                input_producer,
-                output_consumer,
-            },
-            main_channels: AudioChannels {
-                input_producer: output_producer,
-                output_consumer: input_consumer,
-            },
+            producer: Some(audio_producer),
+            consumer: audio_consumer,
         }
+    }
+
+    pub fn producer_mut(&mut self) -> Option<&mut AudioRingBufferProducer> {
+        self.producer.as_mut()
+    }
+
+    pub fn take_producer(&mut self) -> Option<AudioRingBufferProducer> {
+        self.producer.take()
     }
 }
 
@@ -50,32 +46,18 @@ pub type ParameterRingBufferProducer =
     ringbuf::wrap::caching::Caching<std::sync::Arc<ParameterRingBuffer>, true, false>;
 
 pub struct ParameterChannels {
-    pub input_consumer: ParameterRingBufferConsumer,
-    pub output_producer: ParameterRingBufferProducer,
+    pub consumer: ParameterRingBufferConsumer,
+    pub producer: ParameterRingBufferProducer,
 }
 
-pub struct ParameterChannelPair {
-    pub callback_channels: ParameterChannels,
-    pub main_channels: ParameterChannels,
-}
-
-impl ParameterChannelPair {
+impl ParameterChannels {
     pub fn new(buffer_size: usize) -> Self {
         let input_rb = HeapRb::<Parameters>::new(buffer_size);
-        let (input_producer, input_consumer) = input_rb.split();
-
-        let output_rb = HeapRb::<Parameters>::new(buffer_size);
-        let (output_producer, output_consumer) = output_rb.split();
+        let (parameter_producer, parameter_consumer) = input_rb.split();
 
         Self {
-            callback_channels: ParameterChannels {
-                input_consumer,
-                output_producer,
-            },
-            main_channels: ParameterChannels {
-                input_consumer: output_consumer,
-                output_producer: input_producer,
-            },
+            consumer: parameter_consumer,
+            producer: parameter_producer,
         }
     }
 }

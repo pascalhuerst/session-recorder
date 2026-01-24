@@ -6,25 +6,22 @@ use crate::audio::{
 use crate::grpc::chunk_sink_client::{
     AudioChunk, ChunkSinkClientService, ChunkSinkConfig, RecorderStatusInfo, common::SignalStatus,
 };
-use crate::mdns::service_tracker::{ServiceEvent, ServiceTracker, ServiceTrackerConfig};
 use log::{error, info, warn};
 use ringbuf::traits::Consumer;
 use std::collections::HashMap;
-use std::net::Ipv4Addr;
+
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::mpsc::Receiver;
+
 use std::thread;
 use std::time::{Duration, SystemTime};
-use tokio::time::interval;
+use tokio::time::{interval, sleep};
 use uuid::Uuid;
+use zeroconf_tokio::prelude::*;
+use zeroconf_tokio::{BrowserEvent, MdnsBrowser, MdnsBrowserAsync, ServiceType};
 
 /// Core session recorder that manages discovery, audio handling, and status updates.
 pub struct SessionRecorder {
-    // mDNS service discovery
-    service_tracker: Option<ServiceTracker>,
-    service_event_receiver: Option<Receiver<ServiceEvent>>,
-
     // gRPC client management
     grpc_clients: Arc<tokio::sync::Mutex<HashMap<String, ClientInfo>>>,
 
@@ -52,7 +49,7 @@ pub struct SessionRecorder {
 struct ClientInfo {
     client: ChunkSinkClientService,
     service_name: String,
-    addresses: Vec<Ipv4Addr>,
+    addresses: Vec<String>,
     current_address_index: usize,
     connection_url: String,
     last_successful_send: Option<SystemTime>,
@@ -62,7 +59,7 @@ impl ClientInfo {
     fn new(
         client: ChunkSinkClientService,
         service_name: String,
-        addresses: Vec<Ipv4Addr>,
+        addresses: Vec<String>,
         connection_url: String,
     ) -> Self {
         Self {
@@ -75,12 +72,12 @@ impl ClientInfo {
         }
     }
 
-    fn get_next_address(&mut self) -> Option<Ipv4Addr> {
+    fn get_next_address(&mut self) -> Option<String> {
         if self.addresses.is_empty() {
             return None;
         }
 
-        let addr = self.addresses[self.current_address_index];
+        let addr = self.addresses[self.current_address_index].clone();
         self.current_address_index = (self.current_address_index + 1) % self.addresses.len();
         Some(addr)
     }
@@ -115,8 +112,6 @@ impl SessionRecorder {
         };
 
         Self {
-            service_tracker: None,
-            service_event_receiver: None,
             grpc_clients: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
             audio_settings,
             audio_consumer: None,
@@ -136,11 +131,8 @@ impl SessionRecorder {
     pub async fn start(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         info!("Starting Session Recorder");
 
-        // Set up service discovery
-        self.setup_service_discovery().await?;
-
-        // Start service discovery before configuring audio
-        self.start_discovery_task().await;
+        // Start zeroconf service discovery
+        self.start_discovery().await?;
 
         // Set up audio processing
         self.setup_audio_processing().await?;
@@ -159,11 +151,6 @@ impl SessionRecorder {
 
         // Signal shutdown
         self.shutdown_signal.store(true, Ordering::Relaxed);
-
-        // Stop service tracker
-        if let Some(mut tracker) = self.service_tracker.take() {
-            tracker.stop();
-        }
 
         // Wait for tasks to complete
         if let Some(handle) = self.discovery_handle.take() {
@@ -193,22 +180,24 @@ impl SessionRecorder {
         info!("Session Recorder stopped");
     }
 
-    /// Set up mDNS service discovery
-    async fn setup_service_discovery(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        let tracker_config = ServiceTrackerConfig {
-            service_type: "_session-recorder-chunksink._tcp.local.".to_string(),
-            service_timeout: Duration::from_secs(30),
-            cleanup_interval: Duration::from_secs(3),
-            max_services: 50,
-        };
+    async fn start_discovery(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        let service_type = ServiceType::new("session-recorder-chunksink", "tcp")?;
+        let browser = MdnsBrowser::new(service_type);
+        let mut async_browser = MdnsBrowserAsync::new(browser)?;
+        async_browser.start().await?;
+        info!("mDNS discovery started using zeroconf");
 
-        let mut tracker = ServiceTracker::new(tracker_config)?;
-        let event_receiver = tracker.start()?;
+        let clients = Arc::clone(&self.grpc_clients);
+        let shutdown = Arc::clone(&self.shutdown_signal);
+        let recorder_id = self.recorder_id;
+        let recorder_name = self.recorder_name.clone();
 
-        self.service_tracker = Some(tracker);
-        self.service_event_receiver = Some(event_receiver);
+        let handle = tokio::spawn(async move {
+            Self::discovery_task(async_browser, clients, shutdown, recorder_id, recorder_name)
+                .await;
+        });
 
-        info!("mDNS service discovery initialized");
+        self.discovery_handle = Some(handle);
         Ok(())
     }
 
@@ -242,42 +231,6 @@ impl SessionRecorder {
 
         info!("Audio processing initialized");
         Ok(())
-    }
-
-    /// Start the service discovery task
-    async fn start_discovery_task(&mut self) {
-        if self.service_event_receiver.is_none() {
-            error!("Discovery task requested before service tracker produced a receiver");
-            return;
-        }
-
-        info!("Preparing discovery task startup");
-
-        let event_receiver = self.service_event_receiver.take().unwrap();
-        let clients = Arc::clone(&self.grpc_clients);
-        let shutdown = self.shutdown_signal.clone();
-        let recorder_id = self.recorder_id;
-        let recorder_name = self.recorder_name.clone();
-
-        info!(
-            "Spawning discovery task with recorder_id={} recorder_name={}",
-            recorder_id, recorder_name
-        );
-
-        let handle = tokio::spawn(async move {
-            info!("Discovery task future started");
-            Self::discovery_task(
-                event_receiver,
-                clients,
-                shutdown,
-                recorder_id,
-                recorder_name,
-            )
-            .await;
-            info!("Discovery task future completed");
-        });
-
-        self.discovery_handle = Some(handle);
     }
 
     /// Start the audio processing task
@@ -324,7 +277,7 @@ impl SessionRecorder {
 
     /// Service discovery background task
     async fn discovery_task(
-        event_receiver: Receiver<ServiceEvent>,
+        mut browser: MdnsBrowserAsync,
         clients: Arc<tokio::sync::Mutex<HashMap<String, ClientInfo>>>,
         shutdown: Arc<AtomicBool>,
         recorder_id: Uuid,
@@ -333,85 +286,110 @@ impl SessionRecorder {
         info!("Service discovery task started");
 
         while !shutdown.load(Ordering::Relaxed) {
-            match event_receiver.recv_timeout(Duration::from_secs(1)) {
-                Ok(event) => {
-                    info!("Discovery task received event: {:?}", event);
+            tokio::select! {
+                event = browser.next() => {
                     match event {
-                        ServiceEvent::ServiceDiscovered(service_info) => {
-                            info!("Discovered service: {}", service_info.instance_name);
+                        Some(Ok(BrowserEvent::Add(discovery))) => {
+                            info!("Discovered service: {}", discovery.name());
 
-                            if let Some(url) = service_info.connection_url() {
-                                let config = ChunkSinkConfig {
-                                    server_address: url.clone(),
-                                    recorder_id,
-                                    recorder_name: recorder_name.clone(),
-                                    connect_timeout: Duration::from_secs(10),
-                                    request_timeout: Duration::from_secs(5),
-                                    retry_interval: Duration::from_secs(3),
-                                    max_retries: 3,
-                                    audio_buffer_size: 8192,
-                                    parameter_buffer_size: 64,
-                                };
+                            let port = *discovery.port();
+                            let host_name = discovery.host_name().to_string();
+                            let mut addresses = Vec::new();
 
-                                let mut client = ChunkSinkClientService::new(config);
-                                client.initialize_channels();
+                            let primary_address = discovery.address().to_string();
+                            if !primary_address.is_empty() {
+                                addresses.push(primary_address);
+                            }
 
-                                match client.connect().await {
-                                    Ok(_) => {
-                                        info!(
-                                            "Connected to service {} at {}",
-                                            service_info.instance_name, url
-                                        );
+                            if !host_name.is_empty() && !addresses.contains(&host_name) {
+                                addresses.push(host_name.clone());
+                            }
 
-                                        let client_info = ClientInfo::new(
-                                            client,
-                                            service_info.instance_name.clone(),
-                                            service_info.addresses.clone(),
-                                            url,
-                                        );
+                            if addresses.is_empty() {
+                                addresses.push(discovery.name().to_string());
+                            }
 
-                                        clients.lock().await.insert(
-                                            service_info.instance_name.clone(),
-                                            client_info,
-                                        );
-                                    }
-                                    Err(e) => {
-                                        error!(
-                                            "Failed to connect to {}: {}",
-                                            service_info.instance_name, e
-                                        );
-                                    }
+                            let endpoint = addresses
+                                .first()
+                                .cloned()
+                                .unwrap_or_else(|| host_name.clone());
+                            let url = format!("http://{}:{}", endpoint, port);
+
+                            info!(
+                                "Discovered service: {} (endpoints: {:?})",
+                                discovery.name(),
+                                addresses
+                            );
+
+                            let config = ChunkSinkConfig {
+                                server_address: url.clone(),
+                                recorder_id,
+                                recorder_name: recorder_name.clone(),
+                                connect_timeout: Duration::from_secs(10),
+                                request_timeout: Duration::from_secs(5),
+                                retry_interval: Duration::from_secs(3),
+                                max_retries: 3,
+                                audio_buffer_size: 8192,
+                                parameter_buffer_size: 64,
+                            };
+
+                            let mut client = ChunkSinkClientService::new(config);
+                            client.initialize_channels();
+
+                            match client.connect().await {
+                                Ok(_) => {
+                                    info!("Connected to service {} via {}", discovery.name(), url);
+
+                                    let client_info = ClientInfo::new(
+                                        client,
+                                        discovery.name().to_string(),
+                                        addresses,
+                                        url,
+                                    );
+
+                                    clients
+                                        .lock()
+                                        .await
+                                        .insert(discovery.name().to_string(), client_info);
+                                }
+                                Err(e) => {
+                                    error!("Failed to connect to {}: {}", discovery.name(), e);
                                 }
                             }
                         }
-                        ServiceEvent::ServiceRemoved(instance_name) => {
-                            info!("Service removed: {}", instance_name);
+                        Some(Ok(BrowserEvent::Remove(removal))) => {
+                            info!("Service removed: {}", removal.name());
 
-                            if let Some(mut client_info) =
-                                clients.lock().await.remove(&instance_name)
-                            {
-                                let service_name = client_info.service_name.clone();
-                                let service_url = client_info.connection_url.clone();
+                            if let Some(mut client_info) = clients.lock().await.remove(removal.name()) {
                                 client_info.client.disconnect().await;
                                 info!(
-                                    "Disconnected from service {} at {}",
-                                    service_name, service_url
+                                    "Disconnected from service: {} at {}",
+                                    client_info.service_name, client_info.connection_url
                                 );
+                            } else {
+                                warn!("Tried to remove unknown service: {}", removal.name());
                             }
                         }
-                        ServiceEvent::ServiceUpdated(service_info) => {
-                            info!("Service updated: {}", service_info.instance_name);
+                        Some(Err(e)) => {
+                            warn!("Service discovery error: {}", e);
+                        }
+                        None => {
+                            info!("mDNS browser stream ended");
+                            break;
                         }
                     }
                 }
-                Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
-                    continue;
-                }
-                Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
-                    error!("Discovery task channel disconnected");
-                    break;
+                _ = sleep(Duration::from_millis(500)) => {
+                    if shutdown.load(Ordering::Relaxed) {
+                        info!("Discovery shutdown requested");
+                        break;
+                    }
                 }
             }
+        }
+
+        if let Err(e) = browser.shutdown().await {
+            warn!("Failed to shut down mDNS browser: {}", e);
         }
 
         info!("Service discovery task stopped");

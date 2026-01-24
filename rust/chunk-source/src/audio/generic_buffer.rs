@@ -86,5 +86,5 @@ pub fn zero_slice(buffer: &mut [f32]) {
     }
 }
 
-pub type IntBuffer = GenericBuffer<Sample>;
+//pub type IntBuffer = GenericBuffer<Sample>;
 pub type AudioBuffer = GenericBuffer<Sample>;

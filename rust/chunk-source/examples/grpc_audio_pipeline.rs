@@ -19,6 +19,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::Duration;
 use tokio::time::sleep;
+use uuid::Uuid;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -30,7 +31,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Audio configuration
     let audio_settings = AudioSettings {
         input_device: "default".to_string(),
-        output_device: "default".to_string(),
         num_channels: 2,
         period_size: 512,
         buffer_size: 2048,
@@ -40,7 +40,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // gRPC client configuration
     let grpc_config = ChunkSinkConfig {
         server_address: "http://localhost:50051".to_string(),
-        recorder_id: "ab406fc5-dd32-4474-ab59-43f119632efe".to_string(),
+        recorder_id: Uuid::parse_str("ab406fc5-dd32-4474-ab59-43f119632efe")?,
         recorder_name: "Rust Audio Recorder Example".to_string(),
         connect_timeout: Duration::from_secs(10),
         request_timeout: Duration::from_secs(5),

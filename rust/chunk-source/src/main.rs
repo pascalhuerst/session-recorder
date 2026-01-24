@@ -3,6 +3,7 @@ use env_logger::Env;
 use log::{Level, info};
 use std::env;
 use std::io::Write;
+use std::path::Path;
 use std::process;
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
@@ -21,7 +22,10 @@ fn init_logger() {
                 Level::Error => "\x1b[31mERROR\x1b[0m",
             };
             let timestamp = buf.timestamp_millis();
-            let file = record.file().unwrap_or("unknown");
+            let file = record
+                .file()
+                .and_then(|path| Path::new(path).file_name().and_then(|name| name.to_str()))
+                .unwrap_or("unknown");
             let line = record.line().unwrap_or(0);
             writeln!(
                 buf,

@@ -132,10 +132,12 @@ func main() {
 	chunkSinkHandler := NewChunkSinkHandler(sessionStorage, recorderBroadcaster)
 
 	chunkSinkServer := grpc.NewChunkSinkServer(&grpc.ChunkSinkServerConfig{
-		Name:               hostname,
-		Version:            version,
-		OnRecorderStatusCB: chunkSinkHandler.setRecorderStatus,
-		OnChunksCB:         chunkSinkHandler.setChunks,
+		Name:                     hostname,
+		Version:                  version,
+		OnRecorderStatusCB:       chunkSinkHandler.setRecorderStatus,
+		OnChunksCB:               chunkSinkHandler.setChunks,
+		OnRecorderConnectedCB:    chunkSinkHandler.OnRecorderConnected,
+		OnRecorderDisconnectedCB: chunkSinkHandler.OnRecorderDisconnected,
 	})
 
 	// Create email sender if SMTP config is provided

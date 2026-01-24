@@ -437,7 +437,7 @@ func (h *SessionSourceHandler) streamSessions(ctx context.Context, request *sspb
 }
 
 func (h *SessionSourceHandler) cutSession(ctx context.Context, request *sspb.CutSessionRequest) (*cmpb.Respone, error) {
-	log.Debug().Msg("Streaming sessions")
+	log.Debug().Str("recorder-id", request.RecorderID).Msg("Cutting session")
 
 	recorderID, err := uuid.Parse(request.RecorderID)
 	if err != nil {
@@ -446,9 +446,15 @@ func (h *SessionSourceHandler) cutSession(ctx context.Context, request *sspb.Cut
 		return nil, err
 	}
 
+	if !h.chunkSinkServer.IsRecorderConnected(recorderID) {
+		msg := fmt.Sprintf("No connection to recorder %s", recorderID)
+		log.Warn().Str("recorder-id", request.RecorderID).Msg(msg)
+		return &cmpb.Respone{Success: false, ErrorMessage: msg}, fmt.Errorf(msg)
+	}
+
 	if err := h.chunkSinkServer.CutSession(recorderID); err != nil {
 		log.Err(err).Str("recorder-id", request.RecorderID).Msg("Cannot cut session")
-		return nil, err
+		return &cmpb.Respone{Success: false, ErrorMessage: err.Error()}, err
 	}
 
 	return success, nil

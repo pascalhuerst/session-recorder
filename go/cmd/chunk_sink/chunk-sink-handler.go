@@ -19,6 +19,7 @@ type ChunkSinkHandler struct {
 	sessionStorage      storage.Storage
 	lock                sync.Mutex
 	recorderStates      map[uuid.UUID]*recorderState
+	connectedRecorders  map[uuid.UUID]struct{}
 }
 
 type recorderState struct {
@@ -35,6 +36,7 @@ func NewChunkSinkHandler(sessionStorage storage.Storage, recorderBroadcaster *br
 		sessionStorage:      sessionStorage,
 		recorderBroadcaster: recorderBroadcaster,
 		recorderStates:      make(map[uuid.UUID]*recorderState),
+		connectedRecorders:  make(map[uuid.UUID]struct{}),
 	}
 }
 
@@ -165,4 +167,33 @@ func (h *ChunkSinkHandler) setChunks(ctx context.Context, chunks *cspb.Chunks) e
 	}
 
 	return nil
+}
+
+func (h *ChunkSinkHandler) OnRecorderConnected(recorderID uuid.UUID) {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+
+	if _, ok := h.recorderStates[recorderID]; !ok {
+		h.recorderStates[recorderID] = &recorderState{}
+	}
+	h.connectedRecorders[recorderID] = struct{}{}
+}
+
+func (h *ChunkSinkHandler) OnRecorderDisconnected(recorderID uuid.UUID) {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+
+	delete(h.connectedRecorders, recorderID)
+	if state, ok := h.recorderStates[recorderID]; ok {
+		state.recording = false
+		state.lastSession = uuid.Nil
+	}
+}
+
+func (h *ChunkSinkHandler) IsRecorderConnected(recorderID uuid.UUID) bool {
+	h.lock.Lock()
+	defer h.lock.Unlock()
+
+	_, ok := h.connectedRecorders[recorderID]
+	return ok
 }

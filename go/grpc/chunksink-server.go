@@ -13,26 +13,32 @@ import (
 
 type OnRecorderStatusCB func(ctx context.Context, status *cmpb.RecorderStatus) error
 type OnChunksCB func(ctx context.Context, chunks *cspb.Chunks) error
+type OnRecorderConnectedCB func(recorderID uuid.UUID)
+type OnRecorderDisconnectedCB func(recorderID uuid.UUID)
 
 type ChunkSinkServerConfig struct {
 	Name    string
 	Version string
 
-	OnRecorderStatusCB OnRecorderStatusCB
-	OnChunksCB         OnChunksCB
+	OnRecorderStatusCB       OnRecorderStatusCB
+	OnChunksCB               OnChunksCB
+	OnRecorderConnectedCB    OnRecorderConnectedCB
+	OnRecorderDisconnectedCB OnRecorderDisconnectedCB
 }
 
 type ChunkSinkServer struct {
 	config *ChunkSinkServerConfig
 
 	sendCommandFuncMapLock sync.Mutex
-	sendCommandFuncMap     map[string]func(*cspb.Command) error
+	sendCommandFuncMap     map[uuid.UUID]func(*cspb.Command) error
+	connectedRecorders     map[uuid.UUID]struct{}
 }
 
 func NewChunkSinkServer(config *ChunkSinkServerConfig) *ChunkSinkServer {
 	return &ChunkSinkServer{
 		config:             config,
-		sendCommandFuncMap: make(map[string]func(*cspb.Command) error),
+		sendCommandFuncMap: make(map[uuid.UUID]func(*cspb.Command) error),
+		connectedRecorders: make(map[uuid.UUID]struct{}),
 	}
 }
 
@@ -52,9 +58,28 @@ func (s *ChunkSinkServer) announcement() [][]byte {
 }
 
 func (s *ChunkSinkServer) SetRecorderStatus(ctx context.Context, in *cmpb.RecorderStatus) (*cmpb.Respone, error) {
+	var recorderID uuid.UUID
+	newlyConnected := false
+
+	if in != nil {
+		if parsedID, err := uuid.Parse(in.GetRecorderID()); err == nil {
+			recorderID = parsedID
+
+			s.sendCommandFuncMapLock.Lock()
+			if _, ok := s.connectedRecorders[recorderID]; !ok {
+				s.connectedRecorders[recorderID] = struct{}{}
+				newlyConnected = true
+			}
+			s.sendCommandFuncMapLock.Unlock()
+		}
+	}
+
+	if newlyConnected && s.config.OnRecorderConnectedCB != nil {
+		s.config.OnRecorderConnectedCB(recorderID)
+	}
+
 	if s.config.OnRecorderStatusCB != nil {
-		err := s.config.OnRecorderStatusCB(ctx, in)
-		if err != nil {
+		if err := s.config.OnRecorderStatusCB(ctx, in); err != nil {
 			response := &cmpb.Respone{
 				Success:      false,
 				ErrorMessage: err.Error(),
@@ -88,14 +113,30 @@ func (s *ChunkSinkServer) SetChunks(ctx context.Context, in *cspb.Chunks) (*cmpb
 }
 
 func (s *ChunkSinkServer) GetCommands(request *cspb.GetCommandRequest, server cspb.ChunkSink_GetCommandsServer) error {
+	recorderID, err := uuid.Parse(request.RecorderID)
+	if err != nil {
+		return fmt.Errorf("invalid recorder id %q: %w", request.RecorderID, err)
+	}
+
 	s.sendCommandFuncMapLock.Lock()
-	s.sendCommandFuncMap[request.RecorderID] = server.Send
+	s.sendCommandFuncMap[recorderID] = server.Send
+	s.connectedRecorders[recorderID] = struct{}{}
 	s.sendCommandFuncMapLock.Unlock()
 
+	if s.config.OnRecorderConnectedCB != nil {
+		s.config.OnRecorderConnectedCB(recorderID)
+	}
+
 	<-server.Context().Done()
+
 	s.sendCommandFuncMapLock.Lock()
-	delete(s.sendCommandFuncMap, request.RecorderID)
+	delete(s.sendCommandFuncMap, recorderID)
+	delete(s.connectedRecorders, recorderID)
 	s.sendCommandFuncMapLock.Unlock()
+
+	if s.config.OnRecorderDisconnectedCB != nil {
+		s.config.OnRecorderDisconnectedCB(recorderID)
+	}
 
 	return server.Context().Err()
 }
@@ -104,9 +145,17 @@ func (s *ChunkSinkServer) CutSession(recorderID uuid.UUID) error {
 	s.sendCommandFuncMapLock.Lock()
 	defer s.sendCommandFuncMapLock.Unlock()
 
-	if sendCommandFunc, ok := s.sendCommandFuncMap[recorderID.String()]; ok {
+	if sendCommandFunc, ok := s.sendCommandFuncMap[recorderID]; ok {
 		return sendCommandFunc(&cspb.Command{Command: &cspb.Command_CmdCutSession{CmdCutSession: &cspb.CmdCutSession{}}})
 	}
 
-	return fmt.Errorf("No connection to recorder %s", recorderID)
+	return fmt.Errorf("no connection to recorder %s", recorderID)
+}
+
+func (s *ChunkSinkServer) IsRecorderConnected(recorderID uuid.UUID) bool {
+	s.sendCommandFuncMapLock.Lock()
+	defer s.sendCommandFuncMapLock.Unlock()
+
+	_, ok := s.connectedRecorders[recorderID]
+	return ok
 }

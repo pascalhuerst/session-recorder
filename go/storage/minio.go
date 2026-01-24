@@ -705,7 +705,7 @@ func (m *Minio) flushChunks(ctx context.Context, recorderID, sessionID uuid.UUID
 		}
 	}
 
-	log.Debug().Stringer("recorder-id", recorderID).Stringer("session-id", sessionID).Msg("Done flushing chunks")
+	log.Info().Stringer("recorder-id", recorderID).Stringer("session-id", sessionID).Msg("Done flushing chunks")
 
 	return nil
 }

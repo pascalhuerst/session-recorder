@@ -126,10 +126,10 @@ impl SessionRecorder {
         );
 
         let audio_settings = AudioSettings {
-            input_device: "default".to_string(),
+            input_device: "pipewire".to_string(),
             num_channels: 2,
             period_size: 512,
-            buffer_size: 2048,
+            buffer_size: 16768,
             sample_rate: 48000,
         };
 

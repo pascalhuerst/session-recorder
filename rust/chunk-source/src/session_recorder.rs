@@ -30,7 +30,8 @@ pub struct SessionRecorder {
     audio_consumer: Option<AudioRingBufferConsumer>,
     recorder_id: Uuid,
     recorder_name: String,
-    session_id: Uuid,
+    detector_threshold: f64,
+    detector_succession: u32,
     callback_handle: Option<thread::JoinHandle<()>>,
 
     // Status management
@@ -89,12 +90,26 @@ impl ClientInfo {
 
 impl SessionRecorder {
     /// Create a new session recorder
-    pub fn new(recorder_id: Uuid, recorder_name: String) -> Self {
-        let session_id = Uuid::new_v4();
+    pub fn new(
+        recorder_id: Uuid,
+        recorder_name: String,
+        detector_threshold: f64,
+        detector_succession: u32,
+    ) -> Self {
+        let sanitized_threshold = detector_threshold.max(0.0);
+        let sanitized_succession = detector_succession.max(1);
+
+        if sanitized_threshold != detector_threshold || sanitized_succession != detector_succession
+        {
+            warn!(
+                "Adjusted detector parameters: threshold {:.2}→{:.2}, succession {}→{}",
+                detector_threshold, sanitized_threshold, detector_succession, sanitized_succession
+            );
+        }
 
         info!(
-            "Creating new session recorder {} with ID: {} (session {})",
-            recorder_name, recorder_id, session_id
+            "Creating new session recorder {} with ID: {} (threshold {:.2}, succession {})",
+            recorder_name, recorder_id, sanitized_threshold, sanitized_succession
         );
 
         let audio_settings = AudioSettings {
@@ -117,7 +132,8 @@ impl SessionRecorder {
             audio_consumer: None,
             recorder_id,
             recorder_name,
-            session_id,
+            detector_threshold: sanitized_threshold,
+            detector_succession: sanitized_succession,
             callback_handle: None,
             recorder_status: Arc::new(tokio::sync::Mutex::new(initial_status)),
             shutdown_signal: Arc::new(AtomicBool::new(false)),
@@ -244,7 +260,9 @@ impl SessionRecorder {
         let status = Arc::clone(&self.recorder_status);
         let num_channels = self.audio_settings.num_channels as usize;
         let frames_per_chunk = self.audio_settings.period_size as usize;
-        let session_id = self.session_id;
+
+        let detector_threshold = self.detector_threshold;
+        let detector_succession = self.detector_succession;
 
         let handle = tokio::spawn(async move {
             Self::audio_processing_task(
@@ -254,7 +272,8 @@ impl SessionRecorder {
                 status,
                 num_channels,
                 frames_per_chunk,
-                session_id,
+                detector_threshold,
+                detector_succession,
             )
             .await;
         });
@@ -403,119 +422,165 @@ impl SessionRecorder {
         status: Arc<tokio::sync::Mutex<RecorderStatusInfo>>,
         num_channels: usize,
         frames_per_chunk: usize,
-        session_id: Uuid,
+        detector_threshold: f64,
+        detector_succession: u32,
     ) {
         info!("Audio processing task started");
 
         let mut sample_buffer = vec![0i16; num_channels * frames_per_chunk];
         let mut chunk_counter = 0u32;
         let mut interval = interval(Duration::from_millis(100)); // 10 chunks per second
+        let mut session_id = Uuid::new_v4();
+        let mut rms_counter: u32 = 0;
+        let mut recording = false;
 
         while !shutdown.load(Ordering::Relaxed) {
             interval.tick().await;
 
             let samples_read = consumer.pop_slice(&mut sample_buffer);
 
-            info!("Read {} audio samples to be sent for storage", samples_read);
-
-            if samples_read > 0 {
-                let rms = sample_buffer[..samples_read]
-                    .iter()
-                    .map(|&x| {
-                        let normalized = i32::from(x) as f64 / i16::MAX as f64;
-                        normalized * normalized
-                    })
-                    .sum::<f64>()
-                    / samples_read as f64;
-                let rms_percent = (rms.sqrt() * 100.0).min(100.0);
-
-                let clipping = sample_buffer[..samples_read]
-                    .iter()
-                    .any(|&x| i32::from(x).abs() >= i32::from(i16::MAX));
-
-                {
-                    let mut status_guard = status.lock().await;
-                    status_guard.signal_status = SignalStatus::Signal;
-                    status_guard.rms_percent = rms_percent;
-                    status_guard.clipping = clipping;
-                }
-
-                let chunk_template = AudioChunk {
-                    session_id: session_id.to_string(),
-                    chunk_count: chunk_counter,
-                    data: sample_buffer[..samples_read]
-                        .iter()
-                        .map(|&sample| (i32::from(sample) - i32::from(i16::MIN)) as u32)
-                        .collect(),
-                    timestamp: SystemTime::now(),
-                };
-
-                let mut clients_guard = clients.lock().await;
-                let mut failed_clients = Vec::new();
-
-                for (name, client_info) in clients_guard.iter_mut() {
-                    if chunk_counter == 0 {
-                        let client_config = client_info.client.config();
-                        warn!(
-                            "Sending first chunk to service {} at {} (recorder_id={}, recorder_name={}, session_id={}, samples={})",
-                            client_info.service_name,
-                            client_info.connection_url,
-                            client_config.recorder_id,
-                            client_config.recorder_name,
-                            session_id,
-                            samples_read
-                        );
-                    }
-
-                    match client_info
-                        .client
-                        .set_chunks_with_retry(chunk_template.clone())
-                        .await
-                    {
-                        Ok(true) => {
-                            client_info.mark_successful_send();
-                        }
-                        Ok(false) => {
-                            warn!(
-                                "Server reported error for {} at {}",
-                                client_info.service_name, client_info.connection_url
-                            );
-                            failed_clients.push(name.clone());
-                        }
-                        Err(e) => {
-                            warn!(
-                                "Failed to send chunk to {} at {}: {}",
-                                client_info.service_name, client_info.connection_url, e
-                            );
-
-                            if let Some(_next_addr) = client_info.get_next_address() {
-                                warn!(
-                                    "Could implement reconnection with next address for {} at {}",
-                                    client_info.service_name, client_info.connection_url
-                                );
-                            } else {
-                                failed_clients.push(name.clone());
-                            }
-                        }
-                    }
-                }
-
-                for name in failed_clients {
-                    if let Some(mut client_info) = clients_guard.remove(&name) {
-                        let service_name = client_info.service_name.clone();
-                        let service_url = client_info.connection_url.clone();
-                        client_info.client.disconnect().await;
-                        warn!("Removed failed client {} at {}", service_name, service_url);
-                    }
-                }
-
-                chunk_counter += 1;
-            } else {
+            if samples_read == 0 {
                 let mut status_guard = status.lock().await;
-                status_guard.signal_status = SignalStatus::NoSignal;
+                status_guard.signal_status = if recording {
+                    SignalStatus::Signal
+                } else {
+                    SignalStatus::NoSignal
+                };
                 status_guard.rms_percent = 0.0;
                 status_guard.clipping = false;
+                continue;
             }
+
+            let rms = sample_buffer[..samples_read]
+                .iter()
+                .map(|&x| {
+                    let normalized = i32::from(x) as f64 / i16::MAX as f64;
+                    normalized * normalized
+                })
+                .sum::<f64>()
+                / samples_read as f64;
+            let rms_percent = (rms.sqrt() * 100.0).min(100.0);
+
+            let clipping = sample_buffer[..samples_read]
+                .iter()
+                .any(|&x| i32::from(x).abs() >= i32::from(i16::MAX));
+
+            let mut transitioned_to_signal = false;
+            let mut transitioned_to_silent = false;
+
+            if rms_percent < detector_threshold {
+                if rms_counter > 0 {
+                    rms_counter -= 1;
+                    if rms_counter == 0 && recording {
+                        recording = false;
+                        transitioned_to_silent = true;
+                    }
+                }
+            } else {
+                if rms_counter < detector_succession {
+                    rms_counter += 1;
+                    if rms_counter >= detector_succession && !recording {
+                        recording = true;
+                        transitioned_to_signal = true;
+                    }
+                }
+            }
+
+            if transitioned_to_signal {
+                info!("Detector transitioned to SIGNAL (rms {:.2}%)", rms_percent);
+                session_id = Uuid::new_v4();
+                chunk_counter = 0;
+                rms_counter = detector_succession;
+            } else if transitioned_to_silent {
+                info!("Detector transitioned to SILENT (rms {:.2}%)", rms_percent);
+                rms_counter = 0;
+            }
+
+            {
+                let mut status_guard = status.lock().await;
+                status_guard.signal_status = if recording {
+                    SignalStatus::Signal
+                } else {
+                    SignalStatus::NoSignal
+                };
+                status_guard.rms_percent = rms_percent;
+                status_guard.clipping = clipping;
+            }
+
+            if !recording {
+                continue;
+            }
+
+            let chunk_template = AudioChunk {
+                session_id: session_id.to_string(),
+                chunk_count: chunk_counter,
+                data: sample_buffer[..samples_read]
+                    .iter()
+                    .map(|&sample| (i32::from(sample) - i32::from(i16::MIN)) as u32)
+                    .collect(),
+                timestamp: SystemTime::now(),
+            };
+
+            let mut clients_guard = clients.lock().await;
+            let mut failed_clients = Vec::new();
+
+            for (name, client_info) in clients_guard.iter_mut() {
+                if chunk_counter == 0 {
+                    let client_config = client_info.client.config();
+                    warn!(
+                        "Sending first chunk to service {} at {} (recorder_id={}, recorder_name={}, session_id={}, samples={})",
+                        client_info.service_name,
+                        client_info.connection_url,
+                        client_config.recorder_id,
+                        client_config.recorder_name,
+                        session_id,
+                        samples_read
+                    );
+                }
+
+                match client_info
+                    .client
+                    .set_chunks_with_retry(chunk_template.clone())
+                    .await
+                {
+                    Ok(true) => {
+                        client_info.mark_successful_send();
+                    }
+                    Ok(false) => {
+                        warn!(
+                            "Server reported error for {} at {}",
+                            client_info.service_name, client_info.connection_url
+                        );
+                        failed_clients.push(name.clone());
+                    }
+                    Err(e) => {
+                        warn!(
+                            "Failed to send chunk to {} at {}: {}",
+                            client_info.service_name, client_info.connection_url, e
+                        );
+
+                        if let Some(_next_addr) = client_info.get_next_address() {
+                            warn!(
+                                "Could implement reconnection with next address for {} at {}",
+                                client_info.service_name, client_info.connection_url
+                            );
+                        } else {
+                            failed_clients.push(name.clone());
+                        }
+                    }
+                }
+            }
+
+            for name in failed_clients {
+                if let Some(mut client_info) = clients_guard.remove(&name) {
+                    let service_name = client_info.service_name.clone();
+                    let service_url = client_info.connection_url.clone();
+                    client_info.client.disconnect().await;
+                    warn!("Removed failed client {} at {}", service_name, service_url);
+                }
+            }
+
+            chunk_counter += 1;
         }
 
         info!("Audio processing task stopped");

@@ -35,33 +35,58 @@ fn init_logger() {
 
 fn usage(program: &str) {
     eprintln!(
-        "Usage: {program} --recorder-id <UUID> --recorder-name <NAME>",
+        "Usage: {program} --recorder-id <UUID> --recorder-name <NAME> [--detector-threshold <PERCENT>] [--detector-succession <COUNT>]",
         program = program
     );
 }
 
-fn parse_cli_args() -> Result<(Uuid, String), String> {
+struct CliArgs {
+    recorder_id: Uuid,
+    recorder_name: String,
+    detector_threshold: f64,
+    detector_succession: u32,
+}
+
+fn parse_cli_args() -> Result<CliArgs, String> {
     let mut args = env::args();
     args.next();
 
     let mut recorder_id: Option<Uuid> = None;
     let mut recorder_name: Option<String> = None;
+    let mut detector_threshold: f64 = 10.0;
+    let mut detector_succession: u32 = 5;
 
     while let Some(arg) = args.next() {
         match arg.as_str() {
             "--recorder-id" => {
                 let value = args
                     .next()
-                    .ok_or_else(|| format!("Missing value for --recorder-id\n"))?;
+                    .ok_or_else(|| String::from("Missing value for --recorder-id\n"))?;
                 let parsed = Uuid::parse_str(&value)
-                    .map_err(|_| format!("Invalid UUID passed to --recorder-id\n"))?;
+                    .map_err(|_| String::from("Invalid UUID passed to --recorder-id\n"))?;
                 recorder_id = Some(parsed);
             }
             "--recorder-name" => {
                 let value = args
                     .next()
-                    .ok_or_else(|| format!("Missing value for --recorder-name\n"))?;
+                    .ok_or_else(|| String::from("Missing value for --recorder-name\n"))?;
                 recorder_name = Some(value);
+            }
+            "--detector-threshold" => {
+                let value = args
+                    .next()
+                    .ok_or_else(|| String::from("Missing value for --detector-threshold\n"))?;
+                detector_threshold = value
+                    .parse::<f64>()
+                    .map_err(|_| String::from("Invalid value for --detector-threshold\n"))?;
+            }
+            "--detector-succession" => {
+                let value = args
+                    .next()
+                    .ok_or_else(|| String::from("Missing value for --detector-succession\n"))?;
+                detector_succession = value
+                    .parse::<u32>()
+                    .map_err(|_| String::from("Invalid value for --detector-succession\n"))?;
             }
             other => {
                 return Err(format!("Unknown argument: {other}\n"));
@@ -69,10 +94,17 @@ fn parse_cli_args() -> Result<(Uuid, String), String> {
         }
     }
 
-    let id = recorder_id.ok_or_else(|| format!("--recorder-id <UUID> is required\n"))?;
-    let name = recorder_name.ok_or_else(|| format!("--recorder-name <NAME> is required\n"))?;
+    let recorder_id =
+        recorder_id.ok_or_else(|| String::from("--recorder-id <UUID> is required\n"))?;
+    let recorder_name =
+        recorder_name.ok_or_else(|| String::from("--recorder-name <NAME> is required\n"))?;
 
-    Ok((id, name))
+    Ok(CliArgs {
+        recorder_id,
+        recorder_name,
+        detector_threshold,
+        detector_succession,
+    })
 }
 
 #[tokio::main]
@@ -80,7 +112,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     init_logger();
     info!("Starting Session Recorder");
 
-    let (recorder_id, recorder_name) = match parse_cli_args() {
+    let args = match parse_cli_args() {
         Ok(values) => values,
         Err(message) => {
             let program = env::args()
@@ -92,7 +124,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
 
-    let mut recorder = SessionRecorder::new(recorder_id, recorder_name.clone());
+    let CliArgs {
+        recorder_id,
+        recorder_name,
+        detector_threshold,
+        detector_succession,
+    } = args;
+
+    let mut recorder = SessionRecorder::new(
+        recorder_id,
+        recorder_name,
+        detector_threshold,
+        detector_succession,
+    );
     recorder.start().await?;
 
     let shutdown_flag = recorder.shutdown_signal();

@@ -677,6 +677,54 @@ impl SessionRecorder {
             chunk_counter += 1;
         }
 
+        if recording {
+            {
+                let mut status_guard = status.lock().await;
+                status_guard.signal_status = SignalStatus::NoSignal;
+                status_guard.rms_percent = 0.0;
+                status_guard.clipping = false;
+            }
+            let final_status = {
+                let status_guard = status.lock().await;
+                status_guard.clone()
+            };
+            status_notify.notify_waiters();
+
+            let mut clients_guard = clients.lock().await;
+            let client_count = clients_guard.len();
+            info!(
+                "Dispatching final recorder status to {} client(s)",
+                client_count
+            );
+            let mut failed_clients = Vec::new();
+
+            for (name, client_info) in clients_guard.iter_mut() {
+                if let Err(e) = client_info
+                    .client
+                    .set_recorder_status(final_status.clone())
+                    .await
+                {
+                    warn!(
+                        "Failed to send final status to {} at {}: {}",
+                        client_info.service_name, client_info.connection_url, e
+                    );
+                    failed_clients.push(name.clone());
+                }
+            }
+
+            for name in failed_clients {
+                if let Some(mut client_info) = clients_guard.remove(&name) {
+                    let service_name = client_info.service_name.clone();
+                    let service_url = client_info.connection_url.clone();
+                    client_info.client.disconnect().await;
+                    warn!(
+                        "Removed failed client {} at {} during final status update",
+                        service_name, service_url
+                    );
+                }
+            }
+        }
+
         info!("Audio processing task stopped");
     }
 

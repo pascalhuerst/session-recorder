@@ -62,8 +62,8 @@ func TestNewChunkSinkServer(t *testing.T) {
 		t.Error("NewChunkSinkServer() config not set correctly")
 	}
 
-	if server.sendCommandFuncMap == nil {
-		t.Error("NewChunkSinkServer() sendCommandFuncMap not initialized")
+	if server.sendCommandFunc == nil {
+		t.Error("NewChunkSinkServer() sendCommandFunc not initialized")
 	}
 }
 

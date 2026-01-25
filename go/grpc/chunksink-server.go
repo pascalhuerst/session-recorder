@@ -11,11 +11,13 @@ import (
 	"google.golang.org/grpc"
 )
 
+// Callbacks that can be provided by the caller to react to events.
 type OnRecorderStatusCB func(ctx context.Context, status *cmpb.RecorderStatus) error
 type OnChunksCB func(ctx context.Context, chunks *cspb.Chunks) error
 type OnRecorderConnectedCB func(recorderID uuid.UUID)
 type OnRecorderDisconnectedCB func(recorderID uuid.UUID)
 
+// ChunkSinkServerConfig contains all configuration and optional callbacks.
 type ChunkSinkServerConfig struct {
 	Name    string
 	Version string
@@ -26,30 +28,34 @@ type ChunkSinkServerConfig struct {
 	OnRecorderDisconnectedCB OnRecorderDisconnectedCB
 }
 
+// ChunkSinkServer implements the ChunkSink gRPC service and keeps track of
+// active recorder connections so that commands (CutSession, etc.) can be routed.
 type ChunkSinkServer struct {
 	config *ChunkSinkServerConfig
 
-	sendCommandFuncMapLock sync.Mutex
-	sendCommandFuncMap     map[uuid.UUID]func(*cspb.Command) error
-	connectedRecorders     map[uuid.UUID]struct{}
+	mu              sync.Mutex
+	sendCommandFunc map[uuid.UUID]func(*cspb.Command) error
 }
 
+// NewChunkSinkServer constructs a new server instance with the provided config.
 func NewChunkSinkServer(config *ChunkSinkServerConfig) *ChunkSinkServer {
 	return &ChunkSinkServer{
-		config:             config,
-		sendCommandFuncMap: make(map[uuid.UUID]func(*cspb.Command) error),
-		connectedRecorders: make(map[uuid.UUID]struct{}),
+		config:          config,
+		sendCommandFunc: make(map[uuid.UUID]func(*cspb.Command) error),
 	}
 }
 
+// registerGrpcServer registers the service implementation with a gRPC server.
 func (s *ChunkSinkServer) registerGrpcServer(server *grpc.Server) {
 	cspb.RegisterChunkSinkServer(server, s)
 }
 
+// serverOptions allows future customization of server options.
 func (s *ChunkSinkServer) serverOptions() []grpc.ServerOption {
 	return []grpc.ServerOption{}
 }
 
+// announcement data is published via mDNS to advertise the service.
 func (s *ChunkSinkServer) announcement() [][]byte {
 	return [][]byte{
 		[]byte(fmt.Sprintf("Chunk Sink Server: %s", s.config.Name)),
@@ -57,105 +63,76 @@ func (s *ChunkSinkServer) announcement() [][]byte {
 	}
 }
 
+// SetRecorderStatus processes status updates from recorders.
 func (s *ChunkSinkServer) SetRecorderStatus(ctx context.Context, in *cmpb.RecorderStatus) (*cmpb.Respone, error) {
-	var recorderID uuid.UUID
-	newlyConnected := false
-
-	if in != nil {
-		if parsedID, err := uuid.Parse(in.GetRecorderID()); err == nil {
-			recorderID = parsedID
-
-			s.sendCommandFuncMapLock.Lock()
-			if _, ok := s.connectedRecorders[recorderID]; !ok {
-				s.connectedRecorders[recorderID] = struct{}{}
-				newlyConnected = true
-			}
-			s.sendCommandFuncMapLock.Unlock()
-		}
-	}
-
-	if newlyConnected && s.config.OnRecorderConnectedCB != nil {
-		s.config.OnRecorderConnectedCB(recorderID)
-	}
-
 	if s.config.OnRecorderStatusCB != nil {
 		if err := s.config.OnRecorderStatusCB(ctx, in); err != nil {
-			response := &cmpb.Respone{
-				Success:      false,
-				ErrorMessage: err.Error(),
-			}
-
-			return response, err
+			return &cmpb.Respone{Success: false, ErrorMessage: err.Error()}, err
 		}
 	}
 
-	return &cmpb.Respone{
-		Success: true,
-	}, nil
+	return &cmpb.Respone{Success: true}, nil
 }
 
+// SetChunks processes incoming audio chunks from recorders.
 func (s *ChunkSinkServer) SetChunks(ctx context.Context, in *cspb.Chunks) (*cmpb.Respone, error) {
 	if s.config.OnChunksCB != nil {
-		err := s.config.OnChunksCB(ctx, in)
-		if err != nil {
-			response := &cmpb.Respone{
-				Success:      false,
-				ErrorMessage: err.Error(),
-			}
-
-			return response, err
+		if err := s.config.OnChunksCB(ctx, in); err != nil {
+			return &cmpb.Respone{Success: false, ErrorMessage: err.Error()}, err
 		}
 	}
 
-	return &cmpb.Respone{
-		Success: true,
-	}, nil
+	return &cmpb.Respone{Success: true}, nil
 }
 
+// GetCommands establishes a command stream for a recorder. The stream's send
+// function is stored so commands can be routed later (e.g., CutSession).
 func (s *ChunkSinkServer) GetCommands(request *cspb.GetCommandRequest, server cspb.ChunkSink_GetCommandsServer) error {
-	recorderID, err := uuid.Parse(request.RecorderID)
+	recorderID, err := uuid.Parse(request.GetRecorderID())
 	if err != nil {
-		return fmt.Errorf("invalid recorder id %q: %w", request.RecorderID, err)
+		return fmt.Errorf("invalid recorder id %q: %w", request.GetRecorderID(), err)
 	}
 
-	s.sendCommandFuncMapLock.Lock()
-	s.sendCommandFuncMap[recorderID] = server.Send
-	s.connectedRecorders[recorderID] = struct{}{}
-	s.sendCommandFuncMapLock.Unlock()
-
+	s.mu.Lock()
+	s.sendCommandFunc[recorderID] = server.Send
 	if s.config.OnRecorderConnectedCB != nil {
-		s.config.OnRecorderConnectedCB(recorderID)
+		go s.config.OnRecorderConnectedCB(recorderID)
 	}
+	s.mu.Unlock()
 
 	<-server.Context().Done()
 
-	s.sendCommandFuncMapLock.Lock()
-	delete(s.sendCommandFuncMap, recorderID)
-	delete(s.connectedRecorders, recorderID)
-	s.sendCommandFuncMapLock.Unlock()
-
+	s.mu.Lock()
+	delete(s.sendCommandFunc, recorderID)
 	if s.config.OnRecorderDisconnectedCB != nil {
-		s.config.OnRecorderDisconnectedCB(recorderID)
+		go s.config.OnRecorderDisconnectedCB(recorderID)
 	}
+	s.mu.Unlock()
 
 	return server.Context().Err()
 }
 
+// CutSession forwards a cut command to the recorder if a command stream exists.
 func (s *ChunkSinkServer) CutSession(recorderID uuid.UUID) error {
-	s.sendCommandFuncMapLock.Lock()
-	defer s.sendCommandFuncMapLock.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	if sendCommandFunc, ok := s.sendCommandFuncMap[recorderID]; ok {
-		return sendCommandFunc(&cspb.Command{Command: &cspb.Command_CmdCutSession{CmdCutSession: &cspb.CmdCutSession{}}})
+	if send := s.sendCommandFunc[recorderID]; send != nil {
+		return send(&cspb.Command{
+			Command: &cspb.Command_CmdCutSession{
+				CmdCutSession: &cspb.CmdCutSession{},
+			},
+		})
 	}
 
 	return fmt.Errorf("no connection to recorder %s", recorderID)
 }
 
+// IsRecorderConnected reports whether the recorder currently has an active command stream.
 func (s *ChunkSinkServer) IsRecorderConnected(recorderID uuid.UUID) bool {
-	s.sendCommandFuncMapLock.Lock()
-	defer s.sendCommandFuncMapLock.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
-	_, ok := s.connectedRecorders[recorderID]
+	_, ok := s.sendCommandFunc[recorderID]
 	return ok
 }

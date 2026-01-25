@@ -610,7 +610,7 @@ impl SessionRecorder {
                 chunk_count: chunk_counter,
                 data: sample_buffer[..samples_read]
                     .iter()
-                    .map(|&sample| (i32::from(sample) - i32::from(i16::MIN)) as u32)
+                    .map(|&sample| (sample as u16) as u32)
                     .collect(),
                 timestamp: SystemTime::now(),
             };

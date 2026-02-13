@@ -1,9 +1,3 @@
-# AI Assistant Starter (symlinked from ../ai-assistant-starter)
-CLAUDE.md
-.ai-assistant
-.ai-project
-.claude/commands
-
 # MCP (Model Context Protocol) - local dev tool config
 .mcp.json
 .playwright-mcp/

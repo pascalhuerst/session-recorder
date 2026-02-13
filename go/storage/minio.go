@@ -100,10 +100,13 @@ type Minio struct {
 	sessionTimeout time.Duration
 	stopTimeout    chan struct{}
 
-	onSessionClosedCb       OnSessionClosedCb
-	onSessionStateChangedCb OnSessionStateChangedCb
-	onAudioChunkCb          OnAudioChunkCb
-	cbLock                  sync.Mutex
+	onSessionClosedCb        OnSessionClosedCb
+	onSessionStateChangedCbs []OnSessionStateChangedCb
+	onAudioChunkCb           OnAudioChunkCb
+	cbLock                   sync.Mutex
+
+	shows    map[uuid.UUID]Show
+	showLock sync.RWMutex
 }
 
 func NewMinioStorage(endpoint, localEndpoint, publicEndpoint, accessKey, secretKey string) (*Minio, error) {
@@ -135,6 +138,7 @@ func NewMinioStorage(endpoint, localEndpoint, publicEndpoint, accessKey, secretK
 		lastChunkTime:  make(map[uuid.UUID]time.Time),
 		sessionTimeout: DefaultSessionTimeout,
 		stopTimeout:    make(chan struct{}),
+		shows:          make(map[uuid.UUID]Show),
 	}, nil
 }
 
@@ -270,6 +274,11 @@ func (m *Minio) Start(ctx context.Context) error {
 		}
 	}
 
+	// Load shows
+	if err := m.loadShows(ctx); err != nil {
+		log.Warn().Err(err).Msg("Cannot load shows")
+	}
+
 	// Start the session timeout checker
 	go m.runSessionTimeoutChecker(ctx)
 
@@ -394,7 +403,7 @@ func (m *Minio) RegisterOnSessionStateChangedCallback(cb OnSessionStateChangedCb
 	m.cbLock.Lock()
 	defer m.cbLock.Unlock()
 
-	m.onSessionStateChangedCb = cb
+	m.onSessionStateChangedCbs = append(m.onSessionStateChangedCbs, cb)
 
 	return nil
 }
@@ -408,11 +417,13 @@ func (m *Minio) RegisterOnAudioChunkCallback(cb OnAudioChunkCb) error {
 	return nil
 }
 
-// notifyStateChange calls the state changed callback if registered
+// notifyStateChange calls all registered state changed callbacks
 func (m *Minio) notifyStateChange(session *Session, previousState SessionState) {
-	if m.onSessionStateChangedCb != nil {
+	if len(m.onSessionStateChangedCbs) > 0 {
 		m.cbLock.Lock()
-		m.onSessionStateChangedCb(session, previousState)
+		for _, cb := range m.onSessionStateChangedCbs {
+			cb(session, previousState)
+		}
 		m.cbLock.Unlock()
 	}
 }
@@ -1782,4 +1793,103 @@ func (m *Minio) setSegmentError(ctx context.Context, recorderID, sessionID, segm
 		Stringer("segment-id", segmentID).
 		Str("error", errorMsg).
 		Msg("Segment rendering failed")
+}
+
+// Show persistence
+
+func (m *Minio) GetShows() map[uuid.UUID]Show {
+	m.showLock.RLock()
+	defer m.showLock.RUnlock()
+
+	result := make(map[uuid.UUID]Show, len(m.shows))
+	for k, v := range m.shows {
+		result[k] = v
+	}
+	return result
+}
+
+func (m *Minio) GetShow(showID uuid.UUID) (Show, error) {
+	m.showLock.RLock()
+	defer m.showLock.RUnlock()
+
+	show, ok := m.shows[showID]
+	if !ok {
+		return Show{}, fmt.Errorf("show %s not found", showID)
+	}
+	return show, nil
+}
+
+func (m *Minio) SaveShow(ctx context.Context, show Show) error {
+	objectName := fmt.Sprintf("shows/%s/metadata.json", show.ID)
+
+	buffer := new(bytes.Buffer)
+	if err := json.NewEncoder(buffer).Encode(show); err != nil {
+		return fmt.Errorf("cannot marshal show metadata: %w", err)
+	}
+
+	_, err := m.client.PutObject(ctx, bucketName, objectName, buffer, int64(buffer.Len()), minio.PutObjectOptions{})
+	if err != nil {
+		return fmt.Errorf("cannot put show metadata: %w", err)
+	}
+
+	m.showLock.Lock()
+	m.shows[show.ID] = show
+	m.showLock.Unlock()
+
+	return nil
+}
+
+func (m *Minio) DeleteShow(ctx context.Context, showID uuid.UUID) error {
+	objectName := fmt.Sprintf("shows/%s/metadata.json", showID)
+
+	if err := m.client.RemoveObject(ctx, bucketName, objectName, minio.RemoveObjectOptions{}); err != nil {
+		return fmt.Errorf("cannot delete show metadata: %w", err)
+	}
+
+	m.showLock.Lock()
+	delete(m.shows, showID)
+	m.showLock.Unlock()
+
+	return nil
+}
+
+func (m *Minio) loadShows(ctx context.Context) error {
+	prefix := "shows/"
+	objectCh := m.client.ListObjects(ctx, bucketName, minio.ListObjectsOptions{
+		Prefix:    prefix,
+		Recursive: true,
+	})
+
+	for obj := range objectCh {
+		if obj.Err != nil {
+			return fmt.Errorf("cannot list show objects: %w", obj.Err)
+		}
+
+		if !strings.HasSuffix(obj.Key, "/metadata.json") {
+			continue
+		}
+
+		reader, err := m.client.GetObject(ctx, bucketName, obj.Key, minio.GetObjectOptions{})
+		if err != nil {
+			log.Warn().Str("key", obj.Key).Err(err).Msg("Cannot get show metadata")
+			continue
+		}
+
+		buffer := new(bytes.Buffer)
+		if _, err := buffer.ReadFrom(reader); err != nil {
+			log.Warn().Str("key", obj.Key).Err(err).Msg("Cannot read show metadata")
+			continue
+		}
+
+		var show Show
+		if err := json.Unmarshal(buffer.Bytes(), &show); err != nil {
+			log.Warn().Str("key", obj.Key).Err(err).Msg("Cannot unmarshal show metadata")
+			continue
+		}
+
+		m.shows[show.ID] = show
+		log.Info().Str("show", show.Name).Stringer("id", show.ID).Msg("Loaded show")
+	}
+
+	return nil
 }

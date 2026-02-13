@@ -165,6 +165,15 @@ func main() {
 
 	sessionSourceHandler := NewSessionSourceHandler(sessionStorage, chunkSinkServer, recorderBroadcaster, sessionBroadcaster, audioBroadcaster, emailSender, fileSharer)
 
+	showHandler := NewShowHandler(sessionStorage, chunkSinkServer, emailSender, fileSharer, sessionSourceHandler.renderSemaphore)
+
+	// Register show handler for session state changes (links sessions to shows, transitions LIVE→ENDED)
+	sessionStorage.RegisterOnSessionStateChangedCallback(
+		func(session *storage.Session, previousState storage.SessionState) {
+			showHandler.OnSessionStateChanged(session, previousState)
+		},
+	)
+
 	sessionSourceServer := grpc.NewSessionSourceServer(&grpc.SessionSourceServerConfig{
 		Name:                 hostname,
 		Version:              version,
@@ -181,6 +190,13 @@ func main() {
 		RenderSegmentCB:      sessionSourceHandler.renderSegment,
 		ShareSessionCB:       sessionSourceHandler.shareSession,
 		ShareSegmentCB:       sessionSourceHandler.shareSegment,
+		CreateShowCB:         showHandler.createShow,
+		UpdateShowCB:         showHandler.updateShow,
+		DeleteShowCB:         showHandler.deleteShow,
+		ListShowsCB:          showHandler.listShows,
+		StartShowCB:          showHandler.startShow,
+		RenderAllCB:          showHandler.renderAll,
+		DistributeAllCB:      showHandler.distributeAll,
 	})
 
 	port, err := grpc.StartProtocolServer(sessionSourceServer, mdnsServer, sessionSourceService, uint16(*sessionSourcePort))

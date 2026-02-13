@@ -438,6 +438,144 @@ export interface AudioChunk {
     timestamp?: Timestamp;
 }
 /**
+ * @generated from protobuf message sessionsource.ActInfo
+ */
+export interface ActInfo {
+    /**
+     * @generated from protobuf field: string actID = 1
+     */
+    actID: string;
+    /**
+     * @generated from protobuf field: string name = 2
+     */
+    name: string;
+    /**
+     * @generated from protobuf field: google.protobuf.Timestamp plannedStart = 3
+     */
+    plannedStart?: Timestamp;
+    /**
+     * @generated from protobuf field: google.protobuf.Timestamp plannedEnd = 4
+     */
+    plannedEnd?: Timestamp;
+    /**
+     * @generated from protobuf field: repeated string emails = 5
+     */
+    emails: string[];
+    /**
+     * @generated from protobuf field: string segmentID = 6
+     */
+    segmentID: string;
+    /**
+     * @generated from protobuf field: google.protobuf.Timestamp actualStart = 7
+     */
+    actualStart?: Timestamp;
+    /**
+     * @generated from protobuf field: google.protobuf.Timestamp actualEnd = 8
+     */
+    actualEnd?: Timestamp;
+}
+/**
+ * @generated from protobuf message sessionsource.ShowInfo
+ */
+export interface ShowInfo {
+    /**
+     * @generated from protobuf field: string showID = 1
+     */
+    showID: string;
+    /**
+     * @generated from protobuf field: string name = 2
+     */
+    name: string;
+    /**
+     * @generated from protobuf field: google.protobuf.Timestamp date = 3
+     */
+    date?: Timestamp;
+    /**
+     * @generated from protobuf field: sessionsource.ShowState state = 4
+     */
+    state: ShowState;
+    /**
+     * @generated from protobuf field: string recorderID = 5
+     */
+    recorderID: string;
+    /**
+     * @generated from protobuf field: string sessionID = 6
+     */
+    sessionID: string;
+    /**
+     * @generated from protobuf field: repeated sessionsource.ActInfo acts = 7
+     */
+    acts: ActInfo[];
+}
+/**
+ * @generated from protobuf message sessionsource.CreateShowRequest
+ */
+export interface CreateShowRequest {
+    /**
+     * @generated from protobuf field: sessionsource.ShowInfo show = 1
+     */
+    show?: ShowInfo;
+}
+/**
+ * @generated from protobuf message sessionsource.UpdateShowRequest
+ */
+export interface UpdateShowRequest {
+    /**
+     * @generated from protobuf field: sessionsource.ShowInfo show = 1
+     */
+    show?: ShowInfo;
+}
+/**
+ * @generated from protobuf message sessionsource.DeleteShowRequest
+ */
+export interface DeleteShowRequest {
+    /**
+     * @generated from protobuf field: string showID = 1
+     */
+    showID: string;
+}
+/**
+ * @generated from protobuf message sessionsource.ListShowsRequest
+ */
+export interface ListShowsRequest {
+}
+/**
+ * @generated from protobuf message sessionsource.ListShowsResponse
+ */
+export interface ListShowsResponse {
+    /**
+     * @generated from protobuf field: repeated sessionsource.ShowInfo shows = 1
+     */
+    shows: ShowInfo[];
+}
+/**
+ * @generated from protobuf message sessionsource.StartShowRequest
+ */
+export interface StartShowRequest {
+    /**
+     * @generated from protobuf field: string showID = 1
+     */
+    showID: string;
+}
+/**
+ * @generated from protobuf message sessionsource.RenderAllRequest
+ */
+export interface RenderAllRequest {
+    /**
+     * @generated from protobuf field: string showID = 1
+     */
+    showID: string;
+}
+/**
+ * @generated from protobuf message sessionsource.DistributeAllRequest
+ */
+export interface DistributeAllRequest {
+    /**
+     * @generated from protobuf field: string showID = 1
+     */
+    showID: string;
+}
+/**
  * @generated from protobuf enum sessionsource.SegmentState
  */
 export enum SegmentState {
@@ -486,6 +624,29 @@ export enum SessionState {
      * @generated from protobuf enum value: SESSION_STATE_ERROR = 4;
      */
     ERROR = 4
+}
+// Show management
+
+/**
+ * @generated from protobuf enum sessionsource.ShowState
+ */
+export enum ShowState {
+    /**
+     * @generated from protobuf enum value: SHOW_STATE_DRAFT = 0;
+     */
+    DRAFT = 0,
+    /**
+     * @generated from protobuf enum value: SHOW_STATE_LIVE = 1;
+     */
+    LIVE = 1,
+    /**
+     * @generated from protobuf enum value: SHOW_STATE_ENDED = 2;
+     */
+    ENDED = 2,
+    /**
+     * @generated from protobuf enum value: SHOW_STATE_ARCHIVED = 3;
+     */
+    ARCHIVED = 3
 }
 // @generated message type with reflection information, may provide speed optimized methods
 class StreamRecordersRequest$Type extends MessageType<StreamRecordersRequest> {
@@ -1974,6 +2135,564 @@ class AudioChunk$Type extends MessageType<AudioChunk> {
  * @generated MessageType for protobuf message sessionsource.AudioChunk
  */
 export const AudioChunk = new AudioChunk$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class ActInfo$Type extends MessageType<ActInfo> {
+    constructor() {
+        super("sessionsource.ActInfo", [
+            { no: 1, name: "actID", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 2, name: "name", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 3, name: "plannedStart", kind: "message", T: () => Timestamp },
+            { no: 4, name: "plannedEnd", kind: "message", T: () => Timestamp },
+            { no: 5, name: "emails", kind: "scalar", repeat: 2 /*RepeatType.UNPACKED*/, T: 9 /*ScalarType.STRING*/ },
+            { no: 6, name: "segmentID", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 7, name: "actualStart", kind: "message", T: () => Timestamp },
+            { no: 8, name: "actualEnd", kind: "message", T: () => Timestamp }
+        ]);
+    }
+    create(value?: PartialMessage<ActInfo>): ActInfo {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.actID = "";
+        message.name = "";
+        message.emails = [];
+        message.segmentID = "";
+        if (value !== undefined)
+            reflectionMergePartial<ActInfo>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: ActInfo): ActInfo {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* string actID */ 1:
+                    message.actID = reader.string();
+                    break;
+                case /* string name */ 2:
+                    message.name = reader.string();
+                    break;
+                case /* google.protobuf.Timestamp plannedStart */ 3:
+                    message.plannedStart = Timestamp.internalBinaryRead(reader, reader.uint32(), options, message.plannedStart);
+                    break;
+                case /* google.protobuf.Timestamp plannedEnd */ 4:
+                    message.plannedEnd = Timestamp.internalBinaryRead(reader, reader.uint32(), options, message.plannedEnd);
+                    break;
+                case /* repeated string emails */ 5:
+                    message.emails.push(reader.string());
+                    break;
+                case /* string segmentID */ 6:
+                    message.segmentID = reader.string();
+                    break;
+                case /* google.protobuf.Timestamp actualStart */ 7:
+                    message.actualStart = Timestamp.internalBinaryRead(reader, reader.uint32(), options, message.actualStart);
+                    break;
+                case /* google.protobuf.Timestamp actualEnd */ 8:
+                    message.actualEnd = Timestamp.internalBinaryRead(reader, reader.uint32(), options, message.actualEnd);
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: ActInfo, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* string actID = 1; */
+        if (message.actID !== "")
+            writer.tag(1, WireType.LengthDelimited).string(message.actID);
+        /* string name = 2; */
+        if (message.name !== "")
+            writer.tag(2, WireType.LengthDelimited).string(message.name);
+        /* google.protobuf.Timestamp plannedStart = 3; */
+        if (message.plannedStart)
+            Timestamp.internalBinaryWrite(message.plannedStart, writer.tag(3, WireType.LengthDelimited).fork(), options).join();
+        /* google.protobuf.Timestamp plannedEnd = 4; */
+        if (message.plannedEnd)
+            Timestamp.internalBinaryWrite(message.plannedEnd, writer.tag(4, WireType.LengthDelimited).fork(), options).join();
+        /* repeated string emails = 5; */
+        for (let i = 0; i < message.emails.length; i++)
+            writer.tag(5, WireType.LengthDelimited).string(message.emails[i]);
+        /* string segmentID = 6; */
+        if (message.segmentID !== "")
+            writer.tag(6, WireType.LengthDelimited).string(message.segmentID);
+        /* google.protobuf.Timestamp actualStart = 7; */
+        if (message.actualStart)
+            Timestamp.internalBinaryWrite(message.actualStart, writer.tag(7, WireType.LengthDelimited).fork(), options).join();
+        /* google.protobuf.Timestamp actualEnd = 8; */
+        if (message.actualEnd)
+            Timestamp.internalBinaryWrite(message.actualEnd, writer.tag(8, WireType.LengthDelimited).fork(), options).join();
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message sessionsource.ActInfo
+ */
+export const ActInfo = new ActInfo$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class ShowInfo$Type extends MessageType<ShowInfo> {
+    constructor() {
+        super("sessionsource.ShowInfo", [
+            { no: 1, name: "showID", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 2, name: "name", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 3, name: "date", kind: "message", T: () => Timestamp },
+            { no: 4, name: "state", kind: "enum", T: () => ["sessionsource.ShowState", ShowState, "SHOW_STATE_"] },
+            { no: 5, name: "recorderID", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 6, name: "sessionID", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 7, name: "acts", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => ActInfo }
+        ]);
+    }
+    create(value?: PartialMessage<ShowInfo>): ShowInfo {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.showID = "";
+        message.name = "";
+        message.state = 0;
+        message.recorderID = "";
+        message.sessionID = "";
+        message.acts = [];
+        if (value !== undefined)
+            reflectionMergePartial<ShowInfo>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: ShowInfo): ShowInfo {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* string showID */ 1:
+                    message.showID = reader.string();
+                    break;
+                case /* string name */ 2:
+                    message.name = reader.string();
+                    break;
+                case /* google.protobuf.Timestamp date */ 3:
+                    message.date = Timestamp.internalBinaryRead(reader, reader.uint32(), options, message.date);
+                    break;
+                case /* sessionsource.ShowState state */ 4:
+                    message.state = reader.int32();
+                    break;
+                case /* string recorderID */ 5:
+                    message.recorderID = reader.string();
+                    break;
+                case /* string sessionID */ 6:
+                    message.sessionID = reader.string();
+                    break;
+                case /* repeated sessionsource.ActInfo acts */ 7:
+                    message.acts.push(ActInfo.internalBinaryRead(reader, reader.uint32(), options));
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: ShowInfo, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* string showID = 1; */
+        if (message.showID !== "")
+            writer.tag(1, WireType.LengthDelimited).string(message.showID);
+        /* string name = 2; */
+        if (message.name !== "")
+            writer.tag(2, WireType.LengthDelimited).string(message.name);
+        /* google.protobuf.Timestamp date = 3; */
+        if (message.date)
+            Timestamp.internalBinaryWrite(message.date, writer.tag(3, WireType.LengthDelimited).fork(), options).join();
+        /* sessionsource.ShowState state = 4; */
+        if (message.state !== 0)
+            writer.tag(4, WireType.Varint).int32(message.state);
+        /* string recorderID = 5; */
+        if (message.recorderID !== "")
+            writer.tag(5, WireType.LengthDelimited).string(message.recorderID);
+        /* string sessionID = 6; */
+        if (message.sessionID !== "")
+            writer.tag(6, WireType.LengthDelimited).string(message.sessionID);
+        /* repeated sessionsource.ActInfo acts = 7; */
+        for (let i = 0; i < message.acts.length; i++)
+            ActInfo.internalBinaryWrite(message.acts[i], writer.tag(7, WireType.LengthDelimited).fork(), options).join();
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message sessionsource.ShowInfo
+ */
+export const ShowInfo = new ShowInfo$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class CreateShowRequest$Type extends MessageType<CreateShowRequest> {
+    constructor() {
+        super("sessionsource.CreateShowRequest", [
+            { no: 1, name: "show", kind: "message", T: () => ShowInfo }
+        ]);
+    }
+    create(value?: PartialMessage<CreateShowRequest>): CreateShowRequest {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        if (value !== undefined)
+            reflectionMergePartial<CreateShowRequest>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: CreateShowRequest): CreateShowRequest {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* sessionsource.ShowInfo show */ 1:
+                    message.show = ShowInfo.internalBinaryRead(reader, reader.uint32(), options, message.show);
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: CreateShowRequest, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* sessionsource.ShowInfo show = 1; */
+        if (message.show)
+            ShowInfo.internalBinaryWrite(message.show, writer.tag(1, WireType.LengthDelimited).fork(), options).join();
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message sessionsource.CreateShowRequest
+ */
+export const CreateShowRequest = new CreateShowRequest$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class UpdateShowRequest$Type extends MessageType<UpdateShowRequest> {
+    constructor() {
+        super("sessionsource.UpdateShowRequest", [
+            { no: 1, name: "show", kind: "message", T: () => ShowInfo }
+        ]);
+    }
+    create(value?: PartialMessage<UpdateShowRequest>): UpdateShowRequest {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        if (value !== undefined)
+            reflectionMergePartial<UpdateShowRequest>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: UpdateShowRequest): UpdateShowRequest {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* sessionsource.ShowInfo show */ 1:
+                    message.show = ShowInfo.internalBinaryRead(reader, reader.uint32(), options, message.show);
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: UpdateShowRequest, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* sessionsource.ShowInfo show = 1; */
+        if (message.show)
+            ShowInfo.internalBinaryWrite(message.show, writer.tag(1, WireType.LengthDelimited).fork(), options).join();
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message sessionsource.UpdateShowRequest
+ */
+export const UpdateShowRequest = new UpdateShowRequest$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class DeleteShowRequest$Type extends MessageType<DeleteShowRequest> {
+    constructor() {
+        super("sessionsource.DeleteShowRequest", [
+            { no: 1, name: "showID", kind: "scalar", T: 9 /*ScalarType.STRING*/ }
+        ]);
+    }
+    create(value?: PartialMessage<DeleteShowRequest>): DeleteShowRequest {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.showID = "";
+        if (value !== undefined)
+            reflectionMergePartial<DeleteShowRequest>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: DeleteShowRequest): DeleteShowRequest {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* string showID */ 1:
+                    message.showID = reader.string();
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: DeleteShowRequest, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* string showID = 1; */
+        if (message.showID !== "")
+            writer.tag(1, WireType.LengthDelimited).string(message.showID);
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message sessionsource.DeleteShowRequest
+ */
+export const DeleteShowRequest = new DeleteShowRequest$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class ListShowsRequest$Type extends MessageType<ListShowsRequest> {
+    constructor() {
+        super("sessionsource.ListShowsRequest", []);
+    }
+    create(value?: PartialMessage<ListShowsRequest>): ListShowsRequest {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        if (value !== undefined)
+            reflectionMergePartial<ListShowsRequest>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: ListShowsRequest): ListShowsRequest {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: ListShowsRequest, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message sessionsource.ListShowsRequest
+ */
+export const ListShowsRequest = new ListShowsRequest$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class ListShowsResponse$Type extends MessageType<ListShowsResponse> {
+    constructor() {
+        super("sessionsource.ListShowsResponse", [
+            { no: 1, name: "shows", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => ShowInfo }
+        ]);
+    }
+    create(value?: PartialMessage<ListShowsResponse>): ListShowsResponse {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.shows = [];
+        if (value !== undefined)
+            reflectionMergePartial<ListShowsResponse>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: ListShowsResponse): ListShowsResponse {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* repeated sessionsource.ShowInfo shows */ 1:
+                    message.shows.push(ShowInfo.internalBinaryRead(reader, reader.uint32(), options));
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: ListShowsResponse, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* repeated sessionsource.ShowInfo shows = 1; */
+        for (let i = 0; i < message.shows.length; i++)
+            ShowInfo.internalBinaryWrite(message.shows[i], writer.tag(1, WireType.LengthDelimited).fork(), options).join();
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message sessionsource.ListShowsResponse
+ */
+export const ListShowsResponse = new ListShowsResponse$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class StartShowRequest$Type extends MessageType<StartShowRequest> {
+    constructor() {
+        super("sessionsource.StartShowRequest", [
+            { no: 1, name: "showID", kind: "scalar", T: 9 /*ScalarType.STRING*/ }
+        ]);
+    }
+    create(value?: PartialMessage<StartShowRequest>): StartShowRequest {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.showID = "";
+        if (value !== undefined)
+            reflectionMergePartial<StartShowRequest>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: StartShowRequest): StartShowRequest {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* string showID */ 1:
+                    message.showID = reader.string();
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: StartShowRequest, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* string showID = 1; */
+        if (message.showID !== "")
+            writer.tag(1, WireType.LengthDelimited).string(message.showID);
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message sessionsource.StartShowRequest
+ */
+export const StartShowRequest = new StartShowRequest$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class RenderAllRequest$Type extends MessageType<RenderAllRequest> {
+    constructor() {
+        super("sessionsource.RenderAllRequest", [
+            { no: 1, name: "showID", kind: "scalar", T: 9 /*ScalarType.STRING*/ }
+        ]);
+    }
+    create(value?: PartialMessage<RenderAllRequest>): RenderAllRequest {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.showID = "";
+        if (value !== undefined)
+            reflectionMergePartial<RenderAllRequest>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: RenderAllRequest): RenderAllRequest {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* string showID */ 1:
+                    message.showID = reader.string();
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: RenderAllRequest, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* string showID = 1; */
+        if (message.showID !== "")
+            writer.tag(1, WireType.LengthDelimited).string(message.showID);
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message sessionsource.RenderAllRequest
+ */
+export const RenderAllRequest = new RenderAllRequest$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class DistributeAllRequest$Type extends MessageType<DistributeAllRequest> {
+    constructor() {
+        super("sessionsource.DistributeAllRequest", [
+            { no: 1, name: "showID", kind: "scalar", T: 9 /*ScalarType.STRING*/ }
+        ]);
+    }
+    create(value?: PartialMessage<DistributeAllRequest>): DistributeAllRequest {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.showID = "";
+        if (value !== undefined)
+            reflectionMergePartial<DistributeAllRequest>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: DistributeAllRequest): DistributeAllRequest {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* string showID */ 1:
+                    message.showID = reader.string();
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: DistributeAllRequest, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* string showID = 1; */
+        if (message.showID !== "")
+            writer.tag(1, WireType.LengthDelimited).string(message.showID);
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message sessionsource.DistributeAllRequest
+ */
+export const DistributeAllRequest = new DistributeAllRequest$Type();
 /**
  * @generated ServiceType for protobuf service sessionsource.SessionSource
  */
@@ -1990,5 +2709,12 @@ export const SessionSource = new ServiceType("sessionsource.SessionSource", [
     { name: "UpdateSegment", options: {}, I: UpdateSegmentRequest, O: Respone },
     { name: "CutSession", options: {}, I: CutSessionRequest, O: Respone },
     { name: "ShareSession", options: {}, I: ShareSessionRequest, O: Respone },
-    { name: "ShareSegment", options: {}, I: ShareSegmentRequest, O: Respone }
+    { name: "ShareSegment", options: {}, I: ShareSegmentRequest, O: Respone },
+    { name: "CreateShow", options: {}, I: CreateShowRequest, O: Respone },
+    { name: "UpdateShow", options: {}, I: UpdateShowRequest, O: Respone },
+    { name: "DeleteShow", options: {}, I: DeleteShowRequest, O: Respone },
+    { name: "ListShows", options: {}, I: ListShowsRequest, O: ListShowsResponse },
+    { name: "StartShow", options: {}, I: StartShowRequest, O: Respone },
+    { name: "RenderAll", options: {}, I: RenderAllRequest, O: Respone },
+    { name: "DistributeAll", options: {}, I: DistributeAllRequest, O: Respone }
 ]);

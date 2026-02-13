@@ -150,6 +150,12 @@ type Storage interface {
 	SetSegmentState(ctx context.Context, recorderID, sessionID, segmentID uuid.UUID, state SegmentState) error
 	RenderSegment(ctx context.Context, recorderID, sessionID, segmentID uuid.UUID) error
 	GetSegmentPresignedURL(ctx context.Context, asset SegmentAssetOptions, options SigningOptions) (string, error)
+
+	// Show operations
+	GetShows() map[uuid.UUID]Show
+	GetShow(showID uuid.UUID) (Show, error)
+	SaveShow(ctx context.Context, show Show) error
+	DeleteShow(ctx context.Context, showID uuid.UUID) error
 }
 
 type System struct {
@@ -226,4 +232,50 @@ type Segment struct {
 	EndPoint     int64        `json:"end_point"`
 	State        SegmentState `json:"state"`
 	ErrorMessage string       `json:"error_message,omitempty"`
+}
+
+// ShowState represents the lifecycle state of a show
+type ShowState int32
+
+const (
+	ShowStateDraft    ShowState = 0
+	ShowStateLive     ShowState = 1
+	ShowStateEnded    ShowState = 2
+	ShowStateArchived ShowState = 3
+)
+
+func (s ShowState) String() string {
+	switch s {
+	case ShowStateDraft:
+		return "DRAFT"
+	case ShowStateLive:
+		return "LIVE"
+	case ShowStateEnded:
+		return "ENDED"
+	case ShowStateArchived:
+		return "ARCHIVED"
+	default:
+		return "UNKNOWN"
+	}
+}
+
+type Act struct {
+	ID           uuid.UUID `json:"id"`
+	Name         string    `json:"name"`
+	PlannedStart time.Time `json:"planned_start"`
+	PlannedEnd   time.Time `json:"planned_end"`
+	Emails       []string  `json:"emails,omitempty"`
+	SegmentID    uuid.UUID `json:"segment_id,omitempty"`
+	ActualStart  time.Time `json:"actual_start,omitempty"`
+	ActualEnd    time.Time `json:"actual_end,omitempty"`
+}
+
+type Show struct {
+	ID         uuid.UUID `json:"id"`
+	Name       string    `json:"name"`
+	Date       time.Time `json:"date"`
+	State      ShowState `json:"state"`
+	RecorderID uuid.UUID `json:"recorder_id"`
+	SessionID  uuid.UUID `json:"session_id,omitempty"`
+	Acts       []Act     `json:"acts"`
 }

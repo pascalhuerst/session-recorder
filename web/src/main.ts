@@ -8,6 +8,10 @@ import RecordersIndexView from './views/recorders/views/index/RecordersIndexView
 import RecorderView from './views/recorders/views/_recorderId/RecorderView.vue';
 import SessionsView from './views/recorders/views/_recorderId/views/sessions/SessionsView.vue';
 import SessionsIndexView from './views/recorders/views/_recorderId/views/sessions/views/index/SessionsIndexView.vue';
+import RecorderShowsView from './views/recorders/views/_recorderId/views/shows/RecorderShowsView.vue';
+import RecorderShowsListView from './views/recorders/views/_recorderId/views/shows/views/index/RecorderShowsListView.vue';
+import RecorderShowDetailView from './views/recorders/views/_recorderId/views/shows/views/_showId/RecorderShowDetailView.vue';
+import LiveModeView from './views/recorders/views/_recorderId/views/live/LiveModeView.vue';
 import { setup } from '@session-recorder/session-waveform';
 import { useThemeStore } from './store/useThemeStore';
 
@@ -39,6 +43,24 @@ const router = createRouter({
                   component: SessionsIndexView,
                 },
               ],
+            },
+            {
+              path: 'shows',
+              component: RecorderShowsView,
+              children: [
+                {
+                  path: '',
+                  component: RecorderShowsListView,
+                },
+                {
+                  path: ':showId',
+                  component: RecorderShowDetailView,
+                },
+              ],
+            },
+            {
+              path: 'live',
+              component: LiveModeView,
             },
           ],
         },

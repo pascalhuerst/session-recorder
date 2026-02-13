@@ -4,6 +4,14 @@
 import type { RpcTransport } from "@protobuf-ts/runtime-rpc";
 import type { ServiceInfo } from "@protobuf-ts/runtime-rpc";
 import { SessionSource } from "./sessionsource";
+import type { DistributeAllRequest } from "./sessionsource";
+import type { RenderAllRequest } from "./sessionsource";
+import type { StartShowRequest } from "./sessionsource";
+import type { ListShowsResponse } from "./sessionsource";
+import type { ListShowsRequest } from "./sessionsource";
+import type { DeleteShowRequest } from "./sessionsource";
+import type { UpdateShowRequest } from "./sessionsource";
+import type { CreateShowRequest } from "./sessionsource";
 import type { ShareSegmentRequest } from "./sessionsource";
 import type { ShareSessionRequest } from "./sessionsource";
 import type { CutSessionRequest } from "./sessionsource";
@@ -85,6 +93,36 @@ export interface ISessionSourceClient {
      * @generated from protobuf rpc: ShareSegment
      */
     shareSegment(input: ShareSegmentRequest, options?: RpcOptions): UnaryCall<ShareSegmentRequest, Respone>;
+    /**
+     * Shows
+     *
+     * @generated from protobuf rpc: CreateShow
+     */
+    createShow(input: CreateShowRequest, options?: RpcOptions): UnaryCall<CreateShowRequest, Respone>;
+    /**
+     * @generated from protobuf rpc: UpdateShow
+     */
+    updateShow(input: UpdateShowRequest, options?: RpcOptions): UnaryCall<UpdateShowRequest, Respone>;
+    /**
+     * @generated from protobuf rpc: DeleteShow
+     */
+    deleteShow(input: DeleteShowRequest, options?: RpcOptions): UnaryCall<DeleteShowRequest, Respone>;
+    /**
+     * @generated from protobuf rpc: ListShows
+     */
+    listShows(input: ListShowsRequest, options?: RpcOptions): UnaryCall<ListShowsRequest, ListShowsResponse>;
+    /**
+     * @generated from protobuf rpc: StartShow
+     */
+    startShow(input: StartShowRequest, options?: RpcOptions): UnaryCall<StartShowRequest, Respone>;
+    /**
+     * @generated from protobuf rpc: RenderAll
+     */
+    renderAll(input: RenderAllRequest, options?: RpcOptions): UnaryCall<RenderAllRequest, Respone>;
+    /**
+     * @generated from protobuf rpc: DistributeAll
+     */
+    distributeAll(input: DistributeAllRequest, options?: RpcOptions): UnaryCall<DistributeAllRequest, Respone>;
 }
 /**
  * @generated from protobuf service sessionsource.SessionSource
@@ -189,5 +227,56 @@ export class SessionSourceClient implements ISessionSourceClient, ServiceInfo {
     shareSegment(input: ShareSegmentRequest, options?: RpcOptions): UnaryCall<ShareSegmentRequest, Respone> {
         const method = this.methods[12], opt = this._transport.mergeOptions(options);
         return stackIntercept<ShareSegmentRequest, Respone>("unary", this._transport, method, opt, input);
+    }
+    /**
+     * Shows
+     *
+     * @generated from protobuf rpc: CreateShow
+     */
+    createShow(input: CreateShowRequest, options?: RpcOptions): UnaryCall<CreateShowRequest, Respone> {
+        const method = this.methods[13], opt = this._transport.mergeOptions(options);
+        return stackIntercept<CreateShowRequest, Respone>("unary", this._transport, method, opt, input);
+    }
+    /**
+     * @generated from protobuf rpc: UpdateShow
+     */
+    updateShow(input: UpdateShowRequest, options?: RpcOptions): UnaryCall<UpdateShowRequest, Respone> {
+        const method = this.methods[14], opt = this._transport.mergeOptions(options);
+        return stackIntercept<UpdateShowRequest, Respone>("unary", this._transport, method, opt, input);
+    }
+    /**
+     * @generated from protobuf rpc: DeleteShow
+     */
+    deleteShow(input: DeleteShowRequest, options?: RpcOptions): UnaryCall<DeleteShowRequest, Respone> {
+        const method = this.methods[15], opt = this._transport.mergeOptions(options);
+        return stackIntercept<DeleteShowRequest, Respone>("unary", this._transport, method, opt, input);
+    }
+    /**
+     * @generated from protobuf rpc: ListShows
+     */
+    listShows(input: ListShowsRequest, options?: RpcOptions): UnaryCall<ListShowsRequest, ListShowsResponse> {
+        const method = this.methods[16], opt = this._transport.mergeOptions(options);
+        return stackIntercept<ListShowsRequest, ListShowsResponse>("unary", this._transport, method, opt, input);
+    }
+    /**
+     * @generated from protobuf rpc: StartShow
+     */
+    startShow(input: StartShowRequest, options?: RpcOptions): UnaryCall<StartShowRequest, Respone> {
+        const method = this.methods[17], opt = this._transport.mergeOptions(options);
+        return stackIntercept<StartShowRequest, Respone>("unary", this._transport, method, opt, input);
+    }
+    /**
+     * @generated from protobuf rpc: RenderAll
+     */
+    renderAll(input: RenderAllRequest, options?: RpcOptions): UnaryCall<RenderAllRequest, Respone> {
+        const method = this.methods[18], opt = this._transport.mergeOptions(options);
+        return stackIntercept<RenderAllRequest, Respone>("unary", this._transport, method, opt, input);
+    }
+    /**
+     * @generated from protobuf rpc: DistributeAll
+     */
+    distributeAll(input: DistributeAllRequest, options?: RpcOptions): UnaryCall<DistributeAllRequest, Respone> {
+        const method = this.methods[19], opt = this._transport.mergeOptions(options);
+        return stackIntercept<DistributeAllRequest, Respone>("unary", this._transport, method, opt, input);
     }
 }

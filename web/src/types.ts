@@ -37,3 +37,26 @@ export type Session = {
   inlineFiles: SessionInfo_Files | null;
   downloadFiles: SessionInfo_Files | null;
 };
+
+export type ShowState = 'draft' | 'live' | 'ended' | 'archived';
+
+export interface Act {
+  id: string;
+  name: string;
+  plannedStart: Date;
+  plannedEnd: Date;
+  emails: string[];
+  segmentId: string | null;
+  actualStart: Date | null;
+  actualEnd: Date | null;
+}
+
+export interface Show {
+  id: string;
+  name: string;
+  date: Date;
+  state: ShowState;
+  recorderId: string;
+  sessionId: string | null;
+  acts: Act[];
+}

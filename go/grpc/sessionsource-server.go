@@ -27,6 +27,14 @@ type RenderSegmentCB func(ctx context.Context, request *sspb.RenderSegmentReques
 type ShareSessionCB func(ctx context.Context, request *sspb.ShareSessionRequest) (*cmpb.Respone, error)
 type ShareSegmentCB func(ctx context.Context, request *sspb.ShareSegmentRequest) (*cmpb.Respone, error)
 
+type CreateShowCB func(ctx context.Context, request *sspb.CreateShowRequest) (*cmpb.Respone, error)
+type UpdateShowCB func(ctx context.Context, request *sspb.UpdateShowRequest) (*cmpb.Respone, error)
+type DeleteShowCB func(ctx context.Context, request *sspb.DeleteShowRequest) (*cmpb.Respone, error)
+type ListShowsCB func(ctx context.Context, request *sspb.ListShowsRequest) (*sspb.ListShowsResponse, error)
+type StartShowCB func(ctx context.Context, request *sspb.StartShowRequest) (*cmpb.Respone, error)
+type RenderAllCB func(ctx context.Context, request *sspb.RenderAllRequest) (*cmpb.Respone, error)
+type DistributeAllCB func(ctx context.Context, request *sspb.DistributeAllRequest) (*cmpb.Respone, error)
+
 var noSuccess = &cmpb.Respone{Success: true}
 
 type SessionSourceServerConfig struct {
@@ -48,6 +56,14 @@ type SessionSourceServerConfig struct {
 
 	ShareSessionCB ShareSessionCB
 	ShareSegmentCB ShareSegmentCB
+
+	CreateShowCB    CreateShowCB
+	UpdateShowCB    UpdateShowCB
+	DeleteShowCB    DeleteShowCB
+	ListShowsCB     ListShowsCB
+	StartShowCB     StartShowCB
+	RenderAllCB     RenderAllCB
+	DistributeAllCB DistributeAllCB
 }
 
 type SessionSourceServer struct {
@@ -177,5 +193,56 @@ func (s *SessionSourceServer) ShareSegment(ctx context.Context, in *sspb.ShareSe
 		return s.config.ShareSegmentCB(ctx, in)
 	}
 
+	return noSuccess, nil
+}
+
+// Show API
+
+func (s *SessionSourceServer) CreateShow(ctx context.Context, in *sspb.CreateShowRequest) (*common.Respone, error) {
+	if s.config.CreateShowCB != nil {
+		return s.config.CreateShowCB(ctx, in)
+	}
+	return noSuccess, nil
+}
+
+func (s *SessionSourceServer) UpdateShow(ctx context.Context, in *sspb.UpdateShowRequest) (*common.Respone, error) {
+	if s.config.UpdateShowCB != nil {
+		return s.config.UpdateShowCB(ctx, in)
+	}
+	return noSuccess, nil
+}
+
+func (s *SessionSourceServer) DeleteShow(ctx context.Context, in *sspb.DeleteShowRequest) (*common.Respone, error) {
+	if s.config.DeleteShowCB != nil {
+		return s.config.DeleteShowCB(ctx, in)
+	}
+	return noSuccess, nil
+}
+
+func (s *SessionSourceServer) ListShows(ctx context.Context, in *sspb.ListShowsRequest) (*sspb.ListShowsResponse, error) {
+	if s.config.ListShowsCB != nil {
+		return s.config.ListShowsCB(ctx, in)
+	}
+	return &sspb.ListShowsResponse{}, nil
+}
+
+func (s *SessionSourceServer) StartShow(ctx context.Context, in *sspb.StartShowRequest) (*common.Respone, error) {
+	if s.config.StartShowCB != nil {
+		return s.config.StartShowCB(ctx, in)
+	}
+	return noSuccess, nil
+}
+
+func (s *SessionSourceServer) RenderAll(ctx context.Context, in *sspb.RenderAllRequest) (*common.Respone, error) {
+	if s.config.RenderAllCB != nil {
+		return s.config.RenderAllCB(ctx, in)
+	}
+	return noSuccess, nil
+}
+
+func (s *SessionSourceServer) DistributeAll(ctx context.Context, in *sspb.DistributeAllRequest) (*common.Respone, error) {
+	if s.config.DistributeAllCB != nil {
+		return s.config.DistributeAllCB(ctx, in)
+	}
 	return noSuccess, nil
 }

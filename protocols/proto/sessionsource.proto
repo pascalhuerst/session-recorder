@@ -175,6 +175,66 @@ message AudioChunk {
 	google.protobuf.Timestamp timestamp = 4;
 }
 
+// Show management
+
+enum ShowState {
+	SHOW_STATE_DRAFT = 0;
+	SHOW_STATE_LIVE = 1;
+	SHOW_STATE_ENDED = 2;
+	SHOW_STATE_ARCHIVED = 3;
+}
+
+message ActInfo {
+	string actID = 1;
+	string name = 2;
+	google.protobuf.Timestamp plannedStart = 3;
+	google.protobuf.Timestamp plannedEnd = 4;
+	repeated string emails = 5;
+	string segmentID = 6;
+	google.protobuf.Timestamp actualStart = 7;
+	google.protobuf.Timestamp actualEnd = 8;
+}
+
+message ShowInfo {
+	string showID = 1;
+	string name = 2;
+	google.protobuf.Timestamp date = 3;
+	ShowState state = 4;
+	string recorderID = 5;
+	string sessionID = 6;
+	repeated ActInfo acts = 7;
+}
+
+message CreateShowRequest {
+	ShowInfo show = 1;
+}
+
+message UpdateShowRequest {
+	ShowInfo show = 1;
+}
+
+message DeleteShowRequest {
+	string showID = 1;
+}
+
+message ListShowsRequest {}
+
+message ListShowsResponse {
+	repeated ShowInfo shows = 1;
+}
+
+message StartShowRequest {
+	string showID = 1;
+}
+
+message RenderAllRequest {
+	string showID = 1;
+}
+
+message DistributeAllRequest {
+	string showID = 1;
+}
+
 service SessionSource {
 	// Stream
 	rpc StreamRecorders(StreamRecordersRequest) returns (stream Recorder);
@@ -195,4 +255,13 @@ service SessionSource {
 
 	rpc ShareSession(ShareSessionRequest) returns (common.Respone);
 	rpc ShareSegment(ShareSegmentRequest) returns (common.Respone);
+
+	// Shows
+	rpc CreateShow(CreateShowRequest) returns (common.Respone);
+	rpc UpdateShow(UpdateShowRequest) returns (common.Respone);
+	rpc DeleteShow(DeleteShowRequest) returns (common.Respone);
+	rpc ListShows(ListShowsRequest) returns (ListShowsResponse);
+	rpc StartShow(StartShowRequest) returns (common.Respone);
+	rpc RenderAll(RenderAllRequest) returns (common.Respone);
+	rpc DistributeAll(DistributeAllRequest) returns (common.Respone);
 }

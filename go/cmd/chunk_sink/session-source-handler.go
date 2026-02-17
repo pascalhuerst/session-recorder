@@ -291,16 +291,39 @@ func (h *SessionSourceHandler) onSessionClosed(session *storage.Session) {
 }
 
 // onAudioChunk is called when audio samples are received. Broadcasts to audio subscribers.
+// Downsamples to peak values to keep gRPC-web message sizes small (~1KB vs ~576KB).
 func (h *SessionSourceHandler) onAudioChunk(recorderID, sessionID uuid.UUID, samples []int16, chunkNumber int, timestamp time.Time) {
-	// Convert int16 samples to int32 for proto (proto doesn't have int16)
-	int32Samples := make([]int32, len(samples))
-	for i, s := range samples {
-		int32Samples[i] = int32(s)
+	// Downsample to ~200 peak values instead of sending all ~96000 raw samples.
+	// Raw int32 varint encoding of negative audio values uses 10 bytes each,
+	// making full-sample messages too large for gRPC-web streaming.
+	const targetPeaks = 200
+	windowSize := len(samples) / targetPeaks
+	if windowSize < 1 {
+		windowSize = 1
+	}
+
+	peaks := make([]int32, 0, targetPeaks)
+	for i := 0; i < len(samples); i += windowSize {
+		var maxVal int16
+		end := i + windowSize
+		if end > len(samples) {
+			end = len(samples)
+		}
+		for j := i; j < end; j++ {
+			v := samples[j]
+			if v < 0 {
+				v = -v
+			}
+			if v > maxVal {
+				maxVal = v
+			}
+		}
+		peaks = append(peaks, int32(maxVal))
 	}
 
 	h.audioBroadcaster.Broadcast(&sspb.AudioChunk{
 		SessionID:   sessionID.String(),
-		Samples:     int32Samples,
+		Samples:     peaks,
 		ChunkNumber: uint32(chunkNumber),
 		Timestamp:   timestamppb.New(timestamp),
 	})
@@ -315,6 +338,8 @@ func (h *SessionSourceHandler) streamSessionAudio(ctx context.Context, request *
 	updateCh, unsubscribe := h.audioBroadcaster.Subscribe()
 	defer unsubscribe()
 
+	chunksSent := 0
+	chunksReceived := 0
 	for {
 		select {
 		case chunk, ok := <-updateCh:
@@ -322,15 +347,20 @@ func (h *SessionSourceHandler) streamSessionAudio(ctx context.Context, request *
 				// Channel closed, subscriber was removed
 				return nil
 			}
+			chunksReceived++
 			// Filter by session ID
 			if chunk.SessionID == requestedSessionID {
+				chunksSent++
+				if chunksSent%10 == 1 {
+					log.Info().Str("session-id", requestedSessionID).Int("sent", chunksSent).Int("received", chunksReceived).Int("samples", len(chunk.Samples)).Msg("Sending audio chunk to client")
+				}
 				if err := server.Send(chunk); err != nil {
 					log.Err(err).Msg("Cannot send audio chunk")
 					return err
 				}
 			}
 		case <-ctx.Done():
-			log.Debug().Str("session-id", request.SessionID).Msg("Done streaming session audio")
+			log.Debug().Str("session-id", request.SessionID).Int("sent", chunksSent).Int("received", chunksReceived).Msg("Done streaming session audio")
 			return nil
 		}
 	}

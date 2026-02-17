@@ -463,6 +463,9 @@ func (m *Minio) initSession(ctx context.Context, recorderID, sessionID uuid.UUID
 		return
 	}
 
+	// Add to in-memory map so GetSessions() includes this recording session
+	m.system.Recorders[recorderID].Sessions[sessionID] = session
+
 	// Notify about new recording session
 	m.notifyStateChange(&session, SessionStateUnknown)
 }
@@ -924,6 +927,7 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 		if putErr := m.putSessionMetadata(ctx, recorderID, sessionID, sm); putErr != nil {
 			log.Err(putErr).Msg("Cannot update session state to ERROR")
 		}
+		m.system.Recorders[recorderID].Sessions[sessionID] = *sm
 		m.dataLock.Unlock()
 		m.notifyStateChange(sm, previousState)
 		return err
@@ -936,6 +940,7 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 	if err := m.putSessionMetadata(ctx, recorderID, sessionID, sm); err != nil {
 		log.Err(err).Msg("Cannot put session metadata")
 	}
+	m.system.Recorders[recorderID].Sessions[sessionID] = *sm
 	m.dataLock.Unlock()
 
 	if err := m.client.RemoveObject(ctx, bucketName, chunksPrefix, minio.RemoveObjectOptions{ForceDelete: true}); err != nil {

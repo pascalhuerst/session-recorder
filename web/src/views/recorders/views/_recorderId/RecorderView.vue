@@ -75,8 +75,6 @@ const livePath = computed(
   align-items: center;
   justify-content: space-between;
   border-bottom: 1px solid var(--border-primary);
-  margin: calc(-1 * var(--size-4));
-  margin-bottom: 0;
   padding: 0 var(--size-4);
   flex-shrink: 0;
 }
@@ -144,7 +142,6 @@ const livePath = computed(
 .tab-content {
   flex: 1;
   overflow-y: auto;
-  margin: 0 calc(-1 * var(--size-4));
-  padding: calc(var(--size-4) * 2) var(--size-4) 0;
+  padding: var(--size-4);
 }
 </style>

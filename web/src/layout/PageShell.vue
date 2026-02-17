@@ -120,6 +120,5 @@ const settingsOpen = ref(false);
 
 main {
   flex: 1;
-  padding: var(--size-4);
 }
 </style>

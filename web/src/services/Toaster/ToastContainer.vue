@@ -52,7 +52,7 @@ const removeToast = (id: string) => {
   position: fixed;
   top: var(--size-6);
   right: var(--size-6);
-  z-index: 1000;
+  z-index: 10000;
   display: flex;
   flex-direction: column;
   gap: var(--size-3);
@@ -73,39 +73,27 @@ const removeToast = (id: string) => {
 }
 
 .toast--success {
-  border-color: var(--color-green-500);
-  background: var(--color-green-50);
-}
-
-:global(.theme-dark) .toast--success {
-  background: var(--color-green-950);
+  border-color: var(--color-green-700);
+  background: var(--color-green-700);
+  color: white;
 }
 
 .toast--error {
-  border-color: var(--color-red-500);
-  background: var(--color-red-50);
-}
-
-:global(.theme-dark) .toast--error {
-  background: var(--color-red-950);
+  border-color: var(--color-red-700);
+  background: var(--color-red-700);
+  color: white;
 }
 
 .toast--warning {
   border-color: var(--color-yellow-500);
-  background: var(--color-yellow-50);
-}
-
-:global(.theme-dark) .toast--warning {
-  background: var(--color-yellow-950);
+  background: var(--color-yellow-500);
+  color: var(--color-grey-900);
 }
 
 .toast--info {
-  border-color: var(--color-blue-500);
-  background: var(--color-blue-50);
-}
-
-:global(.theme-dark) .toast--info {
-  background: var(--color-blue-950);
+  border-color: var(--color-blue-700);
+  background: var(--color-blue-700);
+  color: white;
 }
 
 .toast__content {
@@ -116,28 +104,17 @@ const removeToast = (id: string) => {
 
 .toast__icon {
   flex-shrink: 0;
-}
-
-.toast--success .toast__icon {
-  color: var(--color-green-500);
-}
-
-.toast--error .toast__icon {
-  color: var(--color-red-500);
+  color: inherit;
 }
 
 .toast--warning .toast__icon {
-  color: var(--color-yellow-500);
-}
-
-.toast--info .toast__icon {
-  color: var(--color-blue-500);
+  color: var(--color-grey-900);
 }
 
 .toast__message {
   flex: 1;
   font-size: var(--scale-1);
-  color: var(--text-primary);
+  color: inherit;
 }
 
 .toast__close {
@@ -145,7 +122,8 @@ const removeToast = (id: string) => {
   border: none;
   cursor: pointer;
   padding: var(--size-1);
-  color: var(--text-muted);
+  color: inherit;
+  opacity: 0.7;
   border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
@@ -156,8 +134,7 @@ const removeToast = (id: string) => {
 }
 
 .toast__close:hover {
-  background: var(--bg-hover);
-  color: var(--text-primary);
+  opacity: 1;
 }
 
 /* Transition animations */

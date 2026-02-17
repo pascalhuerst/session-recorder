@@ -146,56 +146,56 @@ const drawWaveform = () => {
   animationId = requestAnimationFrame(drawWaveform);
 };
 
-onMounted(() => {
-  // Start animation loop
-  animationId = requestAnimationFrame(drawWaveform);
+let retryTimeout: ReturnType<typeof setTimeout> | null = null;
+let mounted = true;
 
-  // Subscribe to audio stream for this session
+function subscribeAudio(sessionID: string) {
   unsubscribeAudio = streamSessionAudio({
-    sessionID: props.session.id,
+    sessionID,
     onChunk: onAudioChunk,
     onError: (error) => {
       console.error('Audio stream error:', error);
+      // Retry after 2 seconds
+      if (mounted) {
+        retryTimeout = setTimeout(() => subscribeAudio(sessionID), 2000);
+      }
     },
     onEnd: () => {
       console.log('Audio stream ended');
     },
   });
+}
+
+onMounted(() => {
+  animationId = requestAnimationFrame(drawWaveform);
+  subscribeAudio(props.session.id);
 });
 
 onUnmounted(() => {
+  mounted = false;
   if (animationId !== null) {
     cancelAnimationFrame(animationId);
   }
   if (unsubscribeAudio) {
     unsubscribeAudio();
   }
+  if (retryTimeout !== null) {
+    clearTimeout(retryTimeout);
+  }
 });
 
-// Re-subscribe if session changes
 watch(
   () => props.session.id,
   (newId, oldId) => {
     if (newId !== oldId) {
-      // Clear existing peaks
       peaks.value = [];
-
-      // Unsubscribe from old session
       if (unsubscribeAudio) {
         unsubscribeAudio();
       }
-
-      // Subscribe to new session
-      unsubscribeAudio = streamSessionAudio({
-        sessionID: newId,
-        onChunk: onAudioChunk,
-        onError: (error) => {
-          console.error('Audio stream error:', error);
-        },
-        onEnd: () => {
-          console.log('Audio stream ended');
-        },
-      });
+      if (retryTimeout !== null) {
+        clearTimeout(retryTimeout);
+      }
+      subscribeAudio(newId);
     }
   }
 );

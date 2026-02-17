@@ -147,11 +147,19 @@ const drawWaveform = () => {
   animationId = requestAnimationFrame(drawWaveform);
 };
 
+let retryTimeout: ReturnType<typeof setTimeout> | null = null;
+let mounted = true;
+
 function subscribeAudio() {
   unsubscribeAudio = streamSessionAudio({
     sessionID: props.session.id,
     onChunk: onAudioChunk,
-    onError: (error) => console.error('Audio stream error:', error),
+    onError: (error) => {
+      console.error('Audio stream error:', error);
+      if (mounted) {
+        retryTimeout = setTimeout(() => subscribeAudio(), 2000);
+      }
+    },
     onEnd: () => console.log('Audio stream ended'),
   });
 }
@@ -162,8 +170,10 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  mounted = false;
   if (animationId !== null) cancelAnimationFrame(animationId);
   if (unsubscribeAudio) unsubscribeAudio();
+  if (retryTimeout !== null) clearTimeout(retryTimeout);
 });
 
 watch(
@@ -172,6 +182,7 @@ watch(
     if (newId !== oldId) {
       peaks.value = [];
       if (unsubscribeAudio) unsubscribeAudio();
+      if (retryTimeout !== null) clearTimeout(retryTimeout);
       subscribeAudio();
     }
   },

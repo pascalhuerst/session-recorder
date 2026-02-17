@@ -197,6 +197,7 @@ func main() {
 		StartShowCB:          showHandler.startShow,
 		RenderAllCB:          showHandler.renderAll,
 		DistributeAllCB:      showHandler.distributeAll,
+		AdvanceActCB:         showHandler.advanceAct,
 	})
 
 	port, err := grpc.StartProtocolServer(sessionSourceServer, mdnsServer, sessionSourceService, uint16(*sessionSourcePort))

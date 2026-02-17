@@ -284,6 +284,60 @@ func (h *ShowHandler) createSegmentsFromActs(ctx context.Context, show *storage.
 	}
 }
 
+func (h *ShowHandler) advanceAct(ctx context.Context, request *sspb.AdvanceActRequest) (*cmpb.Respone, error) {
+	showID, err := uuid.Parse(request.ShowID)
+	if err != nil {
+		return noSuccess, fmt.Errorf("invalid show ID: %w", err)
+	}
+
+	show, err := h.sessionStorage.GetShow(showID)
+	if err != nil {
+		return noSuccess, err
+	}
+
+	if show.State != storage.ShowStateLive {
+		return noSuccess, fmt.Errorf("can only advance acts in LIVE shows")
+	}
+
+	if len(show.Acts) == 0 {
+		return noSuccess, fmt.Errorf("show has no acts")
+	}
+
+	now := time.Now()
+
+	// Find the current act: first act with ActualStart set but ActualEnd not set
+	currentIdx := -1
+	for i, act := range show.Acts {
+		if !act.ActualStart.IsZero() && act.ActualEnd.IsZero() {
+			currentIdx = i
+			break
+		}
+	}
+
+	if currentIdx == -1 {
+		// No act has been started yet — start the first act
+		show.Acts[0].ActualStart = now
+		log.Info().Str("show-id", showID.String()).Str("act", show.Acts[0].Name).Msg("Started first act")
+	} else {
+		// End the current act
+		show.Acts[currentIdx].ActualEnd = now
+		log.Info().Str("show-id", showID.String()).Str("act", show.Acts[currentIdx].Name).Msg("Ended act")
+
+		// Start the next act if one exists
+		if currentIdx+1 < len(show.Acts) {
+			show.Acts[currentIdx+1].ActualStart = now
+			log.Info().Str("show-id", showID.String()).Str("act", show.Acts[currentIdx+1].Name).Msg("Started next act")
+		}
+	}
+
+	if err := h.sessionStorage.SaveShow(ctx, show); err != nil {
+		log.Err(err).Msg("Cannot save show")
+		return noSuccess, err
+	}
+
+	return success, nil
+}
+
 func (h *ShowHandler) renderAll(ctx context.Context, request *sspb.RenderAllRequest) (*cmpb.Respone, error) {
 	showID, err := uuid.Parse(request.ShowID)
 	if err != nil {

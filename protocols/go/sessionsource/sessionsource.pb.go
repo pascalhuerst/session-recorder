@@ -2108,6 +2108,50 @@ func (x *DistributeAllRequest) GetShowID() string {
 	return ""
 }
 
+type AdvanceActRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ShowID        string                 `protobuf:"bytes,1,opt,name=showID,proto3" json:"showID,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AdvanceActRequest) Reset() {
+	*x = AdvanceActRequest{}
+	mi := &file_sessionsource_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AdvanceActRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AdvanceActRequest) ProtoMessage() {}
+
+func (x *AdvanceActRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_sessionsource_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AdvanceActRequest.ProtoReflect.Descriptor instead.
+func (*AdvanceActRequest) Descriptor() ([]byte, []int) {
+	return file_sessionsource_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *AdvanceActRequest) GetShowID() string {
+	if x != nil {
+		return x.ShowID
+	}
+	return ""
+}
+
 type SegmentInfo_Files struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Ogg           string                 `protobuf:"bytes,1,opt,name=ogg,proto3" json:"ogg,omitempty"`
@@ -2118,7 +2162,7 @@ type SegmentInfo_Files struct {
 
 func (x *SegmentInfo_Files) Reset() {
 	*x = SegmentInfo_Files{}
-	mi := &file_sessionsource_proto_msgTypes[32]
+	mi := &file_sessionsource_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2130,7 +2174,7 @@ func (x *SegmentInfo_Files) String() string {
 func (*SegmentInfo_Files) ProtoMessage() {}
 
 func (x *SegmentInfo_Files) ProtoReflect() protoreflect.Message {
-	mi := &file_sessionsource_proto_msgTypes[32]
+	mi := &file_sessionsource_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2171,7 +2215,7 @@ type SessionInfo_Files struct {
 
 func (x *SessionInfo_Files) Reset() {
 	*x = SessionInfo_Files{}
-	mi := &file_sessionsource_proto_msgTypes[33]
+	mi := &file_sessionsource_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2183,7 +2227,7 @@ func (x *SessionInfo_Files) String() string {
 func (*SessionInfo_Files) ProtoMessage() {}
 
 func (x *SessionInfo_Files) ProtoReflect() protoreflect.Message {
-	mi := &file_sessionsource_proto_msgTypes[33]
+	mi := &file_sessionsource_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2381,6 +2425,8 @@ const file_sessionsource_proto_rawDesc = "" +
 	"\x10RenderAllRequest\x12\x16\n" +
 	"\x06showID\x18\x01 \x01(\tR\x06showID\".\n" +
 	"\x14DistributeAllRequest\x12\x16\n" +
+	"\x06showID\x18\x01 \x01(\tR\x06showID\"+\n" +
+	"\x11AdvanceActRequest\x12\x16\n" +
 	"\x06showID\x18\x01 \x01(\tR\x06showID*\x95\x01\n" +
 	"\fSegmentState\x12\x19\n" +
 	"\x15SEGMENT_STATE_UNKNOWN\x10\x00\x12\x1b\n" +
@@ -2398,7 +2444,7 @@ const file_sessionsource_proto_rawDesc = "" +
 	"\x10SHOW_STATE_DRAFT\x10\x00\x12\x13\n" +
 	"\x0fSHOW_STATE_LIVE\x10\x01\x12\x14\n" +
 	"\x10SHOW_STATE_ENDED\x10\x02\x12\x17\n" +
-	"\x13SHOW_STATE_ARCHIVED\x10\x032\x9c\v\n" +
+	"\x13SHOW_STATE_ARCHIVED\x10\x032\xdd\v\n" +
 	"\rSessionSource\x12S\n" +
 	"\x0fStreamRecorders\x12%.sessionsource.StreamRecordersRequest\x1a\x17.sessionsource.Recorder0\x01\x12O\n" +
 	"\x0eStreamSessions\x12#.sessionsource.StreamSessionRequest\x1a\x16.sessionsource.Session0\x01\x12[\n" +
@@ -2423,7 +2469,9 @@ const file_sessionsource_proto_rawDesc = "" +
 	"\tListShows\x12\x1f.sessionsource.ListShowsRequest\x1a .sessionsource.ListShowsResponse\x12=\n" +
 	"\tStartShow\x12\x1f.sessionsource.StartShowRequest\x1a\x0f.common.Respone\x12=\n" +
 	"\tRenderAll\x12\x1f.sessionsource.RenderAllRequest\x1a\x0f.common.Respone\x12E\n" +
-	"\rDistributeAll\x12#.sessionsource.DistributeAllRequest\x1a\x0f.common.ResponeBEZCgithub.com/pascalhuerst/session-recorder/protocols/go/sessionsourceb\x06proto3"
+	"\rDistributeAll\x12#.sessionsource.DistributeAllRequest\x1a\x0f.common.Respone\x12?\n" +
+	"\n" +
+	"AdvanceAct\x12 .sessionsource.AdvanceActRequest\x1a\x0f.common.ResponeBEZCgithub.com/pascalhuerst/session-recorder/protocols/go/sessionsourceb\x06proto3"
 
 var (
 	file_sessionsource_proto_rawDescOnce sync.Once
@@ -2438,7 +2486,7 @@ func file_sessionsource_proto_rawDescGZIP() []byte {
 }
 
 var file_sessionsource_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_sessionsource_proto_msgTypes = make([]protoimpl.MessageInfo, 34)
+var file_sessionsource_proto_msgTypes = make([]protoimpl.MessageInfo, 35)
 var file_sessionsource_proto_goTypes = []any{
 	(SegmentState)(0),                 // 0: sessionsource.SegmentState
 	(SessionState)(0),                 // 1: sessionsource.SessionState
@@ -2475,40 +2523,41 @@ var file_sessionsource_proto_goTypes = []any{
 	(*StartShowRequest)(nil),          // 32: sessionsource.StartShowRequest
 	(*RenderAllRequest)(nil),          // 33: sessionsource.RenderAllRequest
 	(*DistributeAllRequest)(nil),      // 34: sessionsource.DistributeAllRequest
-	(*SegmentInfo_Files)(nil),         // 35: sessionsource.SegmentInfo.Files
-	(*SessionInfo_Files)(nil),         // 36: sessionsource.SessionInfo.Files
-	(*common.RecorderStatus)(nil),     // 37: common.RecorderStatus
-	(*timestamppb.Timestamp)(nil),     // 38: google.protobuf.Timestamp
-	(*durationpb.Duration)(nil),       // 39: google.protobuf.Duration
-	(*common.Respone)(nil),            // 40: common.Respone
+	(*AdvanceActRequest)(nil),         // 35: sessionsource.AdvanceActRequest
+	(*SegmentInfo_Files)(nil),         // 36: sessionsource.SegmentInfo.Files
+	(*SessionInfo_Files)(nil),         // 37: sessionsource.SessionInfo.Files
+	(*common.RecorderStatus)(nil),     // 38: common.RecorderStatus
+	(*timestamppb.Timestamp)(nil),     // 39: google.protobuf.Timestamp
+	(*durationpb.Duration)(nil),       // 40: google.protobuf.Duration
+	(*common.Respone)(nil),            // 41: common.Respone
 }
 var file_sessionsource_proto_depIdxs = []int32{
-	37, // 0: sessionsource.Recorder.status:type_name -> common.RecorderStatus
+	38, // 0: sessionsource.Recorder.status:type_name -> common.RecorderStatus
 	4,  // 1: sessionsource.Recorder.removed:type_name -> sessionsource.RecordereRemoved
-	38, // 2: sessionsource.SegmentInfo.timeStart:type_name -> google.protobuf.Timestamp
-	38, // 3: sessionsource.SegmentInfo.timeEnd:type_name -> google.protobuf.Timestamp
+	39, // 2: sessionsource.SegmentInfo.timeStart:type_name -> google.protobuf.Timestamp
+	39, // 3: sessionsource.SegmentInfo.timeEnd:type_name -> google.protobuf.Timestamp
 	0,  // 4: sessionsource.SegmentInfo.state:type_name -> sessionsource.SegmentState
-	35, // 5: sessionsource.SegmentInfo.inlineFiles:type_name -> sessionsource.SegmentInfo.Files
-	35, // 6: sessionsource.SegmentInfo.downloadFiles:type_name -> sessionsource.SegmentInfo.Files
+	36, // 5: sessionsource.SegmentInfo.inlineFiles:type_name -> sessionsource.SegmentInfo.Files
+	36, // 6: sessionsource.SegmentInfo.downloadFiles:type_name -> sessionsource.SegmentInfo.Files
 	7,  // 7: sessionsource.Segment.updated:type_name -> sessionsource.SegmentInfo
 	8,  // 8: sessionsource.Segment.removed:type_name -> sessionsource.SegmentRemoved
-	38, // 9: sessionsource.SessionInfo.timeCreated:type_name -> google.protobuf.Timestamp
-	38, // 10: sessionsource.SessionInfo.timeFinished:type_name -> google.protobuf.Timestamp
-	39, // 11: sessionsource.SessionInfo.lifetime:type_name -> google.protobuf.Duration
+	39, // 9: sessionsource.SessionInfo.timeCreated:type_name -> google.protobuf.Timestamp
+	39, // 10: sessionsource.SessionInfo.timeFinished:type_name -> google.protobuf.Timestamp
+	40, // 11: sessionsource.SessionInfo.lifetime:type_name -> google.protobuf.Duration
 	1,  // 12: sessionsource.SessionInfo.state:type_name -> sessionsource.SessionState
 	9,  // 13: sessionsource.SessionInfo.segments:type_name -> sessionsource.Segment
-	36, // 14: sessionsource.SessionInfo.inlineFiles:type_name -> sessionsource.SessionInfo.Files
-	36, // 15: sessionsource.SessionInfo.downloadFiles:type_name -> sessionsource.SessionInfo.Files
+	37, // 14: sessionsource.SessionInfo.inlineFiles:type_name -> sessionsource.SessionInfo.Files
+	37, // 15: sessionsource.SessionInfo.downloadFiles:type_name -> sessionsource.SessionInfo.Files
 	10, // 16: sessionsource.Session.updated:type_name -> sessionsource.SessionInfo
 	11, // 17: sessionsource.Session.removed:type_name -> sessionsource.SessionRemoved
 	7,  // 18: sessionsource.CreateSegmentRequest.info:type_name -> sessionsource.SegmentInfo
 	7,  // 19: sessionsource.UpdateSegmentRequest.info:type_name -> sessionsource.SegmentInfo
-	38, // 20: sessionsource.AudioChunk.timestamp:type_name -> google.protobuf.Timestamp
-	38, // 21: sessionsource.ActInfo.plannedStart:type_name -> google.protobuf.Timestamp
-	38, // 22: sessionsource.ActInfo.plannedEnd:type_name -> google.protobuf.Timestamp
-	38, // 23: sessionsource.ActInfo.actualStart:type_name -> google.protobuf.Timestamp
-	38, // 24: sessionsource.ActInfo.actualEnd:type_name -> google.protobuf.Timestamp
-	38, // 25: sessionsource.ShowInfo.date:type_name -> google.protobuf.Timestamp
+	39, // 20: sessionsource.AudioChunk.timestamp:type_name -> google.protobuf.Timestamp
+	39, // 21: sessionsource.ActInfo.plannedStart:type_name -> google.protobuf.Timestamp
+	39, // 22: sessionsource.ActInfo.plannedEnd:type_name -> google.protobuf.Timestamp
+	39, // 23: sessionsource.ActInfo.actualStart:type_name -> google.protobuf.Timestamp
+	39, // 24: sessionsource.ActInfo.actualEnd:type_name -> google.protobuf.Timestamp
+	39, // 25: sessionsource.ShowInfo.date:type_name -> google.protobuf.Timestamp
 	2,  // 26: sessionsource.ShowInfo.state:type_name -> sessionsource.ShowState
 	25, // 27: sessionsource.ShowInfo.acts:type_name -> sessionsource.ActInfo
 	26, // 28: sessionsource.CreateShowRequest.show:type_name -> sessionsource.ShowInfo
@@ -2534,28 +2583,30 @@ var file_sessionsource_proto_depIdxs = []int32{
 	32, // 48: sessionsource.SessionSource.StartShow:input_type -> sessionsource.StartShowRequest
 	33, // 49: sessionsource.SessionSource.RenderAll:input_type -> sessionsource.RenderAllRequest
 	34, // 50: sessionsource.SessionSource.DistributeAll:input_type -> sessionsource.DistributeAllRequest
-	5,  // 51: sessionsource.SessionSource.StreamRecorders:output_type -> sessionsource.Recorder
-	12, // 52: sessionsource.SessionSource.StreamSessions:output_type -> sessionsource.Session
-	24, // 53: sessionsource.SessionSource.StreamSessionAudio:output_type -> sessionsource.AudioChunk
-	40, // 54: sessionsource.SessionSource.SetKeepSession:output_type -> common.Respone
-	40, // 55: sessionsource.SessionSource.DeleteSession:output_type -> common.Respone
-	40, // 56: sessionsource.SessionSource.SetName:output_type -> common.Respone
-	40, // 57: sessionsource.SessionSource.CreateSegment:output_type -> common.Respone
-	40, // 58: sessionsource.SessionSource.DeleteSegment:output_type -> common.Respone
-	40, // 59: sessionsource.SessionSource.RenderSegment:output_type -> common.Respone
-	40, // 60: sessionsource.SessionSource.UpdateSegment:output_type -> common.Respone
-	40, // 61: sessionsource.SessionSource.CutSession:output_type -> common.Respone
-	40, // 62: sessionsource.SessionSource.ShareSession:output_type -> common.Respone
-	40, // 63: sessionsource.SessionSource.ShareSegment:output_type -> common.Respone
-	40, // 64: sessionsource.SessionSource.CreateShow:output_type -> common.Respone
-	40, // 65: sessionsource.SessionSource.UpdateShow:output_type -> common.Respone
-	40, // 66: sessionsource.SessionSource.DeleteShow:output_type -> common.Respone
-	31, // 67: sessionsource.SessionSource.ListShows:output_type -> sessionsource.ListShowsResponse
-	40, // 68: sessionsource.SessionSource.StartShow:output_type -> common.Respone
-	40, // 69: sessionsource.SessionSource.RenderAll:output_type -> common.Respone
-	40, // 70: sessionsource.SessionSource.DistributeAll:output_type -> common.Respone
-	51, // [51:71] is the sub-list for method output_type
-	31, // [31:51] is the sub-list for method input_type
+	35, // 51: sessionsource.SessionSource.AdvanceAct:input_type -> sessionsource.AdvanceActRequest
+	5,  // 52: sessionsource.SessionSource.StreamRecorders:output_type -> sessionsource.Recorder
+	12, // 53: sessionsource.SessionSource.StreamSessions:output_type -> sessionsource.Session
+	24, // 54: sessionsource.SessionSource.StreamSessionAudio:output_type -> sessionsource.AudioChunk
+	41, // 55: sessionsource.SessionSource.SetKeepSession:output_type -> common.Respone
+	41, // 56: sessionsource.SessionSource.DeleteSession:output_type -> common.Respone
+	41, // 57: sessionsource.SessionSource.SetName:output_type -> common.Respone
+	41, // 58: sessionsource.SessionSource.CreateSegment:output_type -> common.Respone
+	41, // 59: sessionsource.SessionSource.DeleteSegment:output_type -> common.Respone
+	41, // 60: sessionsource.SessionSource.RenderSegment:output_type -> common.Respone
+	41, // 61: sessionsource.SessionSource.UpdateSegment:output_type -> common.Respone
+	41, // 62: sessionsource.SessionSource.CutSession:output_type -> common.Respone
+	41, // 63: sessionsource.SessionSource.ShareSession:output_type -> common.Respone
+	41, // 64: sessionsource.SessionSource.ShareSegment:output_type -> common.Respone
+	41, // 65: sessionsource.SessionSource.CreateShow:output_type -> common.Respone
+	41, // 66: sessionsource.SessionSource.UpdateShow:output_type -> common.Respone
+	41, // 67: sessionsource.SessionSource.DeleteShow:output_type -> common.Respone
+	31, // 68: sessionsource.SessionSource.ListShows:output_type -> sessionsource.ListShowsResponse
+	41, // 69: sessionsource.SessionSource.StartShow:output_type -> common.Respone
+	41, // 70: sessionsource.SessionSource.RenderAll:output_type -> common.Respone
+	41, // 71: sessionsource.SessionSource.DistributeAll:output_type -> common.Respone
+	41, // 72: sessionsource.SessionSource.AdvanceAct:output_type -> common.Respone
+	52, // [52:73] is the sub-list for method output_type
+	31, // [31:52] is the sub-list for method input_type
 	31, // [31:31] is the sub-list for extension type_name
 	31, // [31:31] is the sub-list for extension extendee
 	0,  // [0:31] is the sub-list for field type_name
@@ -2584,7 +2635,7 @@ func file_sessionsource_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_sessionsource_proto_rawDesc), len(file_sessionsource_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   34,
+			NumMessages:   35,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

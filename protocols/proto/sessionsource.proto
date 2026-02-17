@@ -235,6 +235,10 @@ message DistributeAllRequest {
 	string showID = 1;
 }
 
+message AdvanceActRequest {
+	string showID = 1;
+}
+
 service SessionSource {
 	// Stream
 	rpc StreamRecorders(StreamRecordersRequest) returns (stream Recorder);
@@ -264,4 +268,5 @@ service SessionSource {
 	rpc StartShow(StartShowRequest) returns (common.Respone);
 	rpc RenderAll(RenderAllRequest) returns (common.Respone);
 	rpc DistributeAll(DistributeAllRequest) returns (common.Respone);
+	rpc AdvanceAct(AdvanceActRequest) returns (common.Respone);
 }

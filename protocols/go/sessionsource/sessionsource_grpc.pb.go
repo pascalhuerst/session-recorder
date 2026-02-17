@@ -40,6 +40,7 @@ const (
 	SessionSource_StartShow_FullMethodName          = "/sessionsource.SessionSource/StartShow"
 	SessionSource_RenderAll_FullMethodName          = "/sessionsource.SessionSource/RenderAll"
 	SessionSource_DistributeAll_FullMethodName      = "/sessionsource.SessionSource/DistributeAll"
+	SessionSource_AdvanceAct_FullMethodName         = "/sessionsource.SessionSource/AdvanceAct"
 )
 
 // SessionSourceClient is the client API for SessionSource service.
@@ -69,6 +70,7 @@ type SessionSourceClient interface {
 	StartShow(ctx context.Context, in *StartShowRequest, opts ...grpc.CallOption) (*common.Respone, error)
 	RenderAll(ctx context.Context, in *RenderAllRequest, opts ...grpc.CallOption) (*common.Respone, error)
 	DistributeAll(ctx context.Context, in *DistributeAllRequest, opts ...grpc.CallOption) (*common.Respone, error)
+	AdvanceAct(ctx context.Context, in *AdvanceActRequest, opts ...grpc.CallOption) (*common.Respone, error)
 }
 
 type sessionSourceClient struct {
@@ -306,6 +308,16 @@ func (c *sessionSourceClient) DistributeAll(ctx context.Context, in *DistributeA
 	return out, nil
 }
 
+func (c *sessionSourceClient) AdvanceAct(ctx context.Context, in *AdvanceActRequest, opts ...grpc.CallOption) (*common.Respone, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(common.Respone)
+	err := c.cc.Invoke(ctx, SessionSource_AdvanceAct_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // SessionSourceServer is the server API for SessionSource service.
 // All implementations should embed UnimplementedSessionSourceServer
 // for forward compatibility.
@@ -333,6 +345,7 @@ type SessionSourceServer interface {
 	StartShow(context.Context, *StartShowRequest) (*common.Respone, error)
 	RenderAll(context.Context, *RenderAllRequest) (*common.Respone, error)
 	DistributeAll(context.Context, *DistributeAllRequest) (*common.Respone, error)
+	AdvanceAct(context.Context, *AdvanceActRequest) (*common.Respone, error)
 }
 
 // UnimplementedSessionSourceServer should be embedded to have
@@ -401,6 +414,9 @@ func (UnimplementedSessionSourceServer) RenderAll(context.Context, *RenderAllReq
 }
 func (UnimplementedSessionSourceServer) DistributeAll(context.Context, *DistributeAllRequest) (*common.Respone, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method DistributeAll not implemented")
+}
+func (UnimplementedSessionSourceServer) AdvanceAct(context.Context, *AdvanceActRequest) (*common.Respone, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AdvanceAct not implemented")
 }
 func (UnimplementedSessionSourceServer) testEmbeddedByValue() {}
 
@@ -761,6 +777,24 @@ func _SessionSource_DistributeAll_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SessionSource_AdvanceAct_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AdvanceActRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SessionSourceServer).AdvanceAct(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SessionSource_AdvanceAct_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SessionSourceServer).AdvanceAct(ctx, req.(*AdvanceActRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // SessionSource_ServiceDesc is the grpc.ServiceDesc for SessionSource service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -835,6 +869,10 @@ var SessionSource_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DistributeAll",
 			Handler:    _SessionSource_DistributeAll_Handler,
+		},
+		{
+			MethodName: "AdvanceAct",
+			Handler:    _SessionSource_AdvanceAct_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

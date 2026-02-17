@@ -58,6 +58,11 @@ export const useShowsStore = defineStore('shows', () => {
     await fetchShows();
   }
 
+  async function advanceAct(showId: string) {
+    await showsApi.advanceAct(showId);
+    await fetchShows();
+  }
+
   return {
     shows,
     loading,
@@ -70,5 +75,6 @@ export const useShowsStore = defineStore('shows', () => {
     startShow,
     renderAllActs,
     distributeAllActs,
+    advanceAct,
   };
 });

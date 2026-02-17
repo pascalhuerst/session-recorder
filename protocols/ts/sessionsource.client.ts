@@ -4,6 +4,7 @@
 import type { RpcTransport } from "@protobuf-ts/runtime-rpc";
 import type { ServiceInfo } from "@protobuf-ts/runtime-rpc";
 import { SessionSource } from "./sessionsource";
+import type { AdvanceActRequest } from "./sessionsource";
 import type { DistributeAllRequest } from "./sessionsource";
 import type { RenderAllRequest } from "./sessionsource";
 import type { StartShowRequest } from "./sessionsource";
@@ -123,6 +124,10 @@ export interface ISessionSourceClient {
      * @generated from protobuf rpc: DistributeAll
      */
     distributeAll(input: DistributeAllRequest, options?: RpcOptions): UnaryCall<DistributeAllRequest, Respone>;
+    /**
+     * @generated from protobuf rpc: AdvanceAct
+     */
+    advanceAct(input: AdvanceActRequest, options?: RpcOptions): UnaryCall<AdvanceActRequest, Respone>;
 }
 /**
  * @generated from protobuf service sessionsource.SessionSource
@@ -278,5 +283,12 @@ export class SessionSourceClient implements ISessionSourceClient, ServiceInfo {
     distributeAll(input: DistributeAllRequest, options?: RpcOptions): UnaryCall<DistributeAllRequest, Respone> {
         const method = this.methods[19], opt = this._transport.mergeOptions(options);
         return stackIntercept<DistributeAllRequest, Respone>("unary", this._transport, method, opt, input);
+    }
+    /**
+     * @generated from protobuf rpc: AdvanceAct
+     */
+    advanceAct(input: AdvanceActRequest, options?: RpcOptions): UnaryCall<AdvanceActRequest, Respone> {
+        const method = this.methods[20], opt = this._transport.mergeOptions(options);
+        return stackIntercept<AdvanceActRequest, Respone>("unary", this._transport, method, opt, input);
     }
 }

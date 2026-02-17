@@ -6,19 +6,19 @@
 #include "sessionsource.grpc.pb.h"
 
 #include <functional>
-#include <grpcpp/support/async_stream.h>
-#include <grpcpp/support/async_unary_call.h>
-#include <grpcpp/impl/channel_interface.h>
-#include <grpcpp/impl/client_unary_call.h>
-#include <grpcpp/support/client_callback.h>
-#include <grpcpp/support/message_allocator.h>
-#include <grpcpp/support/method_handler.h>
-#include <grpcpp/impl/rpc_service_method.h>
-#include <grpcpp/support/server_callback.h>
+#include <grpcpp/impl/codegen/async_stream.h>
+#include <grpcpp/impl/codegen/async_unary_call.h>
+#include <grpcpp/impl/codegen/channel_interface.h>
+#include <grpcpp/impl/codegen/client_unary_call.h>
+#include <grpcpp/impl/codegen/client_callback.h>
+#include <grpcpp/impl/codegen/message_allocator.h>
+#include <grpcpp/impl/codegen/method_handler.h>
+#include <grpcpp/impl/codegen/rpc_service_method.h>
+#include <grpcpp/impl/codegen/server_callback.h>
 #include <grpcpp/impl/codegen/server_callback_handlers.h>
-#include <grpcpp/server_context.h>
-#include <grpcpp/impl/service_type.h>
-#include <grpcpp/support/sync_stream.h>
+#include <grpcpp/impl/codegen/server_context.h>
+#include <grpcpp/impl/codegen/service_type.h>
+#include <grpcpp/impl/codegen/sync_stream.h>
 namespace sessionsource {
 
 static const char* SessionSource_method_names[] = {
@@ -35,6 +35,14 @@ static const char* SessionSource_method_names[] = {
   "/sessionsource.SessionSource/CutSession",
   "/sessionsource.SessionSource/ShareSession",
   "/sessionsource.SessionSource/ShareSegment",
+  "/sessionsource.SessionSource/CreateShow",
+  "/sessionsource.SessionSource/UpdateShow",
+  "/sessionsource.SessionSource/DeleteShow",
+  "/sessionsource.SessionSource/ListShows",
+  "/sessionsource.SessionSource/StartShow",
+  "/sessionsource.SessionSource/RenderAll",
+  "/sessionsource.SessionSource/DistributeAll",
+  "/sessionsource.SessionSource/AdvanceAct",
 };
 
 std::unique_ptr< SessionSource::Stub> SessionSource::NewStub(const std::shared_ptr< ::grpc::ChannelInterface>& channel, const ::grpc::StubOptions& options) {
@@ -57,6 +65,14 @@ SessionSource::Stub::Stub(const std::shared_ptr< ::grpc::ChannelInterface>& chan
   , rpcmethod_CutSession_(SessionSource_method_names[10], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
   , rpcmethod_ShareSession_(SessionSource_method_names[11], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
   , rpcmethod_ShareSegment_(SessionSource_method_names[12], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
+  , rpcmethod_CreateShow_(SessionSource_method_names[13], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
+  , rpcmethod_UpdateShow_(SessionSource_method_names[14], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
+  , rpcmethod_DeleteShow_(SessionSource_method_names[15], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
+  , rpcmethod_ListShows_(SessionSource_method_names[16], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
+  , rpcmethod_StartShow_(SessionSource_method_names[17], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
+  , rpcmethod_RenderAll_(SessionSource_method_names[18], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
+  , rpcmethod_DistributeAll_(SessionSource_method_names[19], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
+  , rpcmethod_AdvanceAct_(SessionSource_method_names[20], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
   {}
 
 ::grpc::ClientReader< ::sessionsource::Recorder>* SessionSource::Stub::StreamRecordersRaw(::grpc::ClientContext* context, const ::sessionsource::StreamRecordersRequest& request) {
@@ -337,6 +353,190 @@ void SessionSource::Stub::async::ShareSegment(::grpc::ClientContext* context, co
   return result;
 }
 
+::grpc::Status SessionSource::Stub::CreateShow(::grpc::ClientContext* context, const ::sessionsource::CreateShowRequest& request, ::common::Respone* response) {
+  return ::grpc::internal::BlockingUnaryCall< ::sessionsource::CreateShowRequest, ::common::Respone, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), rpcmethod_CreateShow_, context, request, response);
+}
+
+void SessionSource::Stub::async::CreateShow(::grpc::ClientContext* context, const ::sessionsource::CreateShowRequest* request, ::common::Respone* response, std::function<void(::grpc::Status)> f) {
+  ::grpc::internal::CallbackUnaryCall< ::sessionsource::CreateShowRequest, ::common::Respone, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(stub_->channel_.get(), stub_->rpcmethod_CreateShow_, context, request, response, std::move(f));
+}
+
+void SessionSource::Stub::async::CreateShow(::grpc::ClientContext* context, const ::sessionsource::CreateShowRequest* request, ::common::Respone* response, ::grpc::ClientUnaryReactor* reactor) {
+  ::grpc::internal::ClientCallbackUnaryFactory::Create< ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(stub_->channel_.get(), stub_->rpcmethod_CreateShow_, context, request, response, reactor);
+}
+
+::grpc::ClientAsyncResponseReader< ::common::Respone>* SessionSource::Stub::PrepareAsyncCreateShowRaw(::grpc::ClientContext* context, const ::sessionsource::CreateShowRequest& request, ::grpc::CompletionQueue* cq) {
+  return ::grpc::internal::ClientAsyncResponseReaderHelper::Create< ::common::Respone, ::sessionsource::CreateShowRequest, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), cq, rpcmethod_CreateShow_, context, request);
+}
+
+::grpc::ClientAsyncResponseReader< ::common::Respone>* SessionSource::Stub::AsyncCreateShowRaw(::grpc::ClientContext* context, const ::sessionsource::CreateShowRequest& request, ::grpc::CompletionQueue* cq) {
+  auto* result =
+    this->PrepareAsyncCreateShowRaw(context, request, cq);
+  result->StartCall();
+  return result;
+}
+
+::grpc::Status SessionSource::Stub::UpdateShow(::grpc::ClientContext* context, const ::sessionsource::UpdateShowRequest& request, ::common::Respone* response) {
+  return ::grpc::internal::BlockingUnaryCall< ::sessionsource::UpdateShowRequest, ::common::Respone, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), rpcmethod_UpdateShow_, context, request, response);
+}
+
+void SessionSource::Stub::async::UpdateShow(::grpc::ClientContext* context, const ::sessionsource::UpdateShowRequest* request, ::common::Respone* response, std::function<void(::grpc::Status)> f) {
+  ::grpc::internal::CallbackUnaryCall< ::sessionsource::UpdateShowRequest, ::common::Respone, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(stub_->channel_.get(), stub_->rpcmethod_UpdateShow_, context, request, response, std::move(f));
+}
+
+void SessionSource::Stub::async::UpdateShow(::grpc::ClientContext* context, const ::sessionsource::UpdateShowRequest* request, ::common::Respone* response, ::grpc::ClientUnaryReactor* reactor) {
+  ::grpc::internal::ClientCallbackUnaryFactory::Create< ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(stub_->channel_.get(), stub_->rpcmethod_UpdateShow_, context, request, response, reactor);
+}
+
+::grpc::ClientAsyncResponseReader< ::common::Respone>* SessionSource::Stub::PrepareAsyncUpdateShowRaw(::grpc::ClientContext* context, const ::sessionsource::UpdateShowRequest& request, ::grpc::CompletionQueue* cq) {
+  return ::grpc::internal::ClientAsyncResponseReaderHelper::Create< ::common::Respone, ::sessionsource::UpdateShowRequest, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), cq, rpcmethod_UpdateShow_, context, request);
+}
+
+::grpc::ClientAsyncResponseReader< ::common::Respone>* SessionSource::Stub::AsyncUpdateShowRaw(::grpc::ClientContext* context, const ::sessionsource::UpdateShowRequest& request, ::grpc::CompletionQueue* cq) {
+  auto* result =
+    this->PrepareAsyncUpdateShowRaw(context, request, cq);
+  result->StartCall();
+  return result;
+}
+
+::grpc::Status SessionSource::Stub::DeleteShow(::grpc::ClientContext* context, const ::sessionsource::DeleteShowRequest& request, ::common::Respone* response) {
+  return ::grpc::internal::BlockingUnaryCall< ::sessionsource::DeleteShowRequest, ::common::Respone, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), rpcmethod_DeleteShow_, context, request, response);
+}
+
+void SessionSource::Stub::async::DeleteShow(::grpc::ClientContext* context, const ::sessionsource::DeleteShowRequest* request, ::common::Respone* response, std::function<void(::grpc::Status)> f) {
+  ::grpc::internal::CallbackUnaryCall< ::sessionsource::DeleteShowRequest, ::common::Respone, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(stub_->channel_.get(), stub_->rpcmethod_DeleteShow_, context, request, response, std::move(f));
+}
+
+void SessionSource::Stub::async::DeleteShow(::grpc::ClientContext* context, const ::sessionsource::DeleteShowRequest* request, ::common::Respone* response, ::grpc::ClientUnaryReactor* reactor) {
+  ::grpc::internal::ClientCallbackUnaryFactory::Create< ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(stub_->channel_.get(), stub_->rpcmethod_DeleteShow_, context, request, response, reactor);
+}
+
+::grpc::ClientAsyncResponseReader< ::common::Respone>* SessionSource::Stub::PrepareAsyncDeleteShowRaw(::grpc::ClientContext* context, const ::sessionsource::DeleteShowRequest& request, ::grpc::CompletionQueue* cq) {
+  return ::grpc::internal::ClientAsyncResponseReaderHelper::Create< ::common::Respone, ::sessionsource::DeleteShowRequest, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), cq, rpcmethod_DeleteShow_, context, request);
+}
+
+::grpc::ClientAsyncResponseReader< ::common::Respone>* SessionSource::Stub::AsyncDeleteShowRaw(::grpc::ClientContext* context, const ::sessionsource::DeleteShowRequest& request, ::grpc::CompletionQueue* cq) {
+  auto* result =
+    this->PrepareAsyncDeleteShowRaw(context, request, cq);
+  result->StartCall();
+  return result;
+}
+
+::grpc::Status SessionSource::Stub::ListShows(::grpc::ClientContext* context, const ::sessionsource::ListShowsRequest& request, ::sessionsource::ListShowsResponse* response) {
+  return ::grpc::internal::BlockingUnaryCall< ::sessionsource::ListShowsRequest, ::sessionsource::ListShowsResponse, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), rpcmethod_ListShows_, context, request, response);
+}
+
+void SessionSource::Stub::async::ListShows(::grpc::ClientContext* context, const ::sessionsource::ListShowsRequest* request, ::sessionsource::ListShowsResponse* response, std::function<void(::grpc::Status)> f) {
+  ::grpc::internal::CallbackUnaryCall< ::sessionsource::ListShowsRequest, ::sessionsource::ListShowsResponse, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(stub_->channel_.get(), stub_->rpcmethod_ListShows_, context, request, response, std::move(f));
+}
+
+void SessionSource::Stub::async::ListShows(::grpc::ClientContext* context, const ::sessionsource::ListShowsRequest* request, ::sessionsource::ListShowsResponse* response, ::grpc::ClientUnaryReactor* reactor) {
+  ::grpc::internal::ClientCallbackUnaryFactory::Create< ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(stub_->channel_.get(), stub_->rpcmethod_ListShows_, context, request, response, reactor);
+}
+
+::grpc::ClientAsyncResponseReader< ::sessionsource::ListShowsResponse>* SessionSource::Stub::PrepareAsyncListShowsRaw(::grpc::ClientContext* context, const ::sessionsource::ListShowsRequest& request, ::grpc::CompletionQueue* cq) {
+  return ::grpc::internal::ClientAsyncResponseReaderHelper::Create< ::sessionsource::ListShowsResponse, ::sessionsource::ListShowsRequest, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), cq, rpcmethod_ListShows_, context, request);
+}
+
+::grpc::ClientAsyncResponseReader< ::sessionsource::ListShowsResponse>* SessionSource::Stub::AsyncListShowsRaw(::grpc::ClientContext* context, const ::sessionsource::ListShowsRequest& request, ::grpc::CompletionQueue* cq) {
+  auto* result =
+    this->PrepareAsyncListShowsRaw(context, request, cq);
+  result->StartCall();
+  return result;
+}
+
+::grpc::Status SessionSource::Stub::StartShow(::grpc::ClientContext* context, const ::sessionsource::StartShowRequest& request, ::common::Respone* response) {
+  return ::grpc::internal::BlockingUnaryCall< ::sessionsource::StartShowRequest, ::common::Respone, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), rpcmethod_StartShow_, context, request, response);
+}
+
+void SessionSource::Stub::async::StartShow(::grpc::ClientContext* context, const ::sessionsource::StartShowRequest* request, ::common::Respone* response, std::function<void(::grpc::Status)> f) {
+  ::grpc::internal::CallbackUnaryCall< ::sessionsource::StartShowRequest, ::common::Respone, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(stub_->channel_.get(), stub_->rpcmethod_StartShow_, context, request, response, std::move(f));
+}
+
+void SessionSource::Stub::async::StartShow(::grpc::ClientContext* context, const ::sessionsource::StartShowRequest* request, ::common::Respone* response, ::grpc::ClientUnaryReactor* reactor) {
+  ::grpc::internal::ClientCallbackUnaryFactory::Create< ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(stub_->channel_.get(), stub_->rpcmethod_StartShow_, context, request, response, reactor);
+}
+
+::grpc::ClientAsyncResponseReader< ::common::Respone>* SessionSource::Stub::PrepareAsyncStartShowRaw(::grpc::ClientContext* context, const ::sessionsource::StartShowRequest& request, ::grpc::CompletionQueue* cq) {
+  return ::grpc::internal::ClientAsyncResponseReaderHelper::Create< ::common::Respone, ::sessionsource::StartShowRequest, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), cq, rpcmethod_StartShow_, context, request);
+}
+
+::grpc::ClientAsyncResponseReader< ::common::Respone>* SessionSource::Stub::AsyncStartShowRaw(::grpc::ClientContext* context, const ::sessionsource::StartShowRequest& request, ::grpc::CompletionQueue* cq) {
+  auto* result =
+    this->PrepareAsyncStartShowRaw(context, request, cq);
+  result->StartCall();
+  return result;
+}
+
+::grpc::Status SessionSource::Stub::RenderAll(::grpc::ClientContext* context, const ::sessionsource::RenderAllRequest& request, ::common::Respone* response) {
+  return ::grpc::internal::BlockingUnaryCall< ::sessionsource::RenderAllRequest, ::common::Respone, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), rpcmethod_RenderAll_, context, request, response);
+}
+
+void SessionSource::Stub::async::RenderAll(::grpc::ClientContext* context, const ::sessionsource::RenderAllRequest* request, ::common::Respone* response, std::function<void(::grpc::Status)> f) {
+  ::grpc::internal::CallbackUnaryCall< ::sessionsource::RenderAllRequest, ::common::Respone, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(stub_->channel_.get(), stub_->rpcmethod_RenderAll_, context, request, response, std::move(f));
+}
+
+void SessionSource::Stub::async::RenderAll(::grpc::ClientContext* context, const ::sessionsource::RenderAllRequest* request, ::common::Respone* response, ::grpc::ClientUnaryReactor* reactor) {
+  ::grpc::internal::ClientCallbackUnaryFactory::Create< ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(stub_->channel_.get(), stub_->rpcmethod_RenderAll_, context, request, response, reactor);
+}
+
+::grpc::ClientAsyncResponseReader< ::common::Respone>* SessionSource::Stub::PrepareAsyncRenderAllRaw(::grpc::ClientContext* context, const ::sessionsource::RenderAllRequest& request, ::grpc::CompletionQueue* cq) {
+  return ::grpc::internal::ClientAsyncResponseReaderHelper::Create< ::common::Respone, ::sessionsource::RenderAllRequest, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), cq, rpcmethod_RenderAll_, context, request);
+}
+
+::grpc::ClientAsyncResponseReader< ::common::Respone>* SessionSource::Stub::AsyncRenderAllRaw(::grpc::ClientContext* context, const ::sessionsource::RenderAllRequest& request, ::grpc::CompletionQueue* cq) {
+  auto* result =
+    this->PrepareAsyncRenderAllRaw(context, request, cq);
+  result->StartCall();
+  return result;
+}
+
+::grpc::Status SessionSource::Stub::DistributeAll(::grpc::ClientContext* context, const ::sessionsource::DistributeAllRequest& request, ::common::Respone* response) {
+  return ::grpc::internal::BlockingUnaryCall< ::sessionsource::DistributeAllRequest, ::common::Respone, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), rpcmethod_DistributeAll_, context, request, response);
+}
+
+void SessionSource::Stub::async::DistributeAll(::grpc::ClientContext* context, const ::sessionsource::DistributeAllRequest* request, ::common::Respone* response, std::function<void(::grpc::Status)> f) {
+  ::grpc::internal::CallbackUnaryCall< ::sessionsource::DistributeAllRequest, ::common::Respone, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(stub_->channel_.get(), stub_->rpcmethod_DistributeAll_, context, request, response, std::move(f));
+}
+
+void SessionSource::Stub::async::DistributeAll(::grpc::ClientContext* context, const ::sessionsource::DistributeAllRequest* request, ::common::Respone* response, ::grpc::ClientUnaryReactor* reactor) {
+  ::grpc::internal::ClientCallbackUnaryFactory::Create< ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(stub_->channel_.get(), stub_->rpcmethod_DistributeAll_, context, request, response, reactor);
+}
+
+::grpc::ClientAsyncResponseReader< ::common::Respone>* SessionSource::Stub::PrepareAsyncDistributeAllRaw(::grpc::ClientContext* context, const ::sessionsource::DistributeAllRequest& request, ::grpc::CompletionQueue* cq) {
+  return ::grpc::internal::ClientAsyncResponseReaderHelper::Create< ::common::Respone, ::sessionsource::DistributeAllRequest, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), cq, rpcmethod_DistributeAll_, context, request);
+}
+
+::grpc::ClientAsyncResponseReader< ::common::Respone>* SessionSource::Stub::AsyncDistributeAllRaw(::grpc::ClientContext* context, const ::sessionsource::DistributeAllRequest& request, ::grpc::CompletionQueue* cq) {
+  auto* result =
+    this->PrepareAsyncDistributeAllRaw(context, request, cq);
+  result->StartCall();
+  return result;
+}
+
+::grpc::Status SessionSource::Stub::AdvanceAct(::grpc::ClientContext* context, const ::sessionsource::AdvanceActRequest& request, ::common::Respone* response) {
+  return ::grpc::internal::BlockingUnaryCall< ::sessionsource::AdvanceActRequest, ::common::Respone, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), rpcmethod_AdvanceAct_, context, request, response);
+}
+
+void SessionSource::Stub::async::AdvanceAct(::grpc::ClientContext* context, const ::sessionsource::AdvanceActRequest* request, ::common::Respone* response, std::function<void(::grpc::Status)> f) {
+  ::grpc::internal::CallbackUnaryCall< ::sessionsource::AdvanceActRequest, ::common::Respone, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(stub_->channel_.get(), stub_->rpcmethod_AdvanceAct_, context, request, response, std::move(f));
+}
+
+void SessionSource::Stub::async::AdvanceAct(::grpc::ClientContext* context, const ::sessionsource::AdvanceActRequest* request, ::common::Respone* response, ::grpc::ClientUnaryReactor* reactor) {
+  ::grpc::internal::ClientCallbackUnaryFactory::Create< ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(stub_->channel_.get(), stub_->rpcmethod_AdvanceAct_, context, request, response, reactor);
+}
+
+::grpc::ClientAsyncResponseReader< ::common::Respone>* SessionSource::Stub::PrepareAsyncAdvanceActRaw(::grpc::ClientContext* context, const ::sessionsource::AdvanceActRequest& request, ::grpc::CompletionQueue* cq) {
+  return ::grpc::internal::ClientAsyncResponseReaderHelper::Create< ::common::Respone, ::sessionsource::AdvanceActRequest, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), cq, rpcmethod_AdvanceAct_, context, request);
+}
+
+::grpc::ClientAsyncResponseReader< ::common::Respone>* SessionSource::Stub::AsyncAdvanceActRaw(::grpc::ClientContext* context, const ::sessionsource::AdvanceActRequest& request, ::grpc::CompletionQueue* cq) {
+  auto* result =
+    this->PrepareAsyncAdvanceActRaw(context, request, cq);
+  result->StartCall();
+  return result;
+}
+
 SessionSource::Service::Service() {
   AddMethod(new ::grpc::internal::RpcServiceMethod(
       SessionSource_method_names[0],
@@ -468,6 +668,86 @@ SessionSource::Service::Service() {
              ::common::Respone* resp) {
                return service->ShareSegment(ctx, req, resp);
              }, this)));
+  AddMethod(new ::grpc::internal::RpcServiceMethod(
+      SessionSource_method_names[13],
+      ::grpc::internal::RpcMethod::NORMAL_RPC,
+      new ::grpc::internal::RpcMethodHandler< SessionSource::Service, ::sessionsource::CreateShowRequest, ::common::Respone, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(
+          [](SessionSource::Service* service,
+             ::grpc::ServerContext* ctx,
+             const ::sessionsource::CreateShowRequest* req,
+             ::common::Respone* resp) {
+               return service->CreateShow(ctx, req, resp);
+             }, this)));
+  AddMethod(new ::grpc::internal::RpcServiceMethod(
+      SessionSource_method_names[14],
+      ::grpc::internal::RpcMethod::NORMAL_RPC,
+      new ::grpc::internal::RpcMethodHandler< SessionSource::Service, ::sessionsource::UpdateShowRequest, ::common::Respone, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(
+          [](SessionSource::Service* service,
+             ::grpc::ServerContext* ctx,
+             const ::sessionsource::UpdateShowRequest* req,
+             ::common::Respone* resp) {
+               return service->UpdateShow(ctx, req, resp);
+             }, this)));
+  AddMethod(new ::grpc::internal::RpcServiceMethod(
+      SessionSource_method_names[15],
+      ::grpc::internal::RpcMethod::NORMAL_RPC,
+      new ::grpc::internal::RpcMethodHandler< SessionSource::Service, ::sessionsource::DeleteShowRequest, ::common::Respone, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(
+          [](SessionSource::Service* service,
+             ::grpc::ServerContext* ctx,
+             const ::sessionsource::DeleteShowRequest* req,
+             ::common::Respone* resp) {
+               return service->DeleteShow(ctx, req, resp);
+             }, this)));
+  AddMethod(new ::grpc::internal::RpcServiceMethod(
+      SessionSource_method_names[16],
+      ::grpc::internal::RpcMethod::NORMAL_RPC,
+      new ::grpc::internal::RpcMethodHandler< SessionSource::Service, ::sessionsource::ListShowsRequest, ::sessionsource::ListShowsResponse, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(
+          [](SessionSource::Service* service,
+             ::grpc::ServerContext* ctx,
+             const ::sessionsource::ListShowsRequest* req,
+             ::sessionsource::ListShowsResponse* resp) {
+               return service->ListShows(ctx, req, resp);
+             }, this)));
+  AddMethod(new ::grpc::internal::RpcServiceMethod(
+      SessionSource_method_names[17],
+      ::grpc::internal::RpcMethod::NORMAL_RPC,
+      new ::grpc::internal::RpcMethodHandler< SessionSource::Service, ::sessionsource::StartShowRequest, ::common::Respone, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(
+          [](SessionSource::Service* service,
+             ::grpc::ServerContext* ctx,
+             const ::sessionsource::StartShowRequest* req,
+             ::common::Respone* resp) {
+               return service->StartShow(ctx, req, resp);
+             }, this)));
+  AddMethod(new ::grpc::internal::RpcServiceMethod(
+      SessionSource_method_names[18],
+      ::grpc::internal::RpcMethod::NORMAL_RPC,
+      new ::grpc::internal::RpcMethodHandler< SessionSource::Service, ::sessionsource::RenderAllRequest, ::common::Respone, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(
+          [](SessionSource::Service* service,
+             ::grpc::ServerContext* ctx,
+             const ::sessionsource::RenderAllRequest* req,
+             ::common::Respone* resp) {
+               return service->RenderAll(ctx, req, resp);
+             }, this)));
+  AddMethod(new ::grpc::internal::RpcServiceMethod(
+      SessionSource_method_names[19],
+      ::grpc::internal::RpcMethod::NORMAL_RPC,
+      new ::grpc::internal::RpcMethodHandler< SessionSource::Service, ::sessionsource::DistributeAllRequest, ::common::Respone, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(
+          [](SessionSource::Service* service,
+             ::grpc::ServerContext* ctx,
+             const ::sessionsource::DistributeAllRequest* req,
+             ::common::Respone* resp) {
+               return service->DistributeAll(ctx, req, resp);
+             }, this)));
+  AddMethod(new ::grpc::internal::RpcServiceMethod(
+      SessionSource_method_names[20],
+      ::grpc::internal::RpcMethod::NORMAL_RPC,
+      new ::grpc::internal::RpcMethodHandler< SessionSource::Service, ::sessionsource::AdvanceActRequest, ::common::Respone, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(
+          [](SessionSource::Service* service,
+             ::grpc::ServerContext* ctx,
+             const ::sessionsource::AdvanceActRequest* req,
+             ::common::Respone* resp) {
+               return service->AdvanceAct(ctx, req, resp);
+             }, this)));
 }
 
 SessionSource::Service::~Service() {
@@ -558,6 +838,62 @@ SessionSource::Service::~Service() {
 }
 
 ::grpc::Status SessionSource::Service::ShareSegment(::grpc::ServerContext* context, const ::sessionsource::ShareSegmentRequest* request, ::common::Respone* response) {
+  (void) context;
+  (void) request;
+  (void) response;
+  return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+}
+
+::grpc::Status SessionSource::Service::CreateShow(::grpc::ServerContext* context, const ::sessionsource::CreateShowRequest* request, ::common::Respone* response) {
+  (void) context;
+  (void) request;
+  (void) response;
+  return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+}
+
+::grpc::Status SessionSource::Service::UpdateShow(::grpc::ServerContext* context, const ::sessionsource::UpdateShowRequest* request, ::common::Respone* response) {
+  (void) context;
+  (void) request;
+  (void) response;
+  return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+}
+
+::grpc::Status SessionSource::Service::DeleteShow(::grpc::ServerContext* context, const ::sessionsource::DeleteShowRequest* request, ::common::Respone* response) {
+  (void) context;
+  (void) request;
+  (void) response;
+  return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+}
+
+::grpc::Status SessionSource::Service::ListShows(::grpc::ServerContext* context, const ::sessionsource::ListShowsRequest* request, ::sessionsource::ListShowsResponse* response) {
+  (void) context;
+  (void) request;
+  (void) response;
+  return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+}
+
+::grpc::Status SessionSource::Service::StartShow(::grpc::ServerContext* context, const ::sessionsource::StartShowRequest* request, ::common::Respone* response) {
+  (void) context;
+  (void) request;
+  (void) response;
+  return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+}
+
+::grpc::Status SessionSource::Service::RenderAll(::grpc::ServerContext* context, const ::sessionsource::RenderAllRequest* request, ::common::Respone* response) {
+  (void) context;
+  (void) request;
+  (void) response;
+  return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+}
+
+::grpc::Status SessionSource::Service::DistributeAll(::grpc::ServerContext* context, const ::sessionsource::DistributeAllRequest* request, ::common::Respone* response) {
+  (void) context;
+  (void) request;
+  (void) response;
+  return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+}
+
+::grpc::Status SessionSource::Service::AdvanceAct(::grpc::ServerContext* context, const ::sessionsource::AdvanceActRequest* request, ::common::Respone* response) {
   (void) context;
   (void) request;
   (void) response;

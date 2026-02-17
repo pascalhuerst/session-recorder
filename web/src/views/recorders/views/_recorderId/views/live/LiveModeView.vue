@@ -27,6 +27,12 @@ const recordingSession = computed(() =>
 const exitPath = computed(
   () => `/recorders/${selectedRecorderId.value}/sessions`,
 );
+
+async function handleAdvanceAct() {
+  if (liveShow.value) {
+    await showsStore.advanceAct(liveShow.value.id);
+  }
+}
 </script>
 
 <template>
@@ -39,7 +45,7 @@ const exitPath = computed(
       </router-link>
     </div>
     <div class="live-mode-content">
-      <LiveShowTimeline v-if="liveShow" :show="liveShow" />
+      <LiveShowTimeline v-if="liveShow" :show="liveShow" @advance-act="handleAdvanceAct" />
       <LiveRecordingWaveform
         v-else-if="recordingSession"
         :session="recordingSession"

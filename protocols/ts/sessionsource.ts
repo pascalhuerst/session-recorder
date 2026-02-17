@@ -576,6 +576,15 @@ export interface DistributeAllRequest {
     showID: string;
 }
 /**
+ * @generated from protobuf message sessionsource.AdvanceActRequest
+ */
+export interface AdvanceActRequest {
+    /**
+     * @generated from protobuf field: string showID = 1
+     */
+    showID: string;
+}
+/**
  * @generated from protobuf enum sessionsource.SegmentState
  */
 export enum SegmentState {
@@ -2693,6 +2702,53 @@ class DistributeAllRequest$Type extends MessageType<DistributeAllRequest> {
  * @generated MessageType for protobuf message sessionsource.DistributeAllRequest
  */
 export const DistributeAllRequest = new DistributeAllRequest$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class AdvanceActRequest$Type extends MessageType<AdvanceActRequest> {
+    constructor() {
+        super("sessionsource.AdvanceActRequest", [
+            { no: 1, name: "showID", kind: "scalar", T: 9 /*ScalarType.STRING*/ }
+        ]);
+    }
+    create(value?: PartialMessage<AdvanceActRequest>): AdvanceActRequest {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.showID = "";
+        if (value !== undefined)
+            reflectionMergePartial<AdvanceActRequest>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: AdvanceActRequest): AdvanceActRequest {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* string showID */ 1:
+                    message.showID = reader.string();
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: AdvanceActRequest, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* string showID = 1; */
+        if (message.showID !== "")
+            writer.tag(1, WireType.LengthDelimited).string(message.showID);
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message sessionsource.AdvanceActRequest
+ */
+export const AdvanceActRequest = new AdvanceActRequest$Type();
 /**
  * @generated ServiceType for protobuf service sessionsource.SessionSource
  */
@@ -2716,5 +2772,6 @@ export const SessionSource = new ServiceType("sessionsource.SessionSource", [
     { name: "ListShows", options: {}, I: ListShowsRequest, O: ListShowsResponse },
     { name: "StartShow", options: {}, I: StartShowRequest, O: Respone },
     { name: "RenderAll", options: {}, I: RenderAllRequest, O: Respone },
-    { name: "DistributeAll", options: {}, I: DistributeAllRequest, O: Respone }
+    { name: "DistributeAll", options: {}, I: DistributeAllRequest, O: Respone },
+    { name: "AdvanceAct", options: {}, I: AdvanceActRequest, O: Respone }
 ]);

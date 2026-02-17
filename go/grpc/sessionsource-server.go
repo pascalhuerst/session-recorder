@@ -34,6 +34,7 @@ type ListShowsCB func(ctx context.Context, request *sspb.ListShowsRequest) (*ssp
 type StartShowCB func(ctx context.Context, request *sspb.StartShowRequest) (*cmpb.Respone, error)
 type RenderAllCB func(ctx context.Context, request *sspb.RenderAllRequest) (*cmpb.Respone, error)
 type DistributeAllCB func(ctx context.Context, request *sspb.DistributeAllRequest) (*cmpb.Respone, error)
+type AdvanceActCB func(ctx context.Context, request *sspb.AdvanceActRequest) (*cmpb.Respone, error)
 
 var noSuccess = &cmpb.Respone{Success: true}
 
@@ -64,6 +65,7 @@ type SessionSourceServerConfig struct {
 	StartShowCB     StartShowCB
 	RenderAllCB     RenderAllCB
 	DistributeAllCB DistributeAllCB
+	AdvanceActCB    AdvanceActCB
 }
 
 type SessionSourceServer struct {
@@ -243,6 +245,13 @@ func (s *SessionSourceServer) RenderAll(ctx context.Context, in *sspb.RenderAllR
 func (s *SessionSourceServer) DistributeAll(ctx context.Context, in *sspb.DistributeAllRequest) (*common.Respone, error) {
 	if s.config.DistributeAllCB != nil {
 		return s.config.DistributeAllCB(ctx, in)
+	}
+	return noSuccess, nil
+}
+
+func (s *SessionSourceServer) AdvanceAct(ctx context.Context, in *sspb.AdvanceActRequest) (*common.Respone, error) {
+	if s.config.AdvanceActCB != nil {
+		return s.config.AdvanceActCB(ctx, in)
 	}
 	return noSuccess, nil
 }

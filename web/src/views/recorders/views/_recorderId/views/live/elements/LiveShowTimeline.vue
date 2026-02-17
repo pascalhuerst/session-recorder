@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
-import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
+import { ref, computed, onMounted, onUnmounted } from 'vue';
 import type { Show, Act } from '@/types';
 
 const props = defineProps<{
   show: Show;
+}>();
+
+const emit = defineEmits<{
+  advanceAct: [];
 }>();
 
 const now = ref(new Date());
@@ -21,11 +24,33 @@ onUnmounted(() => {
 });
 
 function actStatus(act: Act): 'upcoming' | 'active' | 'completed' {
+  // Prefer actual timestamps set by AdvanceAct
+  if (act.actualEnd) return 'completed';
+  if (act.actualStart) return 'active';
+  // Fall back to planned times for acts not yet touched
   const t = now.value.getTime();
   if (t < act.plannedStart.getTime()) return 'upcoming';
   if (t > act.plannedEnd.getTime()) return 'completed';
   return 'active';
 }
+
+const hasActiveAct = computed(() =>
+  props.show.acts.some((a) => actStatus(a) === 'active'),
+);
+
+const allActsCompleted = computed(() =>
+  props.show.acts.every((a) => actStatus(a) === 'completed'),
+);
+
+const nextActLabel = computed(() => {
+  if (allActsCompleted.value) return null;
+  if (!hasActiveAct.value) return 'Start First Act';
+  const activeIdx = props.show.acts.findIndex((a) => actStatus(a) === 'active');
+  if (activeIdx >= 0 && activeIdx + 1 < props.show.acts.length) {
+    return `Next: ${props.show.acts[activeIdx + 1].name}`;
+  }
+  return 'End Act';
+});
 
 function formatTime(d: Date): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
@@ -73,11 +98,19 @@ function formatElapsed(): string {
             <span v-if="actStatus(act) === 'active'" class="now-badge">NOW</span>
           </div>
           <span class="act-time">
-            {{ formatTime(act.plannedStart) }} – {{ formatTime(act.plannedEnd) }}
+            {{ formatTime(act.actualStart ?? act.plannedStart) }} – {{ formatTime(act.actualEnd ?? act.plannedEnd) }}
           </span>
         </div>
       </div>
     </div>
+
+    <button
+      v-if="nextActLabel"
+      class="advance-btn"
+      @click="emit('advanceAct')"
+    >
+      {{ nextActLabel }}
+    </button>
   </div>
 </template>
 
@@ -232,5 +265,22 @@ h1 {
   font-size: var(--scale-1);
   color: var(--text-muted);
   font-family: monospace;
+}
+
+.advance-btn {
+  margin-top: var(--size-4);
+  padding: var(--size-3) var(--size-5);
+  font-size: var(--scale-2);
+  font-weight: var(--weight-bold);
+  color: white;
+  background: #dc2626;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.advance-btn:hover {
+  background: #b91c1c;
 }
 </style>

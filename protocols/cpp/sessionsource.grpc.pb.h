@@ -7,23 +7,23 @@
 #include "sessionsource.pb.h"
 
 #include <functional>
-#include <grpcpp/generic/async_generic_service.h>
-#include <grpcpp/support/async_stream.h>
-#include <grpcpp/support/async_unary_call.h>
-#include <grpcpp/support/client_callback.h>
-#include <grpcpp/client_context.h>
-#include <grpcpp/completion_queue.h>
-#include <grpcpp/support/message_allocator.h>
-#include <grpcpp/support/method_handler.h>
+#include <grpcpp/impl/codegen/async_generic_service.h>
+#include <grpcpp/impl/codegen/async_stream.h>
+#include <grpcpp/impl/codegen/async_unary_call.h>
+#include <grpcpp/impl/codegen/client_callback.h>
+#include <grpcpp/impl/codegen/client_context.h>
+#include <grpcpp/impl/codegen/completion_queue.h>
+#include <grpcpp/impl/codegen/message_allocator.h>
+#include <grpcpp/impl/codegen/method_handler.h>
 #include <grpcpp/impl/codegen/proto_utils.h>
-#include <grpcpp/impl/rpc_method.h>
-#include <grpcpp/support/server_callback.h>
+#include <grpcpp/impl/codegen/rpc_method.h>
+#include <grpcpp/impl/codegen/server_callback.h>
 #include <grpcpp/impl/codegen/server_callback_handlers.h>
-#include <grpcpp/server_context.h>
-#include <grpcpp/impl/service_type.h>
+#include <grpcpp/impl/codegen/server_context.h>
+#include <grpcpp/impl/codegen/service_type.h>
 #include <grpcpp/impl/codegen/status.h>
-#include <grpcpp/support/stub_options.h>
-#include <grpcpp/support/sync_stream.h>
+#include <grpcpp/impl/codegen/stub_options.h>
+#include <grpcpp/impl/codegen/sync_stream.h>
 
 namespace sessionsource {
 
@@ -134,6 +134,63 @@ class SessionSource final {
     std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>> PrepareAsyncShareSegment(::grpc::ClientContext* context, const ::sessionsource::ShareSegmentRequest& request, ::grpc::CompletionQueue* cq) {
       return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>>(PrepareAsyncShareSegmentRaw(context, request, cq));
     }
+    // Shows
+    virtual ::grpc::Status CreateShow(::grpc::ClientContext* context, const ::sessionsource::CreateShowRequest& request, ::common::Respone* response) = 0;
+    std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>> AsyncCreateShow(::grpc::ClientContext* context, const ::sessionsource::CreateShowRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>>(AsyncCreateShowRaw(context, request, cq));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>> PrepareAsyncCreateShow(::grpc::ClientContext* context, const ::sessionsource::CreateShowRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>>(PrepareAsyncCreateShowRaw(context, request, cq));
+    }
+    virtual ::grpc::Status UpdateShow(::grpc::ClientContext* context, const ::sessionsource::UpdateShowRequest& request, ::common::Respone* response) = 0;
+    std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>> AsyncUpdateShow(::grpc::ClientContext* context, const ::sessionsource::UpdateShowRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>>(AsyncUpdateShowRaw(context, request, cq));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>> PrepareAsyncUpdateShow(::grpc::ClientContext* context, const ::sessionsource::UpdateShowRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>>(PrepareAsyncUpdateShowRaw(context, request, cq));
+    }
+    virtual ::grpc::Status DeleteShow(::grpc::ClientContext* context, const ::sessionsource::DeleteShowRequest& request, ::common::Respone* response) = 0;
+    std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>> AsyncDeleteShow(::grpc::ClientContext* context, const ::sessionsource::DeleteShowRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>>(AsyncDeleteShowRaw(context, request, cq));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>> PrepareAsyncDeleteShow(::grpc::ClientContext* context, const ::sessionsource::DeleteShowRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>>(PrepareAsyncDeleteShowRaw(context, request, cq));
+    }
+    virtual ::grpc::Status ListShows(::grpc::ClientContext* context, const ::sessionsource::ListShowsRequest& request, ::sessionsource::ListShowsResponse* response) = 0;
+    std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::sessionsource::ListShowsResponse>> AsyncListShows(::grpc::ClientContext* context, const ::sessionsource::ListShowsRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::sessionsource::ListShowsResponse>>(AsyncListShowsRaw(context, request, cq));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::sessionsource::ListShowsResponse>> PrepareAsyncListShows(::grpc::ClientContext* context, const ::sessionsource::ListShowsRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::sessionsource::ListShowsResponse>>(PrepareAsyncListShowsRaw(context, request, cq));
+    }
+    virtual ::grpc::Status StartShow(::grpc::ClientContext* context, const ::sessionsource::StartShowRequest& request, ::common::Respone* response) = 0;
+    std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>> AsyncStartShow(::grpc::ClientContext* context, const ::sessionsource::StartShowRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>>(AsyncStartShowRaw(context, request, cq));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>> PrepareAsyncStartShow(::grpc::ClientContext* context, const ::sessionsource::StartShowRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>>(PrepareAsyncStartShowRaw(context, request, cq));
+    }
+    virtual ::grpc::Status RenderAll(::grpc::ClientContext* context, const ::sessionsource::RenderAllRequest& request, ::common::Respone* response) = 0;
+    std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>> AsyncRenderAll(::grpc::ClientContext* context, const ::sessionsource::RenderAllRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>>(AsyncRenderAllRaw(context, request, cq));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>> PrepareAsyncRenderAll(::grpc::ClientContext* context, const ::sessionsource::RenderAllRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>>(PrepareAsyncRenderAllRaw(context, request, cq));
+    }
+    virtual ::grpc::Status DistributeAll(::grpc::ClientContext* context, const ::sessionsource::DistributeAllRequest& request, ::common::Respone* response) = 0;
+    std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>> AsyncDistributeAll(::grpc::ClientContext* context, const ::sessionsource::DistributeAllRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>>(AsyncDistributeAllRaw(context, request, cq));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>> PrepareAsyncDistributeAll(::grpc::ClientContext* context, const ::sessionsource::DistributeAllRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>>(PrepareAsyncDistributeAllRaw(context, request, cq));
+    }
+    virtual ::grpc::Status AdvanceAct(::grpc::ClientContext* context, const ::sessionsource::AdvanceActRequest& request, ::common::Respone* response) = 0;
+    std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>> AsyncAdvanceAct(::grpc::ClientContext* context, const ::sessionsource::AdvanceActRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>>(AsyncAdvanceActRaw(context, request, cq));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>> PrepareAsyncAdvanceAct(::grpc::ClientContext* context, const ::sessionsource::AdvanceActRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>>(PrepareAsyncAdvanceActRaw(context, request, cq));
+    }
     class async_interface {
      public:
       virtual ~async_interface() {}
@@ -162,6 +219,23 @@ class SessionSource final {
       virtual void ShareSession(::grpc::ClientContext* context, const ::sessionsource::ShareSessionRequest* request, ::common::Respone* response, ::grpc::ClientUnaryReactor* reactor) = 0;
       virtual void ShareSegment(::grpc::ClientContext* context, const ::sessionsource::ShareSegmentRequest* request, ::common::Respone* response, std::function<void(::grpc::Status)>) = 0;
       virtual void ShareSegment(::grpc::ClientContext* context, const ::sessionsource::ShareSegmentRequest* request, ::common::Respone* response, ::grpc::ClientUnaryReactor* reactor) = 0;
+      // Shows
+      virtual void CreateShow(::grpc::ClientContext* context, const ::sessionsource::CreateShowRequest* request, ::common::Respone* response, std::function<void(::grpc::Status)>) = 0;
+      virtual void CreateShow(::grpc::ClientContext* context, const ::sessionsource::CreateShowRequest* request, ::common::Respone* response, ::grpc::ClientUnaryReactor* reactor) = 0;
+      virtual void UpdateShow(::grpc::ClientContext* context, const ::sessionsource::UpdateShowRequest* request, ::common::Respone* response, std::function<void(::grpc::Status)>) = 0;
+      virtual void UpdateShow(::grpc::ClientContext* context, const ::sessionsource::UpdateShowRequest* request, ::common::Respone* response, ::grpc::ClientUnaryReactor* reactor) = 0;
+      virtual void DeleteShow(::grpc::ClientContext* context, const ::sessionsource::DeleteShowRequest* request, ::common::Respone* response, std::function<void(::grpc::Status)>) = 0;
+      virtual void DeleteShow(::grpc::ClientContext* context, const ::sessionsource::DeleteShowRequest* request, ::common::Respone* response, ::grpc::ClientUnaryReactor* reactor) = 0;
+      virtual void ListShows(::grpc::ClientContext* context, const ::sessionsource::ListShowsRequest* request, ::sessionsource::ListShowsResponse* response, std::function<void(::grpc::Status)>) = 0;
+      virtual void ListShows(::grpc::ClientContext* context, const ::sessionsource::ListShowsRequest* request, ::sessionsource::ListShowsResponse* response, ::grpc::ClientUnaryReactor* reactor) = 0;
+      virtual void StartShow(::grpc::ClientContext* context, const ::sessionsource::StartShowRequest* request, ::common::Respone* response, std::function<void(::grpc::Status)>) = 0;
+      virtual void StartShow(::grpc::ClientContext* context, const ::sessionsource::StartShowRequest* request, ::common::Respone* response, ::grpc::ClientUnaryReactor* reactor) = 0;
+      virtual void RenderAll(::grpc::ClientContext* context, const ::sessionsource::RenderAllRequest* request, ::common::Respone* response, std::function<void(::grpc::Status)>) = 0;
+      virtual void RenderAll(::grpc::ClientContext* context, const ::sessionsource::RenderAllRequest* request, ::common::Respone* response, ::grpc::ClientUnaryReactor* reactor) = 0;
+      virtual void DistributeAll(::grpc::ClientContext* context, const ::sessionsource::DistributeAllRequest* request, ::common::Respone* response, std::function<void(::grpc::Status)>) = 0;
+      virtual void DistributeAll(::grpc::ClientContext* context, const ::sessionsource::DistributeAllRequest* request, ::common::Respone* response, ::grpc::ClientUnaryReactor* reactor) = 0;
+      virtual void AdvanceAct(::grpc::ClientContext* context, const ::sessionsource::AdvanceActRequest* request, ::common::Respone* response, std::function<void(::grpc::Status)>) = 0;
+      virtual void AdvanceAct(::grpc::ClientContext* context, const ::sessionsource::AdvanceActRequest* request, ::common::Respone* response, ::grpc::ClientUnaryReactor* reactor) = 0;
     };
     typedef class async_interface experimental_async_interface;
     virtual class async_interface* async() { return nullptr; }
@@ -196,6 +270,22 @@ class SessionSource final {
     virtual ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>* PrepareAsyncShareSessionRaw(::grpc::ClientContext* context, const ::sessionsource::ShareSessionRequest& request, ::grpc::CompletionQueue* cq) = 0;
     virtual ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>* AsyncShareSegmentRaw(::grpc::ClientContext* context, const ::sessionsource::ShareSegmentRequest& request, ::grpc::CompletionQueue* cq) = 0;
     virtual ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>* PrepareAsyncShareSegmentRaw(::grpc::ClientContext* context, const ::sessionsource::ShareSegmentRequest& request, ::grpc::CompletionQueue* cq) = 0;
+    virtual ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>* AsyncCreateShowRaw(::grpc::ClientContext* context, const ::sessionsource::CreateShowRequest& request, ::grpc::CompletionQueue* cq) = 0;
+    virtual ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>* PrepareAsyncCreateShowRaw(::grpc::ClientContext* context, const ::sessionsource::CreateShowRequest& request, ::grpc::CompletionQueue* cq) = 0;
+    virtual ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>* AsyncUpdateShowRaw(::grpc::ClientContext* context, const ::sessionsource::UpdateShowRequest& request, ::grpc::CompletionQueue* cq) = 0;
+    virtual ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>* PrepareAsyncUpdateShowRaw(::grpc::ClientContext* context, const ::sessionsource::UpdateShowRequest& request, ::grpc::CompletionQueue* cq) = 0;
+    virtual ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>* AsyncDeleteShowRaw(::grpc::ClientContext* context, const ::sessionsource::DeleteShowRequest& request, ::grpc::CompletionQueue* cq) = 0;
+    virtual ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>* PrepareAsyncDeleteShowRaw(::grpc::ClientContext* context, const ::sessionsource::DeleteShowRequest& request, ::grpc::CompletionQueue* cq) = 0;
+    virtual ::grpc::ClientAsyncResponseReaderInterface< ::sessionsource::ListShowsResponse>* AsyncListShowsRaw(::grpc::ClientContext* context, const ::sessionsource::ListShowsRequest& request, ::grpc::CompletionQueue* cq) = 0;
+    virtual ::grpc::ClientAsyncResponseReaderInterface< ::sessionsource::ListShowsResponse>* PrepareAsyncListShowsRaw(::grpc::ClientContext* context, const ::sessionsource::ListShowsRequest& request, ::grpc::CompletionQueue* cq) = 0;
+    virtual ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>* AsyncStartShowRaw(::grpc::ClientContext* context, const ::sessionsource::StartShowRequest& request, ::grpc::CompletionQueue* cq) = 0;
+    virtual ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>* PrepareAsyncStartShowRaw(::grpc::ClientContext* context, const ::sessionsource::StartShowRequest& request, ::grpc::CompletionQueue* cq) = 0;
+    virtual ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>* AsyncRenderAllRaw(::grpc::ClientContext* context, const ::sessionsource::RenderAllRequest& request, ::grpc::CompletionQueue* cq) = 0;
+    virtual ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>* PrepareAsyncRenderAllRaw(::grpc::ClientContext* context, const ::sessionsource::RenderAllRequest& request, ::grpc::CompletionQueue* cq) = 0;
+    virtual ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>* AsyncDistributeAllRaw(::grpc::ClientContext* context, const ::sessionsource::DistributeAllRequest& request, ::grpc::CompletionQueue* cq) = 0;
+    virtual ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>* PrepareAsyncDistributeAllRaw(::grpc::ClientContext* context, const ::sessionsource::DistributeAllRequest& request, ::grpc::CompletionQueue* cq) = 0;
+    virtual ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>* AsyncAdvanceActRaw(::grpc::ClientContext* context, const ::sessionsource::AdvanceActRequest& request, ::grpc::CompletionQueue* cq) = 0;
+    virtual ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>* PrepareAsyncAdvanceActRaw(::grpc::ClientContext* context, const ::sessionsource::AdvanceActRequest& request, ::grpc::CompletionQueue* cq) = 0;
   };
   class Stub final : public StubInterface {
    public:
@@ -297,6 +387,62 @@ class SessionSource final {
     std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::common::Respone>> PrepareAsyncShareSegment(::grpc::ClientContext* context, const ::sessionsource::ShareSegmentRequest& request, ::grpc::CompletionQueue* cq) {
       return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::common::Respone>>(PrepareAsyncShareSegmentRaw(context, request, cq));
     }
+    ::grpc::Status CreateShow(::grpc::ClientContext* context, const ::sessionsource::CreateShowRequest& request, ::common::Respone* response) override;
+    std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::common::Respone>> AsyncCreateShow(::grpc::ClientContext* context, const ::sessionsource::CreateShowRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::common::Respone>>(AsyncCreateShowRaw(context, request, cq));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::common::Respone>> PrepareAsyncCreateShow(::grpc::ClientContext* context, const ::sessionsource::CreateShowRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::common::Respone>>(PrepareAsyncCreateShowRaw(context, request, cq));
+    }
+    ::grpc::Status UpdateShow(::grpc::ClientContext* context, const ::sessionsource::UpdateShowRequest& request, ::common::Respone* response) override;
+    std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::common::Respone>> AsyncUpdateShow(::grpc::ClientContext* context, const ::sessionsource::UpdateShowRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::common::Respone>>(AsyncUpdateShowRaw(context, request, cq));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::common::Respone>> PrepareAsyncUpdateShow(::grpc::ClientContext* context, const ::sessionsource::UpdateShowRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::common::Respone>>(PrepareAsyncUpdateShowRaw(context, request, cq));
+    }
+    ::grpc::Status DeleteShow(::grpc::ClientContext* context, const ::sessionsource::DeleteShowRequest& request, ::common::Respone* response) override;
+    std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::common::Respone>> AsyncDeleteShow(::grpc::ClientContext* context, const ::sessionsource::DeleteShowRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::common::Respone>>(AsyncDeleteShowRaw(context, request, cq));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::common::Respone>> PrepareAsyncDeleteShow(::grpc::ClientContext* context, const ::sessionsource::DeleteShowRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::common::Respone>>(PrepareAsyncDeleteShowRaw(context, request, cq));
+    }
+    ::grpc::Status ListShows(::grpc::ClientContext* context, const ::sessionsource::ListShowsRequest& request, ::sessionsource::ListShowsResponse* response) override;
+    std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::sessionsource::ListShowsResponse>> AsyncListShows(::grpc::ClientContext* context, const ::sessionsource::ListShowsRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::sessionsource::ListShowsResponse>>(AsyncListShowsRaw(context, request, cq));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::sessionsource::ListShowsResponse>> PrepareAsyncListShows(::grpc::ClientContext* context, const ::sessionsource::ListShowsRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::sessionsource::ListShowsResponse>>(PrepareAsyncListShowsRaw(context, request, cq));
+    }
+    ::grpc::Status StartShow(::grpc::ClientContext* context, const ::sessionsource::StartShowRequest& request, ::common::Respone* response) override;
+    std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::common::Respone>> AsyncStartShow(::grpc::ClientContext* context, const ::sessionsource::StartShowRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::common::Respone>>(AsyncStartShowRaw(context, request, cq));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::common::Respone>> PrepareAsyncStartShow(::grpc::ClientContext* context, const ::sessionsource::StartShowRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::common::Respone>>(PrepareAsyncStartShowRaw(context, request, cq));
+    }
+    ::grpc::Status RenderAll(::grpc::ClientContext* context, const ::sessionsource::RenderAllRequest& request, ::common::Respone* response) override;
+    std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::common::Respone>> AsyncRenderAll(::grpc::ClientContext* context, const ::sessionsource::RenderAllRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::common::Respone>>(AsyncRenderAllRaw(context, request, cq));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::common::Respone>> PrepareAsyncRenderAll(::grpc::ClientContext* context, const ::sessionsource::RenderAllRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::common::Respone>>(PrepareAsyncRenderAllRaw(context, request, cq));
+    }
+    ::grpc::Status DistributeAll(::grpc::ClientContext* context, const ::sessionsource::DistributeAllRequest& request, ::common::Respone* response) override;
+    std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::common::Respone>> AsyncDistributeAll(::grpc::ClientContext* context, const ::sessionsource::DistributeAllRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::common::Respone>>(AsyncDistributeAllRaw(context, request, cq));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::common::Respone>> PrepareAsyncDistributeAll(::grpc::ClientContext* context, const ::sessionsource::DistributeAllRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::common::Respone>>(PrepareAsyncDistributeAllRaw(context, request, cq));
+    }
+    ::grpc::Status AdvanceAct(::grpc::ClientContext* context, const ::sessionsource::AdvanceActRequest& request, ::common::Respone* response) override;
+    std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::common::Respone>> AsyncAdvanceAct(::grpc::ClientContext* context, const ::sessionsource::AdvanceActRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::common::Respone>>(AsyncAdvanceActRaw(context, request, cq));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::common::Respone>> PrepareAsyncAdvanceAct(::grpc::ClientContext* context, const ::sessionsource::AdvanceActRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::common::Respone>>(PrepareAsyncAdvanceActRaw(context, request, cq));
+    }
     class async final :
       public StubInterface::async_interface {
      public:
@@ -323,6 +469,22 @@ class SessionSource final {
       void ShareSession(::grpc::ClientContext* context, const ::sessionsource::ShareSessionRequest* request, ::common::Respone* response, ::grpc::ClientUnaryReactor* reactor) override;
       void ShareSegment(::grpc::ClientContext* context, const ::sessionsource::ShareSegmentRequest* request, ::common::Respone* response, std::function<void(::grpc::Status)>) override;
       void ShareSegment(::grpc::ClientContext* context, const ::sessionsource::ShareSegmentRequest* request, ::common::Respone* response, ::grpc::ClientUnaryReactor* reactor) override;
+      void CreateShow(::grpc::ClientContext* context, const ::sessionsource::CreateShowRequest* request, ::common::Respone* response, std::function<void(::grpc::Status)>) override;
+      void CreateShow(::grpc::ClientContext* context, const ::sessionsource::CreateShowRequest* request, ::common::Respone* response, ::grpc::ClientUnaryReactor* reactor) override;
+      void UpdateShow(::grpc::ClientContext* context, const ::sessionsource::UpdateShowRequest* request, ::common::Respone* response, std::function<void(::grpc::Status)>) override;
+      void UpdateShow(::grpc::ClientContext* context, const ::sessionsource::UpdateShowRequest* request, ::common::Respone* response, ::grpc::ClientUnaryReactor* reactor) override;
+      void DeleteShow(::grpc::ClientContext* context, const ::sessionsource::DeleteShowRequest* request, ::common::Respone* response, std::function<void(::grpc::Status)>) override;
+      void DeleteShow(::grpc::ClientContext* context, const ::sessionsource::DeleteShowRequest* request, ::common::Respone* response, ::grpc::ClientUnaryReactor* reactor) override;
+      void ListShows(::grpc::ClientContext* context, const ::sessionsource::ListShowsRequest* request, ::sessionsource::ListShowsResponse* response, std::function<void(::grpc::Status)>) override;
+      void ListShows(::grpc::ClientContext* context, const ::sessionsource::ListShowsRequest* request, ::sessionsource::ListShowsResponse* response, ::grpc::ClientUnaryReactor* reactor) override;
+      void StartShow(::grpc::ClientContext* context, const ::sessionsource::StartShowRequest* request, ::common::Respone* response, std::function<void(::grpc::Status)>) override;
+      void StartShow(::grpc::ClientContext* context, const ::sessionsource::StartShowRequest* request, ::common::Respone* response, ::grpc::ClientUnaryReactor* reactor) override;
+      void RenderAll(::grpc::ClientContext* context, const ::sessionsource::RenderAllRequest* request, ::common::Respone* response, std::function<void(::grpc::Status)>) override;
+      void RenderAll(::grpc::ClientContext* context, const ::sessionsource::RenderAllRequest* request, ::common::Respone* response, ::grpc::ClientUnaryReactor* reactor) override;
+      void DistributeAll(::grpc::ClientContext* context, const ::sessionsource::DistributeAllRequest* request, ::common::Respone* response, std::function<void(::grpc::Status)>) override;
+      void DistributeAll(::grpc::ClientContext* context, const ::sessionsource::DistributeAllRequest* request, ::common::Respone* response, ::grpc::ClientUnaryReactor* reactor) override;
+      void AdvanceAct(::grpc::ClientContext* context, const ::sessionsource::AdvanceActRequest* request, ::common::Respone* response, std::function<void(::grpc::Status)>) override;
+      void AdvanceAct(::grpc::ClientContext* context, const ::sessionsource::AdvanceActRequest* request, ::common::Respone* response, ::grpc::ClientUnaryReactor* reactor) override;
      private:
       friend class Stub;
       explicit async(Stub* stub): stub_(stub) { }
@@ -363,6 +525,22 @@ class SessionSource final {
     ::grpc::ClientAsyncResponseReader< ::common::Respone>* PrepareAsyncShareSessionRaw(::grpc::ClientContext* context, const ::sessionsource::ShareSessionRequest& request, ::grpc::CompletionQueue* cq) override;
     ::grpc::ClientAsyncResponseReader< ::common::Respone>* AsyncShareSegmentRaw(::grpc::ClientContext* context, const ::sessionsource::ShareSegmentRequest& request, ::grpc::CompletionQueue* cq) override;
     ::grpc::ClientAsyncResponseReader< ::common::Respone>* PrepareAsyncShareSegmentRaw(::grpc::ClientContext* context, const ::sessionsource::ShareSegmentRequest& request, ::grpc::CompletionQueue* cq) override;
+    ::grpc::ClientAsyncResponseReader< ::common::Respone>* AsyncCreateShowRaw(::grpc::ClientContext* context, const ::sessionsource::CreateShowRequest& request, ::grpc::CompletionQueue* cq) override;
+    ::grpc::ClientAsyncResponseReader< ::common::Respone>* PrepareAsyncCreateShowRaw(::grpc::ClientContext* context, const ::sessionsource::CreateShowRequest& request, ::grpc::CompletionQueue* cq) override;
+    ::grpc::ClientAsyncResponseReader< ::common::Respone>* AsyncUpdateShowRaw(::grpc::ClientContext* context, const ::sessionsource::UpdateShowRequest& request, ::grpc::CompletionQueue* cq) override;
+    ::grpc::ClientAsyncResponseReader< ::common::Respone>* PrepareAsyncUpdateShowRaw(::grpc::ClientContext* context, const ::sessionsource::UpdateShowRequest& request, ::grpc::CompletionQueue* cq) override;
+    ::grpc::ClientAsyncResponseReader< ::common::Respone>* AsyncDeleteShowRaw(::grpc::ClientContext* context, const ::sessionsource::DeleteShowRequest& request, ::grpc::CompletionQueue* cq) override;
+    ::grpc::ClientAsyncResponseReader< ::common::Respone>* PrepareAsyncDeleteShowRaw(::grpc::ClientContext* context, const ::sessionsource::DeleteShowRequest& request, ::grpc::CompletionQueue* cq) override;
+    ::grpc::ClientAsyncResponseReader< ::sessionsource::ListShowsResponse>* AsyncListShowsRaw(::grpc::ClientContext* context, const ::sessionsource::ListShowsRequest& request, ::grpc::CompletionQueue* cq) override;
+    ::grpc::ClientAsyncResponseReader< ::sessionsource::ListShowsResponse>* PrepareAsyncListShowsRaw(::grpc::ClientContext* context, const ::sessionsource::ListShowsRequest& request, ::grpc::CompletionQueue* cq) override;
+    ::grpc::ClientAsyncResponseReader< ::common::Respone>* AsyncStartShowRaw(::grpc::ClientContext* context, const ::sessionsource::StartShowRequest& request, ::grpc::CompletionQueue* cq) override;
+    ::grpc::ClientAsyncResponseReader< ::common::Respone>* PrepareAsyncStartShowRaw(::grpc::ClientContext* context, const ::sessionsource::StartShowRequest& request, ::grpc::CompletionQueue* cq) override;
+    ::grpc::ClientAsyncResponseReader< ::common::Respone>* AsyncRenderAllRaw(::grpc::ClientContext* context, const ::sessionsource::RenderAllRequest& request, ::grpc::CompletionQueue* cq) override;
+    ::grpc::ClientAsyncResponseReader< ::common::Respone>* PrepareAsyncRenderAllRaw(::grpc::ClientContext* context, const ::sessionsource::RenderAllRequest& request, ::grpc::CompletionQueue* cq) override;
+    ::grpc::ClientAsyncResponseReader< ::common::Respone>* AsyncDistributeAllRaw(::grpc::ClientContext* context, const ::sessionsource::DistributeAllRequest& request, ::grpc::CompletionQueue* cq) override;
+    ::grpc::ClientAsyncResponseReader< ::common::Respone>* PrepareAsyncDistributeAllRaw(::grpc::ClientContext* context, const ::sessionsource::DistributeAllRequest& request, ::grpc::CompletionQueue* cq) override;
+    ::grpc::ClientAsyncResponseReader< ::common::Respone>* AsyncAdvanceActRaw(::grpc::ClientContext* context, const ::sessionsource::AdvanceActRequest& request, ::grpc::CompletionQueue* cq) override;
+    ::grpc::ClientAsyncResponseReader< ::common::Respone>* PrepareAsyncAdvanceActRaw(::grpc::ClientContext* context, const ::sessionsource::AdvanceActRequest& request, ::grpc::CompletionQueue* cq) override;
     const ::grpc::internal::RpcMethod rpcmethod_StreamRecorders_;
     const ::grpc::internal::RpcMethod rpcmethod_StreamSessions_;
     const ::grpc::internal::RpcMethod rpcmethod_StreamSessionAudio_;
@@ -376,6 +554,14 @@ class SessionSource final {
     const ::grpc::internal::RpcMethod rpcmethod_CutSession_;
     const ::grpc::internal::RpcMethod rpcmethod_ShareSession_;
     const ::grpc::internal::RpcMethod rpcmethod_ShareSegment_;
+    const ::grpc::internal::RpcMethod rpcmethod_CreateShow_;
+    const ::grpc::internal::RpcMethod rpcmethod_UpdateShow_;
+    const ::grpc::internal::RpcMethod rpcmethod_DeleteShow_;
+    const ::grpc::internal::RpcMethod rpcmethod_ListShows_;
+    const ::grpc::internal::RpcMethod rpcmethod_StartShow_;
+    const ::grpc::internal::RpcMethod rpcmethod_RenderAll_;
+    const ::grpc::internal::RpcMethod rpcmethod_DistributeAll_;
+    const ::grpc::internal::RpcMethod rpcmethod_AdvanceAct_;
   };
   static std::unique_ptr<Stub> NewStub(const std::shared_ptr< ::grpc::ChannelInterface>& channel, const ::grpc::StubOptions& options = ::grpc::StubOptions());
 
@@ -398,6 +584,15 @@ class SessionSource final {
     virtual ::grpc::Status CutSession(::grpc::ServerContext* context, const ::sessionsource::CutSessionRequest* request, ::common::Respone* response);
     virtual ::grpc::Status ShareSession(::grpc::ServerContext* context, const ::sessionsource::ShareSessionRequest* request, ::common::Respone* response);
     virtual ::grpc::Status ShareSegment(::grpc::ServerContext* context, const ::sessionsource::ShareSegmentRequest* request, ::common::Respone* response);
+    // Shows
+    virtual ::grpc::Status CreateShow(::grpc::ServerContext* context, const ::sessionsource::CreateShowRequest* request, ::common::Respone* response);
+    virtual ::grpc::Status UpdateShow(::grpc::ServerContext* context, const ::sessionsource::UpdateShowRequest* request, ::common::Respone* response);
+    virtual ::grpc::Status DeleteShow(::grpc::ServerContext* context, const ::sessionsource::DeleteShowRequest* request, ::common::Respone* response);
+    virtual ::grpc::Status ListShows(::grpc::ServerContext* context, const ::sessionsource::ListShowsRequest* request, ::sessionsource::ListShowsResponse* response);
+    virtual ::grpc::Status StartShow(::grpc::ServerContext* context, const ::sessionsource::StartShowRequest* request, ::common::Respone* response);
+    virtual ::grpc::Status RenderAll(::grpc::ServerContext* context, const ::sessionsource::RenderAllRequest* request, ::common::Respone* response);
+    virtual ::grpc::Status DistributeAll(::grpc::ServerContext* context, const ::sessionsource::DistributeAllRequest* request, ::common::Respone* response);
+    virtual ::grpc::Status AdvanceAct(::grpc::ServerContext* context, const ::sessionsource::AdvanceActRequest* request, ::common::Respone* response);
   };
   template <class BaseClass>
   class WithAsyncMethod_StreamRecorders : public BaseClass {
@@ -659,7 +854,167 @@ class SessionSource final {
       ::grpc::Service::RequestAsyncUnary(12, context, request, response, new_call_cq, notification_cq, tag);
     }
   };
-  typedef WithAsyncMethod_StreamRecorders<WithAsyncMethod_StreamSessions<WithAsyncMethod_StreamSessionAudio<WithAsyncMethod_SetKeepSession<WithAsyncMethod_DeleteSession<WithAsyncMethod_SetName<WithAsyncMethod_CreateSegment<WithAsyncMethod_DeleteSegment<WithAsyncMethod_RenderSegment<WithAsyncMethod_UpdateSegment<WithAsyncMethod_CutSession<WithAsyncMethod_ShareSession<WithAsyncMethod_ShareSegment<Service > > > > > > > > > > > > > AsyncService;
+  template <class BaseClass>
+  class WithAsyncMethod_CreateShow : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithAsyncMethod_CreateShow() {
+      ::grpc::Service::MarkMethodAsync(13);
+    }
+    ~WithAsyncMethod_CreateShow() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status CreateShow(::grpc::ServerContext* /*context*/, const ::sessionsource::CreateShowRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    void RequestCreateShow(::grpc::ServerContext* context, ::sessionsource::CreateShowRequest* request, ::grpc::ServerAsyncResponseWriter< ::common::Respone>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
+      ::grpc::Service::RequestAsyncUnary(13, context, request, response, new_call_cq, notification_cq, tag);
+    }
+  };
+  template <class BaseClass>
+  class WithAsyncMethod_UpdateShow : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithAsyncMethod_UpdateShow() {
+      ::grpc::Service::MarkMethodAsync(14);
+    }
+    ~WithAsyncMethod_UpdateShow() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status UpdateShow(::grpc::ServerContext* /*context*/, const ::sessionsource::UpdateShowRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    void RequestUpdateShow(::grpc::ServerContext* context, ::sessionsource::UpdateShowRequest* request, ::grpc::ServerAsyncResponseWriter< ::common::Respone>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
+      ::grpc::Service::RequestAsyncUnary(14, context, request, response, new_call_cq, notification_cq, tag);
+    }
+  };
+  template <class BaseClass>
+  class WithAsyncMethod_DeleteShow : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithAsyncMethod_DeleteShow() {
+      ::grpc::Service::MarkMethodAsync(15);
+    }
+    ~WithAsyncMethod_DeleteShow() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status DeleteShow(::grpc::ServerContext* /*context*/, const ::sessionsource::DeleteShowRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    void RequestDeleteShow(::grpc::ServerContext* context, ::sessionsource::DeleteShowRequest* request, ::grpc::ServerAsyncResponseWriter< ::common::Respone>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
+      ::grpc::Service::RequestAsyncUnary(15, context, request, response, new_call_cq, notification_cq, tag);
+    }
+  };
+  template <class BaseClass>
+  class WithAsyncMethod_ListShows : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithAsyncMethod_ListShows() {
+      ::grpc::Service::MarkMethodAsync(16);
+    }
+    ~WithAsyncMethod_ListShows() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status ListShows(::grpc::ServerContext* /*context*/, const ::sessionsource::ListShowsRequest* /*request*/, ::sessionsource::ListShowsResponse* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    void RequestListShows(::grpc::ServerContext* context, ::sessionsource::ListShowsRequest* request, ::grpc::ServerAsyncResponseWriter< ::sessionsource::ListShowsResponse>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
+      ::grpc::Service::RequestAsyncUnary(16, context, request, response, new_call_cq, notification_cq, tag);
+    }
+  };
+  template <class BaseClass>
+  class WithAsyncMethod_StartShow : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithAsyncMethod_StartShow() {
+      ::grpc::Service::MarkMethodAsync(17);
+    }
+    ~WithAsyncMethod_StartShow() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status StartShow(::grpc::ServerContext* /*context*/, const ::sessionsource::StartShowRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    void RequestStartShow(::grpc::ServerContext* context, ::sessionsource::StartShowRequest* request, ::grpc::ServerAsyncResponseWriter< ::common::Respone>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
+      ::grpc::Service::RequestAsyncUnary(17, context, request, response, new_call_cq, notification_cq, tag);
+    }
+  };
+  template <class BaseClass>
+  class WithAsyncMethod_RenderAll : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithAsyncMethod_RenderAll() {
+      ::grpc::Service::MarkMethodAsync(18);
+    }
+    ~WithAsyncMethod_RenderAll() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status RenderAll(::grpc::ServerContext* /*context*/, const ::sessionsource::RenderAllRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    void RequestRenderAll(::grpc::ServerContext* context, ::sessionsource::RenderAllRequest* request, ::grpc::ServerAsyncResponseWriter< ::common::Respone>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
+      ::grpc::Service::RequestAsyncUnary(18, context, request, response, new_call_cq, notification_cq, tag);
+    }
+  };
+  template <class BaseClass>
+  class WithAsyncMethod_DistributeAll : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithAsyncMethod_DistributeAll() {
+      ::grpc::Service::MarkMethodAsync(19);
+    }
+    ~WithAsyncMethod_DistributeAll() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status DistributeAll(::grpc::ServerContext* /*context*/, const ::sessionsource::DistributeAllRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    void RequestDistributeAll(::grpc::ServerContext* context, ::sessionsource::DistributeAllRequest* request, ::grpc::ServerAsyncResponseWriter< ::common::Respone>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
+      ::grpc::Service::RequestAsyncUnary(19, context, request, response, new_call_cq, notification_cq, tag);
+    }
+  };
+  template <class BaseClass>
+  class WithAsyncMethod_AdvanceAct : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithAsyncMethod_AdvanceAct() {
+      ::grpc::Service::MarkMethodAsync(20);
+    }
+    ~WithAsyncMethod_AdvanceAct() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status AdvanceAct(::grpc::ServerContext* /*context*/, const ::sessionsource::AdvanceActRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    void RequestAdvanceAct(::grpc::ServerContext* context, ::sessionsource::AdvanceActRequest* request, ::grpc::ServerAsyncResponseWriter< ::common::Respone>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
+      ::grpc::Service::RequestAsyncUnary(20, context, request, response, new_call_cq, notification_cq, tag);
+    }
+  };
+  typedef WithAsyncMethod_StreamRecorders<WithAsyncMethod_StreamSessions<WithAsyncMethod_StreamSessionAudio<WithAsyncMethod_SetKeepSession<WithAsyncMethod_DeleteSession<WithAsyncMethod_SetName<WithAsyncMethod_CreateSegment<WithAsyncMethod_DeleteSegment<WithAsyncMethod_RenderSegment<WithAsyncMethod_UpdateSegment<WithAsyncMethod_CutSession<WithAsyncMethod_ShareSession<WithAsyncMethod_ShareSegment<WithAsyncMethod_CreateShow<WithAsyncMethod_UpdateShow<WithAsyncMethod_DeleteShow<WithAsyncMethod_ListShows<WithAsyncMethod_StartShow<WithAsyncMethod_RenderAll<WithAsyncMethod_DistributeAll<WithAsyncMethod_AdvanceAct<Service > > > > > > > > > > > > > > > > > > > > > AsyncService;
   template <class BaseClass>
   class WithCallbackMethod_StreamRecorders : public BaseClass {
    private:
@@ -996,7 +1351,223 @@ class SessionSource final {
     virtual ::grpc::ServerUnaryReactor* ShareSegment(
       ::grpc::CallbackServerContext* /*context*/, const ::sessionsource::ShareSegmentRequest* /*request*/, ::common::Respone* /*response*/)  { return nullptr; }
   };
-  typedef WithCallbackMethod_StreamRecorders<WithCallbackMethod_StreamSessions<WithCallbackMethod_StreamSessionAudio<WithCallbackMethod_SetKeepSession<WithCallbackMethod_DeleteSession<WithCallbackMethod_SetName<WithCallbackMethod_CreateSegment<WithCallbackMethod_DeleteSegment<WithCallbackMethod_RenderSegment<WithCallbackMethod_UpdateSegment<WithCallbackMethod_CutSession<WithCallbackMethod_ShareSession<WithCallbackMethod_ShareSegment<Service > > > > > > > > > > > > > CallbackService;
+  template <class BaseClass>
+  class WithCallbackMethod_CreateShow : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithCallbackMethod_CreateShow() {
+      ::grpc::Service::MarkMethodCallback(13,
+          new ::grpc::internal::CallbackUnaryHandler< ::sessionsource::CreateShowRequest, ::common::Respone>(
+            [this](
+                   ::grpc::CallbackServerContext* context, const ::sessionsource::CreateShowRequest* request, ::common::Respone* response) { return this->CreateShow(context, request, response); }));}
+    void SetMessageAllocatorFor_CreateShow(
+        ::grpc::MessageAllocator< ::sessionsource::CreateShowRequest, ::common::Respone>* allocator) {
+      ::grpc::internal::MethodHandler* const handler = ::grpc::Service::GetHandler(13);
+      static_cast<::grpc::internal::CallbackUnaryHandler< ::sessionsource::CreateShowRequest, ::common::Respone>*>(handler)
+              ->SetMessageAllocator(allocator);
+    }
+    ~WithCallbackMethod_CreateShow() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status CreateShow(::grpc::ServerContext* /*context*/, const ::sessionsource::CreateShowRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    virtual ::grpc::ServerUnaryReactor* CreateShow(
+      ::grpc::CallbackServerContext* /*context*/, const ::sessionsource::CreateShowRequest* /*request*/, ::common::Respone* /*response*/)  { return nullptr; }
+  };
+  template <class BaseClass>
+  class WithCallbackMethod_UpdateShow : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithCallbackMethod_UpdateShow() {
+      ::grpc::Service::MarkMethodCallback(14,
+          new ::grpc::internal::CallbackUnaryHandler< ::sessionsource::UpdateShowRequest, ::common::Respone>(
+            [this](
+                   ::grpc::CallbackServerContext* context, const ::sessionsource::UpdateShowRequest* request, ::common::Respone* response) { return this->UpdateShow(context, request, response); }));}
+    void SetMessageAllocatorFor_UpdateShow(
+        ::grpc::MessageAllocator< ::sessionsource::UpdateShowRequest, ::common::Respone>* allocator) {
+      ::grpc::internal::MethodHandler* const handler = ::grpc::Service::GetHandler(14);
+      static_cast<::grpc::internal::CallbackUnaryHandler< ::sessionsource::UpdateShowRequest, ::common::Respone>*>(handler)
+              ->SetMessageAllocator(allocator);
+    }
+    ~WithCallbackMethod_UpdateShow() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status UpdateShow(::grpc::ServerContext* /*context*/, const ::sessionsource::UpdateShowRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    virtual ::grpc::ServerUnaryReactor* UpdateShow(
+      ::grpc::CallbackServerContext* /*context*/, const ::sessionsource::UpdateShowRequest* /*request*/, ::common::Respone* /*response*/)  { return nullptr; }
+  };
+  template <class BaseClass>
+  class WithCallbackMethod_DeleteShow : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithCallbackMethod_DeleteShow() {
+      ::grpc::Service::MarkMethodCallback(15,
+          new ::grpc::internal::CallbackUnaryHandler< ::sessionsource::DeleteShowRequest, ::common::Respone>(
+            [this](
+                   ::grpc::CallbackServerContext* context, const ::sessionsource::DeleteShowRequest* request, ::common::Respone* response) { return this->DeleteShow(context, request, response); }));}
+    void SetMessageAllocatorFor_DeleteShow(
+        ::grpc::MessageAllocator< ::sessionsource::DeleteShowRequest, ::common::Respone>* allocator) {
+      ::grpc::internal::MethodHandler* const handler = ::grpc::Service::GetHandler(15);
+      static_cast<::grpc::internal::CallbackUnaryHandler< ::sessionsource::DeleteShowRequest, ::common::Respone>*>(handler)
+              ->SetMessageAllocator(allocator);
+    }
+    ~WithCallbackMethod_DeleteShow() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status DeleteShow(::grpc::ServerContext* /*context*/, const ::sessionsource::DeleteShowRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    virtual ::grpc::ServerUnaryReactor* DeleteShow(
+      ::grpc::CallbackServerContext* /*context*/, const ::sessionsource::DeleteShowRequest* /*request*/, ::common::Respone* /*response*/)  { return nullptr; }
+  };
+  template <class BaseClass>
+  class WithCallbackMethod_ListShows : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithCallbackMethod_ListShows() {
+      ::grpc::Service::MarkMethodCallback(16,
+          new ::grpc::internal::CallbackUnaryHandler< ::sessionsource::ListShowsRequest, ::sessionsource::ListShowsResponse>(
+            [this](
+                   ::grpc::CallbackServerContext* context, const ::sessionsource::ListShowsRequest* request, ::sessionsource::ListShowsResponse* response) { return this->ListShows(context, request, response); }));}
+    void SetMessageAllocatorFor_ListShows(
+        ::grpc::MessageAllocator< ::sessionsource::ListShowsRequest, ::sessionsource::ListShowsResponse>* allocator) {
+      ::grpc::internal::MethodHandler* const handler = ::grpc::Service::GetHandler(16);
+      static_cast<::grpc::internal::CallbackUnaryHandler< ::sessionsource::ListShowsRequest, ::sessionsource::ListShowsResponse>*>(handler)
+              ->SetMessageAllocator(allocator);
+    }
+    ~WithCallbackMethod_ListShows() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status ListShows(::grpc::ServerContext* /*context*/, const ::sessionsource::ListShowsRequest* /*request*/, ::sessionsource::ListShowsResponse* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    virtual ::grpc::ServerUnaryReactor* ListShows(
+      ::grpc::CallbackServerContext* /*context*/, const ::sessionsource::ListShowsRequest* /*request*/, ::sessionsource::ListShowsResponse* /*response*/)  { return nullptr; }
+  };
+  template <class BaseClass>
+  class WithCallbackMethod_StartShow : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithCallbackMethod_StartShow() {
+      ::grpc::Service::MarkMethodCallback(17,
+          new ::grpc::internal::CallbackUnaryHandler< ::sessionsource::StartShowRequest, ::common::Respone>(
+            [this](
+                   ::grpc::CallbackServerContext* context, const ::sessionsource::StartShowRequest* request, ::common::Respone* response) { return this->StartShow(context, request, response); }));}
+    void SetMessageAllocatorFor_StartShow(
+        ::grpc::MessageAllocator< ::sessionsource::StartShowRequest, ::common::Respone>* allocator) {
+      ::grpc::internal::MethodHandler* const handler = ::grpc::Service::GetHandler(17);
+      static_cast<::grpc::internal::CallbackUnaryHandler< ::sessionsource::StartShowRequest, ::common::Respone>*>(handler)
+              ->SetMessageAllocator(allocator);
+    }
+    ~WithCallbackMethod_StartShow() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status StartShow(::grpc::ServerContext* /*context*/, const ::sessionsource::StartShowRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    virtual ::grpc::ServerUnaryReactor* StartShow(
+      ::grpc::CallbackServerContext* /*context*/, const ::sessionsource::StartShowRequest* /*request*/, ::common::Respone* /*response*/)  { return nullptr; }
+  };
+  template <class BaseClass>
+  class WithCallbackMethod_RenderAll : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithCallbackMethod_RenderAll() {
+      ::grpc::Service::MarkMethodCallback(18,
+          new ::grpc::internal::CallbackUnaryHandler< ::sessionsource::RenderAllRequest, ::common::Respone>(
+            [this](
+                   ::grpc::CallbackServerContext* context, const ::sessionsource::RenderAllRequest* request, ::common::Respone* response) { return this->RenderAll(context, request, response); }));}
+    void SetMessageAllocatorFor_RenderAll(
+        ::grpc::MessageAllocator< ::sessionsource::RenderAllRequest, ::common::Respone>* allocator) {
+      ::grpc::internal::MethodHandler* const handler = ::grpc::Service::GetHandler(18);
+      static_cast<::grpc::internal::CallbackUnaryHandler< ::sessionsource::RenderAllRequest, ::common::Respone>*>(handler)
+              ->SetMessageAllocator(allocator);
+    }
+    ~WithCallbackMethod_RenderAll() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status RenderAll(::grpc::ServerContext* /*context*/, const ::sessionsource::RenderAllRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    virtual ::grpc::ServerUnaryReactor* RenderAll(
+      ::grpc::CallbackServerContext* /*context*/, const ::sessionsource::RenderAllRequest* /*request*/, ::common::Respone* /*response*/)  { return nullptr; }
+  };
+  template <class BaseClass>
+  class WithCallbackMethod_DistributeAll : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithCallbackMethod_DistributeAll() {
+      ::grpc::Service::MarkMethodCallback(19,
+          new ::grpc::internal::CallbackUnaryHandler< ::sessionsource::DistributeAllRequest, ::common::Respone>(
+            [this](
+                   ::grpc::CallbackServerContext* context, const ::sessionsource::DistributeAllRequest* request, ::common::Respone* response) { return this->DistributeAll(context, request, response); }));}
+    void SetMessageAllocatorFor_DistributeAll(
+        ::grpc::MessageAllocator< ::sessionsource::DistributeAllRequest, ::common::Respone>* allocator) {
+      ::grpc::internal::MethodHandler* const handler = ::grpc::Service::GetHandler(19);
+      static_cast<::grpc::internal::CallbackUnaryHandler< ::sessionsource::DistributeAllRequest, ::common::Respone>*>(handler)
+              ->SetMessageAllocator(allocator);
+    }
+    ~WithCallbackMethod_DistributeAll() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status DistributeAll(::grpc::ServerContext* /*context*/, const ::sessionsource::DistributeAllRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    virtual ::grpc::ServerUnaryReactor* DistributeAll(
+      ::grpc::CallbackServerContext* /*context*/, const ::sessionsource::DistributeAllRequest* /*request*/, ::common::Respone* /*response*/)  { return nullptr; }
+  };
+  template <class BaseClass>
+  class WithCallbackMethod_AdvanceAct : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithCallbackMethod_AdvanceAct() {
+      ::grpc::Service::MarkMethodCallback(20,
+          new ::grpc::internal::CallbackUnaryHandler< ::sessionsource::AdvanceActRequest, ::common::Respone>(
+            [this](
+                   ::grpc::CallbackServerContext* context, const ::sessionsource::AdvanceActRequest* request, ::common::Respone* response) { return this->AdvanceAct(context, request, response); }));}
+    void SetMessageAllocatorFor_AdvanceAct(
+        ::grpc::MessageAllocator< ::sessionsource::AdvanceActRequest, ::common::Respone>* allocator) {
+      ::grpc::internal::MethodHandler* const handler = ::grpc::Service::GetHandler(20);
+      static_cast<::grpc::internal::CallbackUnaryHandler< ::sessionsource::AdvanceActRequest, ::common::Respone>*>(handler)
+              ->SetMessageAllocator(allocator);
+    }
+    ~WithCallbackMethod_AdvanceAct() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status AdvanceAct(::grpc::ServerContext* /*context*/, const ::sessionsource::AdvanceActRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    virtual ::grpc::ServerUnaryReactor* AdvanceAct(
+      ::grpc::CallbackServerContext* /*context*/, const ::sessionsource::AdvanceActRequest* /*request*/, ::common::Respone* /*response*/)  { return nullptr; }
+  };
+  typedef WithCallbackMethod_StreamRecorders<WithCallbackMethod_StreamSessions<WithCallbackMethod_StreamSessionAudio<WithCallbackMethod_SetKeepSession<WithCallbackMethod_DeleteSession<WithCallbackMethod_SetName<WithCallbackMethod_CreateSegment<WithCallbackMethod_DeleteSegment<WithCallbackMethod_RenderSegment<WithCallbackMethod_UpdateSegment<WithCallbackMethod_CutSession<WithCallbackMethod_ShareSession<WithCallbackMethod_ShareSegment<WithCallbackMethod_CreateShow<WithCallbackMethod_UpdateShow<WithCallbackMethod_DeleteShow<WithCallbackMethod_ListShows<WithCallbackMethod_StartShow<WithCallbackMethod_RenderAll<WithCallbackMethod_DistributeAll<WithCallbackMethod_AdvanceAct<Service > > > > > > > > > > > > > > > > > > > > > CallbackService;
   typedef CallbackService ExperimentalCallbackService;
   template <class BaseClass>
   class WithGenericMethod_StreamRecorders : public BaseClass {
@@ -1215,6 +1786,142 @@ class SessionSource final {
     }
     // disable synchronous version of this method
     ::grpc::Status ShareSegment(::grpc::ServerContext* /*context*/, const ::sessionsource::ShareSegmentRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+  };
+  template <class BaseClass>
+  class WithGenericMethod_CreateShow : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithGenericMethod_CreateShow() {
+      ::grpc::Service::MarkMethodGeneric(13);
+    }
+    ~WithGenericMethod_CreateShow() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status CreateShow(::grpc::ServerContext* /*context*/, const ::sessionsource::CreateShowRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+  };
+  template <class BaseClass>
+  class WithGenericMethod_UpdateShow : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithGenericMethod_UpdateShow() {
+      ::grpc::Service::MarkMethodGeneric(14);
+    }
+    ~WithGenericMethod_UpdateShow() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status UpdateShow(::grpc::ServerContext* /*context*/, const ::sessionsource::UpdateShowRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+  };
+  template <class BaseClass>
+  class WithGenericMethod_DeleteShow : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithGenericMethod_DeleteShow() {
+      ::grpc::Service::MarkMethodGeneric(15);
+    }
+    ~WithGenericMethod_DeleteShow() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status DeleteShow(::grpc::ServerContext* /*context*/, const ::sessionsource::DeleteShowRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+  };
+  template <class BaseClass>
+  class WithGenericMethod_ListShows : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithGenericMethod_ListShows() {
+      ::grpc::Service::MarkMethodGeneric(16);
+    }
+    ~WithGenericMethod_ListShows() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status ListShows(::grpc::ServerContext* /*context*/, const ::sessionsource::ListShowsRequest* /*request*/, ::sessionsource::ListShowsResponse* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+  };
+  template <class BaseClass>
+  class WithGenericMethod_StartShow : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithGenericMethod_StartShow() {
+      ::grpc::Service::MarkMethodGeneric(17);
+    }
+    ~WithGenericMethod_StartShow() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status StartShow(::grpc::ServerContext* /*context*/, const ::sessionsource::StartShowRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+  };
+  template <class BaseClass>
+  class WithGenericMethod_RenderAll : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithGenericMethod_RenderAll() {
+      ::grpc::Service::MarkMethodGeneric(18);
+    }
+    ~WithGenericMethod_RenderAll() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status RenderAll(::grpc::ServerContext* /*context*/, const ::sessionsource::RenderAllRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+  };
+  template <class BaseClass>
+  class WithGenericMethod_DistributeAll : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithGenericMethod_DistributeAll() {
+      ::grpc::Service::MarkMethodGeneric(19);
+    }
+    ~WithGenericMethod_DistributeAll() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status DistributeAll(::grpc::ServerContext* /*context*/, const ::sessionsource::DistributeAllRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+  };
+  template <class BaseClass>
+  class WithGenericMethod_AdvanceAct : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithGenericMethod_AdvanceAct() {
+      ::grpc::Service::MarkMethodGeneric(20);
+    }
+    ~WithGenericMethod_AdvanceAct() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status AdvanceAct(::grpc::ServerContext* /*context*/, const ::sessionsource::AdvanceActRequest* /*request*/, ::common::Respone* /*response*/) override {
       abort();
       return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
     }
@@ -1477,6 +2184,166 @@ class SessionSource final {
     }
     void RequestShareSegment(::grpc::ServerContext* context, ::grpc::ByteBuffer* request, ::grpc::ServerAsyncResponseWriter< ::grpc::ByteBuffer>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
       ::grpc::Service::RequestAsyncUnary(12, context, request, response, new_call_cq, notification_cq, tag);
+    }
+  };
+  template <class BaseClass>
+  class WithRawMethod_CreateShow : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithRawMethod_CreateShow() {
+      ::grpc::Service::MarkMethodRaw(13);
+    }
+    ~WithRawMethod_CreateShow() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status CreateShow(::grpc::ServerContext* /*context*/, const ::sessionsource::CreateShowRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    void RequestCreateShow(::grpc::ServerContext* context, ::grpc::ByteBuffer* request, ::grpc::ServerAsyncResponseWriter< ::grpc::ByteBuffer>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
+      ::grpc::Service::RequestAsyncUnary(13, context, request, response, new_call_cq, notification_cq, tag);
+    }
+  };
+  template <class BaseClass>
+  class WithRawMethod_UpdateShow : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithRawMethod_UpdateShow() {
+      ::grpc::Service::MarkMethodRaw(14);
+    }
+    ~WithRawMethod_UpdateShow() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status UpdateShow(::grpc::ServerContext* /*context*/, const ::sessionsource::UpdateShowRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    void RequestUpdateShow(::grpc::ServerContext* context, ::grpc::ByteBuffer* request, ::grpc::ServerAsyncResponseWriter< ::grpc::ByteBuffer>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
+      ::grpc::Service::RequestAsyncUnary(14, context, request, response, new_call_cq, notification_cq, tag);
+    }
+  };
+  template <class BaseClass>
+  class WithRawMethod_DeleteShow : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithRawMethod_DeleteShow() {
+      ::grpc::Service::MarkMethodRaw(15);
+    }
+    ~WithRawMethod_DeleteShow() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status DeleteShow(::grpc::ServerContext* /*context*/, const ::sessionsource::DeleteShowRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    void RequestDeleteShow(::grpc::ServerContext* context, ::grpc::ByteBuffer* request, ::grpc::ServerAsyncResponseWriter< ::grpc::ByteBuffer>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
+      ::grpc::Service::RequestAsyncUnary(15, context, request, response, new_call_cq, notification_cq, tag);
+    }
+  };
+  template <class BaseClass>
+  class WithRawMethod_ListShows : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithRawMethod_ListShows() {
+      ::grpc::Service::MarkMethodRaw(16);
+    }
+    ~WithRawMethod_ListShows() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status ListShows(::grpc::ServerContext* /*context*/, const ::sessionsource::ListShowsRequest* /*request*/, ::sessionsource::ListShowsResponse* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    void RequestListShows(::grpc::ServerContext* context, ::grpc::ByteBuffer* request, ::grpc::ServerAsyncResponseWriter< ::grpc::ByteBuffer>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
+      ::grpc::Service::RequestAsyncUnary(16, context, request, response, new_call_cq, notification_cq, tag);
+    }
+  };
+  template <class BaseClass>
+  class WithRawMethod_StartShow : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithRawMethod_StartShow() {
+      ::grpc::Service::MarkMethodRaw(17);
+    }
+    ~WithRawMethod_StartShow() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status StartShow(::grpc::ServerContext* /*context*/, const ::sessionsource::StartShowRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    void RequestStartShow(::grpc::ServerContext* context, ::grpc::ByteBuffer* request, ::grpc::ServerAsyncResponseWriter< ::grpc::ByteBuffer>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
+      ::grpc::Service::RequestAsyncUnary(17, context, request, response, new_call_cq, notification_cq, tag);
+    }
+  };
+  template <class BaseClass>
+  class WithRawMethod_RenderAll : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithRawMethod_RenderAll() {
+      ::grpc::Service::MarkMethodRaw(18);
+    }
+    ~WithRawMethod_RenderAll() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status RenderAll(::grpc::ServerContext* /*context*/, const ::sessionsource::RenderAllRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    void RequestRenderAll(::grpc::ServerContext* context, ::grpc::ByteBuffer* request, ::grpc::ServerAsyncResponseWriter< ::grpc::ByteBuffer>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
+      ::grpc::Service::RequestAsyncUnary(18, context, request, response, new_call_cq, notification_cq, tag);
+    }
+  };
+  template <class BaseClass>
+  class WithRawMethod_DistributeAll : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithRawMethod_DistributeAll() {
+      ::grpc::Service::MarkMethodRaw(19);
+    }
+    ~WithRawMethod_DistributeAll() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status DistributeAll(::grpc::ServerContext* /*context*/, const ::sessionsource::DistributeAllRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    void RequestDistributeAll(::grpc::ServerContext* context, ::grpc::ByteBuffer* request, ::grpc::ServerAsyncResponseWriter< ::grpc::ByteBuffer>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
+      ::grpc::Service::RequestAsyncUnary(19, context, request, response, new_call_cq, notification_cq, tag);
+    }
+  };
+  template <class BaseClass>
+  class WithRawMethod_AdvanceAct : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithRawMethod_AdvanceAct() {
+      ::grpc::Service::MarkMethodRaw(20);
+    }
+    ~WithRawMethod_AdvanceAct() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status AdvanceAct(::grpc::ServerContext* /*context*/, const ::sessionsource::AdvanceActRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    void RequestAdvanceAct(::grpc::ServerContext* context, ::grpc::ByteBuffer* request, ::grpc::ServerAsyncResponseWriter< ::grpc::ByteBuffer>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
+      ::grpc::Service::RequestAsyncUnary(20, context, request, response, new_call_cq, notification_cq, tag);
     }
   };
   template <class BaseClass>
@@ -1766,6 +2633,182 @@ class SessionSource final {
       ::grpc::CallbackServerContext* /*context*/, const ::grpc::ByteBuffer* /*request*/, ::grpc::ByteBuffer* /*response*/)  { return nullptr; }
   };
   template <class BaseClass>
+  class WithRawCallbackMethod_CreateShow : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithRawCallbackMethod_CreateShow() {
+      ::grpc::Service::MarkMethodRawCallback(13,
+          new ::grpc::internal::CallbackUnaryHandler< ::grpc::ByteBuffer, ::grpc::ByteBuffer>(
+            [this](
+                   ::grpc::CallbackServerContext* context, const ::grpc::ByteBuffer* request, ::grpc::ByteBuffer* response) { return this->CreateShow(context, request, response); }));
+    }
+    ~WithRawCallbackMethod_CreateShow() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status CreateShow(::grpc::ServerContext* /*context*/, const ::sessionsource::CreateShowRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    virtual ::grpc::ServerUnaryReactor* CreateShow(
+      ::grpc::CallbackServerContext* /*context*/, const ::grpc::ByteBuffer* /*request*/, ::grpc::ByteBuffer* /*response*/)  { return nullptr; }
+  };
+  template <class BaseClass>
+  class WithRawCallbackMethod_UpdateShow : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithRawCallbackMethod_UpdateShow() {
+      ::grpc::Service::MarkMethodRawCallback(14,
+          new ::grpc::internal::CallbackUnaryHandler< ::grpc::ByteBuffer, ::grpc::ByteBuffer>(
+            [this](
+                   ::grpc::CallbackServerContext* context, const ::grpc::ByteBuffer* request, ::grpc::ByteBuffer* response) { return this->UpdateShow(context, request, response); }));
+    }
+    ~WithRawCallbackMethod_UpdateShow() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status UpdateShow(::grpc::ServerContext* /*context*/, const ::sessionsource::UpdateShowRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    virtual ::grpc::ServerUnaryReactor* UpdateShow(
+      ::grpc::CallbackServerContext* /*context*/, const ::grpc::ByteBuffer* /*request*/, ::grpc::ByteBuffer* /*response*/)  { return nullptr; }
+  };
+  template <class BaseClass>
+  class WithRawCallbackMethod_DeleteShow : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithRawCallbackMethod_DeleteShow() {
+      ::grpc::Service::MarkMethodRawCallback(15,
+          new ::grpc::internal::CallbackUnaryHandler< ::grpc::ByteBuffer, ::grpc::ByteBuffer>(
+            [this](
+                   ::grpc::CallbackServerContext* context, const ::grpc::ByteBuffer* request, ::grpc::ByteBuffer* response) { return this->DeleteShow(context, request, response); }));
+    }
+    ~WithRawCallbackMethod_DeleteShow() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status DeleteShow(::grpc::ServerContext* /*context*/, const ::sessionsource::DeleteShowRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    virtual ::grpc::ServerUnaryReactor* DeleteShow(
+      ::grpc::CallbackServerContext* /*context*/, const ::grpc::ByteBuffer* /*request*/, ::grpc::ByteBuffer* /*response*/)  { return nullptr; }
+  };
+  template <class BaseClass>
+  class WithRawCallbackMethod_ListShows : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithRawCallbackMethod_ListShows() {
+      ::grpc::Service::MarkMethodRawCallback(16,
+          new ::grpc::internal::CallbackUnaryHandler< ::grpc::ByteBuffer, ::grpc::ByteBuffer>(
+            [this](
+                   ::grpc::CallbackServerContext* context, const ::grpc::ByteBuffer* request, ::grpc::ByteBuffer* response) { return this->ListShows(context, request, response); }));
+    }
+    ~WithRawCallbackMethod_ListShows() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status ListShows(::grpc::ServerContext* /*context*/, const ::sessionsource::ListShowsRequest* /*request*/, ::sessionsource::ListShowsResponse* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    virtual ::grpc::ServerUnaryReactor* ListShows(
+      ::grpc::CallbackServerContext* /*context*/, const ::grpc::ByteBuffer* /*request*/, ::grpc::ByteBuffer* /*response*/)  { return nullptr; }
+  };
+  template <class BaseClass>
+  class WithRawCallbackMethod_StartShow : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithRawCallbackMethod_StartShow() {
+      ::grpc::Service::MarkMethodRawCallback(17,
+          new ::grpc::internal::CallbackUnaryHandler< ::grpc::ByteBuffer, ::grpc::ByteBuffer>(
+            [this](
+                   ::grpc::CallbackServerContext* context, const ::grpc::ByteBuffer* request, ::grpc::ByteBuffer* response) { return this->StartShow(context, request, response); }));
+    }
+    ~WithRawCallbackMethod_StartShow() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status StartShow(::grpc::ServerContext* /*context*/, const ::sessionsource::StartShowRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    virtual ::grpc::ServerUnaryReactor* StartShow(
+      ::grpc::CallbackServerContext* /*context*/, const ::grpc::ByteBuffer* /*request*/, ::grpc::ByteBuffer* /*response*/)  { return nullptr; }
+  };
+  template <class BaseClass>
+  class WithRawCallbackMethod_RenderAll : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithRawCallbackMethod_RenderAll() {
+      ::grpc::Service::MarkMethodRawCallback(18,
+          new ::grpc::internal::CallbackUnaryHandler< ::grpc::ByteBuffer, ::grpc::ByteBuffer>(
+            [this](
+                   ::grpc::CallbackServerContext* context, const ::grpc::ByteBuffer* request, ::grpc::ByteBuffer* response) { return this->RenderAll(context, request, response); }));
+    }
+    ~WithRawCallbackMethod_RenderAll() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status RenderAll(::grpc::ServerContext* /*context*/, const ::sessionsource::RenderAllRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    virtual ::grpc::ServerUnaryReactor* RenderAll(
+      ::grpc::CallbackServerContext* /*context*/, const ::grpc::ByteBuffer* /*request*/, ::grpc::ByteBuffer* /*response*/)  { return nullptr; }
+  };
+  template <class BaseClass>
+  class WithRawCallbackMethod_DistributeAll : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithRawCallbackMethod_DistributeAll() {
+      ::grpc::Service::MarkMethodRawCallback(19,
+          new ::grpc::internal::CallbackUnaryHandler< ::grpc::ByteBuffer, ::grpc::ByteBuffer>(
+            [this](
+                   ::grpc::CallbackServerContext* context, const ::grpc::ByteBuffer* request, ::grpc::ByteBuffer* response) { return this->DistributeAll(context, request, response); }));
+    }
+    ~WithRawCallbackMethod_DistributeAll() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status DistributeAll(::grpc::ServerContext* /*context*/, const ::sessionsource::DistributeAllRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    virtual ::grpc::ServerUnaryReactor* DistributeAll(
+      ::grpc::CallbackServerContext* /*context*/, const ::grpc::ByteBuffer* /*request*/, ::grpc::ByteBuffer* /*response*/)  { return nullptr; }
+  };
+  template <class BaseClass>
+  class WithRawCallbackMethod_AdvanceAct : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithRawCallbackMethod_AdvanceAct() {
+      ::grpc::Service::MarkMethodRawCallback(20,
+          new ::grpc::internal::CallbackUnaryHandler< ::grpc::ByteBuffer, ::grpc::ByteBuffer>(
+            [this](
+                   ::grpc::CallbackServerContext* context, const ::grpc::ByteBuffer* request, ::grpc::ByteBuffer* response) { return this->AdvanceAct(context, request, response); }));
+    }
+    ~WithRawCallbackMethod_AdvanceAct() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status AdvanceAct(::grpc::ServerContext* /*context*/, const ::sessionsource::AdvanceActRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    virtual ::grpc::ServerUnaryReactor* AdvanceAct(
+      ::grpc::CallbackServerContext* /*context*/, const ::grpc::ByteBuffer* /*request*/, ::grpc::ByteBuffer* /*response*/)  { return nullptr; }
+  };
+  template <class BaseClass>
   class WithStreamedUnaryMethod_SetKeepSession : public BaseClass {
    private:
     void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
@@ -2035,7 +3078,223 @@ class SessionSource final {
     // replace default version of method with streamed unary
     virtual ::grpc::Status StreamedShareSegment(::grpc::ServerContext* context, ::grpc::ServerUnaryStreamer< ::sessionsource::ShareSegmentRequest,::common::Respone>* server_unary_streamer) = 0;
   };
-  typedef WithStreamedUnaryMethod_SetKeepSession<WithStreamedUnaryMethod_DeleteSession<WithStreamedUnaryMethod_SetName<WithStreamedUnaryMethod_CreateSegment<WithStreamedUnaryMethod_DeleteSegment<WithStreamedUnaryMethod_RenderSegment<WithStreamedUnaryMethod_UpdateSegment<WithStreamedUnaryMethod_CutSession<WithStreamedUnaryMethod_ShareSession<WithStreamedUnaryMethod_ShareSegment<Service > > > > > > > > > > StreamedUnaryService;
+  template <class BaseClass>
+  class WithStreamedUnaryMethod_CreateShow : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithStreamedUnaryMethod_CreateShow() {
+      ::grpc::Service::MarkMethodStreamed(13,
+        new ::grpc::internal::StreamedUnaryHandler<
+          ::sessionsource::CreateShowRequest, ::common::Respone>(
+            [this](::grpc::ServerContext* context,
+                   ::grpc::ServerUnaryStreamer<
+                     ::sessionsource::CreateShowRequest, ::common::Respone>* streamer) {
+                       return this->StreamedCreateShow(context,
+                         streamer);
+                  }));
+    }
+    ~WithStreamedUnaryMethod_CreateShow() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable regular version of this method
+    ::grpc::Status CreateShow(::grpc::ServerContext* /*context*/, const ::sessionsource::CreateShowRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    // replace default version of method with streamed unary
+    virtual ::grpc::Status StreamedCreateShow(::grpc::ServerContext* context, ::grpc::ServerUnaryStreamer< ::sessionsource::CreateShowRequest,::common::Respone>* server_unary_streamer) = 0;
+  };
+  template <class BaseClass>
+  class WithStreamedUnaryMethod_UpdateShow : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithStreamedUnaryMethod_UpdateShow() {
+      ::grpc::Service::MarkMethodStreamed(14,
+        new ::grpc::internal::StreamedUnaryHandler<
+          ::sessionsource::UpdateShowRequest, ::common::Respone>(
+            [this](::grpc::ServerContext* context,
+                   ::grpc::ServerUnaryStreamer<
+                     ::sessionsource::UpdateShowRequest, ::common::Respone>* streamer) {
+                       return this->StreamedUpdateShow(context,
+                         streamer);
+                  }));
+    }
+    ~WithStreamedUnaryMethod_UpdateShow() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable regular version of this method
+    ::grpc::Status UpdateShow(::grpc::ServerContext* /*context*/, const ::sessionsource::UpdateShowRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    // replace default version of method with streamed unary
+    virtual ::grpc::Status StreamedUpdateShow(::grpc::ServerContext* context, ::grpc::ServerUnaryStreamer< ::sessionsource::UpdateShowRequest,::common::Respone>* server_unary_streamer) = 0;
+  };
+  template <class BaseClass>
+  class WithStreamedUnaryMethod_DeleteShow : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithStreamedUnaryMethod_DeleteShow() {
+      ::grpc::Service::MarkMethodStreamed(15,
+        new ::grpc::internal::StreamedUnaryHandler<
+          ::sessionsource::DeleteShowRequest, ::common::Respone>(
+            [this](::grpc::ServerContext* context,
+                   ::grpc::ServerUnaryStreamer<
+                     ::sessionsource::DeleteShowRequest, ::common::Respone>* streamer) {
+                       return this->StreamedDeleteShow(context,
+                         streamer);
+                  }));
+    }
+    ~WithStreamedUnaryMethod_DeleteShow() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable regular version of this method
+    ::grpc::Status DeleteShow(::grpc::ServerContext* /*context*/, const ::sessionsource::DeleteShowRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    // replace default version of method with streamed unary
+    virtual ::grpc::Status StreamedDeleteShow(::grpc::ServerContext* context, ::grpc::ServerUnaryStreamer< ::sessionsource::DeleteShowRequest,::common::Respone>* server_unary_streamer) = 0;
+  };
+  template <class BaseClass>
+  class WithStreamedUnaryMethod_ListShows : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithStreamedUnaryMethod_ListShows() {
+      ::grpc::Service::MarkMethodStreamed(16,
+        new ::grpc::internal::StreamedUnaryHandler<
+          ::sessionsource::ListShowsRequest, ::sessionsource::ListShowsResponse>(
+            [this](::grpc::ServerContext* context,
+                   ::grpc::ServerUnaryStreamer<
+                     ::sessionsource::ListShowsRequest, ::sessionsource::ListShowsResponse>* streamer) {
+                       return this->StreamedListShows(context,
+                         streamer);
+                  }));
+    }
+    ~WithStreamedUnaryMethod_ListShows() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable regular version of this method
+    ::grpc::Status ListShows(::grpc::ServerContext* /*context*/, const ::sessionsource::ListShowsRequest* /*request*/, ::sessionsource::ListShowsResponse* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    // replace default version of method with streamed unary
+    virtual ::grpc::Status StreamedListShows(::grpc::ServerContext* context, ::grpc::ServerUnaryStreamer< ::sessionsource::ListShowsRequest,::sessionsource::ListShowsResponse>* server_unary_streamer) = 0;
+  };
+  template <class BaseClass>
+  class WithStreamedUnaryMethod_StartShow : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithStreamedUnaryMethod_StartShow() {
+      ::grpc::Service::MarkMethodStreamed(17,
+        new ::grpc::internal::StreamedUnaryHandler<
+          ::sessionsource::StartShowRequest, ::common::Respone>(
+            [this](::grpc::ServerContext* context,
+                   ::grpc::ServerUnaryStreamer<
+                     ::sessionsource::StartShowRequest, ::common::Respone>* streamer) {
+                       return this->StreamedStartShow(context,
+                         streamer);
+                  }));
+    }
+    ~WithStreamedUnaryMethod_StartShow() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable regular version of this method
+    ::grpc::Status StartShow(::grpc::ServerContext* /*context*/, const ::sessionsource::StartShowRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    // replace default version of method with streamed unary
+    virtual ::grpc::Status StreamedStartShow(::grpc::ServerContext* context, ::grpc::ServerUnaryStreamer< ::sessionsource::StartShowRequest,::common::Respone>* server_unary_streamer) = 0;
+  };
+  template <class BaseClass>
+  class WithStreamedUnaryMethod_RenderAll : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithStreamedUnaryMethod_RenderAll() {
+      ::grpc::Service::MarkMethodStreamed(18,
+        new ::grpc::internal::StreamedUnaryHandler<
+          ::sessionsource::RenderAllRequest, ::common::Respone>(
+            [this](::grpc::ServerContext* context,
+                   ::grpc::ServerUnaryStreamer<
+                     ::sessionsource::RenderAllRequest, ::common::Respone>* streamer) {
+                       return this->StreamedRenderAll(context,
+                         streamer);
+                  }));
+    }
+    ~WithStreamedUnaryMethod_RenderAll() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable regular version of this method
+    ::grpc::Status RenderAll(::grpc::ServerContext* /*context*/, const ::sessionsource::RenderAllRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    // replace default version of method with streamed unary
+    virtual ::grpc::Status StreamedRenderAll(::grpc::ServerContext* context, ::grpc::ServerUnaryStreamer< ::sessionsource::RenderAllRequest,::common::Respone>* server_unary_streamer) = 0;
+  };
+  template <class BaseClass>
+  class WithStreamedUnaryMethod_DistributeAll : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithStreamedUnaryMethod_DistributeAll() {
+      ::grpc::Service::MarkMethodStreamed(19,
+        new ::grpc::internal::StreamedUnaryHandler<
+          ::sessionsource::DistributeAllRequest, ::common::Respone>(
+            [this](::grpc::ServerContext* context,
+                   ::grpc::ServerUnaryStreamer<
+                     ::sessionsource::DistributeAllRequest, ::common::Respone>* streamer) {
+                       return this->StreamedDistributeAll(context,
+                         streamer);
+                  }));
+    }
+    ~WithStreamedUnaryMethod_DistributeAll() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable regular version of this method
+    ::grpc::Status DistributeAll(::grpc::ServerContext* /*context*/, const ::sessionsource::DistributeAllRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    // replace default version of method with streamed unary
+    virtual ::grpc::Status StreamedDistributeAll(::grpc::ServerContext* context, ::grpc::ServerUnaryStreamer< ::sessionsource::DistributeAllRequest,::common::Respone>* server_unary_streamer) = 0;
+  };
+  template <class BaseClass>
+  class WithStreamedUnaryMethod_AdvanceAct : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithStreamedUnaryMethod_AdvanceAct() {
+      ::grpc::Service::MarkMethodStreamed(20,
+        new ::grpc::internal::StreamedUnaryHandler<
+          ::sessionsource::AdvanceActRequest, ::common::Respone>(
+            [this](::grpc::ServerContext* context,
+                   ::grpc::ServerUnaryStreamer<
+                     ::sessionsource::AdvanceActRequest, ::common::Respone>* streamer) {
+                       return this->StreamedAdvanceAct(context,
+                         streamer);
+                  }));
+    }
+    ~WithStreamedUnaryMethod_AdvanceAct() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable regular version of this method
+    ::grpc::Status AdvanceAct(::grpc::ServerContext* /*context*/, const ::sessionsource::AdvanceActRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    // replace default version of method with streamed unary
+    virtual ::grpc::Status StreamedAdvanceAct(::grpc::ServerContext* context, ::grpc::ServerUnaryStreamer< ::sessionsource::AdvanceActRequest,::common::Respone>* server_unary_streamer) = 0;
+  };
+  typedef WithStreamedUnaryMethod_SetKeepSession<WithStreamedUnaryMethod_DeleteSession<WithStreamedUnaryMethod_SetName<WithStreamedUnaryMethod_CreateSegment<WithStreamedUnaryMethod_DeleteSegment<WithStreamedUnaryMethod_RenderSegment<WithStreamedUnaryMethod_UpdateSegment<WithStreamedUnaryMethod_CutSession<WithStreamedUnaryMethod_ShareSession<WithStreamedUnaryMethod_ShareSegment<WithStreamedUnaryMethod_CreateShow<WithStreamedUnaryMethod_UpdateShow<WithStreamedUnaryMethod_DeleteShow<WithStreamedUnaryMethod_ListShows<WithStreamedUnaryMethod_StartShow<WithStreamedUnaryMethod_RenderAll<WithStreamedUnaryMethod_DistributeAll<WithStreamedUnaryMethod_AdvanceAct<Service > > > > > > > > > > > > > > > > > > StreamedUnaryService;
   template <class BaseClass>
   class WithSplitStreamingMethod_StreamRecorders : public BaseClass {
    private:
@@ -2118,7 +3377,7 @@ class SessionSource final {
     virtual ::grpc::Status StreamedStreamSessionAudio(::grpc::ServerContext* context, ::grpc::ServerSplitStreamer< ::sessionsource::StreamSessionAudioRequest,::sessionsource::AudioChunk>* server_split_streamer) = 0;
   };
   typedef WithSplitStreamingMethod_StreamRecorders<WithSplitStreamingMethod_StreamSessions<WithSplitStreamingMethod_StreamSessionAudio<Service > > > SplitStreamedService;
-  typedef WithSplitStreamingMethod_StreamRecorders<WithSplitStreamingMethod_StreamSessions<WithSplitStreamingMethod_StreamSessionAudio<WithStreamedUnaryMethod_SetKeepSession<WithStreamedUnaryMethod_DeleteSession<WithStreamedUnaryMethod_SetName<WithStreamedUnaryMethod_CreateSegment<WithStreamedUnaryMethod_DeleteSegment<WithStreamedUnaryMethod_RenderSegment<WithStreamedUnaryMethod_UpdateSegment<WithStreamedUnaryMethod_CutSession<WithStreamedUnaryMethod_ShareSession<WithStreamedUnaryMethod_ShareSegment<Service > > > > > > > > > > > > > StreamedService;
+  typedef WithSplitStreamingMethod_StreamRecorders<WithSplitStreamingMethod_StreamSessions<WithSplitStreamingMethod_StreamSessionAudio<WithStreamedUnaryMethod_SetKeepSession<WithStreamedUnaryMethod_DeleteSession<WithStreamedUnaryMethod_SetName<WithStreamedUnaryMethod_CreateSegment<WithStreamedUnaryMethod_DeleteSegment<WithStreamedUnaryMethod_RenderSegment<WithStreamedUnaryMethod_UpdateSegment<WithStreamedUnaryMethod_CutSession<WithStreamedUnaryMethod_ShareSession<WithStreamedUnaryMethod_ShareSegment<WithStreamedUnaryMethod_CreateShow<WithStreamedUnaryMethod_UpdateShow<WithStreamedUnaryMethod_DeleteShow<WithStreamedUnaryMethod_ListShows<WithStreamedUnaryMethod_StartShow<WithStreamedUnaryMethod_RenderAll<WithStreamedUnaryMethod_DistributeAll<WithStreamedUnaryMethod_AdvanceAct<Service > > > > > > > > > > > > > > > > > > > > > StreamedService;
 };
 
 }  // namespace sessionsource

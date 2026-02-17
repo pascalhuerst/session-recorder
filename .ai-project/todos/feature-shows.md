@@ -70,24 +70,24 @@ Add a Shows feature that lets organizers pre-plan a recording schedule (e.g., a 
 
 ### Phase 1 — Core (MVP)
 
-- [ ] Show/Act proto definitions (`show.proto`)
-- [ ] Go handler: CRUD, persistence in MinIO
-- [ ] `StartShow` RPC — creates recording session, links to show
-- [ ] On session stop — transition show to ENDED, auto-create segments from act times
-- [ ] `RenderAll` RPC — queue all acts for segment rendering
-- [ ] `DistributeAll` RPC — share rendered segments to act emails
-- [ ] Shows list page (Upcoming / Past)
-- [ ] Show detail page — DRAFT (create/edit acts with times and emails)
-- [ ] Show detail page — ENDED (adjust times, render, distribute)
-- [ ] Show detail page — ARCHIVED (read-only summary)
+- [x] Show/Act proto definitions (added to `sessionsource.proto`)
+- [x] Go handler: CRUD, persistence in MinIO
+- [x] `StartShow` RPC — creates recording session, links to show
+- [x] On session stop — transition show to ENDED, auto-create segments from act times
+- [x] `RenderAll` RPC — queue all acts for segment rendering
+- [x] `DistributeAll` RPC — share rendered segments to act emails
+- [x] Shows list page (Upcoming / Past)
+- [x] Show detail page — DRAFT (create/edit acts with times and emails)
+- [x] Show detail page — ENDED (adjust times, render, distribute)
+- [x] Show detail page — ARCHIVED (read-only summary)
 
 ### Phase 2 — Live Mode
 
-- [ ] Live timeline view during recording
-- [ ] Manual "Next Act" advance with actual timestamp capture
-- [ ] Auto-advance based on planned times
-- [ ] Real-time progress indicator
-- [ ] `AdvanceAct` RPC
+- [x] Live timeline view during recording
+- [x] Manual "Next Act" advance with actual timestamp capture
+- [x] Auto-advance based on planned times (falls back to planned times for untouched acts)
+- [x] Real-time progress indicator
+- [x] `AdvanceAct` RPC
 
 ### Deferred
 

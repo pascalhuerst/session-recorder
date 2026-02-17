@@ -94,6 +94,11 @@ export const distributeAll = async (showId: string) => {
   return call.response;
 };
 
+export const advanceAct = async (showId: string) => {
+  const call = await sessionSourceClient.advanceAct({ showID: showId });
+  return call.response;
+};
+
 // Normalize proto ShowInfo to app Show type
 function normalizeShow(info: ShowInfo): Show {
   const stateMap: Record<number, Show['state']> = {

@@ -345,7 +345,7 @@ func TestMinio_CloseIntermediateSessions_RecorderNotFound(t *testing.T) {
 	}
 
 	// Should not panic when recorder doesn't exist
-	m.closeIntermediateSessions(nil, uuid.New())
+	m.closeIntermediateSessions(t.Context(), uuid.New())
 }
 
 func TestMinio_CloseIntermediateSessions_NoIntermediateSessions(t *testing.T) {
@@ -374,7 +374,7 @@ func TestMinio_CloseIntermediateSessions_NoIntermediateSessions(t *testing.T) {
 	}
 
 	// Should not modify finished sessions
-	m.closeIntermediateSessions(nil, recorderID)
+	m.closeIntermediateSessions(t.Context(), recorderID)
 
 	session := m.system.Recorders[recorderID].Sessions[sessionID]
 	if session.State != SessionStateFinished {
@@ -409,7 +409,7 @@ func TestMinio_CloseIntermediateSessions_IgnoresErrorState(t *testing.T) {
 	}
 
 	// Should not modify error sessions
-	m.closeIntermediateSessions(nil, recorderID)
+	m.closeIntermediateSessions(t.Context(), recorderID)
 
 	session := m.system.Recorders[recorderID].Sessions[sessionID]
 	if session.State != SessionStateError {

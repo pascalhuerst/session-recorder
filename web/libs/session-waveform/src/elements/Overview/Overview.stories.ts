@@ -13,7 +13,7 @@
  */
 
 import type { Meta, StoryObj } from '@storybook/vue3';
-import { ref, provide } from 'vue';
+import { ref } from 'vue';
 import { within, expect } from '@storybook/test';
 import Overview from './Overview.vue';
 import { createPeaksContext, providePeaksContext } from '../../context/usePeaksContext';

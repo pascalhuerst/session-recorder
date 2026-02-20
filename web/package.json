@@ -5,7 +5,13 @@
   "scripts": {
     "start": "nx serve",
     "build": "nx build",
-    "test": "nx test"
+    "test": "nx test",
+    "predev": "command -v air >/dev/null 2>&1 || go install github.com/air-verse/air@latest",
+    "dev": "concurrently -k -n docker,backend,web -c blue,green,cyan \"pnpm run dev:docker\" \"pnpm run dev:backend\" \"pnpm run dev:web\"",
+    "dev:docker": "docker compose -f ../docker-compose.dev.yml up",
+    "dev:backend": "wait-on tcp:9000 && cd ../go && air",
+    "dev:web": "wait-on tcp:8780 && nx serve",
+    "dev:stop": "docker compose -f ../docker-compose.dev.yml down"
   },
   "private": true,
   "dependencies": {
@@ -58,6 +64,7 @@
     "@vue/eslint-config-typescript": "^12.0.0",
     "@vue/test-utils": "^2.4.4",
     "@vue/tsconfig": "^0.4.0",
+    "concurrently": "^9.1.2",
     "eslint": "^8.56.0",
     "eslint-config-prettier": "^9.0.0",
     "eslint-plugin-vue": "^9.19.2",
@@ -65,13 +72,12 @@
     "nx": "17.2.8",
     "prettier": "^2.6.2",
     "ts-node": "10.9.1",
+    "tslib": "^2.8.1",
     "typescript": "^5.8.3",
     "vite": "^5.0.10",
     "vite-plugin-dts": "~2.3.0",
     "vitest": "~0.34.6",
-    "vue-tsc": "^1.8.26"
-  },
-  "workspaces": [
-    "libs/session-waveform"
-  ]
+    "vue-tsc": "^3.2.2",
+    "wait-on": "^8.0.3"
+  }
 }

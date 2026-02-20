@@ -1,96 +1,132 @@
 <script setup lang="ts">
-import { ref } from 'vue';
-import { Button } from '@session-recorder/session-waveform';
-import { deleteSession } from '../../../grpc/procedures/deleteSession';
-import { toastService } from '../../../services/Toaster/ToastService';
+import { ref, onMounted } from 'vue';
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import type { Session } from '@/types';
 
-const props = defineProps<{
+defineProps<{
   session: Session;
   recorderId: string;
 }>();
 
-const isDeleting = ref(false);
+const canvasRef = ref<HTMLCanvasElement | null>(null);
 
-const handleDelete = async () => {
-  if (isDeleting.value) return;
-  isDeleting.value = true;
+// Draw a static waveform placeholder
+const drawPlaceholder = () => {
+  const canvas = canvasRef.value;
+  if (!canvas) return;
 
-  try {
-    await deleteSession({
-      recorderID: props.recorderId,
-      sessionID: props.session.id,
-    });
-    toastService.success('Session deleted');
-  } catch (error) {
-    console.error('Failed to delete session:', error);
-    toastService.error('Failed to delete session');
-  } finally {
-    isDeleting.value = false;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  const dpr = window.devicePixelRatio || 1;
+  const width = canvas.clientWidth;
+  const height = canvas.clientHeight;
+
+  // Set canvas resolution for sharp rendering
+  canvas.width = width * dpr;
+  canvas.height = height * dpr;
+  ctx.scale(dpr, dpr);
+
+  const centerY = height / 2;
+  const maxAmplitudeHeight = height * 0.4;
+
+  // Subtle placeholder color so error message pops
+  ctx.fillStyle = 'rgba(148, 163, 184, 0.15)';
+
+  // Generate a static waveform pattern
+  ctx.beginPath();
+
+  // Forward pass: draw top edge
+  for (let x = 0; x < width; x++) {
+    // Create a pseudo-random but consistent pattern
+    const noise = Math.sin(x * 0.05) * 0.3 + Math.sin(x * 0.12) * 0.2 + Math.sin(x * 0.03) * 0.5;
+    const amplitude = Math.abs(noise) * 0.6 + 0.1;
+    const y = centerY - amplitude * maxAmplitudeHeight;
+
+    if (x === 0) {
+      ctx.moveTo(x, y);
+    } else {
+      ctx.lineTo(x, y);
+    }
   }
+
+  // Reverse pass: draw bottom edge
+  for (let x = width - 1; x >= 0; x--) {
+    const noise = Math.sin(x * 0.05) * 0.3 + Math.sin(x * 0.12) * 0.2 + Math.sin(x * 0.03) * 0.5;
+    const amplitude = Math.abs(noise) * 0.6 + 0.1;
+    const y = centerY + amplitude * maxAmplitudeHeight;
+
+    ctx.lineTo(x, y);
+  }
+
+  ctx.closePath();
+  ctx.fill();
 };
+
+onMounted(() => {
+  drawPlaceholder();
+});
 </script>
 
 <template>
-  <div class="error-content">
-    <div class="error-icon">
-      <svg
-        width="32"
-        height="32"
-        viewBox="0 0 24 24"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2" />
-        <path
-          d="M12 8V12M12 16H12.01"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-        />
-      </svg>
-    </div>
-    <p class="error-message">{{ session.errorMessage || 'An error occurred while processing this session' }}</p>
-    <div class="actions">
-      <Button
-        variant="secondary"
-        :disabled="isDeleting"
-        @click="handleDelete"
-      >
-        {{ isDeleting ? 'Deleting...' : 'Delete Session' }}
-      </Button>
+  <div class="error-overview">
+    <div class="waveform-placeholder">
+      <canvas ref="canvasRef" class="placeholder-canvas" />
+      <div class="error-message">
+        <font-awesome-icon icon="fa-solid fa-circle-exclamation" class="error-icon" />
+        <span>{{ session.errorMessage || 'An error occurred while processing this session' }}</span>
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.error-content {
+.error-overview {
   display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--size-2);
-  padding: var(--size-4);
-  min-height: 120px;
-  background: var(--color-red-50);
-  border-radius: var(--radius-sm);
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  width: 100%;
+  height: 80px;
 }
 
-.error-icon {
-  color: var(--color-red-500);
+.waveform-placeholder {
+  flex: 1;
+  min-width: 0;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  border-top: 1px solid var(--border-primary);
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.placeholder-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
 }
 
 .error-message {
-  font-size: var(--scale-1);
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--size-2);
+  padding: var(--size-1) var(--size-2);
+  font-size: var(--scale-0);
   color: var(--color-red-700);
-  text-align: center;
-  margin: 0;
-  max-width: 400px;
+  background: var(--color-red-50);
+  border-radius: var(--radius-xs);
 }
 
-.actions {
-  display: flex;
-  gap: var(--size-2);
-  margin-top: var(--size-1);
+:global(.theme-dark) .error-message {
+  color: var(--color-red-300);
+  background: var(--color-red-950);
+}
+
+.error-icon {
+  flex-shrink: 0;
 }
 </style>

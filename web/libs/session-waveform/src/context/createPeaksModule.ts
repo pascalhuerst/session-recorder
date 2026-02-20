@@ -31,6 +31,7 @@ export interface Commands {
     zoomview: HTMLElement;
     audio: HTMLElement;
   }) => void;
+  destroy: () => void;
   play: () => void;
   pause: () => void;
   seek: (time: number) => void;

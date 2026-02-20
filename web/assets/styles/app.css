@@ -5,6 +5,64 @@
 
 :root {
     --font-sans: 'Gabarito';
+
+    /* Theme: Backgrounds */
+    --bg-primary: #ffffff;
+    --bg-secondary: var(--color-grey-50);
+    --bg-tertiary: var(--color-grey-100);
+    --bg-hover: var(--color-grey-100);
+    --bg-selected: rgba(139, 92, 246, 0.1);       /* purple tint for selection */
+    --bg-selected-hover: rgba(139, 92, 246, 0.15);
+
+    /* Theme: Neutral (darker than primary, for emphasis) */
+    --neutral-100: var(--color-grey-100);
+    --neutral-200: var(--color-grey-200);
+    --neutral-300: var(--color-grey-300);
+    --neutral-emphasis: var(--color-grey-200);
+
+    /* Theme: Text (WCAG AA compliant - 4.5:1 minimum contrast) */
+    --text-primary: var(--color-black);
+    --text-secondary: var(--color-grey-700);
+    --text-muted: var(--color-grey-600); /* grey-600 for 6.4:1 contrast on light backgrounds */
+
+    /* Theme: Borders */
+    --border-primary: var(--color-grey-200);
+    --border-secondary: var(--color-grey-300);
+
+    /* Theme: Accent (purple) */
+    --accent: var(--color-purple-500);
+    --accent-hover: var(--color-purple-600);
+    --accent-active: var(--color-purple-700);
+    --accent-subtle: var(--color-purple-300);
+}
+
+.theme-dark {
+    --bg-primary: var(--color-grey-900);
+    --bg-secondary: var(--color-grey-800);
+    --bg-tertiary: var(--color-grey-700);
+    --bg-hover: var(--color-grey-700);
+    --bg-selected: rgba(139, 92, 246, 0.2);       /* purple tint for selection */
+    --bg-selected-hover: rgba(139, 92, 246, 0.25);
+
+    /* Neutral: inverted for dark mode (higher number = darker) */
+    --neutral-100: var(--color-grey-800);
+    --neutral-200: var(--color-grey-900);
+    --neutral-300: var(--color-grey-950);
+    --neutral-emphasis: #000;
+
+    /* Text (WCAG AA compliant) */
+    --text-primary: var(--color-grey-50);  /* lighter for better contrast */
+    --text-secondary: var(--color-grey-200);
+    --text-muted: var(--color-grey-300);   /* grey-300 for 5.5:1 contrast on dark backgrounds */
+
+    --border-primary: var(--color-grey-700);
+    --border-secondary: var(--color-grey-600);
+
+    /* Accent: lighter purple for dark mode visibility */
+    --accent: #a78bfa;         /* violet-400 equivalent - good contrast on dark */
+    --accent-hover: #c4b5fd;   /* violet-300 equivalent - lighter on hover */
+    --accent-active: #8b5cf6;  /* violet-500 equivalent - slightly darker on press */
+    --accent-subtle: #7c3aed;  /* violet-600 equivalent - for subtle backgrounds */
 }
 
 * {
@@ -16,4 +74,11 @@ body {
     font-family: var(--font-sans);
     font-size: var(--scale-0);
     line-height: normal;
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+#modals {
+    display: contents;
 }

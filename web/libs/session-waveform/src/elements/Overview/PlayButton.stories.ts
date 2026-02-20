@@ -23,8 +23,7 @@
  */
 
 import type { Meta, StoryObj } from '@storybook/vue3';
-import { ref } from 'vue';
-import { userEvent, within, expect, fn } from '@storybook/test';
+import { userEvent, within, expect } from '@storybook/test';
 import PlayButton from './controls/PlayButton.vue';
 import { createPeaksContext, providePeaksContext } from '../../context/usePeaksContext';
 

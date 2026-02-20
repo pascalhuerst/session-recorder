@@ -26,6 +26,7 @@ import { faStop } from '@fortawesome/free-solid-svg-icons/faStop';
 import { faCheck } from '@fortawesome/free-solid-svg-icons/faCheck';
 import { faRedo } from '@fortawesome/free-solid-svg-icons/faRedo';
 import { faShare } from '@fortawesome/free-solid-svg-icons/faShare';
+import { faGear } from '@fortawesome/free-solid-svg-icons/faGear';
 
 export const setup = () => {
   library.add(
@@ -54,6 +55,7 @@ export const setup = () => {
     faExclamationTriangle,
     faInfoCircle,
     faRedo,
-    faShare
+    faShare,
+    faGear
   );
 };

@@ -32,16 +32,15 @@ const displayName = computed(() => {
   return props.session.name || `Untitled #${props.index}`;
 });
 
-const displayDate = computed(() => {
-  const { startedAt } = props.session;
-  const format =
-    startedAt.getFullYear() === new Date().getFullYear()
-      ? 'ddd, MMM D, HH:mm'
-      : 'MMM D, YYYY HH:mm';
-  return {
-    iso: startedAt.toISOString(),
-    formatted: useDateFormat(startedAt, format).value,
-  };
+const timeRange = computed(() => {
+  const { startedAt, finishedAt } = props.session;
+  const formatTime = (date: Date) => useDateFormat(date, 'HH:mm').value;
+  const start = formatTime(startedAt);
+  if (finishedAt) {
+    const end = formatTime(finishedAt);
+    return `${start}–${end}`;
+  }
+  return start;
 });
 
 // State checks
@@ -212,6 +211,8 @@ const onDeleteProcessing = () => {
         </svg>
       </button>
 
+      <span class="time-range">{{ timeRange }}</span>
+
       <span
         ref="titleRef"
         class="title"
@@ -230,14 +231,12 @@ const onDeleteProcessing = () => {
       <!-- Elapsed time for recording sessions -->
       <span v-if="isRecording" class="elapsed-time">{{ elapsedTime }}</span>
 
-      <div class="metadata">
-        <time class="timestamp" :datetime="displayDate.iso">{{ displayDate.formatted }}</time>
-      </div>
+      <div class="spacer"></div>
 
       <!-- Actions -->
       <div class="actions">
         <Button
-          v-if="isProcessing"
+          v-if="isProcessing || session.state === 'error'"
           size="xs"
           @click="onDeleteProcessing"
         >
@@ -316,12 +315,12 @@ const onDeleteProcessing = () => {
 }
 
 .title:hover {
-  outline-color: var(--color-grey-200);
+  outline-color: var(--border-primary);
 }
 
 .title:focus,
 .title.editing {
-  outline-color: var(--color-purple-500);
+  outline-color: var(--accent);
 }
 
 .title.readonly {
@@ -332,6 +331,13 @@ const onDeleteProcessing = () => {
   outline-color: transparent;
 }
 
+.time-range {
+  font-size: var(--scale-0);
+  font-weight: var(--weight-normal);
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
 .elapsed-time {
   font-family: monospace;
   font-size: var(--scale-1);
@@ -339,19 +345,8 @@ const onDeleteProcessing = () => {
   color: var(--color-red-500);
 }
 
-.metadata {
-  margin-left: auto;
-  display: flex;
-  flex-wrap: nowrap;
-  align-items: center;
-  gap: var(--size-2);
-  font-size: var(--scale-1);
-}
-
-.timestamp {
-  font-size: var(--scale-0);
-  font-weight: var(--weight-normal);
-  color: var(--color-grey-500);
+.spacer {
+  flex: 1;
 }
 
 .actions {
@@ -371,13 +366,13 @@ const onDeleteProcessing = () => {
   background: transparent;
   cursor: pointer;
   border-radius: var(--radius-xs);
-  color: var(--color-grey-500);
+  color: var(--text-muted);
   transition: transform 0.2s ease, color 0.15s ease, background-color 0.15s ease;
 }
 
 .expand-toggle:hover {
-  background-color: var(--color-grey-100);
-  color: var(--color-grey-700);
+  background-color: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 .expand-toggle.expanded {

@@ -10,7 +10,7 @@ import { setKeepSession } from '../../../grpc/procedures/setKeepSession';
 import { deleteSession } from '../../../grpc/procedures/deleteSession';
 import { shareSession } from '../../../grpc/procedures/shareSession';
 import type { Session } from '../../../types';
-import { useDateFormat } from '@vueuse/core';
+import { useTimeAgo } from '@vueuse/core';
 import { toastService } from '../../../services/Toaster/ToastService';
 import ShareModal from '../../../components/ShareModal.vue';
 
@@ -29,19 +29,12 @@ const sessionName = computed(() => {
   return props.session.name || 'Untitled Recording';
 });
 
-const displayExpiryDate = computed(() => {
+const expiresIn = computed(() => {
   const { expiresAt } = props.session;
   if (!expiresAt) {
     return null;
   }
-  const format =
-    expiresAt.getFullYear() === new Date().getFullYear()
-      ? 'ddd, MMM D, HH:mm'
-      : 'MMM D, YYYY HH:mm';
-  return {
-    iso: expiresAt.toISOString(),
-    formatted: useDateFormat(expiresAt, format).value,
-  };
+  return useTimeAgo(expiresAt, { showSecond: false }).value;
 });
 
 const onKeep = () => {
@@ -113,8 +106,8 @@ const onShareClose = () => {
 
 <template>
   <div class="menu">
-    <template v-if="!session.keep && displayExpiryDate">
-      <div class="balance">Kept until {{ displayExpiryDate.formatted }}</div>
+    <template v-if="!session.keep && expiresIn">
+      <div class="expiry">Expires {{ expiresIn }}</div>
       <Button size="xs" @click="onKeep">
         <font-awesome-icon icon="fa-solid fa-heart"></font-awesome-icon>
         Keep
@@ -171,9 +164,9 @@ const onShareClose = () => {
   gap: var(--size-1);
 }
 
-.balance {
+.expiry {
   font-size: var(--scale-0);
-  color: var(--color-red-500);
+  color: var(--text-muted);
   margin: 0 var(--size-1);
 }
 </style>

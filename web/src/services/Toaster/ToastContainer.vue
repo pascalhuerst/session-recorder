@@ -50,12 +50,12 @@ const removeToast = (id: string) => {
 <style scoped>
 .toast-container {
   position: fixed;
-  top: var(--size-4);
-  right: var(--size-4);
+  top: var(--size-6);
+  right: var(--size-6);
   z-index: 1000;
   display: flex;
   flex-direction: column;
-  gap: var(--size-2);
+  gap: var(--size-3);
   max-width: 400px;
   max-height: 600px;
   pointer-events: none;
@@ -64,32 +64,48 @@ const removeToast = (id: string) => {
 
 .toast {
   pointer-events: auto;
-  padding: var(--size-2);
-  border-radius: var(--radius-xs);
+  padding: var(--size-3);
+  border-radius: var(--radius-sm);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   border: 1px solid;
-  background: white;
+  background: var(--bg-primary);
   min-width: 300px;
 }
 
 .toast--success {
-  border-color: var(--color-purple-500);
-  background: #efeaf8ff;
+  border-color: var(--color-green-500);
+  background: var(--color-green-50);
+}
+
+:global(.theme-dark) .toast--success {
+  background: var(--color-green-950);
 }
 
 .toast--error {
-  border-color: #ef4444;
-  background: #fef2f2;
+  border-color: var(--color-red-500);
+  background: var(--color-red-50);
+}
+
+:global(.theme-dark) .toast--error {
+  background: var(--color-red-950);
 }
 
 .toast--warning {
-  border-color: #f59e0b;
-  background: #fffbeb;
+  border-color: var(--color-yellow-500);
+  background: var(--color-yellow-50);
+}
+
+:global(.theme-dark) .toast--warning {
+  background: var(--color-yellow-950);
 }
 
 .toast--info {
-  border-color: #3b82f6;
-  background: #eff6ff;
+  border-color: var(--color-blue-500);
+  background: var(--color-blue-50);
+}
+
+:global(.theme-dark) .toast--info {
+  background: var(--color-blue-950);
 }
 
 .toast__content {
@@ -103,25 +119,25 @@ const removeToast = (id: string) => {
 }
 
 .toast--success .toast__icon {
-  color: var(--color-purple-500);
+  color: var(--color-green-500);
 }
 
 .toast--error .toast__icon {
-  color: #ef4444;
+  color: var(--color-red-500);
 }
 
 .toast--warning .toast__icon {
-  color: #f59e0b;
+  color: var(--color-yellow-500);
 }
 
 .toast--info .toast__icon {
-  color: #3b82f6;
+  color: var(--color-blue-500);
 }
 
 .toast__message {
   flex: 1;
   font-size: var(--scale-1);
-  color: var(--color-grey-900);
+  color: var(--text-primary);
 }
 
 .toast__close {
@@ -129,7 +145,7 @@ const removeToast = (id: string) => {
   border: none;
   cursor: pointer;
   padding: var(--size-1);
-  color: var(--color-grey-600);
+  color: var(--text-muted);
   border-radius: var(--radius-sm);
   display: flex;
   align-items: center;
@@ -140,8 +156,8 @@ const removeToast = (id: string) => {
 }
 
 .toast__close:hover {
-  background: var(--color-grey-100);
-  color: var(--color-grey-800);
+  background: var(--bg-hover);
+  color: var(--text-primary);
 }
 
 /* Transition animations */

@@ -23,7 +23,7 @@ const setSelected = (item: string) => {
 </script>
 
 <template>
-  <nav>
+  <nav class="device-picker">
     <ul>
       <li v-for="recorder in recorders" :key="recorder.recorderID">
         <DeviceCard
@@ -37,13 +37,17 @@ const setSelected = (item: string) => {
 </template>
 
 <style scoped>
+.device-picker {
+  display: flex;
+  flex-direction: column;
+}
+
 ul {
   display: flex;
-  flex-wrap: nowrap;
-  gap: var(--size-2);
+  flex-direction: column;
+  gap: var(--size-1);
   list-style: none;
   padding: 0;
   margin: 0;
-  overflow-x: auto;
 }
 </style>

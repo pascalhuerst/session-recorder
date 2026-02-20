@@ -13,13 +13,13 @@ export default defineConfig({
     strictPort: true,
     proxy: {
       '/sessionsource.SessionSource': {
-        target: 'http://localhost:8080',
+        target: 'http://localhost:8081',
         changeOrigin: true,
         ws: true,
         rewrite: (path) => path,
       },
       '/grpc': {
-        target: 'http://localhost:8080',
+        target: 'http://localhost:8081',
         changeOrigin: true,
         ws: true,
         rewrite: (path) => path.replace(/^\/grpc/, ''),

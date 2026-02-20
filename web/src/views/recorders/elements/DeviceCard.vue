@@ -20,9 +20,9 @@ const isRecording = computed(() => {
 </script>
 
 <template>
-  <div role="button" :class="['link', { 'is-selected': isSelected }]">
+  <div role="button" :class="['device-card', { 'is-selected': isSelected }]">
     <div class="meta">
-      <font-awesome-icon icon="fa-solid fa-microchip" />
+      <font-awesome-icon icon="fa-solid fa-microchip" class="icon" />
       <div class="name">{{ recorder.recorderName }}</div>
     </div>
     <div class="indicators">
@@ -36,47 +36,65 @@ const isRecording = computed(() => {
 </template>
 
 <style scoped>
-.link {
+.device-card {
   display: flex;
   flex-direction: column;
-  gap: var(--size-2);
-  color: var(--color-black);
+  gap: var(--size-1);
+  color: var(--text-primary);
   background: transparent;
   font-size: var(--scale-0);
   font-weight: var(--weight-medium);
-  padding: var(--size-4) var(--size-4);
-  white-space: nowrap;
+  padding: var(--size-2) var(--size-2);
   border-radius: var(--radius-sm);
   text-decoration: none;
   cursor: pointer;
   border: 1px solid transparent;
-  transition: all 0.25s;
-  width: var(--size-40);
+  transition: all 0.15s ease;
+  width: 100%;
   overflow: hidden;
 }
 
-.link:hover,
-.link.is-selected {
-  background: #fff;
+.device-card:hover {
+  background: var(--bg-hover);
+}
+
+.device-card.is-selected {
+  background: var(--bg-selected);
+  border-color: var(--accent);
+}
+
+.device-card.is-selected:hover {
+  background: var(--bg-selected-hover);
 }
 
 .meta {
   display: flex;
   align-items: center;
-  gap: var(--size-1);
+  gap: var(--size-2);
+  min-width: 0;
 }
 
-.indicators {
-  display: grid;
-  gap: var(--size-2);
-  grid-template-columns: auto 1fr;
+.icon {
+  flex-shrink: 0;
+  color: var(--text-muted);
 }
 
 .name {
-  margin-right: auto;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: var(--color-grey-800);
+  color: var(--text-secondary);
+}
+
+.device-card.is-selected .name {
+  color: var(--text-primary);
+}
+
+.indicators {
+  display: flex;
+  align-items: center;
+  gap: var(--size-2);
+  padding-left: calc(var(--size-4) + var(--size-2));
+  min-width: 0;
 }
 </style>

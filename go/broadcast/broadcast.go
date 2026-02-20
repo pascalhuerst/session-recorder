@@ -50,8 +50,8 @@ func (b *Broadcaster[T]) Subscribe() (ch <-chan T, unsubscribe func()) {
 // Broadcast sends a message to all subscribers.
 // Messages are sent non-blocking - if a subscriber's buffer is full, the message is dropped for that subscriber.
 func (b *Broadcaster[T]) Broadcast(msg T) {
-	b.mu.RLock()
-	defer b.mu.RUnlock()
+	b.mu.Lock()
+	defer b.mu.Unlock()
 
 	// Cache the last value
 	b.lastValue = &msg

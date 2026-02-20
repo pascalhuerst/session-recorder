@@ -23,7 +23,7 @@
  */
 
 import type { Meta, StoryObj } from '@storybook/vue3';
-import { within, expect, userEvent } from '@storybook/test';
+import { expect } from '@storybook/test';
 import WaveformEditor from './WaveformEditor.vue';
 import {
   createPeaksContext,
@@ -171,7 +171,7 @@ export const ManySegments: StoryObj = {
 
 // Read-only mode
 export const ReadOnlyMode: StoryObj = {
-  render: (args) => ({
+  render: () => ({
     components: { WaveformEditor },
     setup() {
       const context = createPeaksContext({

@@ -41,6 +41,7 @@ const { overviewRef } = inject();
 
 .overview__waveform {
   flex: 1;
+  min-width: 0; /* Prevent Firefox overflow */
   height: 80px;
 }
 </style>

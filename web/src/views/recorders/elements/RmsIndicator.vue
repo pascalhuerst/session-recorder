@@ -21,32 +21,41 @@ defineProps<{
 <style scoped>
 .status {
   display: flex;
-  gap: var(--size-1);
+  gap: var(--size-2);
   align-items: center;
+  flex: 1;
+  min-width: 0;
 }
 
 .text {
-  font-size: var(--size-3);
-  color: var(--color-grey-800);
+  font-size: var(--scale-00);
+  color: var(--text-secondary);
+  flex-shrink: 0;
 }
 
 .indicator {
-  position: relative;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   transition: clip-path 0.1s ease 0s;
-  height: var(--size-1);
-  width: 100%;
   background-image: linear-gradient(
-    to left,
-    red 5%,
-    rgb(255, 255, 0) 25%,
-    lime 45%,
-    rgb(0, 136, 0) 100%
+    to right,
+    rgb(0, 136, 0) 0%,
+    lime 55%,
+    rgb(255, 255, 0) 75%,
+    red 95%
   );
 }
 
 .track {
+  position: relative;
   height: var(--size-1);
-  width: 100%;
-  background-color: var(--color-grey-200);
+  flex: 1;
+  min-width: var(--size-10);
+  background-color: var(--border-secondary);
+  border-radius: var(--radius-xs);
+  overflow: hidden;
 }
 </style>

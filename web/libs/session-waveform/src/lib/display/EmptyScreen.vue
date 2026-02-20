@@ -24,15 +24,15 @@
 
 .illustration {
   font-size: var(--scale-fluid-10);
-  color: var(--color-purple-700);
-  opacity: 0.2;
+  color: var(--text-muted);
+  opacity: 0.4;
 }
 
 .text {
   width: 80%;
   max-width: 600px;
   font-size: var(--scale-fluid-5);
-  color: var(--color-grey-400);
+  color: var(--text-muted);
   text-align: center;
   font-weight: var(--weight-medium);
 }

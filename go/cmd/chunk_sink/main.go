@@ -68,18 +68,28 @@ func main() {
 	s3SecretKey := flag.String("s3-secret-key", utils.GetWithDefault("S3_SECRET_KEY", ""), "S3 secret key (env: S3_SECRET_KEY)")
 
 	// Local endpoint configuration (for UI/browser URLs)
+	// S3_LOCAL_ENDPOINT takes precedence if set (supports path-based endpoints like "localhost:3000/minio")
+	s3LocalEndpointDirect := flag.String("s3-local-endpoint", utils.GetWithDefault("S3_LOCAL_ENDPOINT", ""), "S3 endpoint for UI URLs (env: S3_LOCAL_ENDPOINT, supports paths)")
 	s3LocalHost := flag.String("s3-local-host", utils.GetWithDefault("S3_LOCAL_HOST", ""), "S3 host for UI URLs (env: S3_LOCAL_HOST, default: s3-endpoint host)")
 	s3LocalPort := flag.Int("s3-local-port", utils.GetIntWithDefault("S3_LOCAL_PORT", 0), "S3 port for UI URLs (env: S3_LOCAL_PORT, default: s3-endpoint port)")
 
 	// Public endpoint configuration (for email sharing URLs)
+	// S3_PUBLIC_ENDPOINT takes precedence if set (supports path-based endpoints)
+	s3PublicEndpointDirect := flag.String("s3-public-endpoint", utils.GetWithDefault("S3_PUBLIC_ENDPOINT", ""), "S3 endpoint for sharing URLs (env: S3_PUBLIC_ENDPOINT, supports paths)")
 	s3PublicHost := flag.String("s3-public-host", utils.GetWithDefault("S3_PUBLIC_HOST", ""), "S3 host for email sharing URLs (env: S3_PUBLIC_HOST, default: s3-local-host)")
 	s3PublicPort := flag.Int("s3-public-port", utils.GetIntWithDefault("S3_PUBLIC_PORT", 0), "S3 port for email sharing URLs (env: S3_PUBLIC_PORT, default: s3-local-port)")
 
 	flag.Parse()
 
-	// Build endpoint strings from host:port configuration
-	s3LocalEndpoint := buildEndpoint(*s3LocalHost, *s3LocalPort, *s3Endpoint)
-	s3PublicEndpoint := buildEndpoint(*s3PublicHost, *s3PublicPort, s3LocalEndpoint)
+	// Build endpoint strings: direct endpoint takes precedence over host:port
+	s3LocalEndpoint := *s3LocalEndpointDirect
+	if s3LocalEndpoint == "" {
+		s3LocalEndpoint = buildEndpoint(*s3LocalHost, *s3LocalPort, *s3Endpoint)
+	}
+	s3PublicEndpoint := *s3PublicEndpointDirect
+	if s3PublicEndpoint == "" {
+		s3PublicEndpoint = buildEndpoint(*s3PublicHost, *s3PublicPort, s3LocalEndpoint)
+	}
 
 	// Validate required fields
 	if *s3AccessKey == "" || *s3SecretKey == "" {

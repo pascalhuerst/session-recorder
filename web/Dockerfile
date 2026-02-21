@@ -1,5 +1,8 @@
 # Web Interface Dockerfile
-FROM node:20-alpine AS builder
+FROM node:24-alpine AS builder
+
+# Install pnpm
+RUN corepack enable && corepack prepare pnpm@9 --activate
 
 # Set working directory
 WORKDIR /build
@@ -15,7 +18,9 @@ RUN npm ci
 WORKDIR /build/web
 
 # Copy web package files and workspace config
-COPY web/package*.json ./
+COPY web/package.json ./
+COPY web/pnpm-lock.yaml ./
+COPY web/pnpm-workspace.yaml ./
 COPY web/nx.json ./
 COPY web/project.json ./
 COPY web/tsconfig*.json ./
@@ -28,7 +33,7 @@ COPY web/libs/session-waveform/tsconfig*.json ./libs/session-waveform/
 COPY web/libs/session-waveform/vite.config.ts ./libs/session-waveform/
 
 # Install web dependencies (including workspace dependencies)
-RUN npm install
+RUN pnpm install --frozen-lockfile
 
 # Copy web source code
 COPY web/src/ ./src/
@@ -44,7 +49,7 @@ ARG VITE_GRPC_SERVER_URL=http://localhost:3000/grpc
 RUN echo "VITE_GRPC_SERVER_URL=${VITE_GRPC_SERVER_URL}" > .env.production
 
 # Build the application with NX verbose output for debugging
-RUN npx nx build web --verbose
+RUN pnpm nx build web --verbose
 
 # Production stage
 FROM nginx:alpine

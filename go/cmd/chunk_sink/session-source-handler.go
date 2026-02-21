@@ -449,7 +449,7 @@ func (h *SessionSourceHandler) cutSession(ctx context.Context, request *sspb.Cut
 	if !h.chunkSinkServer.IsRecorderConnected(recorderID) {
 		msg := fmt.Sprintf("No connection to recorder %s", recorderID)
 		log.Warn().Str("recorder-id", request.RecorderID).Msg(msg)
-		return &cmpb.Respone{Success: false, ErrorMessage: msg}, fmt.Errorf(msg)
+		return &cmpb.Respone{Success: false, ErrorMessage: msg}, fmt.Errorf("%s", msg)
 	}
 
 	if err := h.chunkSinkServer.CutSession(recorderID); err != nil {

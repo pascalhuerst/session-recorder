@@ -31,7 +31,8 @@ func main() {
 
 	client := sspb.NewSessionSourceClient(conn)
 
-	ctx, _ := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
 
 	if argv := os.Args; len(argv) > 1 {
 		switch argv[1] {

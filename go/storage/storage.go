@@ -128,7 +128,7 @@ type Storage interface {
 	SetName(ctx context.Context, recorderID, sessionID uuid.UUID, name string) error
 
 	CloseRecordingSession(ctx context.Context, recorderID, sessionID uuid.UUID) error
-	isSessionClosed(ctx context.Context, recorderID, sessionID uuid.UUID) bool
+	RetryRenderSession(ctx context.Context, recorderID, sessionID uuid.UUID) error
 	//CloseSession(ctx context.Context, RecorderID, SessionID uuid.UUID) error
 	//CloseOpenSessions(ctx context.Context, RecorderID uuid.UUID) error
 

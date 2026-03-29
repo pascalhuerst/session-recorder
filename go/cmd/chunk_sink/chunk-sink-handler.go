@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/pascalhuerst/session-recorder/broadcast"
@@ -148,7 +149,13 @@ func (h *ChunkSinkHandler) setChunks(ctx context.Context, chunks *cspb.Chunks) e
 		samples = append(samples, int16(sample))
 	}
 
-	timeCreated := chunks.TimeCreated.AsTime()
+	timeCreated := time.Now()
+	if chunks.TimeCreated != nil {
+		t := chunks.TimeCreated.AsTime()
+		if !t.IsZero() {
+			timeCreated = t
+		}
+	}
 
 	if err = h.sessionStorage.SafeChunks(ctx, recorderID, sessionID, chunkID, timeCreated, samples); err != nil {
 		log.Err(err).Msg("Cannot save chunks")
@@ -180,13 +187,31 @@ func (h *ChunkSinkHandler) OnRecorderConnected(recorderID uuid.UUID) {
 }
 
 func (h *ChunkSinkHandler) OnRecorderDisconnected(recorderID uuid.UUID) {
-	h.lock.Lock()
-	defer h.lock.Unlock()
+	var sessionToClose uuid.UUID
 
+	h.lock.Lock()
 	delete(h.connectedRecorders, recorderID)
 	if state, ok := h.recorderStates[recorderID]; ok {
+		if state.recording && state.lastSession != uuid.Nil {
+			sessionToClose = state.lastSession
+		}
 		state.recording = false
 		state.lastSession = uuid.Nil
+	}
+	h.lock.Unlock()
+
+	if sessionToClose != uuid.Nil {
+		if closed, err := h.closeRecorderSession(context.Background(), recorderID, sessionToClose); err != nil {
+			log.Err(err).
+				Str("recorder-id", recorderID.String()).
+				Str("session-id", sessionToClose.String()).
+				Msg("Cannot close session after recorder disconnected")
+		} else if closed {
+			log.Info().
+				Str("recorder-id", recorderID.String()).
+				Str("session-id", sessionToClose.String()).
+				Msg("Closed session after recorder disconnected")
+		}
 	}
 }
 

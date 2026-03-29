@@ -710,6 +710,101 @@ func (m *Minio) flushChunks(ctx context.Context, recorderID, sessionID uuid.UUID
 	return nil
 }
 
+func (m *Minio) renderFromRawData(ctx context.Context, recorderID, sessionID uuid.UUID, sm *Session, previousState SessionState, rawData *minio.Object) error {
+	readers, writer, closer := makeReaders(4)
+	eg, egCtx := errgroup.WithContext(ctx)
+
+	eg.Go(func() error {
+		defer closer.Close()
+		_, err := io.Copy(writer, rawData)
+		if err != nil {
+			log.Err(err).Msg("Cannot setup multiple readers")
+			return err
+		}
+		return nil
+	})
+
+	eg.Go(func() error {
+		waveformData, err := render.CreateWaveform(egCtx, readers[0], 300, 10000, 200)
+		if err != nil {
+			return fmt.Errorf("cannot create waveform: %w", err)
+		}
+		waveformObject := fmt.Sprintf("%s/sessions/%s/waveform.dat", recorderID, sessionID)
+		if _, err := m.client.PutObject(ctx, bucketName, waveformObject, waveformData, int64(waveformData.Len()), minio.PutObjectOptions{}); err != nil {
+			return err
+		}
+		return nil
+	})
+
+	eg.Go(func() error {
+		overviewData, err := render.CreateOverview(egCtx, readers[1], 300, 1000, 200)
+		if err != nil {
+			return fmt.Errorf("cannot create waveform overview: %w", err)
+		}
+		overviewObject := fmt.Sprintf("%s/sessions/%s/overview.png", recorderID, sessionID)
+		if _, err := m.client.PutObject(ctx, bucketName, overviewObject, overviewData, int64(overviewData.Len()), minio.PutObjectOptions{}); err != nil {
+			return err
+		}
+		return nil
+	})
+
+	eg.Go(func() error {
+		flacBuffer, err := render.Flac(readers[2])
+		if err != nil {
+			return err
+		}
+		flacObject := fmt.Sprintf("%s/sessions/%s/data.flac", recorderID, sessionID)
+		if _, err := m.client.PutObject(ctx, bucketName, flacObject, flacBuffer, int64(flacBuffer.Len()), minio.PutObjectOptions{}); err != nil {
+			return err
+		}
+		return nil
+	})
+
+	eg.Go(func() error {
+		buffer, err := render.CreateAudioFile(readers[3], "ogg")
+		if err != nil {
+			return err
+		}
+		object := fmt.Sprintf("%s/sessions/%s/data.ogg", recorderID, sessionID)
+		if _, err := m.client.PutObject(ctx, bucketName, object, buffer, int64(buffer.Len()), minio.PutObjectOptions{}); err != nil {
+			return err
+		}
+		return nil
+	})
+
+	if err := eg.Wait(); err != nil {
+		sm.State = SessionStateError
+		sm.ErrorMessage = err.Error()
+		m.dataLock.Lock()
+		if putErr := m.putSessionMetadata(ctx, recorderID, sessionID, sm); putErr != nil {
+			log.Err(putErr).Msg("Cannot update session state to ERROR")
+		}
+		m.dataLock.Unlock()
+		m.notifyStateChange(sm, previousState)
+		return err
+	}
+
+	sm.State = SessionStateFinished
+	sm.IsClosed = true
+	m.dataLock.Lock()
+	if err := m.putSessionMetadata(ctx, recorderID, sessionID, sm); err != nil {
+		log.Err(err).Msg("Cannot put session metadata")
+	}
+	m.dataLock.Unlock()
+
+	m.notifyStateChange(sm, previousState)
+
+	if m.onSessionClosedCb != nil {
+		m.cbLock.Lock()
+		m.onSessionClosedCb(sm)
+		m.cbLock.Unlock()
+	}
+
+	log.Debug().Stringer("recorder-id", recorderID).Stringer("session-id", sessionID).Msg("Done rendering session")
+
+	return nil
+}
+
 func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UUID) error {
 	log.Debug().Stringer("recorder-id", recorderID).Stringer("session-id", sessionID).Msg("Rendering session")
 
@@ -780,11 +875,50 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 		Object: rawDataObjectName,
 	}
 
+	if len(srcs) == 0 {
+		// No chunks — check if data.raw already exists (e.g. from a previous failed render)
+		rawStat, err := m.client.StatObject(ctx, bucketName, rawDataObjectName, minio.StatObjectOptions{})
+		if err != nil {
+			log.Warn().
+				Stringer("recorder-id", recorderID).
+				Stringer("session-id", sessionID).
+				Msg("No chunks found and no data.raw, nothing to render")
+			return fmt.Errorf("no chunks to compose for session %s", sessionID)
+		}
+
+		log.Info().
+			Stringer("recorder-id", recorderID).
+			Stringer("session-id", sessionID).
+			Int64("size", rawStat.Size).
+			Msg("No chunks found, but data.raw exists. Re-rendering from existing raw data.")
+
+		sm, err := m.getSessionMetadata(ctx, recorderID, sessionID)
+		if err != nil {
+			return fmt.Errorf("cannot get session metadata: %w", err)
+		}
+
+		const bytesPerSecond float64 = 48000.0 * 2.0 * 2.0
+		durationSeconds := float64(rawStat.Size) / bytesPerSecond
+		previousState := sm.State
+		sm.Duration = time.Duration(durationSeconds) * time.Second
+		sm.EndTime = sm.StartTime.Add(sm.Duration)
+
+		var rawData *minio.Object
+		if rawData, err = m.client.GetObject(ctx, bucketName, rawDataObjectName, minio.GetObjectOptions{}); err != nil {
+			return fmt.Errorf("cannot get raw data: %w", err)
+		}
+
+		return m.renderFromRawData(ctx, recorderID, sessionID, sm, previousState, rawData)
+	}
+
 	ui, err := m.client.ComposeObject(ctx, dst, srcs...)
 	if err != nil {
-		log.Err(err).Msg("Cannot compose object, too small. Will delete session.")
-
-		return m.deleteSession(ctx, recorderID, sessionID)
+		log.Err(err).
+			Stringer("recorder-id", recorderID).
+			Stringer("session-id", sessionID).
+			Int("chunks", len(srcs)).
+			Msg("Cannot compose object")
+		return fmt.Errorf("cannot compose object: %w", err)
 	}
 
 	// We need to make this generic and nicer, hack for now to get teh exact end time for the session
@@ -810,138 +944,13 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 		return err
 	}
 
-	readers, writer, closer := makeReaders(4)
-	eg, egCtx := errgroup.WithContext(ctx)
-
-	// Setup some io for the rendering of waveform, overview, flac and ogg files
-	eg.Go(func() error {
-		defer closer.Close()
-
-		_, err := io.Copy(writer, rawData)
-		if err != nil {
-			log.Err(err).Msg("Cannot setup multiple readers")
-
-			return err
-		}
-
-		return nil
-	})
-
-	// Create waveform dat file.
-	eg.Go(func() error {
-		waveformData, err := render.CreateWaveform(egCtx, readers[0], 300, 10000, 200)
-		if err != nil {
-			log.Err(err).Msg("Cannot create waveform")
-
-			return fmt.Errorf("cannot create waveform: %w", err)
-		}
-
-		waveformObject := fmt.Sprintf("%s/sessions/%s/waveform.dat", recorderID, sessionID)
-		if _, err := m.client.PutObject(ctx, bucketName, waveformObject, waveformData, int64(waveformData.Len()), minio.PutObjectOptions{}); err != nil {
-			log.Err(err).Str("object", waveformObject).Msg("Cannot put object")
-
-			return err
-		}
-
-		return nil
-	})
-
-	// Create waveform png overview file.
-	eg.Go(func() error {
-		overviewData, err := render.CreateOverview(egCtx, readers[1], 300, 1000, 200)
-		if err != nil {
-			log.Err(err).Msg("Cannot create waveform overview")
-
-			return fmt.Errorf("cannot create waveform overview: %w", err)
-		}
-
-		overviewObject := fmt.Sprintf("%s/sessions/%s/overview.png", recorderID, sessionID)
-		if _, err := m.client.PutObject(ctx, bucketName, overviewObject, overviewData, int64(overviewData.Len()), minio.PutObjectOptions{}); err != nil {
-			log.Err(err).Str("object", overviewObject).Msg("Cannot put object")
-
-			return err
-		}
-
-		return nil
-	})
-
-	// Create flac file.
-	eg.Go(func() error {
-		var flacBuffer *bytes.Buffer
-		if flacBuffer, err = render.Flac(readers[2]); err != nil {
-			log.Err(err).Msg("Cannot convert to flac")
-
-			return err
-		}
-
-		flacObject := fmt.Sprintf("%s/sessions/%s/data.flac", recorderID, sessionID)
-		if _, err := m.client.PutObject(ctx, bucketName, flacObject, flacBuffer, int64(flacBuffer.Len()), minio.PutObjectOptions{}); err != nil {
-			log.Err(err).Str("object", flacObject).Msg("Cannot put object")
-
-			return err
-		}
-
-		return nil
-	})
-
-	// Create ogg file.
-	eg.Go(func() error {
-		ext := "ogg"
-
-		var buffer *bytes.Buffer
-		if buffer, err = render.CreateAudioFile(readers[3], ext); err != nil {
-			log.Err(err).Msg("Cannot convert to ogg")
-
-			return err
-		}
-
-		object := fmt.Sprintf("%s/sessions/%s/data.%s", recorderID, sessionID, ext)
-		if _, err := m.client.PutObject(ctx, bucketName, object, buffer, int64(buffer.Len()), minio.PutObjectOptions{}); err != nil {
-			log.Err(err).Str("object", object).Msg("Cannot put object")
-
-			return err
-		}
-
-		return nil
-	})
-
-	if err := eg.Wait(); err != nil {
-		// Set state to ERROR on rendering failure
-		sm.State = SessionStateError
-		sm.ErrorMessage = err.Error()
-		m.dataLock.Lock()
-		if putErr := m.putSessionMetadata(ctx, recorderID, sessionID, sm); putErr != nil {
-			log.Err(putErr).Msg("Cannot update session state to ERROR")
-		}
-		m.dataLock.Unlock()
-		m.notifyStateChange(sm, previousState)
+	if err := m.renderFromRawData(ctx, recorderID, sessionID, sm, previousState, rawData); err != nil {
 		return err
 	}
-
-	// Rendering succeeded - set state to FINISHED
-	sm.State = SessionStateFinished
-	sm.IsClosed = true
-	m.dataLock.Lock()
-	if err := m.putSessionMetadata(ctx, recorderID, sessionID, sm); err != nil {
-		log.Err(err).Msg("Cannot put session metadata")
-	}
-	m.dataLock.Unlock()
 
 	if err := m.client.RemoveObject(ctx, bucketName, chunksPrefix, minio.RemoveObjectOptions{ForceDelete: true}); err != nil {
 		log.Err(err).Str("object", chunksPrefix).Msg("Cannot remove object")
 	}
-
-	// Notify state change to FINISHED
-	m.notifyStateChange(sm, previousState)
-
-	// Legacy callback for backward compatibility
-	if m.onSessionClosedCb != nil {
-		m.cbLock.Lock()
-		m.onSessionClosedCb(sm)
-		m.cbLock.Unlock()
-	}
-
-	log.Debug().Stringer("recorder-id", recorderID).Stringer("session-id", sessionID).Msg("Done rendering session")
 
 	return nil
 }
@@ -1224,12 +1233,18 @@ func (m *Minio) closeSessions(ctx context.Context, recorderID uuid.UUID) error {
 	}
 
 	for _, sessionID := range sessionIDs {
-		if err := m.closeSession(ctx, recorderID, sessionID, nil); err != nil {
-			return fmt.Errorf("cannot close session: %w", err)
-		}
+		sid := sessionID
+		go func() {
+			if err := m.closeSession(context.Background(), recorderID, sid, nil); err != nil {
+				log.Err(err).
+					Stringer("recorder-id", recorderID).
+					Stringer("session-id", sid).
+					Msg("Cannot close session on startup")
+			}
+		}()
 	}
 
-	log.Debug().Stringer("recorder-id", recorderID).Msg("Closed all sessions for recorder")
+	log.Debug().Stringer("recorder-id", recorderID).Msg("Kicked off session closing for recorder")
 
 	return nil
 }
@@ -1364,7 +1379,10 @@ func (m *Minio) CloseRecordingSession(ctx context.Context, recorderID, sessionID
 			return fmt.Errorf("cannot update session state to PROCESSING: %w", err)
 		}
 		sessionCopy := *sm
-		go m.notifyStateChange(&sessionCopy, previousState)
+		// Notify synchronously to ensure the PROCESSING state is broadcast
+		// before closeSessionAsync potentially transitions to FINISHED.
+		// dataLock is not held here, so this is safe.
+		m.notifyStateChange(&sessionCopy, previousState)
 	}
 
 	go func(recorderID, sessionID uuid.UUID, chunk *minioChunk) {
@@ -1380,6 +1398,38 @@ func (m *Minio) CloseRecordingSession(ctx context.Context, recorderID, sessionID
 				Msg("Cannot close session asynchronously")
 		}
 	}(recorderID, sessionID, chunkCopy)
+
+	return nil
+}
+
+func (m *Minio) RetryRenderSession(ctx context.Context, recorderID, sessionID uuid.UUID) error {
+	sm, err := m.getSessionMetadata(ctx, recorderID, sessionID)
+	if err != nil {
+		return fmt.Errorf("cannot get session metadata: %w", err)
+	}
+
+	if sm.State != SessionStateError {
+		return fmt.Errorf("session is in state %s, can only retry sessions in ERROR state", sm.State)
+	}
+
+	// Transition to PROCESSING state
+	previousState := sm.State
+	sm.State = SessionStateProcessing
+	sm.ErrorMessage = ""
+	if err := m.putSessionMetadata(ctx, recorderID, sessionID, sm); err != nil {
+		return fmt.Errorf("cannot update session state to PROCESSING: %w", err)
+	}
+	m.notifyStateChange(sm, previousState)
+
+	// Run rendering asynchronously
+	go func() {
+		if err := m.renderSession(context.Background(), recorderID, sessionID); err != nil {
+			log.Err(err).
+				Stringer("recorder-id", recorderID).
+				Stringer("session-id", sessionID).
+				Msg("Cannot retry render session")
+		}
+	}()
 
 	return nil
 }

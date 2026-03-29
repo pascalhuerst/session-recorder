@@ -24,6 +24,8 @@ type UpdateSegmentCB func(ctx context.Context, request *sspb.UpdateSegmentReques
 type DeleteSegmentCB func(ctx context.Context, request *sspb.DeleteSegmentRequest) (*cmpb.Respone, error)
 type RenderSegmentCB func(ctx context.Context, request *sspb.RenderSegmentRequest) (*cmpb.Respone, error)
 
+type RetryRenderSessionCB func(ctx context.Context, request *sspb.DeleteSessionRequest) (*cmpb.Respone, error)
+
 type ShareSessionCB func(ctx context.Context, request *sspb.ShareSessionRequest) (*cmpb.Respone, error)
 type ShareSegmentCB func(ctx context.Context, request *sspb.ShareSegmentRequest) (*cmpb.Respone, error)
 
@@ -44,7 +46,8 @@ type SessionSourceServerConfig struct {
 	CreateSegmentCB CreateSegmentCB
 	UpdateSegmentCB UpdateSegmentCB
 	DeleteSegmentCB DeleteSegmentCB
-	RenderSegmentCB RenderSegmentCB
+	RenderSegmentCB      RenderSegmentCB
+	RetryRenderSessionCB RetryRenderSessionCB
 
 	ShareSessionCB ShareSessionCB
 	ShareSegmentCB ShareSegmentCB
@@ -159,6 +162,14 @@ func (s *SessionSourceServer) RenderSegment(ctx context.Context, in *sspb.Render
 func (s *SessionSourceServer) UpdateSegment(ctx context.Context, in *sspb.UpdateSegmentRequest) (*common.Respone, error) {
 	if s.config.UpdateSegmentCB != nil {
 		return s.config.UpdateSegmentCB(ctx, in)
+	}
+
+	return noSuccess, nil
+}
+
+func (s *SessionSourceServer) RetryRenderSession(ctx context.Context, in *sspb.DeleteSessionRequest) (*common.Respone, error) {
+	if s.config.RetryRenderSessionCB != nil {
+		return s.config.RetryRenderSessionCB(ctx, in)
 	}
 
 	return noSuccess, nil

@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	sspb "github.com/pascalhuerst/session-recorder/protocols/go/sessionsource"
 )
 
@@ -17,22 +18,30 @@ import (
  * - Concurrent access: Thread-safe operations
  */
 
-func makeSession(id string) *sspb.Session {
-	return &sspb.Session{
-		ID: id,
-		Info: &sspb.Session_Updated{
-			Updated: &sspb.SessionInfo{
-				Name: "Test Session",
+var testRecorderID = uuid.New()
+
+func makeUpdate(id string) SessionUpdate {
+	return SessionUpdate{
+		RecorderID: testRecorderID,
+		Session: &sspb.Session{
+			ID: id,
+			Info: &sspb.Session_Updated{
+				Updated: &sspb.SessionInfo{
+					Name: "Test Session",
+				},
 			},
 		},
 	}
 }
 
-func makeSessionRemoved(id string) *sspb.Session {
-	return &sspb.Session{
-		ID: id,
-		Info: &sspb.Session_Removed{
-			Removed: &sspb.SessionRemoved{},
+func makeRemovedUpdate(id string) SessionUpdate {
+	return SessionUpdate{
+		RecorderID: testRecorderID,
+		Session: &sspb.Session{
+			ID: id,
+			Info: &sspb.Session_Removed{
+				Removed: &sspb.SessionRemoved{},
+			},
 		},
 	}
 }
@@ -84,13 +93,12 @@ func TestSessionBroadcaster_Broadcast_SingleSubscriber(t *testing.T) {
 	ch, unsub := b.Subscribe()
 	defer unsub()
 
-	session := makeSession("session-1")
-	b.Broadcast(session)
+	b.Broadcast(makeUpdate("session-1"))
 
 	select {
 	case msg := <-ch:
-		if msg.ID != "session-1" {
-			t.Errorf("Session.ID = %q, want %q", msg.ID, "session-1")
+		if msg.Session.ID != "session-1" {
+			t.Errorf("Session.ID = %q, want %q", msg.Session.ID, "session-1")
 		}
 	case <-time.After(100 * time.Millisecond):
 		t.Error("timeout waiting for message")
@@ -109,15 +117,14 @@ func TestSessionBroadcaster_Broadcast_MultipleSubscribers(t *testing.T) {
 	ch3, unsub3 := b.Subscribe()
 	defer unsub3()
 
-	session := makeSession("session-1")
-	b.Broadcast(session)
+	b.Broadcast(makeUpdate("session-1"))
 
 	// All subscribers should receive
-	for i, ch := range []<-chan *sspb.Session{ch1, ch2, ch3} {
+	for i, ch := range []<-chan SessionUpdate{ch1, ch2, ch3} {
 		select {
 		case msg := <-ch:
-			if msg.ID != "session-1" {
-				t.Errorf("subscriber %d: Session.ID = %q, want %q", i, msg.ID, "session-1")
+			if msg.Session.ID != "session-1" {
+				t.Errorf("subscriber %d: Session.ID = %q, want %q", i, msg.Session.ID, "session-1")
 			}
 		case <-time.After(100 * time.Millisecond):
 			t.Errorf("subscriber %d: timeout waiting for message", i)
@@ -129,8 +136,8 @@ func TestSessionBroadcaster_Broadcast_NoSubscribers(t *testing.T) {
 	b := NewSessionBroadcaster(5)
 
 	// Should not panic
-	b.Broadcast(makeSession("session-1"))
-	b.Broadcast(makeSessionRemoved("session-2"))
+	b.Broadcast(makeUpdate("session-1"))
+	b.Broadcast(makeRemovedUpdate("session-2"))
 }
 
 func TestSessionBroadcaster_Broadcast_SessionUpdated(t *testing.T) {
@@ -139,13 +146,12 @@ func TestSessionBroadcaster_Broadcast_SessionUpdated(t *testing.T) {
 	ch, unsub := b.Subscribe()
 	defer unsub()
 
-	session := makeSession("session-1")
-	b.Broadcast(session)
+	b.Broadcast(makeUpdate("session-1"))
 
 	msg := <-ch
 
 	// Check it's an Updated message
-	updated, ok := msg.Info.(*sspb.Session_Updated)
+	updated, ok := msg.Session.Info.(*sspb.Session_Updated)
 	if !ok {
 		t.Fatal("expected Session_Updated message")
 	}
@@ -161,19 +167,18 @@ func TestSessionBroadcaster_Broadcast_SessionRemoved(t *testing.T) {
 	ch, unsub := b.Subscribe()
 	defer unsub()
 
-	session := makeSessionRemoved("session-1")
-	b.Broadcast(session)
+	b.Broadcast(makeRemovedUpdate("session-1"))
 
 	msg := <-ch
 
 	// Check it's a Removed message
-	_, ok := msg.Info.(*sspb.Session_Removed)
+	_, ok := msg.Session.Info.(*sspb.Session_Removed)
 	if !ok {
 		t.Fatal("expected Session_Removed message")
 	}
 
-	if msg.ID != "session-1" {
-		t.Errorf("ID = %q, want %q", msg.ID, "session-1")
+	if msg.Session.ID != "session-1" {
+		t.Errorf("ID = %q, want %q", msg.Session.ID, "session-1")
 	}
 }
 
@@ -184,24 +189,24 @@ func TestSessionBroadcaster_BufferOverflow(t *testing.T) {
 	defer unsub()
 
 	// Fill the buffer
-	b.Broadcast(makeSession("session-1"))
-	b.Broadcast(makeSession("session-2"))
+	b.Broadcast(makeUpdate("session-1"))
+	b.Broadcast(makeUpdate("session-2"))
 
 	// This should be dropped (buffer full)
-	b.Broadcast(makeSession("session-3"))
+	b.Broadcast(makeUpdate("session-3"))
 
 	// Read the first two messages
 	msg1 := <-ch
 	msg2 := <-ch
 
-	if msg1.ID != "session-1" || msg2.ID != "session-2" {
-		t.Errorf("expected session-1 and session-2, got %q and %q", msg1.ID, msg2.ID)
+	if msg1.Session.ID != "session-1" || msg2.Session.ID != "session-2" {
+		t.Errorf("expected session-1 and session-2, got %q and %q", msg1.Session.ID, msg2.Session.ID)
 	}
 
 	// Channel should be empty (session-3 was dropped)
 	select {
 	case msg := <-ch:
-		t.Errorf("unexpected message in channel: %q", msg.ID)
+		t.Errorf("unexpected message in channel: %q", msg.Session.ID)
 	default:
 		// Expected
 	}
@@ -215,7 +220,7 @@ func TestSessionBroadcaster_Concurrent(t *testing.T) {
 	numMessages := 50
 
 	// Start subscribers
-	subscribers := make([]<-chan *sspb.Session, numSubscribers)
+	subscribers := make([]<-chan SessionUpdate, numSubscribers)
 	unsubscribers := make([]func(), numSubscribers)
 
 	for i := 0; i < numSubscribers; i++ {
@@ -228,7 +233,7 @@ func TestSessionBroadcaster_Concurrent(t *testing.T) {
 	receivedCounts := make([]int, numSubscribers)
 	for i := 0; i < numSubscribers; i++ {
 		wg.Add(1)
-		go func(idx int, ch <-chan *sspb.Session) {
+		go func(idx int, ch <-chan SessionUpdate) {
 			defer wg.Done()
 			for range ch {
 				receivedCounts[idx]++
@@ -241,7 +246,7 @@ func TestSessionBroadcaster_Concurrent(t *testing.T) {
 		wg.Add(1)
 		go func(n int) {
 			defer wg.Done()
-			b.Broadcast(makeSession("session-1"))
+			b.Broadcast(makeUpdate("session-1"))
 		}(i)
 	}
 
@@ -285,7 +290,7 @@ func TestSessionBroadcaster_SubscribeUnsubscribeConcurrent(t *testing.T) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			b.Broadcast(makeSession("session-1"))
+			b.Broadcast(makeUpdate("session-1"))
 		}()
 	}
 
@@ -293,5 +298,23 @@ func TestSessionBroadcaster_SubscribeUnsubscribeConcurrent(t *testing.T) {
 
 	if b.SubscriberCount() != 0 {
 		t.Errorf("SubscriberCount() = %d, want 0", b.SubscriberCount())
+	}
+}
+
+func TestSessionBroadcaster_Broadcast_IncludesRecorderID(t *testing.T) {
+	b := NewSessionBroadcaster(5)
+
+	ch, unsub := b.Subscribe()
+	defer unsub()
+
+	recorderID := uuid.New()
+	b.Broadcast(SessionUpdate{
+		RecorderID: recorderID,
+		Session:    &sspb.Session{ID: "session-1"},
+	})
+
+	msg := <-ch
+	if msg.RecorderID != recorderID {
+		t.Errorf("RecorderID = %s, want %s", msg.RecorderID, recorderID)
 	}
 }

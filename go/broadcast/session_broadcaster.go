@@ -3,33 +3,40 @@ package broadcast
 import (
 	"sync"
 
+	"github.com/google/uuid"
 	sspb "github.com/pascalhuerst/session-recorder/protocols/go/sessionsource"
 	"github.com/rs/zerolog/log"
 )
 
+// SessionUpdate wraps a session proto message with its recorder ID
+// so subscribers can filter by recorder.
+type SessionUpdate struct {
+	RecorderID uuid.UUID
+	Session    *sspb.Session
+}
+
 // SessionBroadcaster is a specialized broadcaster for session updates.
-// All subscribers receive all session updates - filtering by recorder ID
-// should be done at the subscription or handler level.
+// Each update includes the recorder ID so subscribers can filter.
 type SessionBroadcaster struct {
 	mu          sync.RWMutex
-	subscribers map[chan *sspb.Session]struct{}
+	subscribers map[chan SessionUpdate]struct{}
 	bufferSize  int
 }
 
 // NewSessionBroadcaster creates a new SessionBroadcaster.
 func NewSessionBroadcaster(bufferSize int) *SessionBroadcaster {
 	return &SessionBroadcaster{
-		subscribers: make(map[chan *sspb.Session]struct{}),
+		subscribers: make(map[chan SessionUpdate]struct{}),
 		bufferSize:  bufferSize,
 	}
 }
 
 // Subscribe creates a new subscription and returns the channel and unsubscribe function.
-func (b *SessionBroadcaster) Subscribe() (ch <-chan *sspb.Session, unsubscribe func()) {
+func (b *SessionBroadcaster) Subscribe() (ch <-chan SessionUpdate, unsubscribe func()) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
-	subCh := make(chan *sspb.Session, b.bufferSize)
+	subCh := make(chan SessionUpdate, b.bufferSize)
 	b.subscribers[subCh] = struct{}{}
 
 	log.Debug().Int("subscribers", len(b.subscribers)).Msg("New session subscriber added")
@@ -46,15 +53,15 @@ func (b *SessionBroadcaster) Subscribe() (ch <-chan *sspb.Session, unsubscribe f
 }
 
 // Broadcast sends a session update to all subscribers.
-func (b *SessionBroadcaster) Broadcast(session *sspb.Session) {
+func (b *SessionBroadcaster) Broadcast(update SessionUpdate) {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
 	for ch := range b.subscribers {
 		select {
-		case ch <- session:
+		case ch <- update:
 		default:
-			log.Warn().Str("session-id", session.ID).Msg("Subscriber buffer full, dropping session update")
+			log.Warn().Str("session-id", update.Session.ID).Msg("Subscriber buffer full, dropping session update")
 		}
 	}
 }

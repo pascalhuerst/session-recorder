@@ -261,6 +261,19 @@ func newSessionInfo(ctx context.Context, h *SessionSourceHandler, session *stora
 	return info
 }
 
+// broadcastSessionUpdate sends a session update to all stream subscribers for the given recorder.
+func (h *SessionSourceHandler) broadcastSessionUpdate(ctx context.Context, recorderID uuid.UUID, session *storage.Session) {
+	h.sessionBroadcaster.Broadcast(broadcast.SessionUpdate{
+		RecorderID: recorderID,
+		Session: &sspb.Session{
+			ID: session.ID.String(),
+			Info: &sspb.Session_Updated{
+				Updated: newSessionInfo(ctx, h, session),
+			},
+		},
+	})
+}
+
 // onSessionStateChanged is called when a session's state changes (RECORDING, PROCESSING, FINISHED)
 func (h *SessionSourceHandler) onSessionStateChanged(session *storage.Session, previousState storage.SessionState) {
 	log.Debug().
@@ -269,12 +282,7 @@ func (h *SessionSourceHandler) onSessionStateChanged(session *storage.Session, p
 		Str("new-state", session.State.String()).
 		Msg("Session state changed")
 
-	h.sessionBroadcaster.Broadcast(&sspb.Session{
-		ID: session.ID.String(),
-		Info: &sspb.Session_Updated{
-			Updated: newSessionInfo(context.Background(), h, session),
-		},
-	})
+	h.broadcastSessionUpdate(context.Background(), session.RecorderID, session)
 }
 
 // Called after a session has been closed and rendered by storage. Setup above in the constructor
@@ -282,12 +290,7 @@ func (h *SessionSourceHandler) onSessionClosed(session *storage.Session) {
 	log.Debug().Interface("session", session).Msg("Session closed")
 
 	// This is now handled by onSessionStateChanged, but kept for backwards compatibility
-	h.sessionBroadcaster.Broadcast(&sspb.Session{
-		ID: session.ID.String(),
-		Info: &sspb.Session_Updated{
-			Updated: newSessionInfo(context.Background(), h, session),
-		},
-	})
+	h.broadcastSessionUpdate(context.Background(), session.RecorderID, session)
 }
 
 // onAudioChunk is called when audio samples are received. Broadcasts to audio subscribers.
@@ -421,12 +424,16 @@ func (h *SessionSourceHandler) streamSessions(ctx context.Context, request *sspb
 
 	for {
 		select {
-		case session, ok := <-updateCh:
+		case update, ok := <-updateCh:
 			if !ok {
 				// Channel closed, subscriber was removed
 				return nil
 			}
-			if err := server.SendMsg(session); err != nil {
+			// Only forward updates for the requested recorder
+			if update.RecorderID != recorderID {
+				continue
+			}
+			if err := server.SendMsg(update.Session); err != nil {
 				log.Err(err).Msg("Cannot send session data")
 			}
 		case <-ctx.Done():
@@ -454,6 +461,31 @@ func (h *SessionSourceHandler) cutSession(ctx context.Context, request *sspb.Cut
 
 	if err := h.chunkSinkServer.CutSession(recorderID); err != nil {
 		log.Err(err).Str("recorder-id", request.RecorderID).Msg("Cannot cut session")
+		return &cmpb.Respone{Success: false, ErrorMessage: err.Error()}, err
+	}
+
+	return success, nil
+}
+
+func (h *SessionSourceHandler) retryRenderSession(ctx context.Context, request *sspb.DeleteSessionRequest) (*cmpb.Respone, error) {
+	recorderID, sessionID, err := parseIDs(request.RecorderID, request.SessionID)
+	if err != nil {
+		log.Err(err).
+			Str("recorder-id", request.RecorderID).
+			Str("session-id", request.SessionID).
+			Msg("Cannot parse IDs")
+		return noSuccess, err
+	}
+
+	log.Info().
+		Str("recorder-id", request.RecorderID).
+		Str("session-id", request.SessionID).
+		Msg("Retrying session render")
+
+	if err := h.sessionStorage.RetryRenderSession(ctx, recorderID, sessionID); err != nil {
+		log.Err(err).
+			Str("session-id", request.SessionID).
+			Msg("Cannot retry render session")
 		return &cmpb.Respone{Success: false, ErrorMessage: err.Error()}, err
 	}
 
@@ -502,9 +534,12 @@ func (h *SessionSourceHandler) deleteSession(ctx context.Context, request *sspb.
 		return noSuccess, err
 	}
 
-	h.sessionBroadcaster.Broadcast(&sspb.Session{
-		ID:   sessionID.String(),
-		Info: &sspb.Session_Removed{Removed: &sspb.SessionRemoved{}},
+	h.sessionBroadcaster.Broadcast(broadcast.SessionUpdate{
+		RecorderID: recorderID,
+		Session: &sspb.Session{
+			ID:   sessionID.String(),
+			Info: &sspb.Session_Removed{Removed: &sspb.SessionRemoved{}},
+		},
 	})
 
 	return success, nil
@@ -531,12 +566,7 @@ func (h *SessionSourceHandler) setKeepSession(ctx context.Context, request *sspb
 		return noSuccess, err
 	}
 
-	h.sessionBroadcaster.Broadcast(&sspb.Session{
-		ID: session.ID.String(),
-		Info: &sspb.Session_Updated{
-			Updated: newSessionInfo(ctx, h, &session),
-		},
-	})
+	h.broadcastSessionUpdate(ctx, recorderID, &session)
 
 	log.Info().Str("session-id", request.SessionID).Bool("keep", request.Keep).Msg("Set keep session")
 
@@ -564,12 +594,7 @@ func (h *SessionSourceHandler) setName(ctx context.Context, request *sspb.SetNam
 		return noSuccess, err
 	}
 
-	h.sessionBroadcaster.Broadcast(&sspb.Session{
-		ID: session.ID.String(),
-		Info: &sspb.Session_Updated{
-			Updated: newSessionInfo(ctx, h, &session),
-		},
-	})
+	h.broadcastSessionUpdate(ctx, recorderID, &session)
 
 	log.Info().Str("session-id", request.SessionID).Str("name", request.Name).Msg("Set session name")
 
@@ -614,12 +639,7 @@ func (h *SessionSourceHandler) createSegment(ctx context.Context, request *sspb.
 		return noSuccess, err
 	}
 
-	h.sessionBroadcaster.Broadcast(&sspb.Session{
-		ID: session.ID.String(),
-		Info: &sspb.Session_Updated{
-			Updated: newSessionInfo(ctx, h, &session),
-		},
-	})
+	h.broadcastSessionUpdate(ctx, recorderID, &session)
 
 	log.Info().
 		Str("segment-id", request.SegmentID).
@@ -666,12 +686,7 @@ func (h *SessionSourceHandler) updateSegment(ctx context.Context, request *sspb.
 		return noSuccess, err
 	}
 
-	h.sessionBroadcaster.Broadcast(&sspb.Session{
-		ID: session.ID.String(),
-		Info: &sspb.Session_Updated{
-			Updated: newSessionInfo(ctx, h, &session),
-		},
-	})
+	h.broadcastSessionUpdate(ctx, recorderID, &session)
 
 	log.Info().
 		Str("segment-id", request.SegmentID).
@@ -704,12 +719,7 @@ func (h *SessionSourceHandler) deleteSegment(ctx context.Context, request *sspb.
 		return noSuccess, err
 	}
 
-	h.sessionBroadcaster.Broadcast(&sspb.Session{
-		ID: session.ID.String(),
-		Info: &sspb.Session_Updated{
-			Updated: newSessionInfo(ctx, h, &session),
-		},
-	})
+	h.broadcastSessionUpdate(ctx, recorderID, &session)
 
 	log.Info().
 		Str("segment-id", request.SegmentID).
@@ -745,12 +755,7 @@ func (h *SessionSourceHandler) renderSegment(ctx context.Context, request *sspb.
 		return noSuccess, err
 	}
 
-	h.sessionBroadcaster.Broadcast(&sspb.Session{
-		ID: session.ID.String(),
-		Info: &sspb.Session_Updated{
-			Updated: newSessionInfo(ctx, h, &session),
-		},
-	})
+	h.broadcastSessionUpdate(ctx, recorderID, &session)
 
 	log.Info().
 		Str("segment-id", request.SegmentID).
@@ -773,12 +778,7 @@ func (h *SessionSourceHandler) renderSegment(ctx context.Context, request *sspb.
 			log.Err(err).Str("segment-id", segmentID.String()).Msg("Cannot set segment state to rendering")
 		}
 		if session, err := h.sessionStorage.GetSession(recorderID, sessionID); err == nil {
-			h.sessionBroadcaster.Broadcast(&sspb.Session{
-				ID: session.ID.String(),
-				Info: &sspb.Session_Updated{
-					Updated: newSessionInfo(context.Background(), h, &session),
-				},
-			})
+			h.broadcastSessionUpdate(context.Background(), recorderID, &session)
 		}
 
 		if err := h.sessionStorage.RenderSegment(context.Background(), recorderID, sessionID, segmentID); err != nil {
@@ -795,12 +795,7 @@ func (h *SessionSourceHandler) renderSegment(ctx context.Context, request *sspb.
 			return
 		}
 
-		h.sessionBroadcaster.Broadcast(&sspb.Session{
-			ID: session.ID.String(),
-			Info: &sspb.Session_Updated{
-				Updated: newSessionInfo(context.Background(), h, &session),
-			},
-		})
+		h.broadcastSessionUpdate(context.Background(), recorderID, &session)
 
 		log.Info().
 			Str("segment-id", segmentID.String()).

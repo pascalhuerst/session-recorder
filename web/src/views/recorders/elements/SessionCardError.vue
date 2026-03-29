@@ -1,12 +1,33 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
+import { Button } from '@session-recorder/session-waveform';
+import { retryRenderSession } from '../../../grpc/procedures/retryRenderSession';
+import { toastService } from '../../../services/Toaster/ToastService';
 import type { Session } from '@/types';
 
-defineProps<{
+const props = defineProps<{
   session: Session;
   recorderId: string;
 }>();
+
+const isRetrying = ref(false);
+
+const handleRetry = async () => {
+  isRetrying.value = true;
+  try {
+    await retryRenderSession({
+      recorderId: props.recorderId,
+      sessionId: props.session.id,
+    });
+    toastService.success('Retrying session render...');
+  } catch (error) {
+    console.error('Failed to retry render:', error);
+    toastService.error('Failed to retry render');
+  } finally {
+    isRetrying.value = false;
+  }
+};
 
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 
@@ -72,9 +93,15 @@ onMounted(() => {
   <div class="error-overview">
     <div class="waveform-placeholder">
       <canvas ref="canvasRef" class="placeholder-canvas" />
-      <div class="error-message">
-        <font-awesome-icon icon="fa-solid fa-circle-exclamation" class="error-icon" />
-        <span>{{ session.errorMessage || 'An error occurred while processing this session' }}</span>
+      <div class="error-overlay">
+        <div class="error-message">
+          <font-awesome-icon icon="fa-solid fa-circle-exclamation" class="error-icon" />
+          <span>{{ session.errorMessage || 'An error occurred while processing this session' }}</span>
+        </div>
+        <Button size="xs" @click="handleRetry" :disabled="isRetrying">
+          <font-awesome-icon icon="fa-solid fa-redo" />
+          {{ isRetrying ? 'Retrying...' : 'Retry' }}
+        </Button>
       </div>
     </div>
   </div>
@@ -109,8 +136,14 @@ onMounted(() => {
   height: 100%;
 }
 
-.error-message {
+.error-overlay {
   position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--size-2);
+}
+
+.error-message {
   display: flex;
   align-items: center;
   gap: var(--size-2);

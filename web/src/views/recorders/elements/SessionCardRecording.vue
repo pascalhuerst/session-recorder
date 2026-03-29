@@ -8,6 +8,8 @@ import {
   streamSessionAudio,
   type AudioChunkMessage,
 } from '../../../grpc/procedures/streamSessionAudio';
+import { reconnectingStream } from '../../../grpc/reconnectingStream';
+import { useSessionsStore } from '../../../store/useSessionsStore';
 import type { Session } from '@/types';
 
 const props = defineProps<{
@@ -15,6 +17,7 @@ const props = defineProps<{
   recorderId: string;
 }>();
 
+const sessionsStore = useSessionsStore();
 const isCutting = ref(false);
 
 const handleCutSession = async () => {
@@ -24,6 +27,13 @@ const handleCutSession = async () => {
   try {
     await cutSession({ recorderID: props.recorderId });
     toastService.success('Session cut successfully');
+    // Force-reconnect the sessions stream to pick up the state change.
+    // The cut command is forwarded to the recorder asynchronously — the
+    // recorder processes it on its next chunk cycle (~100-500ms), then the
+    // backend transitions the session. Reconnecting fetches fresh initial
+    // state, which avoids relying on a single streamed update that gRPC-Web
+    // proxying may buffer.
+    setTimeout(() => sessionsStore.reconnect(), 1000);
   } catch (error) {
     console.error('Failed to cut session:', error);
     toastService.error('Failed to cut session');
@@ -35,7 +45,7 @@ const handleCutSession = async () => {
 // Canvas-based waveform with real audio data
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 let animationId: number | null = null;
-let unsubscribeAudio: (() => void) | null = null;
+let audioStream: { stop: () => void } | null = null;
 
 // Store computed peaks for rendering
 // Each peak is a normalized value 0-1 representing max amplitude in a time window
@@ -146,30 +156,35 @@ const drawWaveform = () => {
   animationId = requestAnimationFrame(drawWaveform);
 };
 
+const subscribeAudio = (sessionID: string) => {
+  return reconnectingStream({
+    name: `sessionAudio(${sessionID})`,
+    connect: (handlers) =>
+      streamSessionAudio({
+        sessionID,
+        onChunk: (chunk) => {
+          handlers.onMessage();
+          onAudioChunk(chunk);
+        },
+        onError: handlers.onError,
+        onEnd: handlers.onEnd,
+      }),
+  });
+};
+
 onMounted(() => {
   // Start animation loop
   animationId = requestAnimationFrame(drawWaveform);
 
-  // Subscribe to audio stream for this session
-  unsubscribeAudio = streamSessionAudio({
-    sessionID: props.session.id,
-    onChunk: onAudioChunk,
-    onError: (error) => {
-      console.error('Audio stream error:', error);
-    },
-    onEnd: () => {
-      console.log('Audio stream ended');
-    },
-  });
+  // Subscribe to audio stream for this session (with reconnection)
+  audioStream = subscribeAudio(props.session.id);
 });
 
 onUnmounted(() => {
   if (animationId !== null) {
     cancelAnimationFrame(animationId);
   }
-  if (unsubscribeAudio) {
-    unsubscribeAudio();
-  }
+  audioStream?.stop();
 });
 
 // Re-subscribe if session changes
@@ -181,21 +196,10 @@ watch(
       peaks.value = [];
 
       // Unsubscribe from old session
-      if (unsubscribeAudio) {
-        unsubscribeAudio();
-      }
+      audioStream?.stop();
 
-      // Subscribe to new session
-      unsubscribeAudio = streamSessionAudio({
-        sessionID: newId,
-        onChunk: onAudioChunk,
-        onError: (error) => {
-          console.error('Audio stream error:', error);
-        },
-        onEnd: () => {
-          console.log('Audio stream ended');
-        },
-      });
+      // Subscribe to new session (with reconnection)
+      audioStream = subscribeAudio(newId);
     }
   }
 );

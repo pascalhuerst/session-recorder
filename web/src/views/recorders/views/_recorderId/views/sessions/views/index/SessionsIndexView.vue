@@ -59,6 +59,9 @@ const sessionsByDate = computed(() => {
     groups.push({ date: dateKey, dateLabel, sessions: items });
   }
 
+  // Sort groups by date descending (most recent first)
+  groups.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
   return groups;
 });
 </script>

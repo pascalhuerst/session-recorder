@@ -3,19 +3,22 @@ import { streamSessions } from '../grpc/procedures/streamSessions';
 import { useRecordersStore } from './useRecordersStore';
 import { defineStore, storeToRefs } from 'pinia';
 import type { Session } from '../types';
-import { noop } from '@vueuse/core';
+import {
+  reconnectingStream,
+  type ReconnectingStreamHandle,
+} from '../grpc/reconnectingStream';
 
 export const useSessionsStore = defineStore('sessions', () => {
   const { selectedRecorderId } = storeToRefs(useRecordersStore());
   const sessions = ref<Session[]>([]);
 
-  let stop = noop;
+  let handle: ReconnectingStreamHandle | null = null;
 
   watch(
     selectedRecorderId,
     () => {
-      stop();
-      stop = noop;
+      handle?.stop();
+      handle = null;
 
       if (!selectedRecorderId.value) {
         return;
@@ -23,32 +26,38 @@ export const useSessionsStore = defineStore('sessions', () => {
 
       sessions.value = [];
 
-      stop = streamSessions({
-        request: {
-          recorderID: selectedRecorderId.value,
-        },
-        onMessage: (msg) => {
-          console.log('Received message:', msg);
+      const recorderID = selectedRecorderId.value;
 
-          switch (msg.type) {
-            case 'deleted': {
-              sessions.value = sessions.value.filter((s) => s.id !== msg.id);
-              break;
-            }
+      handle = reconnectingStream({
+        name: `sessions(${recorderID})`,
+        connect: (handlers) =>
+          streamSessions({
+            request: { recorderID },
+            onMessage: (msg) => {
+              handlers.onMessage();
 
-            case 'updated': {
-              const excludeUpdated = sessions.value.filter(
-                (s) => s.id !== msg.session.id
-              );
-              sessions.value = [...excludeUpdated, msg.session];
-            }
-          }
-        },
-        onError: (err) => {
-          console.error('Sessions stream error:', err);
-        },
-        onEnd: () => {
-          console.log('Sessions stream ended');
+              switch (msg.type) {
+                case 'deleted': {
+                  sessions.value = sessions.value.filter(
+                    (s) => s.id !== msg.id
+                  );
+                  break;
+                }
+
+                case 'updated': {
+                  const excludeUpdated = sessions.value.filter(
+                    (s) => s.id !== msg.session.id
+                  );
+                  sessions.value = [...excludeUpdated, msg.session];
+                }
+              }
+            },
+            onError: handlers.onError,
+            onEnd: handlers.onEnd,
+          }),
+        onReconnecting: () => {
+          // Clear stale sessions on reconnect so we get fresh state
+          sessions.value = [];
         },
       });
     },
@@ -58,11 +67,16 @@ export const useSessionsStore = defineStore('sessions', () => {
   );
 
   onBeforeUnmount(() => {
-    stop();
+    handle?.stop();
   });
 
+  /** Force-reconnect the sessions stream to fetch fresh state */
+  const reconnect = () => {
+    handle?.reconnect();
+  };
+
   const sortedSessions = computed(() => {
-    return sessions.value.sort((a, b) => {
+    return [...sessions.value].sort((a, b) => {
       // Recording/processing sessions (no finishedAt) go to top
       if (!a.finishedAt && b.finishedAt) return -1;
       if (a.finishedAt && !b.finishedAt) return 1;
@@ -74,5 +88,5 @@ export const useSessionsStore = defineStore('sessions', () => {
     });
   });
 
-  return { sessions: sortedSessions };
+  return { sessions: sortedSessions, reconnect };
 });

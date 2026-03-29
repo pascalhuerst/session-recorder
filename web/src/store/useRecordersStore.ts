@@ -3,6 +3,7 @@ import { Recorder } from '@session-recorder/protocols/ts/sessionsource';
 import { useRoute, useRouter } from 'vue-router';
 import { defineStore } from 'pinia';
 import { streamRecorders } from '../grpc/procedures/streamRecorders';
+import { reconnectingStream } from '../grpc/reconnectingStream';
 
 export const useRecordersStore = defineStore('recorders', () => {
   const router = useRouter();
@@ -18,16 +19,17 @@ export const useRecordersStore = defineStore('recorders', () => {
     },
   });
 
-  const stop = streamRecorders({
-    onMessage: (recorderInfo) => {
-      recorders.value.set(recorderInfo.recorderID, recorderInfo);
-    },
-    onError: (err) => {
-      console.error('Recorders stream error:', err);
-    },
-    onEnd: () => {
-      console.log('Recorders stream ended');
-    },
+  const { stop } = reconnectingStream({
+    name: 'recorders',
+    connect: (handlers) =>
+      streamRecorders({
+        onMessage: (recorderInfo) => {
+          handlers.onMessage();
+          recorders.value.set(recorderInfo.recorderID, recorderInfo);
+        },
+        onError: handlers.onError,
+        onEnd: handlers.onEnd,
+      }),
   });
 
   onBeforeUnmount(() => {

@@ -40,6 +40,11 @@ const elapsedTime = computed(() => {
 });
 
 const startTime = computed(() => {
+  const diff = now.value.getTime() - props.session.startedAt.getTime();
+  const oneDayMs = 24 * 60 * 60 * 1000;
+  if (diff > oneDayMs) {
+    return useDateFormat(props.session.startedAt, 'MMM DD, HH:mm').value;
+  }
   return useDateFormat(props.session.startedAt, 'HH:mm').value;
 });
 </script>

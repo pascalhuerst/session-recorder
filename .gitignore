@@ -1,6 +1,7 @@
 # MCP (Model Context Protocol) - local dev tool config
 .mcp.json
 .playwright-mcp/
+.claude/settings.local.json
 
 # Local development notes (contains sensitive env values)
 DEV.md
@@ -98,3 +99,4 @@ docker-compose.override.yml.local
 
 # Local data directories
 data/
+systemd

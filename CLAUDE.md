@@ -53,10 +53,13 @@ session-recorder/
 ./docker-build.sh clean        # Full cleanup
 ```
 
-### Development Mode (from project root)
+### Development Mode (from `web/`)
 ```bash
-./start-dev.sh                 # Start Envoy + MinIO
-./stop-dev.sh                  # Stop dev services
+pnpm run dev                   # Start all: Docker services + Go backend (air) + Vite
+pnpm run dev:docker            # Start only Docker services (MinIO + Envoy)
+pnpm run dev:backend           # Start only Go backend with hot reload
+pnpm run dev:web               # Start only Vite dev server
+pnpm run dev:stop              # Stop Docker services
 ```
 
 ### Web (from `web/`)

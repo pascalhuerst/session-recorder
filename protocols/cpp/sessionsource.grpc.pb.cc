@@ -6,19 +6,19 @@
 #include "sessionsource.grpc.pb.h"
 
 #include <functional>
-#include <grpcpp/support/async_stream.h>
-#include <grpcpp/support/async_unary_call.h>
-#include <grpcpp/impl/channel_interface.h>
-#include <grpcpp/impl/client_unary_call.h>
-#include <grpcpp/support/client_callback.h>
-#include <grpcpp/support/message_allocator.h>
-#include <grpcpp/support/method_handler.h>
-#include <grpcpp/impl/rpc_service_method.h>
-#include <grpcpp/support/server_callback.h>
+#include <grpcpp/impl/codegen/async_stream.h>
+#include <grpcpp/impl/codegen/async_unary_call.h>
+#include <grpcpp/impl/codegen/channel_interface.h>
+#include <grpcpp/impl/codegen/client_unary_call.h>
+#include <grpcpp/impl/codegen/client_callback.h>
+#include <grpcpp/impl/codegen/message_allocator.h>
+#include <grpcpp/impl/codegen/method_handler.h>
+#include <grpcpp/impl/codegen/rpc_service_method.h>
+#include <grpcpp/impl/codegen/server_callback.h>
 #include <grpcpp/impl/codegen/server_callback_handlers.h>
-#include <grpcpp/server_context.h>
-#include <grpcpp/impl/service_type.h>
-#include <grpcpp/support/sync_stream.h>
+#include <grpcpp/impl/codegen/server_context.h>
+#include <grpcpp/impl/codegen/service_type.h>
+#include <grpcpp/impl/codegen/sync_stream.h>
 namespace sessionsource {
 
 static const char* SessionSource_method_names[] = {
@@ -33,6 +33,7 @@ static const char* SessionSource_method_names[] = {
   "/sessionsource.SessionSource/RenderSegment",
   "/sessionsource.SessionSource/UpdateSegment",
   "/sessionsource.SessionSource/CutSession",
+  "/sessionsource.SessionSource/RetryRenderSession",
   "/sessionsource.SessionSource/ShareSession",
   "/sessionsource.SessionSource/ShareSegment",
 };
@@ -55,8 +56,9 @@ SessionSource::Stub::Stub(const std::shared_ptr< ::grpc::ChannelInterface>& chan
   , rpcmethod_RenderSegment_(SessionSource_method_names[8], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
   , rpcmethod_UpdateSegment_(SessionSource_method_names[9], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
   , rpcmethod_CutSession_(SessionSource_method_names[10], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
-  , rpcmethod_ShareSession_(SessionSource_method_names[11], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
-  , rpcmethod_ShareSegment_(SessionSource_method_names[12], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
+  , rpcmethod_RetryRenderSession_(SessionSource_method_names[11], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
+  , rpcmethod_ShareSession_(SessionSource_method_names[12], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
+  , rpcmethod_ShareSegment_(SessionSource_method_names[13], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
   {}
 
 ::grpc::ClientReader< ::sessionsource::Recorder>* SessionSource::Stub::StreamRecordersRaw(::grpc::ClientContext* context, const ::sessionsource::StreamRecordersRequest& request) {
@@ -291,6 +293,29 @@ void SessionSource::Stub::async::CutSession(::grpc::ClientContext* context, cons
   return result;
 }
 
+::grpc::Status SessionSource::Stub::RetryRenderSession(::grpc::ClientContext* context, const ::sessionsource::RetryRenderSessionRequest& request, ::common::Respone* response) {
+  return ::grpc::internal::BlockingUnaryCall< ::sessionsource::RetryRenderSessionRequest, ::common::Respone, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), rpcmethod_RetryRenderSession_, context, request, response);
+}
+
+void SessionSource::Stub::async::RetryRenderSession(::grpc::ClientContext* context, const ::sessionsource::RetryRenderSessionRequest* request, ::common::Respone* response, std::function<void(::grpc::Status)> f) {
+  ::grpc::internal::CallbackUnaryCall< ::sessionsource::RetryRenderSessionRequest, ::common::Respone, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(stub_->channel_.get(), stub_->rpcmethod_RetryRenderSession_, context, request, response, std::move(f));
+}
+
+void SessionSource::Stub::async::RetryRenderSession(::grpc::ClientContext* context, const ::sessionsource::RetryRenderSessionRequest* request, ::common::Respone* response, ::grpc::ClientUnaryReactor* reactor) {
+  ::grpc::internal::ClientCallbackUnaryFactory::Create< ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(stub_->channel_.get(), stub_->rpcmethod_RetryRenderSession_, context, request, response, reactor);
+}
+
+::grpc::ClientAsyncResponseReader< ::common::Respone>* SessionSource::Stub::PrepareAsyncRetryRenderSessionRaw(::grpc::ClientContext* context, const ::sessionsource::RetryRenderSessionRequest& request, ::grpc::CompletionQueue* cq) {
+  return ::grpc::internal::ClientAsyncResponseReaderHelper::Create< ::common::Respone, ::sessionsource::RetryRenderSessionRequest, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), cq, rpcmethod_RetryRenderSession_, context, request);
+}
+
+::grpc::ClientAsyncResponseReader< ::common::Respone>* SessionSource::Stub::AsyncRetryRenderSessionRaw(::grpc::ClientContext* context, const ::sessionsource::RetryRenderSessionRequest& request, ::grpc::CompletionQueue* cq) {
+  auto* result =
+    this->PrepareAsyncRetryRenderSessionRaw(context, request, cq);
+  result->StartCall();
+  return result;
+}
+
 ::grpc::Status SessionSource::Stub::ShareSession(::grpc::ClientContext* context, const ::sessionsource::ShareSessionRequest& request, ::common::Respone* response) {
   return ::grpc::internal::BlockingUnaryCall< ::sessionsource::ShareSessionRequest, ::common::Respone, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(channel_.get(), rpcmethod_ShareSession_, context, request, response);
 }
@@ -451,6 +476,16 @@ SessionSource::Service::Service() {
   AddMethod(new ::grpc::internal::RpcServiceMethod(
       SessionSource_method_names[11],
       ::grpc::internal::RpcMethod::NORMAL_RPC,
+      new ::grpc::internal::RpcMethodHandler< SessionSource::Service, ::sessionsource::RetryRenderSessionRequest, ::common::Respone, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(
+          [](SessionSource::Service* service,
+             ::grpc::ServerContext* ctx,
+             const ::sessionsource::RetryRenderSessionRequest* req,
+             ::common::Respone* resp) {
+               return service->RetryRenderSession(ctx, req, resp);
+             }, this)));
+  AddMethod(new ::grpc::internal::RpcServiceMethod(
+      SessionSource_method_names[12],
+      ::grpc::internal::RpcMethod::NORMAL_RPC,
       new ::grpc::internal::RpcMethodHandler< SessionSource::Service, ::sessionsource::ShareSessionRequest, ::common::Respone, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(
           [](SessionSource::Service* service,
              ::grpc::ServerContext* ctx,
@@ -459,7 +494,7 @@ SessionSource::Service::Service() {
                return service->ShareSession(ctx, req, resp);
              }, this)));
   AddMethod(new ::grpc::internal::RpcServiceMethod(
-      SessionSource_method_names[12],
+      SessionSource_method_names[13],
       ::grpc::internal::RpcMethod::NORMAL_RPC,
       new ::grpc::internal::RpcMethodHandler< SessionSource::Service, ::sessionsource::ShareSegmentRequest, ::common::Respone, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(
           [](SessionSource::Service* service,
@@ -544,6 +579,13 @@ SessionSource::Service::~Service() {
 }
 
 ::grpc::Status SessionSource::Service::CutSession(::grpc::ServerContext* context, const ::sessionsource::CutSessionRequest* request, ::common::Respone* response) {
+  (void) context;
+  (void) request;
+  (void) response;
+  return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+}
+
+::grpc::Status SessionSource::Service::RetryRenderSession(::grpc::ServerContext* context, const ::sessionsource::RetryRenderSessionRequest* request, ::common::Respone* response) {
   (void) context;
   (void) request;
   (void) response;

@@ -1989,6 +1989,7 @@ export const SessionSource = new ServiceType("sessionsource.SessionSource", [
     { name: "RenderSegment", options: {}, I: RenderSegmentRequest, O: Respone },
     { name: "UpdateSegment", options: {}, I: UpdateSegmentRequest, O: Respone },
     { name: "CutSession", options: {}, I: CutSessionRequest, O: Respone },
+    { name: "RetryRenderSession", options: {}, I: DeleteSessionRequest, O: Respone },
     { name: "ShareSession", options: {}, I: ShareSessionRequest, O: Respone },
     { name: "ShareSegment", options: {}, I: ShareSegmentRequest, O: Respone }
 ]);

@@ -31,6 +31,7 @@ const (
 	SessionSource_RenderSegment_FullMethodName      = "/sessionsource.SessionSource/RenderSegment"
 	SessionSource_UpdateSegment_FullMethodName      = "/sessionsource.SessionSource/UpdateSegment"
 	SessionSource_CutSession_FullMethodName         = "/sessionsource.SessionSource/CutSession"
+	SessionSource_RetryRenderSession_FullMethodName = "/sessionsource.SessionSource/RetryRenderSession"
 	SessionSource_ShareSession_FullMethodName       = "/sessionsource.SessionSource/ShareSession"
 	SessionSource_ShareSegment_FullMethodName       = "/sessionsource.SessionSource/ShareSegment"
 )
@@ -52,6 +53,7 @@ type SessionSourceClient interface {
 	RenderSegment(ctx context.Context, in *RenderSegmentRequest, opts ...grpc.CallOption) (*common.Respone, error)
 	UpdateSegment(ctx context.Context, in *UpdateSegmentRequest, opts ...grpc.CallOption) (*common.Respone, error)
 	CutSession(ctx context.Context, in *CutSessionRequest, opts ...grpc.CallOption) (*common.Respone, error)
+	RetryRenderSession(ctx context.Context, in *DeleteSessionRequest, opts ...grpc.CallOption) (*common.Respone, error)
 	ShareSession(ctx context.Context, in *ShareSessionRequest, opts ...grpc.CallOption) (*common.Respone, error)
 	ShareSegment(ctx context.Context, in *ShareSegmentRequest, opts ...grpc.CallOption) (*common.Respone, error)
 }
@@ -201,6 +203,16 @@ func (c *sessionSourceClient) CutSession(ctx context.Context, in *CutSessionRequ
 	return out, nil
 }
 
+func (c *sessionSourceClient) RetryRenderSession(ctx context.Context, in *DeleteSessionRequest, opts ...grpc.CallOption) (*common.Respone, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(common.Respone)
+	err := c.cc.Invoke(ctx, SessionSource_RetryRenderSession_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *sessionSourceClient) ShareSession(ctx context.Context, in *ShareSessionRequest, opts ...grpc.CallOption) (*common.Respone, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(common.Respone)
@@ -238,6 +250,7 @@ type SessionSourceServer interface {
 	RenderSegment(context.Context, *RenderSegmentRequest) (*common.Respone, error)
 	UpdateSegment(context.Context, *UpdateSegmentRequest) (*common.Respone, error)
 	CutSession(context.Context, *CutSessionRequest) (*common.Respone, error)
+	RetryRenderSession(context.Context, *DeleteSessionRequest) (*common.Respone, error)
 	ShareSession(context.Context, *ShareSessionRequest) (*common.Respone, error)
 	ShareSegment(context.Context, *ShareSegmentRequest) (*common.Respone, error)
 }
@@ -281,6 +294,9 @@ func (UnimplementedSessionSourceServer) UpdateSegment(context.Context, *UpdateSe
 }
 func (UnimplementedSessionSourceServer) CutSession(context.Context, *CutSessionRequest) (*common.Respone, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CutSession not implemented")
+}
+func (UnimplementedSessionSourceServer) RetryRenderSession(context.Context, *DeleteSessionRequest) (*common.Respone, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RetryRenderSession not implemented")
 }
 func (UnimplementedSessionSourceServer) ShareSession(context.Context, *ShareSessionRequest) (*common.Respone, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ShareSession not implemented")
@@ -485,6 +501,24 @@ func _SessionSource_CutSession_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _SessionSource_RetryRenderSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteSessionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SessionSourceServer).RetryRenderSession(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SessionSource_RetryRenderSession_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SessionSourceServer).RetryRenderSession(ctx, req.(*DeleteSessionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _SessionSource_ShareSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ShareSessionRequest)
 	if err := dec(in); err != nil {
@@ -559,6 +593,10 @@ var SessionSource_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CutSession",
 			Handler:    _SessionSource_CutSession_Handler,
+		},
+		{
+			MethodName: "RetryRenderSession",
+			Handler:    _SessionSource_RetryRenderSession_Handler,
 		},
 		{
 			MethodName: "ShareSession",

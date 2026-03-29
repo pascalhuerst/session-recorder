@@ -78,6 +78,10 @@ export interface ISessionSourceClient {
      */
     cutSession(input: CutSessionRequest, options?: RpcOptions): UnaryCall<CutSessionRequest, Respone>;
     /**
+     * @generated from protobuf rpc: RetryRenderSession
+     */
+    retryRenderSession(input: DeleteSessionRequest, options?: RpcOptions): UnaryCall<DeleteSessionRequest, Respone>;
+    /**
      * @generated from protobuf rpc: ShareSession
      */
     shareSession(input: ShareSessionRequest, options?: RpcOptions): UnaryCall<ShareSessionRequest, Respone>;
@@ -177,17 +181,24 @@ export class SessionSourceClient implements ISessionSourceClient, ServiceInfo {
         return stackIntercept<CutSessionRequest, Respone>("unary", this._transport, method, opt, input);
     }
     /**
+     * @generated from protobuf rpc: RetryRenderSession
+     */
+    retryRenderSession(input: DeleteSessionRequest, options?: RpcOptions): UnaryCall<DeleteSessionRequest, Respone> {
+        const method = this.methods[11], opt = this._transport.mergeOptions(options);
+        return stackIntercept<DeleteSessionRequest, Respone>("unary", this._transport, method, opt, input);
+    }
+    /**
      * @generated from protobuf rpc: ShareSession
      */
     shareSession(input: ShareSessionRequest, options?: RpcOptions): UnaryCall<ShareSessionRequest, Respone> {
-        const method = this.methods[11], opt = this._transport.mergeOptions(options);
+        const method = this.methods[12], opt = this._transport.mergeOptions(options);
         return stackIntercept<ShareSessionRequest, Respone>("unary", this._transport, method, opt, input);
     }
     /**
      * @generated from protobuf rpc: ShareSegment
      */
     shareSegment(input: ShareSegmentRequest, options?: RpcOptions): UnaryCall<ShareSegmentRequest, Respone> {
-        const method = this.methods[12], opt = this._transport.mergeOptions(options);
+        const method = this.methods[13], opt = this._transport.mergeOptions(options);
         return stackIntercept<ShareSegmentRequest, Respone>("unary", this._transport, method, opt, input);
     }
 }

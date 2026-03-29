@@ -7,23 +7,23 @@
 #include "sessionsource.pb.h"
 
 #include <functional>
-#include <grpcpp/generic/async_generic_service.h>
-#include <grpcpp/support/async_stream.h>
-#include <grpcpp/support/async_unary_call.h>
-#include <grpcpp/support/client_callback.h>
-#include <grpcpp/client_context.h>
-#include <grpcpp/completion_queue.h>
-#include <grpcpp/support/message_allocator.h>
-#include <grpcpp/support/method_handler.h>
+#include <grpcpp/impl/codegen/async_generic_service.h>
+#include <grpcpp/impl/codegen/async_stream.h>
+#include <grpcpp/impl/codegen/async_unary_call.h>
+#include <grpcpp/impl/codegen/client_callback.h>
+#include <grpcpp/impl/codegen/client_context.h>
+#include <grpcpp/impl/codegen/completion_queue.h>
+#include <grpcpp/impl/codegen/message_allocator.h>
+#include <grpcpp/impl/codegen/method_handler.h>
 #include <grpcpp/impl/codegen/proto_utils.h>
-#include <grpcpp/impl/rpc_method.h>
-#include <grpcpp/support/server_callback.h>
+#include <grpcpp/impl/codegen/rpc_method.h>
+#include <grpcpp/impl/codegen/server_callback.h>
 #include <grpcpp/impl/codegen/server_callback_handlers.h>
-#include <grpcpp/server_context.h>
-#include <grpcpp/impl/service_type.h>
+#include <grpcpp/impl/codegen/server_context.h>
+#include <grpcpp/impl/codegen/service_type.h>
 #include <grpcpp/impl/codegen/status.h>
-#include <grpcpp/support/stub_options.h>
-#include <grpcpp/support/sync_stream.h>
+#include <grpcpp/impl/codegen/stub_options.h>
+#include <grpcpp/impl/codegen/sync_stream.h>
 
 namespace sessionsource {
 
@@ -120,6 +120,13 @@ class SessionSource final {
     std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>> PrepareAsyncCutSession(::grpc::ClientContext* context, const ::sessionsource::CutSessionRequest& request, ::grpc::CompletionQueue* cq) {
       return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>>(PrepareAsyncCutSessionRaw(context, request, cq));
     }
+    virtual ::grpc::Status RetryRenderSession(::grpc::ClientContext* context, const ::sessionsource::RetryRenderSessionRequest& request, ::common::Respone* response) = 0;
+    std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>> AsyncRetryRenderSession(::grpc::ClientContext* context, const ::sessionsource::RetryRenderSessionRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>>(AsyncRetryRenderSessionRaw(context, request, cq));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>> PrepareAsyncRetryRenderSession(::grpc::ClientContext* context, const ::sessionsource::RetryRenderSessionRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>>(PrepareAsyncRetryRenderSessionRaw(context, request, cq));
+    }
     virtual ::grpc::Status ShareSession(::grpc::ClientContext* context, const ::sessionsource::ShareSessionRequest& request, ::common::Respone* response) = 0;
     std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>> AsyncShareSession(::grpc::ClientContext* context, const ::sessionsource::ShareSessionRequest& request, ::grpc::CompletionQueue* cq) {
       return std::unique_ptr< ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>>(AsyncShareSessionRaw(context, request, cq));
@@ -158,6 +165,8 @@ class SessionSource final {
       virtual void UpdateSegment(::grpc::ClientContext* context, const ::sessionsource::UpdateSegmentRequest* request, ::common::Respone* response, ::grpc::ClientUnaryReactor* reactor) = 0;
       virtual void CutSession(::grpc::ClientContext* context, const ::sessionsource::CutSessionRequest* request, ::common::Respone* response, std::function<void(::grpc::Status)>) = 0;
       virtual void CutSession(::grpc::ClientContext* context, const ::sessionsource::CutSessionRequest* request, ::common::Respone* response, ::grpc::ClientUnaryReactor* reactor) = 0;
+      virtual void RetryRenderSession(::grpc::ClientContext* context, const ::sessionsource::RetryRenderSessionRequest* request, ::common::Respone* response, std::function<void(::grpc::Status)>) = 0;
+      virtual void RetryRenderSession(::grpc::ClientContext* context, const ::sessionsource::RetryRenderSessionRequest* request, ::common::Respone* response, ::grpc::ClientUnaryReactor* reactor) = 0;
       virtual void ShareSession(::grpc::ClientContext* context, const ::sessionsource::ShareSessionRequest* request, ::common::Respone* response, std::function<void(::grpc::Status)>) = 0;
       virtual void ShareSession(::grpc::ClientContext* context, const ::sessionsource::ShareSessionRequest* request, ::common::Respone* response, ::grpc::ClientUnaryReactor* reactor) = 0;
       virtual void ShareSegment(::grpc::ClientContext* context, const ::sessionsource::ShareSegmentRequest* request, ::common::Respone* response, std::function<void(::grpc::Status)>) = 0;
@@ -192,6 +201,8 @@ class SessionSource final {
     virtual ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>* PrepareAsyncUpdateSegmentRaw(::grpc::ClientContext* context, const ::sessionsource::UpdateSegmentRequest& request, ::grpc::CompletionQueue* cq) = 0;
     virtual ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>* AsyncCutSessionRaw(::grpc::ClientContext* context, const ::sessionsource::CutSessionRequest& request, ::grpc::CompletionQueue* cq) = 0;
     virtual ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>* PrepareAsyncCutSessionRaw(::grpc::ClientContext* context, const ::sessionsource::CutSessionRequest& request, ::grpc::CompletionQueue* cq) = 0;
+    virtual ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>* AsyncRetryRenderSessionRaw(::grpc::ClientContext* context, const ::sessionsource::RetryRenderSessionRequest& request, ::grpc::CompletionQueue* cq) = 0;
+    virtual ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>* PrepareAsyncRetryRenderSessionRaw(::grpc::ClientContext* context, const ::sessionsource::RetryRenderSessionRequest& request, ::grpc::CompletionQueue* cq) = 0;
     virtual ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>* AsyncShareSessionRaw(::grpc::ClientContext* context, const ::sessionsource::ShareSessionRequest& request, ::grpc::CompletionQueue* cq) = 0;
     virtual ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>* PrepareAsyncShareSessionRaw(::grpc::ClientContext* context, const ::sessionsource::ShareSessionRequest& request, ::grpc::CompletionQueue* cq) = 0;
     virtual ::grpc::ClientAsyncResponseReaderInterface< ::common::Respone>* AsyncShareSegmentRaw(::grpc::ClientContext* context, const ::sessionsource::ShareSegmentRequest& request, ::grpc::CompletionQueue* cq) = 0;
@@ -283,6 +294,13 @@ class SessionSource final {
     std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::common::Respone>> PrepareAsyncCutSession(::grpc::ClientContext* context, const ::sessionsource::CutSessionRequest& request, ::grpc::CompletionQueue* cq) {
       return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::common::Respone>>(PrepareAsyncCutSessionRaw(context, request, cq));
     }
+    ::grpc::Status RetryRenderSession(::grpc::ClientContext* context, const ::sessionsource::RetryRenderSessionRequest& request, ::common::Respone* response) override;
+    std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::common::Respone>> AsyncRetryRenderSession(::grpc::ClientContext* context, const ::sessionsource::RetryRenderSessionRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::common::Respone>>(AsyncRetryRenderSessionRaw(context, request, cq));
+    }
+    std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::common::Respone>> PrepareAsyncRetryRenderSession(::grpc::ClientContext* context, const ::sessionsource::RetryRenderSessionRequest& request, ::grpc::CompletionQueue* cq) {
+      return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::common::Respone>>(PrepareAsyncRetryRenderSessionRaw(context, request, cq));
+    }
     ::grpc::Status ShareSession(::grpc::ClientContext* context, const ::sessionsource::ShareSessionRequest& request, ::common::Respone* response) override;
     std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::common::Respone>> AsyncShareSession(::grpc::ClientContext* context, const ::sessionsource::ShareSessionRequest& request, ::grpc::CompletionQueue* cq) {
       return std::unique_ptr< ::grpc::ClientAsyncResponseReader< ::common::Respone>>(AsyncShareSessionRaw(context, request, cq));
@@ -319,6 +337,8 @@ class SessionSource final {
       void UpdateSegment(::grpc::ClientContext* context, const ::sessionsource::UpdateSegmentRequest* request, ::common::Respone* response, ::grpc::ClientUnaryReactor* reactor) override;
       void CutSession(::grpc::ClientContext* context, const ::sessionsource::CutSessionRequest* request, ::common::Respone* response, std::function<void(::grpc::Status)>) override;
       void CutSession(::grpc::ClientContext* context, const ::sessionsource::CutSessionRequest* request, ::common::Respone* response, ::grpc::ClientUnaryReactor* reactor) override;
+      void RetryRenderSession(::grpc::ClientContext* context, const ::sessionsource::RetryRenderSessionRequest* request, ::common::Respone* response, std::function<void(::grpc::Status)>) override;
+      void RetryRenderSession(::grpc::ClientContext* context, const ::sessionsource::RetryRenderSessionRequest* request, ::common::Respone* response, ::grpc::ClientUnaryReactor* reactor) override;
       void ShareSession(::grpc::ClientContext* context, const ::sessionsource::ShareSessionRequest* request, ::common::Respone* response, std::function<void(::grpc::Status)>) override;
       void ShareSession(::grpc::ClientContext* context, const ::sessionsource::ShareSessionRequest* request, ::common::Respone* response, ::grpc::ClientUnaryReactor* reactor) override;
       void ShareSegment(::grpc::ClientContext* context, const ::sessionsource::ShareSegmentRequest* request, ::common::Respone* response, std::function<void(::grpc::Status)>) override;
@@ -359,6 +379,8 @@ class SessionSource final {
     ::grpc::ClientAsyncResponseReader< ::common::Respone>* PrepareAsyncUpdateSegmentRaw(::grpc::ClientContext* context, const ::sessionsource::UpdateSegmentRequest& request, ::grpc::CompletionQueue* cq) override;
     ::grpc::ClientAsyncResponseReader< ::common::Respone>* AsyncCutSessionRaw(::grpc::ClientContext* context, const ::sessionsource::CutSessionRequest& request, ::grpc::CompletionQueue* cq) override;
     ::grpc::ClientAsyncResponseReader< ::common::Respone>* PrepareAsyncCutSessionRaw(::grpc::ClientContext* context, const ::sessionsource::CutSessionRequest& request, ::grpc::CompletionQueue* cq) override;
+    ::grpc::ClientAsyncResponseReader< ::common::Respone>* AsyncRetryRenderSessionRaw(::grpc::ClientContext* context, const ::sessionsource::RetryRenderSessionRequest& request, ::grpc::CompletionQueue* cq) override;
+    ::grpc::ClientAsyncResponseReader< ::common::Respone>* PrepareAsyncRetryRenderSessionRaw(::grpc::ClientContext* context, const ::sessionsource::RetryRenderSessionRequest& request, ::grpc::CompletionQueue* cq) override;
     ::grpc::ClientAsyncResponseReader< ::common::Respone>* AsyncShareSessionRaw(::grpc::ClientContext* context, const ::sessionsource::ShareSessionRequest& request, ::grpc::CompletionQueue* cq) override;
     ::grpc::ClientAsyncResponseReader< ::common::Respone>* PrepareAsyncShareSessionRaw(::grpc::ClientContext* context, const ::sessionsource::ShareSessionRequest& request, ::grpc::CompletionQueue* cq) override;
     ::grpc::ClientAsyncResponseReader< ::common::Respone>* AsyncShareSegmentRaw(::grpc::ClientContext* context, const ::sessionsource::ShareSegmentRequest& request, ::grpc::CompletionQueue* cq) override;
@@ -374,6 +396,7 @@ class SessionSource final {
     const ::grpc::internal::RpcMethod rpcmethod_RenderSegment_;
     const ::grpc::internal::RpcMethod rpcmethod_UpdateSegment_;
     const ::grpc::internal::RpcMethod rpcmethod_CutSession_;
+    const ::grpc::internal::RpcMethod rpcmethod_RetryRenderSession_;
     const ::grpc::internal::RpcMethod rpcmethod_ShareSession_;
     const ::grpc::internal::RpcMethod rpcmethod_ShareSegment_;
   };
@@ -396,6 +419,7 @@ class SessionSource final {
     virtual ::grpc::Status RenderSegment(::grpc::ServerContext* context, const ::sessionsource::RenderSegmentRequest* request, ::common::Respone* response);
     virtual ::grpc::Status UpdateSegment(::grpc::ServerContext* context, const ::sessionsource::UpdateSegmentRequest* request, ::common::Respone* response);
     virtual ::grpc::Status CutSession(::grpc::ServerContext* context, const ::sessionsource::CutSessionRequest* request, ::common::Respone* response);
+    virtual ::grpc::Status RetryRenderSession(::grpc::ServerContext* context, const ::sessionsource::RetryRenderSessionRequest* request, ::common::Respone* response);
     virtual ::grpc::Status ShareSession(::grpc::ServerContext* context, const ::sessionsource::ShareSessionRequest* request, ::common::Respone* response);
     virtual ::grpc::Status ShareSegment(::grpc::ServerContext* context, const ::sessionsource::ShareSegmentRequest* request, ::common::Respone* response);
   };
@@ -620,12 +644,32 @@ class SessionSource final {
     }
   };
   template <class BaseClass>
+  class WithAsyncMethod_RetryRenderSession : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithAsyncMethod_RetryRenderSession() {
+      ::grpc::Service::MarkMethodAsync(11);
+    }
+    ~WithAsyncMethod_RetryRenderSession() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status RetryRenderSession(::grpc::ServerContext* /*context*/, const ::sessionsource::RetryRenderSessionRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    void RequestRetryRenderSession(::grpc::ServerContext* context, ::sessionsource::RetryRenderSessionRequest* request, ::grpc::ServerAsyncResponseWriter< ::common::Respone>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
+      ::grpc::Service::RequestAsyncUnary(11, context, request, response, new_call_cq, notification_cq, tag);
+    }
+  };
+  template <class BaseClass>
   class WithAsyncMethod_ShareSession : public BaseClass {
    private:
     void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
    public:
     WithAsyncMethod_ShareSession() {
-      ::grpc::Service::MarkMethodAsync(11);
+      ::grpc::Service::MarkMethodAsync(12);
     }
     ~WithAsyncMethod_ShareSession() override {
       BaseClassMustBeDerivedFromService(this);
@@ -636,7 +680,7 @@ class SessionSource final {
       return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
     }
     void RequestShareSession(::grpc::ServerContext* context, ::sessionsource::ShareSessionRequest* request, ::grpc::ServerAsyncResponseWriter< ::common::Respone>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
-      ::grpc::Service::RequestAsyncUnary(11, context, request, response, new_call_cq, notification_cq, tag);
+      ::grpc::Service::RequestAsyncUnary(12, context, request, response, new_call_cq, notification_cq, tag);
     }
   };
   template <class BaseClass>
@@ -645,7 +689,7 @@ class SessionSource final {
     void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
    public:
     WithAsyncMethod_ShareSegment() {
-      ::grpc::Service::MarkMethodAsync(12);
+      ::grpc::Service::MarkMethodAsync(13);
     }
     ~WithAsyncMethod_ShareSegment() override {
       BaseClassMustBeDerivedFromService(this);
@@ -656,10 +700,10 @@ class SessionSource final {
       return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
     }
     void RequestShareSegment(::grpc::ServerContext* context, ::sessionsource::ShareSegmentRequest* request, ::grpc::ServerAsyncResponseWriter< ::common::Respone>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
-      ::grpc::Service::RequestAsyncUnary(12, context, request, response, new_call_cq, notification_cq, tag);
+      ::grpc::Service::RequestAsyncUnary(13, context, request, response, new_call_cq, notification_cq, tag);
     }
   };
-  typedef WithAsyncMethod_StreamRecorders<WithAsyncMethod_StreamSessions<WithAsyncMethod_StreamSessionAudio<WithAsyncMethod_SetKeepSession<WithAsyncMethod_DeleteSession<WithAsyncMethod_SetName<WithAsyncMethod_CreateSegment<WithAsyncMethod_DeleteSegment<WithAsyncMethod_RenderSegment<WithAsyncMethod_UpdateSegment<WithAsyncMethod_CutSession<WithAsyncMethod_ShareSession<WithAsyncMethod_ShareSegment<Service > > > > > > > > > > > > > AsyncService;
+  typedef WithAsyncMethod_StreamRecorders<WithAsyncMethod_StreamSessions<WithAsyncMethod_StreamSessionAudio<WithAsyncMethod_SetKeepSession<WithAsyncMethod_DeleteSession<WithAsyncMethod_SetName<WithAsyncMethod_CreateSegment<WithAsyncMethod_DeleteSegment<WithAsyncMethod_RenderSegment<WithAsyncMethod_UpdateSegment<WithAsyncMethod_CutSession<WithAsyncMethod_RetryRenderSession<WithAsyncMethod_ShareSession<WithAsyncMethod_ShareSegment<Service > > > > > > > > > > > > > > AsyncService;
   template <class BaseClass>
   class WithCallbackMethod_StreamRecorders : public BaseClass {
    private:
@@ -943,18 +987,45 @@ class SessionSource final {
       ::grpc::CallbackServerContext* /*context*/, const ::sessionsource::CutSessionRequest* /*request*/, ::common::Respone* /*response*/)  { return nullptr; }
   };
   template <class BaseClass>
+  class WithCallbackMethod_RetryRenderSession : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithCallbackMethod_RetryRenderSession() {
+      ::grpc::Service::MarkMethodCallback(11,
+          new ::grpc::internal::CallbackUnaryHandler< ::sessionsource::RetryRenderSessionRequest, ::common::Respone>(
+            [this](
+                   ::grpc::CallbackServerContext* context, const ::sessionsource::RetryRenderSessionRequest* request, ::common::Respone* response) { return this->RetryRenderSession(context, request, response); }));}
+    void SetMessageAllocatorFor_RetryRenderSession(
+        ::grpc::MessageAllocator< ::sessionsource::RetryRenderSessionRequest, ::common::Respone>* allocator) {
+      ::grpc::internal::MethodHandler* const handler = ::grpc::Service::GetHandler(11);
+      static_cast<::grpc::internal::CallbackUnaryHandler< ::sessionsource::RetryRenderSessionRequest, ::common::Respone>*>(handler)
+              ->SetMessageAllocator(allocator);
+    }
+    ~WithCallbackMethod_RetryRenderSession() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status RetryRenderSession(::grpc::ServerContext* /*context*/, const ::sessionsource::RetryRenderSessionRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    virtual ::grpc::ServerUnaryReactor* RetryRenderSession(
+      ::grpc::CallbackServerContext* /*context*/, const ::sessionsource::RetryRenderSessionRequest* /*request*/, ::common::Respone* /*response*/)  { return nullptr; }
+  };
+  template <class BaseClass>
   class WithCallbackMethod_ShareSession : public BaseClass {
    private:
     void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
    public:
     WithCallbackMethod_ShareSession() {
-      ::grpc::Service::MarkMethodCallback(11,
+      ::grpc::Service::MarkMethodCallback(12,
           new ::grpc::internal::CallbackUnaryHandler< ::sessionsource::ShareSessionRequest, ::common::Respone>(
             [this](
                    ::grpc::CallbackServerContext* context, const ::sessionsource::ShareSessionRequest* request, ::common::Respone* response) { return this->ShareSession(context, request, response); }));}
     void SetMessageAllocatorFor_ShareSession(
         ::grpc::MessageAllocator< ::sessionsource::ShareSessionRequest, ::common::Respone>* allocator) {
-      ::grpc::internal::MethodHandler* const handler = ::grpc::Service::GetHandler(11);
+      ::grpc::internal::MethodHandler* const handler = ::grpc::Service::GetHandler(12);
       static_cast<::grpc::internal::CallbackUnaryHandler< ::sessionsource::ShareSessionRequest, ::common::Respone>*>(handler)
               ->SetMessageAllocator(allocator);
     }
@@ -975,13 +1046,13 @@ class SessionSource final {
     void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
    public:
     WithCallbackMethod_ShareSegment() {
-      ::grpc::Service::MarkMethodCallback(12,
+      ::grpc::Service::MarkMethodCallback(13,
           new ::grpc::internal::CallbackUnaryHandler< ::sessionsource::ShareSegmentRequest, ::common::Respone>(
             [this](
                    ::grpc::CallbackServerContext* context, const ::sessionsource::ShareSegmentRequest* request, ::common::Respone* response) { return this->ShareSegment(context, request, response); }));}
     void SetMessageAllocatorFor_ShareSegment(
         ::grpc::MessageAllocator< ::sessionsource::ShareSegmentRequest, ::common::Respone>* allocator) {
-      ::grpc::internal::MethodHandler* const handler = ::grpc::Service::GetHandler(12);
+      ::grpc::internal::MethodHandler* const handler = ::grpc::Service::GetHandler(13);
       static_cast<::grpc::internal::CallbackUnaryHandler< ::sessionsource::ShareSegmentRequest, ::common::Respone>*>(handler)
               ->SetMessageAllocator(allocator);
     }
@@ -996,7 +1067,7 @@ class SessionSource final {
     virtual ::grpc::ServerUnaryReactor* ShareSegment(
       ::grpc::CallbackServerContext* /*context*/, const ::sessionsource::ShareSegmentRequest* /*request*/, ::common::Respone* /*response*/)  { return nullptr; }
   };
-  typedef WithCallbackMethod_StreamRecorders<WithCallbackMethod_StreamSessions<WithCallbackMethod_StreamSessionAudio<WithCallbackMethod_SetKeepSession<WithCallbackMethod_DeleteSession<WithCallbackMethod_SetName<WithCallbackMethod_CreateSegment<WithCallbackMethod_DeleteSegment<WithCallbackMethod_RenderSegment<WithCallbackMethod_UpdateSegment<WithCallbackMethod_CutSession<WithCallbackMethod_ShareSession<WithCallbackMethod_ShareSegment<Service > > > > > > > > > > > > > CallbackService;
+  typedef WithCallbackMethod_StreamRecorders<WithCallbackMethod_StreamSessions<WithCallbackMethod_StreamSessionAudio<WithCallbackMethod_SetKeepSession<WithCallbackMethod_DeleteSession<WithCallbackMethod_SetName<WithCallbackMethod_CreateSegment<WithCallbackMethod_DeleteSegment<WithCallbackMethod_RenderSegment<WithCallbackMethod_UpdateSegment<WithCallbackMethod_CutSession<WithCallbackMethod_RetryRenderSession<WithCallbackMethod_ShareSession<WithCallbackMethod_ShareSegment<Service > > > > > > > > > > > > > > CallbackService;
   typedef CallbackService ExperimentalCallbackService;
   template <class BaseClass>
   class WithGenericMethod_StreamRecorders : public BaseClass {
@@ -1186,12 +1257,29 @@ class SessionSource final {
     }
   };
   template <class BaseClass>
+  class WithGenericMethod_RetryRenderSession : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithGenericMethod_RetryRenderSession() {
+      ::grpc::Service::MarkMethodGeneric(11);
+    }
+    ~WithGenericMethod_RetryRenderSession() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status RetryRenderSession(::grpc::ServerContext* /*context*/, const ::sessionsource::RetryRenderSessionRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+  };
+  template <class BaseClass>
   class WithGenericMethod_ShareSession : public BaseClass {
    private:
     void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
    public:
     WithGenericMethod_ShareSession() {
-      ::grpc::Service::MarkMethodGeneric(11);
+      ::grpc::Service::MarkMethodGeneric(12);
     }
     ~WithGenericMethod_ShareSession() override {
       BaseClassMustBeDerivedFromService(this);
@@ -1208,7 +1296,7 @@ class SessionSource final {
     void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
    public:
     WithGenericMethod_ShareSegment() {
-      ::grpc::Service::MarkMethodGeneric(12);
+      ::grpc::Service::MarkMethodGeneric(13);
     }
     ~WithGenericMethod_ShareSegment() override {
       BaseClassMustBeDerivedFromService(this);
@@ -1440,12 +1528,32 @@ class SessionSource final {
     }
   };
   template <class BaseClass>
+  class WithRawMethod_RetryRenderSession : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithRawMethod_RetryRenderSession() {
+      ::grpc::Service::MarkMethodRaw(11);
+    }
+    ~WithRawMethod_RetryRenderSession() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status RetryRenderSession(::grpc::ServerContext* /*context*/, const ::sessionsource::RetryRenderSessionRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    void RequestRetryRenderSession(::grpc::ServerContext* context, ::grpc::ByteBuffer* request, ::grpc::ServerAsyncResponseWriter< ::grpc::ByteBuffer>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
+      ::grpc::Service::RequestAsyncUnary(11, context, request, response, new_call_cq, notification_cq, tag);
+    }
+  };
+  template <class BaseClass>
   class WithRawMethod_ShareSession : public BaseClass {
    private:
     void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
    public:
     WithRawMethod_ShareSession() {
-      ::grpc::Service::MarkMethodRaw(11);
+      ::grpc::Service::MarkMethodRaw(12);
     }
     ~WithRawMethod_ShareSession() override {
       BaseClassMustBeDerivedFromService(this);
@@ -1456,7 +1564,7 @@ class SessionSource final {
       return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
     }
     void RequestShareSession(::grpc::ServerContext* context, ::grpc::ByteBuffer* request, ::grpc::ServerAsyncResponseWriter< ::grpc::ByteBuffer>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
-      ::grpc::Service::RequestAsyncUnary(11, context, request, response, new_call_cq, notification_cq, tag);
+      ::grpc::Service::RequestAsyncUnary(12, context, request, response, new_call_cq, notification_cq, tag);
     }
   };
   template <class BaseClass>
@@ -1465,7 +1573,7 @@ class SessionSource final {
     void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
    public:
     WithRawMethod_ShareSegment() {
-      ::grpc::Service::MarkMethodRaw(12);
+      ::grpc::Service::MarkMethodRaw(13);
     }
     ~WithRawMethod_ShareSegment() override {
       BaseClassMustBeDerivedFromService(this);
@@ -1476,7 +1584,7 @@ class SessionSource final {
       return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
     }
     void RequestShareSegment(::grpc::ServerContext* context, ::grpc::ByteBuffer* request, ::grpc::ServerAsyncResponseWriter< ::grpc::ByteBuffer>* response, ::grpc::CompletionQueue* new_call_cq, ::grpc::ServerCompletionQueue* notification_cq, void *tag) {
-      ::grpc::Service::RequestAsyncUnary(12, context, request, response, new_call_cq, notification_cq, tag);
+      ::grpc::Service::RequestAsyncUnary(13, context, request, response, new_call_cq, notification_cq, tag);
     }
   };
   template <class BaseClass>
@@ -1722,12 +1830,34 @@ class SessionSource final {
       ::grpc::CallbackServerContext* /*context*/, const ::grpc::ByteBuffer* /*request*/, ::grpc::ByteBuffer* /*response*/)  { return nullptr; }
   };
   template <class BaseClass>
+  class WithRawCallbackMethod_RetryRenderSession : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithRawCallbackMethod_RetryRenderSession() {
+      ::grpc::Service::MarkMethodRawCallback(11,
+          new ::grpc::internal::CallbackUnaryHandler< ::grpc::ByteBuffer, ::grpc::ByteBuffer>(
+            [this](
+                   ::grpc::CallbackServerContext* context, const ::grpc::ByteBuffer* request, ::grpc::ByteBuffer* response) { return this->RetryRenderSession(context, request, response); }));
+    }
+    ~WithRawCallbackMethod_RetryRenderSession() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable synchronous version of this method
+    ::grpc::Status RetryRenderSession(::grpc::ServerContext* /*context*/, const ::sessionsource::RetryRenderSessionRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    virtual ::grpc::ServerUnaryReactor* RetryRenderSession(
+      ::grpc::CallbackServerContext* /*context*/, const ::grpc::ByteBuffer* /*request*/, ::grpc::ByteBuffer* /*response*/)  { return nullptr; }
+  };
+  template <class BaseClass>
   class WithRawCallbackMethod_ShareSession : public BaseClass {
    private:
     void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
    public:
     WithRawCallbackMethod_ShareSession() {
-      ::grpc::Service::MarkMethodRawCallback(11,
+      ::grpc::Service::MarkMethodRawCallback(12,
           new ::grpc::internal::CallbackUnaryHandler< ::grpc::ByteBuffer, ::grpc::ByteBuffer>(
             [this](
                    ::grpc::CallbackServerContext* context, const ::grpc::ByteBuffer* request, ::grpc::ByteBuffer* response) { return this->ShareSession(context, request, response); }));
@@ -1749,7 +1879,7 @@ class SessionSource final {
     void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
    public:
     WithRawCallbackMethod_ShareSegment() {
-      ::grpc::Service::MarkMethodRawCallback(12,
+      ::grpc::Service::MarkMethodRawCallback(13,
           new ::grpc::internal::CallbackUnaryHandler< ::grpc::ByteBuffer, ::grpc::ByteBuffer>(
             [this](
                    ::grpc::CallbackServerContext* context, const ::grpc::ByteBuffer* request, ::grpc::ByteBuffer* response) { return this->ShareSegment(context, request, response); }));
@@ -1982,12 +2112,39 @@ class SessionSource final {
     virtual ::grpc::Status StreamedCutSession(::grpc::ServerContext* context, ::grpc::ServerUnaryStreamer< ::sessionsource::CutSessionRequest,::common::Respone>* server_unary_streamer) = 0;
   };
   template <class BaseClass>
+  class WithStreamedUnaryMethod_RetryRenderSession : public BaseClass {
+   private:
+    void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
+   public:
+    WithStreamedUnaryMethod_RetryRenderSession() {
+      ::grpc::Service::MarkMethodStreamed(11,
+        new ::grpc::internal::StreamedUnaryHandler<
+          ::sessionsource::RetryRenderSessionRequest, ::common::Respone>(
+            [this](::grpc::ServerContext* context,
+                   ::grpc::ServerUnaryStreamer<
+                     ::sessionsource::RetryRenderSessionRequest, ::common::Respone>* streamer) {
+                       return this->StreamedRetryRenderSession(context,
+                         streamer);
+                  }));
+    }
+    ~WithStreamedUnaryMethod_RetryRenderSession() override {
+      BaseClassMustBeDerivedFromService(this);
+    }
+    // disable regular version of this method
+    ::grpc::Status RetryRenderSession(::grpc::ServerContext* /*context*/, const ::sessionsource::RetryRenderSessionRequest* /*request*/, ::common::Respone* /*response*/) override {
+      abort();
+      return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+    }
+    // replace default version of method with streamed unary
+    virtual ::grpc::Status StreamedRetryRenderSession(::grpc::ServerContext* context, ::grpc::ServerUnaryStreamer< ::sessionsource::RetryRenderSessionRequest,::common::Respone>* server_unary_streamer) = 0;
+  };
+  template <class BaseClass>
   class WithStreamedUnaryMethod_ShareSession : public BaseClass {
    private:
     void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
    public:
     WithStreamedUnaryMethod_ShareSession() {
-      ::grpc::Service::MarkMethodStreamed(11,
+      ::grpc::Service::MarkMethodStreamed(12,
         new ::grpc::internal::StreamedUnaryHandler<
           ::sessionsource::ShareSessionRequest, ::common::Respone>(
             [this](::grpc::ServerContext* context,
@@ -2014,7 +2171,7 @@ class SessionSource final {
     void BaseClassMustBeDerivedFromService(const Service* /*service*/) {}
    public:
     WithStreamedUnaryMethod_ShareSegment() {
-      ::grpc::Service::MarkMethodStreamed(12,
+      ::grpc::Service::MarkMethodStreamed(13,
         new ::grpc::internal::StreamedUnaryHandler<
           ::sessionsource::ShareSegmentRequest, ::common::Respone>(
             [this](::grpc::ServerContext* context,
@@ -2035,7 +2192,7 @@ class SessionSource final {
     // replace default version of method with streamed unary
     virtual ::grpc::Status StreamedShareSegment(::grpc::ServerContext* context, ::grpc::ServerUnaryStreamer< ::sessionsource::ShareSegmentRequest,::common::Respone>* server_unary_streamer) = 0;
   };
-  typedef WithStreamedUnaryMethod_SetKeepSession<WithStreamedUnaryMethod_DeleteSession<WithStreamedUnaryMethod_SetName<WithStreamedUnaryMethod_CreateSegment<WithStreamedUnaryMethod_DeleteSegment<WithStreamedUnaryMethod_RenderSegment<WithStreamedUnaryMethod_UpdateSegment<WithStreamedUnaryMethod_CutSession<WithStreamedUnaryMethod_ShareSession<WithStreamedUnaryMethod_ShareSegment<Service > > > > > > > > > > StreamedUnaryService;
+  typedef WithStreamedUnaryMethod_SetKeepSession<WithStreamedUnaryMethod_DeleteSession<WithStreamedUnaryMethod_SetName<WithStreamedUnaryMethod_CreateSegment<WithStreamedUnaryMethod_DeleteSegment<WithStreamedUnaryMethod_RenderSegment<WithStreamedUnaryMethod_UpdateSegment<WithStreamedUnaryMethod_CutSession<WithStreamedUnaryMethod_RetryRenderSession<WithStreamedUnaryMethod_ShareSession<WithStreamedUnaryMethod_ShareSegment<Service > > > > > > > > > > > StreamedUnaryService;
   template <class BaseClass>
   class WithSplitStreamingMethod_StreamRecorders : public BaseClass {
    private:
@@ -2118,7 +2275,7 @@ class SessionSource final {
     virtual ::grpc::Status StreamedStreamSessionAudio(::grpc::ServerContext* context, ::grpc::ServerSplitStreamer< ::sessionsource::StreamSessionAudioRequest,::sessionsource::AudioChunk>* server_split_streamer) = 0;
   };
   typedef WithSplitStreamingMethod_StreamRecorders<WithSplitStreamingMethod_StreamSessions<WithSplitStreamingMethod_StreamSessionAudio<Service > > > SplitStreamedService;
-  typedef WithSplitStreamingMethod_StreamRecorders<WithSplitStreamingMethod_StreamSessions<WithSplitStreamingMethod_StreamSessionAudio<WithStreamedUnaryMethod_SetKeepSession<WithStreamedUnaryMethod_DeleteSession<WithStreamedUnaryMethod_SetName<WithStreamedUnaryMethod_CreateSegment<WithStreamedUnaryMethod_DeleteSegment<WithStreamedUnaryMethod_RenderSegment<WithStreamedUnaryMethod_UpdateSegment<WithStreamedUnaryMethod_CutSession<WithStreamedUnaryMethod_ShareSession<WithStreamedUnaryMethod_ShareSegment<Service > > > > > > > > > > > > > StreamedService;
+  typedef WithSplitStreamingMethod_StreamRecorders<WithSplitStreamingMethod_StreamSessions<WithSplitStreamingMethod_StreamSessionAudio<WithStreamedUnaryMethod_SetKeepSession<WithStreamedUnaryMethod_DeleteSession<WithStreamedUnaryMethod_SetName<WithStreamedUnaryMethod_CreateSegment<WithStreamedUnaryMethod_DeleteSegment<WithStreamedUnaryMethod_RenderSegment<WithStreamedUnaryMethod_UpdateSegment<WithStreamedUnaryMethod_CutSession<WithStreamedUnaryMethod_RetryRenderSession<WithStreamedUnaryMethod_ShareSession<WithStreamedUnaryMethod_ShareSegment<Service > > > > > > > > > > > > > > StreamedService;
 };
 
 }  // namespace sessionsource

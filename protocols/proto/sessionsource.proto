@@ -151,6 +151,11 @@ message CutSessionRequest {
 	string recorderID = 1;
 }
 
+message RetryRenderSessionRequest {
+	string recorderID = 1;
+	string sessionID = 2;
+}
+
 message ShareSessionRequest {
 	string recorderID = 1;
 	string sessionID = 2;
@@ -192,6 +197,7 @@ service SessionSource {
 	rpc UpdateSegment(UpdateSegmentRequest) returns (common.Respone);
 
 	rpc CutSession(CutSessionRequest) returns (common.Respone);
+	rpc RetryRenderSession(RetryRenderSessionRequest) returns (common.Respone);
 
 	rpc ShareSession(ShareSessionRequest) returns (common.Respone);
 	rpc ShareSegment(ShareSegmentRequest) returns (common.Respone);

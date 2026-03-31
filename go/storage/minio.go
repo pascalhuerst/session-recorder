@@ -90,7 +90,7 @@ type Minio struct {
 	accessKey      string
 	secretLey      string
 
-	client *minio.Client
+	client MinioClient
 
 	// Key is recorder ID
 	chunks        map[uuid.UUID]*minioChunk
@@ -130,7 +130,7 @@ func NewMinioStorage(endpoint, localEndpoint, publicEndpoint, accessKey, secretK
 		publicEndpoint: publicEndpoint,
 		accessKey:      accessKey,
 		secretLey:      secretKey,
-		client:         c,
+		client:         newRealMinioClient(c),
 		chunks:         make(map[uuid.UUID]*minioChunk),
 		lastChunkTime:  make(map[uuid.UUID]time.Time),
 		sessionTimeout: DefaultSessionTimeout,
@@ -138,9 +138,34 @@ func NewMinioStorage(endpoint, localEndpoint, publicEndpoint, accessKey, secretK
 	}, nil
 }
 
+// NewMinioStorageWithClient creates a Minio storage using a provided MinioClient.
+// This is intended for testing with a fake/in-memory client.
+func NewMinioStorageWithClient(client MinioClient, endpoint, localEndpoint, publicEndpoint string) *Minio {
+	if localEndpoint == "" {
+		localEndpoint = endpoint
+	}
+	if publicEndpoint == "" {
+		publicEndpoint = localEndpoint
+	}
+	return &Minio{
+		endpoint:       endpoint,
+		localEndpoint:  localEndpoint,
+		publicEndpoint: publicEndpoint,
+		client:         client,
+		chunks:         make(map[uuid.UUID]*minioChunk),
+		lastChunkTime:  make(map[uuid.UUID]time.Time),
+		sessionTimeout: DefaultSessionTimeout,
+		stopTimeout:    make(chan struct{}),
+	}
+}
+
 // SetSessionTimeout configures the session timeout duration.
 // Sessions that don't receive chunks for this duration are automatically closed.
+// Safe to call before Start. If called after Start, the new timeout takes effect
+// on the next check cycle.
 func (m *Minio) SetSessionTimeout(timeout time.Duration) {
+	m.dataLock.Lock()
+	defer m.dataLock.Unlock()
 	m.sessionTimeout = timeout
 }
 
@@ -286,8 +311,11 @@ func (m *Minio) runSessionTimeoutChecker(ctx context.Context) {
 	ticker := time.NewTicker(sessionTimeoutCheckInterval)
 	defer ticker.Stop()
 
+	m.dataLock.Lock()
+	timeout := m.sessionTimeout
+	m.dataLock.Unlock()
 	log.Info().
-		Dur("timeout", m.sessionTimeout).
+		Dur("timeout", timeout).
 		Dur("check-interval", sessionTimeoutCheckInterval).
 		Msg("Session timeout checker started")
 
@@ -675,6 +703,13 @@ func (m *Minio) SafeChunks(ctx context.Context, recorderID, sessionID uuid.UUID,
 }
 
 func (m *Minio) isSessionClosed(ctx context.Context, recorderID, sessionID uuid.UUID) bool {
+	// Check metadata first — if the session is already FINISHED or ERROR, it's closed
+	// regardless of whether chunk objects still exist (they may not have been cleaned up).
+	sm, err := m.getSessionMetadata(ctx, recorderID, sessionID)
+	if err == nil && (sm.State == SessionStateFinished || sm.State == SessionStateError) {
+		return true
+	}
+
 	chunksPrefix := fmt.Sprintf("%s/sessions/%s/chunks/", recorderID, sessionID)
 
 	objectCh := m.client.ListObjects(ctx, bucketName, minio.ListObjectsOptions{Prefix: chunksPrefix, Recursive: false})
@@ -710,7 +745,7 @@ func (m *Minio) flushChunks(ctx context.Context, recorderID, sessionID uuid.UUID
 	return nil
 }
 
-func (m *Minio) renderFromRawData(ctx context.Context, recorderID, sessionID uuid.UUID, sm *Session, previousState SessionState, rawData *minio.Object) error {
+func (m *Minio) renderFromRawData(ctx context.Context, recorderID, sessionID uuid.UUID, sm *Session, previousState SessionState, rawData io.Reader) error {
 	readers, writer, closer := makeReaders(4)
 	eg, egCtx := errgroup.WithContext(ctx)
 
@@ -903,7 +938,7 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 		sm.Duration = time.Duration(durationSeconds) * time.Second
 		sm.EndTime = sm.StartTime.Add(sm.Duration)
 
-		var rawData *minio.Object
+		var rawData ObjectHandle
 		if rawData, err = m.client.GetObject(ctx, bucketName, rawDataObjectName, minio.GetObjectOptions{}); err != nil {
 			return fmt.Errorf("cannot get raw data: %w", err)
 		}
@@ -937,7 +972,7 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 	sm.EndTime = sm.StartTime.Add(sm.Duration)
 	// Don't set to FINISHED yet - wait for rendering to complete
 
-	var rawData *minio.Object
+	var rawData ObjectHandle
 	if rawData, err = m.client.GetObject(ctx, bucketName, dst.Object, minio.GetObjectOptions{}); err != nil {
 		log.Err(err).Str("object", dst.Object).Msg("Cannot get object")
 
@@ -1260,6 +1295,21 @@ func (m *Minio) closeIntermediateSessions(ctx context.Context, recorderID uuid.U
 
 	for sessionID, session := range recorder.Sessions {
 		if session.State == SessionStateRecording || session.State == SessionStateProcessing {
+			// Re-read metadata from storage to get the authoritative state.
+			// The in-memory state may be stale (e.g. loaded as RECORDING at startup
+			// but already FINISHED in MinIO from a previous run).
+			freshMeta, err := m.getSessionMetadata(ctx, recorderID, sessionID)
+			if err == nil && (freshMeta.State == SessionStateFinished || freshMeta.State == SessionStateError) {
+				log.Info().
+					Stringer("recorder-id", recorderID).
+					Stringer("session-id", sessionID).
+					Str("stored-state", freshMeta.State.String()).
+					Msg("Session already in terminal state, updating in-memory state")
+				m.system.Recorders[recorderID].Sessions[sessionID] = *freshMeta
+				go m.notifyStateChange(freshMeta, session.State)
+				continue
+			}
+
 			log.Info().
 				Stringer("recorder-id", recorderID).
 				Stringer("session-id", sessionID).
@@ -1299,14 +1349,16 @@ func (m *Minio) closeIntermediateSessions(ctx context.Context, recorderID uuid.U
 // closeSession handles full session closing including state transition.
 // Used at startup when processing sessions that may still be in RECORDING state.
 func (m *Minio) closeSession(ctx context.Context, recorderID, sessionID uuid.UUID, chunk *minioChunk) error {
-	if m.isSessionClosed(ctx, recorderID, sessionID) {
-		return nil
-	}
-
+	// Flush in-memory chunks to storage BEFORE checking isSessionClosed.
+	// See closeSessionAsync for the rationale.
 	if chunk != nil {
 		if err := m.flushChunks(ctx, recorderID, sessionID, chunk); err != nil {
 			return fmt.Errorf("cannot flush session: %w", err)
 		}
+	}
+
+	if m.isSessionClosed(ctx, recorderID, sessionID) {
+		return nil
 	}
 
 	// Update state to PROCESSING before rendering
@@ -1334,19 +1386,39 @@ func (m *Minio) closeSession(ctx context.Context, recorderID, sessionID uuid.UUI
 // closeSessionAsync handles session closing when state was already transitioned to PROCESSING.
 // Used when a new session starts and we need to finish processing the previous session.
 func (m *Minio) closeSessionAsync(ctx context.Context, recorderID, sessionID uuid.UUID, chunk *minioChunk) error {
-	if m.isSessionClosed(ctx, recorderID, sessionID) {
-		return nil
-	}
-
+	// Flush in-memory chunks to storage BEFORE checking isSessionClosed.
+	// isSessionClosed looks for chunk objects in storage — if chunks are still
+	// in memory (below minChunkSize), it would incorrectly report the session
+	// as closed and skip rendering.
 	if chunk != nil {
 		if err := m.flushChunks(ctx, recorderID, sessionID, chunk); err != nil {
 			return fmt.Errorf("cannot flush session: %w", err)
 		}
 	}
 
+	if m.isSessionClosed(ctx, recorderID, sessionID) {
+		return nil
+	}
+
 	// State transition to PROCESSING was already done synchronously in SafeChunks
 	// Proceed directly to rendering
 	if err := m.renderSession(ctx, recorderID, sessionID); err != nil {
+		// renderFromRawData already handles ERROR transition for its own failures,
+		// but ComposeObject failures in renderSession happen before renderFromRawData
+		// is called. Transition to ERROR here so the session doesn't stay stuck in
+		// PROCESSING forever.
+		sm, metaErr := m.getSessionMetadata(ctx, recorderID, sessionID)
+		if metaErr == nil && sm.State == SessionStateProcessing {
+			previousState := sm.State
+			sm.State = SessionStateError
+			sm.ErrorMessage = err.Error()
+			m.dataLock.Lock()
+			if putErr := m.putSessionMetadata(ctx, recorderID, sessionID, sm); putErr != nil {
+				log.Err(putErr).Msg("Cannot update session state to ERROR")
+			}
+			m.dataLock.Unlock()
+			m.notifyStateChange(sm, previousState)
+		}
 		return fmt.Errorf("cannot render session: %w", err)
 	}
 

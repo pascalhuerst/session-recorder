@@ -38,6 +38,7 @@ type SessionSourceHandler struct {
 
 func NewSessionSourceHandler(
 	sessionStorage storage.Storage,
+	eventBus *storage.EventBus,
 	chunkSinkServer *grpc.ChunkSinkServer,
 	recorderBroadcaster *broadcast.RecorderBroadcaster,
 	sessionBroadcaster *broadcast.SessionBroadcaster,
@@ -55,19 +56,8 @@ func NewSessionSourceHandler(
 		fileSharer:          fileSharer,
 	}
 
-	// Register callback for session state changes (RECORDING, PROCESSING, FINISHED)
-	sessionStorage.RegisterOnSessionStateChangedCallback(
-		func(session *storage.Session, previousState storage.SessionState) {
-			h.onSessionStateChanged(session, previousState)
-		},
-	)
-
-	// Keep legacy callback for backwards compatibility
-	sessionStorage.RegisterOnSessionClosedCallback(
-		func(session *storage.Session) {
-			h.onSessionClosed(session)
-		},
-	)
+	// Register for lifecycle events
+	eventBus.AddListener(h)
 
 	// Register callback for audio chunk streaming
 	sessionStorage.RegisterOnAudioChunkCallback(
@@ -269,23 +259,16 @@ func (h *SessionSourceHandler) broadcastSessionUpdate(ctx context.Context, recor
 	})
 }
 
-// onSessionStateChanged is called when a session's state changes (RECORDING, PROCESSING, FINISHED)
-func (h *SessionSourceHandler) onSessionStateChanged(session *storage.Session, previousState storage.SessionState) {
-	log.Debug().
-		Str("session-id", session.ID.String()).
-		Str("previous-state", previousState.String()).
-		Str("new-state", session.State.String()).
-		Msg("Session state changed")
-
-	h.broadcastSessionUpdate(context.Background(), session.RecorderID, session)
+// OnSessionStateChanged implements storage.EventListener.
+func (h *SessionSourceHandler) OnSessionStateChanged(event storage.SessionStateChangedEvent) {
+	session := event.Session
+	h.broadcastSessionUpdate(context.Background(), event.RecorderID, &session)
 }
 
-// Called after a session has been closed and rendered by storage. Setup above in the constructor
-func (h *SessionSourceHandler) onSessionClosed(session *storage.Session) {
-	log.Debug().Interface("session", session).Msg("Session closed")
-
-	// This is now handled by onSessionStateChanged, but kept for backwards compatibility
-	h.broadcastSessionUpdate(context.Background(), session.RecorderID, session)
+// OnSegmentStateChanged implements storage.EventListener.
+func (h *SessionSourceHandler) OnSegmentStateChanged(event storage.SegmentStateChangedEvent) {
+	session := event.Session
+	h.broadcastSessionUpdate(context.Background(), event.RecorderID, &session)
 }
 
 // onAudioChunk is called when audio samples are received. Broadcasts to audio subscribers.

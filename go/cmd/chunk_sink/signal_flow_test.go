@@ -26,9 +26,8 @@ type mockStorage struct {
 	recorders map[uuid.UUID]storage.Recorder
 	sessions  map[uuid.UUID]map[uuid.UUID]storage.Session
 
-	onSessionStateCb storage.OnSessionStateChangedCb
-	onSessionClosed  storage.OnSessionClosedCb
-	onAudioChunkCb   storage.OnAudioChunkCb
+	eventBus       *storage.EventBus
+	onAudioChunkCb storage.OnAudioChunkCb
 
 	// Track calls for assertions
 	safeChunksCalls    []safeChunksCall
@@ -110,6 +109,7 @@ func newMockStorage() *mockStorage {
 		recorders:    make(map[uuid.UUID]storage.Recorder),
 		sessions:     make(map[uuid.UUID]map[uuid.UUID]storage.Session),
 		chunkCounter: make(map[uuid.UUID]int),
+		eventBus:     storage.NewEventBus(),
 	}
 }
 
@@ -232,17 +232,17 @@ func (m *mockStorage) CloseRecordingSession(_ context.Context, recorderID, sessi
 			sessions[sessionID] = session
 		}
 	}
-	cb := m.onSessionStateCb
-	closedCb := m.onSessionClosed
 	session := m.sessions[recorderID][sessionID]
 	m.mu.Unlock()
 
-	if cb != nil {
-		cb(&session, storage.SessionStateRecording)
-	}
-	if closedCb != nil {
-		closedCb(&session)
-	}
+	m.eventBus.EmitSessionStateChanged(storage.SessionStateChangedEvent{
+		RecorderID:    recorderID,
+		SessionID:     sessionID,
+		PreviousState: storage.SessionStateRecording,
+		NewState:      storage.SessionStateProcessing,
+		Trigger:       "CloseRecording",
+		Session:       session,
+	})
 	return nil
 }
 
@@ -314,14 +314,8 @@ func (m *mockStorage) SetName(_ context.Context, recorderID, sessionID uuid.UUID
 	return nil
 }
 
-func (m *mockStorage) RegisterOnSessionClosedCallback(cb storage.OnSessionClosedCb) error {
-	m.onSessionClosed = cb
-	return nil
-}
-
-func (m *mockStorage) RegisterOnSessionStateChangedCallback(cb storage.OnSessionStateChangedCb) error {
-	m.onSessionStateCb = cb
-	return nil
+func (m *mockStorage) EventBus() *storage.EventBus {
+	return m.eventBus
 }
 
 func (m *mockStorage) RegisterOnAudioChunkCallback(cb storage.OnAudioChunkCb) error {
@@ -440,46 +434,61 @@ func (m *mockStorage) GetSegmentPresignedURL(_ context.Context, _ storage.Segmen
 }
 
 // simulateSessionFinished simulates the storage layer finishing a render and
-// firing the onSessionStateChanged callback, as the real MinIO storage would.
+// emitting a SessionStateChanged event, as the real MinIO storage would.
 func (m *mockStorage) simulateSessionFinished(recorderID, sessionID uuid.UUID) {
 	m.mu.Lock()
-	var session *storage.Session
+	var session storage.Session
+	var found bool
 	if sessions, ok := m.sessions[recorderID]; ok {
 		if s, ok := sessions[sessionID]; ok {
 			s.State = storage.SessionStateFinished
 			s.EndTime = time.Now()
 			sessions[sessionID] = s
-			sCopy := s
-			session = &sCopy
+			session = s
+			found = true
 		}
 	}
-	cb := m.onSessionStateCb
 	m.mu.Unlock()
 
-	if cb != nil && session != nil {
-		cb(session, storage.SessionStateProcessing)
+	if found {
+		m.eventBus.EmitSessionStateChanged(storage.SessionStateChangedEvent{
+			RecorderID:    recorderID,
+			SessionID:     sessionID,
+			PreviousState: storage.SessionStateProcessing,
+			NewState:      storage.SessionStateFinished,
+			Trigger:       "RenderSuccess",
+			Session:       session,
+		})
 	}
 }
 
 // simulateSessionError simulates the storage layer failing a render and
-// firing the onSessionStateChanged callback with an ERROR state.
+// emitting a SessionStateChanged event with an ERROR state.
 func (m *mockStorage) simulateSessionError(recorderID, sessionID uuid.UUID, errMsg string) {
 	m.mu.Lock()
-	var session *storage.Session
+	var session storage.Session
+	var found bool
 	if sessions, ok := m.sessions[recorderID]; ok {
 		if s, ok := sessions[sessionID]; ok {
 			s.State = storage.SessionStateError
 			s.ErrorMessage = errMsg
 			sessions[sessionID] = s
-			sCopy := s
-			session = &sCopy
+			session = s
+			found = true
 		}
 	}
-	cb := m.onSessionStateCb
 	m.mu.Unlock()
 
-	if cb != nil && session != nil {
-		cb(session, storage.SessionStateProcessing)
+	if found {
+		m.eventBus.EmitSessionStateChanged(storage.SessionStateChangedEvent{
+			RecorderID:    recorderID,
+			SessionID:     sessionID,
+			PreviousState: storage.SessionStateProcessing,
+			NewState:      storage.SessionStateError,
+			Trigger:       "RenderFailure",
+			ErrorMessage:  errMsg,
+			Session:       session,
+		})
 	}
 }
 
@@ -529,6 +538,7 @@ func setupSignalFlow(t *testing.T) (
 
 	sessionSourceHandler := NewSessionSourceHandler(
 		store,
+		store.EventBus(),
 		chunkSinkServer,
 		recorderBroadcaster,
 		sessionBroadcaster,

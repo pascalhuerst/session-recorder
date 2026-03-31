@@ -443,11 +443,11 @@ func TestContractCloseRecordingSession_TransitionsToProcessing(t *testing.T) {
 	// Register state change callback
 	var stateChanges []SessionState
 	var mu sync.Mutex
-	m.RegisterOnSessionStateChangedCallback(func(s *Session, prev SessionState) {
+	m.EventBus().AddListener(&testSessionListener{onSession: func(e SessionStateChangedEvent) {
 		mu.Lock()
 		defer mu.Unlock()
-		stateChanges = append(stateChanges, s.State)
-	})
+		stateChanges = append(stateChanges, e.NewState)
+	}})
 
 	err := m.CloseRecordingSession(ctx, recorderID, sessionID)
 	if err != nil {
@@ -604,14 +604,14 @@ func TestContractSessionSwitch_StateChangeCallback(t *testing.T) {
 		State     SessionState
 	}
 	var mu sync.Mutex
-	m.RegisterOnSessionStateChangedCallback(func(s *Session, prev SessionState) {
+	m.EventBus().AddListener(&testSessionListener{onSession: func(e SessionStateChangedEvent) {
 		mu.Lock()
 		defer mu.Unlock()
 		stateChanges = append(stateChanges, struct {
 			SessionID uuid.UUID
 			State     SessionState
-		}{s.ID, s.State})
-	})
+		}{e.SessionID, e.NewState})
+	}})
 
 	// Start session 1
 	if err := m.SafeChunks(ctx, recorderID, session1, "001", time.Now(), []int16{1}); err != nil {
@@ -686,11 +686,11 @@ func TestContractSessionTimeout_ClosesStaleSession(t *testing.T) {
 
 	var stateChanges []SessionState
 	var mu sync.Mutex
-	m.RegisterOnSessionStateChangedCallback(func(s *Session, prev SessionState) {
+	m.EventBus().AddListener(&testSessionListener{onSession: func(e SessionStateChangedEvent) {
 		mu.Lock()
 		defer mu.Unlock()
-		stateChanges = append(stateChanges, s.State)
-	})
+		stateChanges = append(stateChanges, e.NewState)
+	}})
 
 	if err := m.SafeChunks(ctx, recorderID, sessionID, "001", time.Now(), []int16{1, 2, 3}); err != nil {
 		t.Fatalf("SafeChunks failed: %v", err)
@@ -712,5 +712,23 @@ func TestContractSessionTimeout_ClosesStaleSession(t *testing.T) {
 	}
 	if !foundProcessing {
 		t.Error("Expected stale session to be closed (transitioned to PROCESSING)")
+	}
+}
+
+// testSessionListener is a test helper that implements EventListener.
+type testSessionListener struct {
+	onSession func(SessionStateChangedEvent)
+	onSegment func(SegmentStateChangedEvent)
+}
+
+func (l *testSessionListener) OnSessionStateChanged(event SessionStateChangedEvent) {
+	if l.onSession != nil {
+		l.onSession(event)
+	}
+}
+
+func (l *testSessionListener) OnSegmentStateChanged(event SegmentStateChangedEvent) {
+	if l.onSegment != nil {
+		l.onSegment(event)
 	}
 }

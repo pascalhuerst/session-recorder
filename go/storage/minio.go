@@ -101,10 +101,9 @@ type Minio struct {
 	sessionTimeout time.Duration
 	stopTimeout    chan struct{}
 
-	onSessionClosedCb       OnSessionClosedCb
-	onSessionStateChangedCb OnSessionStateChangedCb
-	onAudioChunkCb          OnAudioChunkCb
-	cbLock                  sync.Mutex // Protects legacy callback invocations
+	onAudioChunkCb OnAudioChunkCb
+
+	eventBus *EventBus
 
 	// State machines: one per session, keyed by sessionID. Machines are internally thread-safe.
 	sessionMachines map[uuid.UUID]*stateless.StateMachine
@@ -143,6 +142,7 @@ func NewMinioStorage(endpoint, localEndpoint, publicEndpoint, accessKey, secretK
 		lastChunkTime:   make(map[uuid.UUID]time.Time),
 		sessionTimeout:  DefaultSessionTimeout,
 		stopTimeout:     make(chan struct{}),
+		eventBus:        NewEventBus(),
 		sessionMachines: make(map[uuid.UUID]*stateless.StateMachine),
 		renderQueue:     newWorkQueue(DefaultMaxRenderWorkers),
 	}, nil
@@ -166,6 +166,7 @@ func NewMinioStorageWithClient(client MinioClient, endpoint, localEndpoint, publ
 		lastChunkTime:   make(map[uuid.UUID]time.Time),
 		sessionTimeout:  DefaultSessionTimeout,
 		stopTimeout:     make(chan struct{}),
+		eventBus:        NewEventBus(),
 		sessionMachines: make(map[uuid.UUID]*stateless.StateMachine),
 		renderQueue:     newWorkQueue(DefaultMaxRenderWorkers),
 	}
@@ -421,8 +422,15 @@ func (m *Minio) onSessionTransition(ctx context.Context, recorderID, sessionID u
 	m.dataLock.Unlock()
 
 	// Notify outside all locks to prevent deadlocks
-	sessionCopy := session
-	m.notifyStateChange(&sessionCopy, previousState)
+	m.eventBus.EmitSessionStateChanged(SessionStateChangedEvent{
+		RecorderID:    recorderID,
+		SessionID:     sessionID,
+		PreviousState: previousState,
+		NewState:      destination,
+		Trigger:       string(trigger),
+		ErrorMessage:  session.ErrorMessage,
+		Session:       session,
+	})
 }
 
 // runSessionTimeoutChecker periodically checks for stale sessions and closes them
@@ -504,40 +512,18 @@ func (m *Minio) checkAndCloseStaleSession(ctx context.Context) {
 	}
 }
 
-func (m *Minio) RegisterOnSessionClosedCallback(cb OnSessionClosedCb) error {
-	m.cbLock.Lock()
-	defer m.cbLock.Unlock()
-
-	m.onSessionClosedCb = cb
-
-	return nil
-}
-
-func (m *Minio) RegisterOnSessionStateChangedCallback(cb OnSessionStateChangedCb) error {
-	m.cbLock.Lock()
-	defer m.cbLock.Unlock()
-
-	m.onSessionStateChangedCb = cb
-
-	return nil
+// EventBus returns the event bus for registering lifecycle event listeners.
+func (m *Minio) EventBus() *EventBus {
+	return m.eventBus
 }
 
 func (m *Minio) RegisterOnAudioChunkCallback(cb OnAudioChunkCb) error {
-	m.cbLock.Lock()
-	defer m.cbLock.Unlock()
+	m.dataLock.Lock()
+	defer m.dataLock.Unlock()
 
 	m.onAudioChunkCb = cb
 
 	return nil
-}
-
-// notifyStateChange calls the state changed callback if registered
-func (m *Minio) notifyStateChange(session *Session, previousState SessionState) {
-	if m.onSessionStateChangedCb != nil {
-		m.cbLock.Lock()
-		m.onSessionStateChangedCb(session, previousState)
-		m.cbLock.Unlock()
-	}
 }
 
 func (m *Minio) initSession(ctx context.Context, recorderID, sessionID uuid.UUID, timeCreated time.Time) {
@@ -582,8 +568,16 @@ func (m *Minio) initSession(ctx context.Context, recorderID, sessionID uuid.UUID
 	// Create state machine at RECORDING (already transitioned)
 	m.getOrCreateSessionMachine(recorderID, sessionID, SessionStateRecording)
 
-	// Notify about new recording session
-	go m.notifyStateChange(&session, SessionStateUnknown)
+	// Notify about new recording session (emitted while dataLock is held by caller;
+	// listeners must not call back into storage methods that acquire dataLock)
+	m.eventBus.EmitSessionStateChanged(SessionStateChangedEvent{
+		RecorderID:    recorderID,
+		SessionID:     sessionID,
+		PreviousState: SessionStateUnknown,
+		NewState:      SessionStateRecording,
+		Trigger:       string(triggerStartRecording),
+		Session:       session,
+	})
 }
 
 func (m *Minio) initRecorder(ctx context.Context, recorderID uuid.UUID, recorderName string) {
@@ -913,16 +907,6 @@ func (m *Minio) renderFromRawData(ctx context.Context, recorderID, sessionID uui
 	// Transition to FINISHED via FSM
 	if err := m.fireSessionTrigger(ctx, sessionID, triggerRenderSuccess); err != nil {
 		log.Err(err).Msg("Cannot transition session to FINISHED state")
-	}
-
-	// Legacy callback — will be removed when onSessionClosedCb is deprecated
-	if m.onSessionClosedCb != nil {
-		m.dataLock.Lock()
-		session := m.system.Recorders[recorderID].Sessions[sessionID]
-		m.dataLock.Unlock()
-		m.cbLock.Lock()
-		m.onSessionClosedCb(&session)
-		m.cbLock.Unlock()
 	}
 
 	log.Debug().Stringer("recorder-id", recorderID).Stringer("session-id", sessionID).Msg("Done rendering session")
@@ -1427,7 +1411,15 @@ func (m *Minio) closeIntermediateSessions(ctx context.Context, recorderID uuid.U
 				m.system.Recorders[recorderID].Sessions[sessionID] = *freshMeta
 				// Sync FSM to terminal state
 				m.getOrCreateSessionMachine(recorderID, sessionID, freshMeta.State)
-				go m.notifyStateChange(freshMeta, session.State)
+				m.eventBus.EmitSessionStateChanged(SessionStateChangedEvent{
+					RecorderID:    recorderID,
+					SessionID:     sessionID,
+					PreviousState: session.State,
+					NewState:      freshMeta.State,
+					Trigger:       "startup-recovery",
+					ErrorMessage:  freshMeta.ErrorMessage,
+					Session:       *freshMeta,
+				})
 				continue
 			}
 
@@ -1446,7 +1438,14 @@ func (m *Minio) closeIntermediateSessions(ctx context.Context, recorderID uuid.U
 					continue
 				}
 				m.system.Recorders[recorderID].Sessions[sessionID] = session
-				go m.notifyStateChange(&session, previousState)
+				m.eventBus.EmitSessionStateChanged(SessionStateChangedEvent{
+					RecorderID:    recorderID,
+					SessionID:     sessionID,
+					PreviousState: previousState,
+					NewState:      SessionStateProcessing,
+					Trigger:       "startup-close",
+					Session:       session,
+				})
 			}
 
 			// Create/sync FSM at PROCESSING state
@@ -1756,32 +1755,48 @@ func (m *Minio) DeleteSegment(ctx context.Context, recorderID, sessionID, segmen
 
 func (m *Minio) SetSegmentState(ctx context.Context, recorderID, sessionID, segmentID uuid.UUID, state SegmentState) error {
 	m.dataLock.Lock()
-	defer m.dataLock.Unlock()
 
 	if _, ok := m.system.Recorders[recorderID]; !ok {
+		m.dataLock.Unlock()
 		return fmt.Errorf("no recorder with id %s", recorderID)
 	}
 
 	session, ok := m.system.Recorders[recorderID].Sessions[sessionID]
 	if !ok {
+		m.dataLock.Unlock()
 		return fmt.Errorf("no session with id %s", sessionID)
 	}
 
 	segment, ok := session.Segments[segmentID]
 	if !ok {
+		m.dataLock.Unlock()
 		return fmt.Errorf("no segment with id %s", segmentID)
 	}
 
 	if err := validateSegmentTransition(segment.State, state); err != nil {
+		m.dataLock.Unlock()
 		return fmt.Errorf("cannot set segment state: %w", err)
 	}
 
+	previousState := segment.State
 	segment.State = state
 	session.Segments[segmentID] = segment
 
 	if err := m.putSessionMetadata(ctx, recorderID, sessionID, &session); err != nil {
+		m.dataLock.Unlock()
 		return fmt.Errorf("cannot update session metadata: %w", err)
 	}
+
+	m.dataLock.Unlock()
+
+	m.eventBus.EmitSegmentStateChanged(SegmentStateChangedEvent{
+		RecorderID:    recorderID,
+		SessionID:     sessionID,
+		SegmentID:     segmentID,
+		PreviousState: previousState,
+		NewState:      state,
+		Session:       session,
+	})
 
 	log.Debug().
 		Stringer("recorder-id", recorderID).
@@ -1838,8 +1853,14 @@ func (m *Minio) renderSegmentSync(ctx context.Context, recorderID, sessionID, se
 	}
 	m.dataLock.Unlock()
 
-	// Notify about state change
-	m.notifyStateChange(&session, session.State)
+	m.eventBus.EmitSegmentStateChanged(SegmentStateChangedEvent{
+		RecorderID:    recorderID,
+		SessionID:     sessionID,
+		SegmentID:     segmentID,
+		PreviousState: SegmentStateQueued,
+		NewState:      SegmentStateRendering,
+		Session:       session,
+	})
 
 	log.Info().
 		Stringer("recorder-id", recorderID).
@@ -1970,8 +1991,14 @@ func (m *Minio) renderSegmentSync(ctx context.Context, recorderID, sessionID, se
 	}
 	m.dataLock.Unlock()
 
-	// Notify about state change
-	m.notifyStateChange(&session, session.State)
+	m.eventBus.EmitSegmentStateChanged(SegmentStateChangedEvent{
+		RecorderID:    recorderID,
+		SessionID:     sessionID,
+		SegmentID:     segmentID,
+		PreviousState: SegmentStateRendering,
+		NewState:      SegmentStateFinished,
+		Session:       session,
+	})
 
 	log.Info().
 		Stringer("recorder-id", recorderID).
@@ -1984,22 +2011,25 @@ func (m *Minio) renderSegmentSync(ctx context.Context, recorderID, sessionID, se
 
 func (m *Minio) setSegmentError(ctx context.Context, recorderID, sessionID, segmentID uuid.UUID, errorMsg string) {
 	m.dataLock.Lock()
-	defer m.dataLock.Unlock()
 
 	if _, ok := m.system.Recorders[recorderID]; !ok {
+		m.dataLock.Unlock()
 		return
 	}
 
 	session, ok := m.system.Recorders[recorderID].Sessions[sessionID]
 	if !ok {
+		m.dataLock.Unlock()
 		return
 	}
 
 	segment, ok := session.Segments[segmentID]
 	if !ok {
+		m.dataLock.Unlock()
 		return
 	}
 
+	previousState := segment.State
 	segment.State = SegmentStateError
 	segment.ErrorMessage = errorMsg
 	session.Segments[segmentID] = segment
@@ -2008,8 +2038,17 @@ func (m *Minio) setSegmentError(ctx context.Context, recorderID, sessionID, segm
 		log.Err(err).Msg("Cannot update segment state to ERROR")
 	}
 
-	// Notify about state change
-	go m.notifyStateChange(&session, session.State)
+	m.dataLock.Unlock()
+
+	m.eventBus.EmitSegmentStateChanged(SegmentStateChangedEvent{
+		RecorderID:    recorderID,
+		SessionID:     sessionID,
+		SegmentID:     segmentID,
+		PreviousState: previousState,
+		NewState:      SegmentStateError,
+		ErrorMessage:  errorMsg,
+		Session:       session,
+	})
 
 	log.Error().
 		Stringer("segment-id", segmentID).

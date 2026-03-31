@@ -255,22 +255,18 @@ func TestMinio_GetSession_SessionNotFound(t *testing.T) {
 	}
 }
 
-func TestMinio_RegisterOnSessionClosedCallback(t *testing.T) {
+func TestMinio_EventBus(t *testing.T) {
 	m := &Minio{
-		chunks: make(map[uuid.UUID]*minioChunk),
+		chunks:   make(map[uuid.UUID]*minioChunk),
+		eventBus: NewEventBus(),
 	}
 
-	callback := func(session *Session) {
-		// Callback implementation
+	bus := m.EventBus()
+	if bus == nil {
+		t.Fatal("EventBus() returned nil")
 	}
-
-	err := m.RegisterOnSessionClosedCallback(callback)
-	if err != nil {
-		t.Errorf("RegisterOnSessionClosedCallback() error = %v", err)
-	}
-
-	if m.onSessionClosedCb == nil {
-		t.Error("RegisterOnSessionClosedCallback() did not set callback")
+	if bus.ListenerCount() != 0 {
+		t.Errorf("expected 0 listeners, got %d", bus.ListenerCount())
 	}
 }
 

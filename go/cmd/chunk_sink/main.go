@@ -175,7 +175,11 @@ func main() {
 		return
 	}
 
-	sessionSourceHandler := NewSessionSourceHandler(sessionStorage, chunkSinkServer, recorderBroadcaster, sessionBroadcaster, audioBroadcaster, emailSender, fileSharer)
+	// Wire up lifecycle event bus
+	eventBus := minio.EventBus()
+	eventBus.AddListener(&storage.LogListener{})
+
+	sessionSourceHandler := NewSessionSourceHandler(sessionStorage, eventBus, chunkSinkServer, recorderBroadcaster, sessionBroadcaster, audioBroadcaster, emailSender, fileSharer)
 
 	sessionSourceServer := grpc.NewSessionSourceServer(&grpc.SessionSourceServerConfig{
 		Name:                 hostname,

@@ -26,9 +26,6 @@ var (
 	noSuccess = &cmpb.Respone{Success: false}
 )
 
-// Maximum concurrent segment renders to avoid resource exhaustion
-const maxConcurrentRenders = 2
-
 type SessionSourceHandler struct {
 	sessionStorage      storage.Storage
 	chunkSinkServer     *grpc.ChunkSinkServer
@@ -37,7 +34,6 @@ type SessionSourceHandler struct {
 	audioBroadcaster    *broadcast.AudioBroadcaster
 	emailSender         *email.Sender
 	fileSharer          fileshare.FileSharer
-	renderSemaphore     chan struct{} // Limits concurrent segment renders
 }
 
 func NewSessionSourceHandler(
@@ -57,7 +53,6 @@ func NewSessionSourceHandler(
 		audioBroadcaster:    audioBroadcaster,
 		emailSender:         emailSender,
 		fileSharer:          fileSharer,
-		renderSemaphore:     make(chan struct{}, maxConcurrentRenders),
 	}
 
 	// Register callback for session state changes (RECORDING, PROCESSING, FINISHED)
@@ -762,46 +757,15 @@ func (h *SessionSourceHandler) renderSegment(ctx context.Context, request *sspb.
 		Str("session-id", request.SessionID).
 		Msg("Segment queued for rendering")
 
-	// Start rendering asynchronously with concurrency control
-	go func() {
-		// Acquire semaphore slot (blocks if max concurrent renders reached)
-		h.renderSemaphore <- struct{}{}
-		defer func() { <-h.renderSemaphore }()
-
-		log.Debug().
+	// Enqueue render via the storage work queue (bounded concurrency, non-blocking).
+	// The work queue worker handles QUEUED -> RENDERING -> FINISHED/ERROR transitions
+	// and state persistence. UI broadcasts happen via the session state change callback.
+	if err := h.sessionStorage.RenderSegment(ctx, recorderID, sessionID, segmentID); err != nil {
+		log.Err(err).
 			Str("segment-id", segmentID.String()).
-			Int("queue-size", len(h.renderSemaphore)).
-			Msg("Acquired render slot, starting render")
-
-		// Set state to RENDERING and broadcast before starting work
-		if err := h.sessionStorage.SetSegmentState(context.Background(), recorderID, sessionID, segmentID, storage.SegmentStateRendering); err != nil {
-			log.Err(err).Str("segment-id", segmentID.String()).Msg("Cannot set segment state to rendering")
-		}
-		if session, err := h.sessionStorage.GetSession(recorderID, sessionID); err == nil {
-			h.broadcastSessionUpdate(context.Background(), recorderID, &session)
-		}
-
-		if err := h.sessionStorage.RenderSegment(context.Background(), recorderID, sessionID, segmentID); err != nil {
-			log.Err(err).
-				Str("segment-id", segmentID.String()).
-				Msg("Cannot render segment")
-			return
-		}
-
-		// Broadcast session update after rendering completes
-		session, err := h.sessionStorage.GetSession(recorderID, sessionID)
-		if err != nil {
-			log.Err(err).Str("session-id", sessionID.String()).Msg("Cannot get session after render")
-			return
-		}
-
-		h.broadcastSessionUpdate(context.Background(), recorderID, &session)
-
-		log.Info().
-			Str("segment-id", segmentID.String()).
-			Str("session-id", sessionID.String()).
-			Msg("Segment rendered")
-	}()
+			Msg("Cannot enqueue segment render")
+		return noSuccess, err
+	}
 
 	return success, nil
 }

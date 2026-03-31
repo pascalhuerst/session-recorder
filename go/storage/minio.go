@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/qmuntal/stateless"
 
 	"github.com/pascalhuerst/session-recorder/render"
 	"github.com/rs/zerolog/log"
@@ -103,7 +104,14 @@ type Minio struct {
 	onSessionClosedCb       OnSessionClosedCb
 	onSessionStateChangedCb OnSessionStateChangedCb
 	onAudioChunkCb          OnAudioChunkCb
-	cbLock                  sync.Mutex
+	cbLock                  sync.Mutex // Protects legacy callback invocations
+
+	// State machines: one per session, keyed by sessionID. Machines are internally thread-safe.
+	sessionMachines map[uuid.UUID]*stateless.StateMachine
+	machineLock     sync.Mutex
+
+	// Work queue for async rendering (sessions + segments)
+	renderQueue *workQueue
 }
 
 func NewMinioStorage(endpoint, localEndpoint, publicEndpoint, accessKey, secretKey string) (*Minio, error) {
@@ -125,16 +133,18 @@ func NewMinioStorage(endpoint, localEndpoint, publicEndpoint, accessKey, secretK
 	}
 
 	return &Minio{
-		endpoint:       endpoint,
-		localEndpoint:  localEndpoint,
-		publicEndpoint: publicEndpoint,
-		accessKey:      accessKey,
-		secretLey:      secretKey,
-		client:         newRealMinioClient(c),
-		chunks:         make(map[uuid.UUID]*minioChunk),
-		lastChunkTime:  make(map[uuid.UUID]time.Time),
-		sessionTimeout: DefaultSessionTimeout,
-		stopTimeout:    make(chan struct{}),
+		endpoint:        endpoint,
+		localEndpoint:   localEndpoint,
+		publicEndpoint:  publicEndpoint,
+		accessKey:       accessKey,
+		secretLey:       secretKey,
+		client:          newRealMinioClient(c),
+		chunks:          make(map[uuid.UUID]*minioChunk),
+		lastChunkTime:   make(map[uuid.UUID]time.Time),
+		sessionTimeout:  DefaultSessionTimeout,
+		stopTimeout:     make(chan struct{}),
+		sessionMachines: make(map[uuid.UUID]*stateless.StateMachine),
+		renderQueue:     newWorkQueue(DefaultMaxRenderWorkers),
 	}, nil
 }
 
@@ -148,14 +158,16 @@ func NewMinioStorageWithClient(client MinioClient, endpoint, localEndpoint, publ
 		publicEndpoint = localEndpoint
 	}
 	return &Minio{
-		endpoint:       endpoint,
-		localEndpoint:  localEndpoint,
-		publicEndpoint: publicEndpoint,
-		client:         client,
-		chunks:         make(map[uuid.UUID]*minioChunk),
-		lastChunkTime:  make(map[uuid.UUID]time.Time),
-		sessionTimeout: DefaultSessionTimeout,
-		stopTimeout:    make(chan struct{}),
+		endpoint:        endpoint,
+		localEndpoint:   localEndpoint,
+		publicEndpoint:  publicEndpoint,
+		client:          client,
+		chunks:          make(map[uuid.UUID]*minioChunk),
+		lastChunkTime:   make(map[uuid.UUID]time.Time),
+		sessionTimeout:  DefaultSessionTimeout,
+		stopTimeout:     make(chan struct{}),
+		sessionMachines: make(map[uuid.UUID]*stateless.StateMachine),
+		renderQueue:     newWorkQueue(DefaultMaxRenderWorkers),
 	}
 }
 
@@ -286,6 +298,9 @@ func (m *Minio) Start(ctx context.Context) error {
 			}
 
 			m.system.Recorders[recorderID].Sessions[sessionID] = *sessionMetadata
+
+			// Create a state machine for each loaded session
+			m.getOrCreateSessionMachine(recorderID, sessionID, sessionMetadata.State)
 		}
 
 		if err := m.closeSessions(ctx, recorderID); err != nil {
@@ -301,9 +316,113 @@ func (m *Minio) Start(ctx context.Context) error {
 	return nil
 }
 
-// Stop stops the session timeout checker goroutine
+// Stop stops the session timeout checker and drains the work queue.
 func (m *Minio) Stop() {
 	close(m.stopTimeout)
+	if m.renderQueue != nil {
+		m.renderQueue.stop()
+	}
+}
+
+// getOrCreateSessionMachine returns the state machine for a session,
+// creating one at the given initial state if it doesn't exist yet.
+func (m *Minio) getOrCreateSessionMachine(recorderID, sessionID uuid.UUID, initialState SessionState) *stateless.StateMachine {
+	m.machineLock.Lock()
+	defer m.machineLock.Unlock()
+
+	if sm, ok := m.sessionMachines[sessionID]; ok {
+		return sm
+	}
+
+	sm := newSessionStateMachine(recorderID, sessionID, initialState, m.onSessionTransition)
+	m.sessionMachines[sessionID] = sm
+	return sm
+}
+
+// removeSessionMachine removes the state machine for a deleted session.
+func (m *Minio) removeSessionMachine(sessionID uuid.UUID) {
+	m.machineLock.Lock()
+	defer m.machineLock.Unlock()
+	delete(m.sessionMachines, sessionID)
+}
+
+// fireSessionTrigger fires a trigger on a session's state machine.
+func (m *Minio) fireSessionTrigger(ctx context.Context, sessionID uuid.UUID, trigger sessionTrigger, errorMsg ...string) error {
+	m.machineLock.Lock()
+	sm, ok := m.sessionMachines[sessionID]
+	m.machineLock.Unlock()
+
+	if !ok {
+		return fmt.Errorf("no state machine for session %s", sessionID)
+	}
+
+	// Store error message in context for triggerRenderFailure
+	if trigger == triggerRenderFailure && len(errorMsg) > 0 {
+		ctx = context.WithValue(ctx, renderErrorKey{}, errorMsg[0])
+	}
+
+	if err := sm.FireCtx(ctx, trigger); err != nil {
+		return fmt.Errorf("cannot fire trigger %s on session %s: %w", trigger, sessionID, err)
+	}
+
+	return nil
+}
+
+// renderErrorKey is the context key for passing error messages through state transitions.
+type renderErrorKey struct{}
+
+// onSessionTransition is invoked during every session state transition.
+// It persists the new state, updates the in-memory cache, and notifies subscribers.
+// Called with the state machine's internal lock held, so transitions on the same session are serialized.
+func (m *Minio) onSessionTransition(ctx context.Context, recorderID, sessionID uuid.UUID, trigger sessionTrigger, source, destination SessionState) {
+	m.dataLock.Lock()
+
+	recorder, ok := m.system.Recorders[recorderID]
+	if !ok {
+		m.dataLock.Unlock()
+		log.Error().Stringer("recorder-id", recorderID).Msg("onSessionTransition: recorder not found")
+		return
+	}
+
+	session, ok := recorder.Sessions[sessionID]
+	if !ok {
+		// Session might not be in the map yet (e.g., during initSession).
+		// Create a minimal session entry — the caller will fill in details.
+		session = Session{
+			ID:         sessionID,
+			RecorderID: recorderID,
+			Segments:   make(map[uuid.UUID]Segment),
+		}
+	}
+
+	previousState := session.State
+	session.State = destination
+
+	// Handle trigger-specific side effects
+	switch trigger {
+	case triggerRenderSuccess:
+		session.IsClosed = true // backward compatibility
+	case triggerRenderFailure:
+		if errMsg, ok := ctx.Value(renderErrorKey{}).(string); ok {
+			session.ErrorMessage = errMsg
+		}
+	case triggerRetryRender:
+		session.ErrorMessage = ""
+	}
+
+	if err := m.putSessionMetadata(ctx, recorderID, sessionID, &session); err != nil {
+		log.Err(err).
+			Stringer("recorder-id", recorderID).
+			Stringer("session-id", sessionID).
+			Str("trigger", string(trigger)).
+			Msg("onSessionTransition: cannot persist state")
+	}
+
+	m.dataLock.Unlock()
+
+	// Notify outside all locks to prevent deadlocks
+	sessionCopy := session
+	m.notifyStateChange(&sessionCopy, previousState)
 }
 
 // runSessionTimeoutChecker periodically checks for stale sessions and closes them
@@ -363,20 +482,6 @@ func (m *Minio) checkAndCloseStaleSession(ctx context.Context) {
 				chunk      minioChunk
 			}{recorderID, chunk.sessionID, *chunk})
 
-			// Synchronously transition to PROCESSING
-			sm, err := m.getSessionMetadata(ctx, recorderID, chunk.sessionID)
-			if err == nil && sm.State == SessionStateRecording {
-				previousState := sm.State
-				sm.State = SessionStateProcessing
-				if err := m.putSessionMetadata(ctx, recorderID, chunk.sessionID, sm); err != nil {
-					log.Err(err).Msg("Cannot update session state to PROCESSING")
-				}
-				// Create a copy for the callback to avoid races with concurrent modifications
-				sessionCopy := *sm
-				// Notify outside lock to avoid deadlock
-				go m.notifyStateChange(&sessionCopy, previousState)
-			}
-
 			// Remove from tracking maps
 			delete(m.chunks, recorderID)
 			delete(m.lastChunkTime, recorderID)
@@ -385,27 +490,17 @@ func (m *Minio) checkAndCloseStaleSession(ctx context.Context) {
 
 	m.dataLock.Unlock()
 
-	// Process stale sessions asynchronously (outside the lock)
+	// Transition and submit render jobs outside the lock
 	for _, stale := range staleRecorders {
-		go func(recorderID, sessionID uuid.UUID, chunk minioChunk) {
-			log.Info().
-				Stringer("recorder-id", recorderID).
-				Stringer("session-id", sessionID).
-				Msg("Closing timed-out session")
+		// Transition to PROCESSING via FSM (callback acquires dataLock internally)
+		if err := m.fireSessionTrigger(ctx, stale.sessionID, triggerCloseRecording); err != nil {
+			log.Warn().Err(err).
+				Stringer("session-id", stale.sessionID).
+				Msg("Cannot transition timed-out session to PROCESSING")
+		}
 
-			if err := m.closeSessionAsync(context.Background(), recorderID, sessionID, &chunk); err != nil {
-				log.Err(err).
-					Stringer("recorder-id", recorderID).
-					Stringer("session-id", sessionID).
-					Msg("Cannot close timed-out session")
-				return
-			}
-
-			log.Info().
-				Stringer("recorder-id", recorderID).
-				Stringer("session-id", sessionID).
-				Msg("Timed-out session closed")
-		}(stale.recorderID, stale.sessionID, stale.chunk)
+		chunkCopy := stale.chunk
+		m.renderQueue.submitSessionRender(context.Background(), m, stale.recorderID, stale.sessionID, &chunkCopy)
 	}
 }
 
@@ -460,6 +555,10 @@ func (m *Minio) initSession(ctx context.Context, recorderID, sessionID uuid.UUID
 		buffer:    new(bytes.Buffer),
 	}
 
+	// Create session directly at RECORDING state.
+	// We skip the UNKNOWN→RECORDING FSM transition because initSession is called
+	// while dataLock is held (from SafeChunks), and the FSM callback needs dataLock.
+	// The FSM is initialized at RECORDING to stay in sync.
 	session := Session{
 		ID:         sessionID,
 		RecorderID: recorderID,
@@ -480,8 +579,11 @@ func (m *Minio) initSession(ctx context.Context, recorderID, sessionID uuid.UUID
 		return
 	}
 
+	// Create state machine at RECORDING (already transitioned)
+	m.getOrCreateSessionMachine(recorderID, sessionID, SessionStateRecording)
+
 	// Notify about new recording session
-	m.notifyStateChange(&session, SessionStateUnknown)
+	go m.notifyStateChange(&session, SessionStateUnknown)
 }
 
 func (m *Minio) initRecorder(ctx context.Context, recorderID uuid.UUID, recorderName string) {
@@ -511,6 +613,8 @@ func (m *Minio) initRecorder(ctx context.Context, recorderID uuid.UUID, recorder
 func (m *Minio) DeleteSession(ctx context.Context, recorderID, sessionID uuid.UUID) error {
 	m.dataLock.Lock()
 	defer m.dataLock.Unlock()
+
+	m.removeSessionMachine(sessionID)
 
 	return m.deleteSession(ctx, recorderID, sessionID)
 }
@@ -614,15 +718,19 @@ func (m *Minio) SetName(ctx context.Context, recorderID, sessionID uuid.UUID, na
 }
 
 func (m *Minio) SafeChunks(ctx context.Context, recorderID, sessionID uuid.UUID, _ string, timeCreated time.Time, samples []int16) error {
+	// Collect deferred work that must happen outside dataLock
+	var oldSessionID uuid.UUID
+	var lastChunk *minioChunk
+	var needsSessionSwitch bool
+
 	m.dataLock.Lock()
-	defer m.dataLock.Unlock()
 
 	// Track when we last received chunks from this recorder
 	m.lastChunkTime[recorderID] = time.Now()
 
 	if _, ok := m.system.Recorders[recorderID]; !ok {
+		m.dataLock.Unlock()
 		log.Warn().Stringer("recorder-id", recorderID).Msg("No recorder with this id")
-
 		return fmt.Errorf("no recorder with this id")
 	}
 
@@ -633,39 +741,11 @@ func (m *Minio) SafeChunks(ctx context.Context, recorderID, sessionID uuid.UUID,
 	chunk := m.chunks[recorderID]
 
 	// If we have a new sessionID, we need to close the old one
-	// This creates a copy of the last chunk, initSession below resets the chunks
 	if chunk.sessionID != sessionID {
-		oldSessionID := chunk.sessionID
-
-		// Synchronously transition old session to PROCESSING before starting new session
-		// This ensures only one session per recorder can be in RECORDING state at a time
-		sm, err := m.getSessionMetadata(ctx, recorderID, oldSessionID)
-		if err == nil && sm.State == SessionStateRecording {
-			previousState := sm.State
-			sm.State = SessionStateProcessing
-			if err := m.putSessionMetadata(ctx, recorderID, oldSessionID, sm); err != nil {
-				log.Err(err).Msg("Cannot update session state to PROCESSING")
-			}
-			// Create a copy for the callback to avoid races with concurrent modifications
-			sessionCopy := *sm
-			// Notify outside lock to avoid deadlock (we're already holding dataLock)
-			go m.notifyStateChange(&sessionCopy, previousState)
-		}
-
-		// Now process the old session asynchronously (flush + render)
-		go func(recorderID uuid.UUID, lastChunk minioChunk) {
-			sessionID := lastChunk.sessionID
-
-			log.Info().Stringer("recorder-id", recorderID).Stringer("session-id", sessionID).Msg("Closing session")
-
-			if err := m.closeSessionAsync(context.Background(), recorderID, sessionID, &lastChunk); err != nil {
-				log.Err(err).Stringer("recorder-id", recorderID).Stringer("session-id", sessionID).Msg("Cannot close session")
-
-				return
-			}
-
-			log.Info().Stringer("recorder-id", recorderID).Stringer("session-id", sessionID).Msg("Session closed")
-		}(recorderID, *chunk)
+		oldSessionID = chunk.sessionID
+		lc := *chunk
+		lastChunk = &lc
+		needsSessionSwitch = true
 
 		m.initSession(ctx, recorderID, sessionID, timeCreated)
 		chunk = m.chunks[recorderID]
@@ -695,8 +775,23 @@ func (m *Minio) SafeChunks(ctx context.Context, recorderID, sessionID uuid.UUID,
 
 		_, err := m.client.PutObject(ctx, bucketName, objectName, chunk.buffer, int64(chunk.buffer.Len()), minio.PutObjectOptions{})
 		if err != nil {
+			m.dataLock.Unlock()
 			return fmt.Errorf("cannot put object: %w", err)
 		}
+	}
+
+	m.dataLock.Unlock()
+
+	// Handle session switch outside dataLock — fireSessionTrigger's callback acquires it
+	if needsSessionSwitch {
+		if err := m.fireSessionTrigger(ctx, oldSessionID, triggerCloseRecording); err != nil {
+			log.Warn().Err(err).
+				Stringer("session-id", oldSessionID).
+				Msg("Cannot transition old session to PROCESSING (may already be closed)")
+		}
+
+		// Submit render to work queue (non-blocking)
+		m.renderQueue.submitSessionRender(context.Background(), m, recorderID, oldSessionID, lastChunk)
 	}
 
 	return nil
@@ -745,7 +840,7 @@ func (m *Minio) flushChunks(ctx context.Context, recorderID, sessionID uuid.UUID
 	return nil
 }
 
-func (m *Minio) renderFromRawData(ctx context.Context, recorderID, sessionID uuid.UUID, sm *Session, previousState SessionState, rawData io.Reader) error {
+func (m *Minio) renderFromRawData(ctx context.Context, recorderID, sessionID uuid.UUID, rawData io.Reader) error {
 	readers, writer, closer := makeReaders(4)
 	eg, egCtx := errgroup.WithContext(ctx)
 
@@ -808,30 +903,25 @@ func (m *Minio) renderFromRawData(ctx context.Context, recorderID, sessionID uui
 	})
 
 	if err := eg.Wait(); err != nil {
-		sm.State = SessionStateError
-		sm.ErrorMessage = err.Error()
-		m.dataLock.Lock()
-		if putErr := m.putSessionMetadata(ctx, recorderID, sessionID, sm); putErr != nil {
-			log.Err(putErr).Msg("Cannot update session state to ERROR")
+		// Transition to ERROR via FSM
+		if fireErr := m.fireSessionTrigger(ctx, sessionID, triggerRenderFailure, err.Error()); fireErr != nil {
+			log.Err(fireErr).Msg("Cannot transition session to ERROR state")
 		}
-		m.dataLock.Unlock()
-		m.notifyStateChange(sm, previousState)
 		return err
 	}
 
-	sm.State = SessionStateFinished
-	sm.IsClosed = true
-	m.dataLock.Lock()
-	if err := m.putSessionMetadata(ctx, recorderID, sessionID, sm); err != nil {
-		log.Err(err).Msg("Cannot put session metadata")
+	// Transition to FINISHED via FSM
+	if err := m.fireSessionTrigger(ctx, sessionID, triggerRenderSuccess); err != nil {
+		log.Err(err).Msg("Cannot transition session to FINISHED state")
 	}
-	m.dataLock.Unlock()
 
-	m.notifyStateChange(sm, previousState)
-
+	// Legacy callback — will be removed when onSessionClosedCb is deprecated
 	if m.onSessionClosedCb != nil {
+		m.dataLock.Lock()
+		session := m.system.Recorders[recorderID].Sessions[sessionID]
+		m.dataLock.Unlock()
 		m.cbLock.Lock()
-		m.onSessionClosedCb(sm)
+		m.onSessionClosedCb(&session)
 		m.cbLock.Unlock()
 	}
 
@@ -934,16 +1024,23 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 
 		const bytesPerSecond float64 = 48000.0 * 2.0 * 2.0
 		durationSeconds := float64(rawStat.Size) / bytesPerSecond
-		previousState := sm.State
 		sm.Duration = time.Duration(durationSeconds) * time.Second
 		sm.EndTime = sm.StartTime.Add(sm.Duration)
+
+		// Persist duration/endtime before rendering
+		m.dataLock.Lock()
+		if err := m.putSessionMetadata(ctx, recorderID, sessionID, sm); err != nil {
+			m.dataLock.Unlock()
+			return fmt.Errorf("cannot persist session duration: %w", err)
+		}
+		m.dataLock.Unlock()
 
 		var rawData ObjectHandle
 		if rawData, err = m.client.GetObject(ctx, bucketName, rawDataObjectName, minio.GetObjectOptions{}); err != nil {
 			return fmt.Errorf("cannot get raw data: %w", err)
 		}
 
-		return m.renderFromRawData(ctx, recorderID, sessionID, sm, previousState, rawData)
+		return m.renderFromRawData(ctx, recorderID, sessionID, rawData)
 	}
 
 	ui, err := m.client.ComposeObject(ctx, dst, srcs...)
@@ -967,10 +1064,16 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 		return fmt.Errorf("cannot get session metadata: %w", err)
 	}
 
-	previousState := sm.State
 	sm.Duration = time.Duration(durationSeconds) * time.Second
 	sm.EndTime = sm.StartTime.Add(sm.Duration)
-	// Don't set to FINISHED yet - wait for rendering to complete
+
+	// Persist duration/endtime before rendering
+	m.dataLock.Lock()
+	if err := m.putSessionMetadata(ctx, recorderID, sessionID, sm); err != nil {
+		m.dataLock.Unlock()
+		return fmt.Errorf("cannot persist session duration: %w", err)
+	}
+	m.dataLock.Unlock()
 
 	var rawData ObjectHandle
 	if rawData, err = m.client.GetObject(ctx, bucketName, dst.Object, minio.GetObjectOptions{}); err != nil {
@@ -979,7 +1082,7 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 		return err
 	}
 
-	if err := m.renderFromRawData(ctx, recorderID, sessionID, sm, previousState, rawData); err != nil {
+	if err := m.renderFromRawData(ctx, recorderID, sessionID, rawData); err != nil {
 		return err
 	}
 
@@ -1269,17 +1372,30 @@ func (m *Minio) closeSessions(ctx context.Context, recorderID uuid.UUID) error {
 
 	for _, sessionID := range sessionIDs {
 		sid := sessionID
-		go func() {
-			if err := m.closeSession(context.Background(), recorderID, sid, nil); err != nil {
-				log.Err(err).
-					Stringer("recorder-id", recorderID).
-					Stringer("session-id", sid).
-					Msg("Cannot close session on startup")
+
+		// Ensure machine exists
+		session, ok := m.system.Recorders[recorderID].Sessions[sid]
+		if !ok {
+			continue
+		}
+		m.getOrCreateSessionMachine(recorderID, sid, session.State)
+
+		if m.isSessionClosed(ctx, recorderID, sid) {
+			continue
+		}
+
+		// Transition RECORDING -> PROCESSING if needed
+		if session.State == SessionStateRecording {
+			if err := m.fireSessionTrigger(ctx, sid, triggerCloseRecording); err != nil {
+				log.Debug().Err(err).Stringer("session-id", sid).Msg("Cannot transition to PROCESSING on startup")
 			}
-		}()
+		}
+
+		// Submit render to work queue (bounded, non-blocking)
+		m.renderQueue.submitSessionRender(context.Background(), m, recorderID, sid, nil)
 	}
 
-	log.Debug().Stringer("recorder-id", recorderID).Msg("Kicked off session closing for recorder")
+	log.Debug().Stringer("recorder-id", recorderID).Msg("Submitted session closing jobs for recorder")
 
 	return nil
 }
@@ -1287,17 +1403,20 @@ func (m *Minio) closeSessions(ctx context.Context, recorderID uuid.UUID) error {
 // closeIntermediateSessions finds all sessions in RECORDING or PROCESSING state for a recorder
 // and transitions them to be processed. This is called when a new session starts to ensure
 // no sessions are left in an intermediate state.
+// closeIntermediateSessions finds all sessions in RECORDING or PROCESSING state for a recorder
+// and transitions them to be processed. Called while dataLock is held (from initSession).
+// State updates are done directly since we hold the lock; FSMs are synced to match.
 func (m *Minio) closeIntermediateSessions(ctx context.Context, recorderID uuid.UUID) {
 	recorder, ok := m.system.Recorders[recorderID]
 	if !ok {
 		return
 	}
 
+	// Collect sessions that need rendering (submitted outside this function,
+	// but we can submit to the pool here since it's non-blocking)
 	for sessionID, session := range recorder.Sessions {
 		if session.State == SessionStateRecording || session.State == SessionStateProcessing {
 			// Re-read metadata from storage to get the authoritative state.
-			// The in-memory state may be stale (e.g. loaded as RECORDING at startup
-			// but already FINISHED in MinIO from a previous run).
 			freshMeta, err := m.getSessionMetadata(ctx, recorderID, sessionID)
 			if err == nil && (freshMeta.State == SessionStateFinished || freshMeta.State == SessionStateError) {
 				log.Info().
@@ -1306,6 +1425,8 @@ func (m *Minio) closeIntermediateSessions(ctx context.Context, recorderID uuid.U
 					Str("stored-state", freshMeta.State.String()).
 					Msg("Session already in terminal state, updating in-memory state")
 				m.system.Recorders[recorderID].Sessions[sessionID] = *freshMeta
+				// Sync FSM to terminal state
+				m.getOrCreateSessionMachine(recorderID, sessionID, freshMeta.State)
 				go m.notifyStateChange(freshMeta, session.State)
 				continue
 			}
@@ -1316,7 +1437,7 @@ func (m *Minio) closeIntermediateSessions(ctx context.Context, recorderID uuid.U
 				Str("state", session.State.String()).
 				Msg("Found session in intermediate state, closing")
 
-			// Transition to PROCESSING if still RECORDING
+			// Transition to PROCESSING directly (we hold dataLock)
 			if session.State == SessionStateRecording {
 				previousState := session.State
 				session.State = SessionStateProcessing
@@ -1328,68 +1449,18 @@ func (m *Minio) closeIntermediateSessions(ctx context.Context, recorderID uuid.U
 				go m.notifyStateChange(&session, previousState)
 			}
 
-			// Kick off async rendering
-			go func(recorderID, sessionID uuid.UUID) {
-				if err := m.closeSessionAsync(context.Background(), recorderID, sessionID, nil); err != nil {
-					log.Err(err).
-						Stringer("recorder-id", recorderID).
-						Stringer("session-id", sessionID).
-						Msg("Cannot close intermediate session")
-					return
-				}
-				log.Info().
-					Stringer("recorder-id", recorderID).
-					Stringer("session-id", sessionID).
-					Msg("Intermediate session closed")
-			}(recorderID, sessionID)
+			// Create/sync FSM at PROCESSING state
+			m.getOrCreateSessionMachine(recorderID, sessionID, SessionStateProcessing)
+
+			// Submit render to work queue (non-blocking, safe to call while holding dataLock)
+			m.renderQueue.submitSessionRender(context.Background(), m, recorderID, sessionID, nil)
 		}
 	}
-}
-
-// closeSession handles full session closing including state transition.
-// Used at startup when processing sessions that may still be in RECORDING state.
-func (m *Minio) closeSession(ctx context.Context, recorderID, sessionID uuid.UUID, chunk *minioChunk) error {
-	// Flush in-memory chunks to storage BEFORE checking isSessionClosed.
-	// See closeSessionAsync for the rationale.
-	if chunk != nil {
-		if err := m.flushChunks(ctx, recorderID, sessionID, chunk); err != nil {
-			return fmt.Errorf("cannot flush session: %w", err)
-		}
-	}
-
-	if m.isSessionClosed(ctx, recorderID, sessionID) {
-		return nil
-	}
-
-	// Update state to PROCESSING before rendering
-	sm, err := m.getSessionMetadata(ctx, recorderID, sessionID)
-	if err == nil && sm.State == SessionStateRecording {
-		previousState := sm.State
-		sm.State = SessionStateProcessing
-		m.dataLock.Lock()
-		if err := m.putSessionMetadata(ctx, recorderID, sessionID, sm); err != nil {
-			log.Err(err).Msg("Cannot update session state to PROCESSING")
-		}
-		m.dataLock.Unlock()
-		m.notifyStateChange(sm, previousState)
-	}
-
-	if err := m.renderSession(ctx, recorderID, sessionID); err != nil {
-		return fmt.Errorf("cannot render session: %w", err)
-	}
-
-	log.Debug().Stringer("recorder-id", recorderID).Stringer("session-id", sessionID).Msg("Session closed")
-
-	return nil
 }
 
 // closeSessionAsync handles session closing when state was already transitioned to PROCESSING.
-// Used when a new session starts and we need to finish processing the previous session.
+// Used by the work queue when a new session starts and we need to finish processing the previous session.
 func (m *Minio) closeSessionAsync(ctx context.Context, recorderID, sessionID uuid.UUID, chunk *minioChunk) error {
-	// Flush in-memory chunks to storage BEFORE checking isSessionClosed.
-	// isSessionClosed looks for chunk objects in storage — if chunks are still
-	// in memory (below minChunkSize), it would incorrectly report the session
-	// as closed and skip rendering.
 	if chunk != nil {
 		if err := m.flushChunks(ctx, recorderID, sessionID, chunk); err != nil {
 			return fmt.Errorf("cannot flush session: %w", err)
@@ -1400,25 +1471,12 @@ func (m *Minio) closeSessionAsync(ctx context.Context, recorderID, sessionID uui
 		return nil
 	}
 
-	// State transition to PROCESSING was already done synchronously in SafeChunks
-	// Proceed directly to rendering
+	// State transition to PROCESSING was already done by the caller via FSM.
+	// Proceed directly to rendering.
 	if err := m.renderSession(ctx, recorderID, sessionID); err != nil {
-		// renderFromRawData already handles ERROR transition for its own failures,
-		// but ComposeObject failures in renderSession happen before renderFromRawData
-		// is called. Transition to ERROR here so the session doesn't stay stuck in
-		// PROCESSING forever.
-		sm, metaErr := m.getSessionMetadata(ctx, recorderID, sessionID)
-		if metaErr == nil && sm.State == SessionStateProcessing {
-			previousState := sm.State
-			sm.State = SessionStateError
-			sm.ErrorMessage = err.Error()
-			m.dataLock.Lock()
-			if putErr := m.putSessionMetadata(ctx, recorderID, sessionID, sm); putErr != nil {
-				log.Err(putErr).Msg("Cannot update session state to ERROR")
-			}
-			m.dataLock.Unlock()
-			m.notifyStateChange(sm, previousState)
-		}
+		// renderFromRawData fires triggerRenderFailure internally, but ComposeObject
+		// failures happen before that. Fire as safety net.
+		m.fireSessionTrigger(ctx, sessionID, triggerRenderFailure, err.Error())
 		return fmt.Errorf("cannot render session: %w", err)
 	}
 
@@ -1439,69 +1497,25 @@ func (m *Minio) CloseRecordingSession(ctx context.Context, recorderID, sessionID
 	}
 	m.dataLock.Unlock()
 
-	sm, err := m.getSessionMetadata(ctx, recorderID, sessionID)
-	if err != nil {
-		return fmt.Errorf("cannot get session metadata: %w", err)
+	// Transition to PROCESSING via FSM
+	if err := m.fireSessionTrigger(ctx, sessionID, triggerCloseRecording); err != nil {
+		return fmt.Errorf("cannot close recording session: %w", err)
 	}
 
-	if sm.State == SessionStateRecording {
-		previousState := sm.State
-		sm.State = SessionStateProcessing
-		if err := m.putSessionMetadata(ctx, recorderID, sessionID, sm); err != nil {
-			return fmt.Errorf("cannot update session state to PROCESSING: %w", err)
-		}
-		sessionCopy := *sm
-		// Notify synchronously to ensure the PROCESSING state is broadcast
-		// before closeSessionAsync potentially transitions to FINISHED.
-		// dataLock is not held here, so this is safe.
-		m.notifyStateChange(&sessionCopy, previousState)
-	}
-
-	go func(recorderID, sessionID uuid.UUID, chunk *minioChunk) {
-		var chunkArg *minioChunk
-		if chunk != nil {
-			c := *chunk
-			chunkArg = &c
-		}
-		if err := m.closeSessionAsync(context.Background(), recorderID, sessionID, chunkArg); err != nil {
-			log.Err(err).
-				Stringer("recorder-id", recorderID).
-				Stringer("session-id", sessionID).
-				Msg("Cannot close session asynchronously")
-		}
-	}(recorderID, sessionID, chunkCopy)
+	// Submit render to work queue
+	m.renderQueue.submitSessionRender(context.Background(), m, recorderID, sessionID, chunkCopy)
 
 	return nil
 }
 
 func (m *Minio) RetryRenderSession(ctx context.Context, recorderID, sessionID uuid.UUID) error {
-	sm, err := m.getSessionMetadata(ctx, recorderID, sessionID)
-	if err != nil {
-		return fmt.Errorf("cannot get session metadata: %w", err)
+	// FSM enforces that only ERROR -> PROCESSING is valid for this trigger
+	if err := m.fireSessionTrigger(ctx, sessionID, triggerRetryRender); err != nil {
+		return fmt.Errorf("cannot retry render session: %w", err)
 	}
 
-	if sm.State != SessionStateError {
-		return fmt.Errorf("session is in state %s, can only retry sessions in ERROR state", sm.State)
-	}
-
-	// Transition to PROCESSING state
-	previousState := sm.State
-	sm.State = SessionStateProcessing
-	sm.ErrorMessage = ""
-	if err := m.putSessionMetadata(ctx, recorderID, sessionID, sm); err != nil {
-		return fmt.Errorf("cannot update session state to PROCESSING: %w", err)
-	}
-	m.notifyStateChange(sm, previousState)
-
-	// Run rendering asynchronously
-	go func() {
-		if err := m.renderSession(context.Background(), recorderID, sessionID); err != nil {
-			log.Err(err).
-				Stringer("recorder-id", recorderID).
-				Stringer("session-id", sessionID).
-				Msg("Cannot retry render session")
-		}
-	}()
+	// Submit render to work queue
+	m.renderQueue.submitSessionRender(context.Background(), m, recorderID, sessionID, nil)
 
 	return nil
 }
@@ -1758,6 +1772,10 @@ func (m *Minio) SetSegmentState(ctx context.Context, recorderID, sessionID, segm
 		return fmt.Errorf("no segment with id %s", segmentID)
 	}
 
+	if err := validateSegmentTransition(segment.State, state); err != nil {
+		return fmt.Errorf("cannot set segment state: %w", err)
+	}
+
 	segment.State = state
 	session.Segments[segmentID] = segment
 
@@ -1775,7 +1793,17 @@ func (m *Minio) SetSegmentState(ctx context.Context, recorderID, sessionID, segm
 	return nil
 }
 
+// RenderSegment enqueues a segment render job on the work queue.
+// The caller should set the segment state to QUEUED before calling this.
+// The work queue worker will transition QUEUED -> RENDERING -> FINISHED/ERROR.
 func (m *Minio) RenderSegment(ctx context.Context, recorderID, sessionID, segmentID uuid.UUID) error {
+	m.renderQueue.submitSegmentRender(ctx, m, recorderID, sessionID, segmentID)
+	return nil
+}
+
+// renderSegmentSync performs the actual synchronous segment render.
+// Called by the work queue worker via renderSegmentInternal.
+func (m *Minio) renderSegmentSync(ctx context.Context, recorderID, sessionID, segmentID uuid.UUID) error {
 	// Get session and segment info
 	m.dataLock.Lock()
 	if _, ok := m.system.Recorders[recorderID]; !ok {
@@ -1795,7 +1823,11 @@ func (m *Minio) RenderSegment(ctx context.Context, recorderID, sessionID, segmen
 		return fmt.Errorf("no segment with id %s", segmentID)
 	}
 
-	// Set state to RENDERING
+	// Validate and set state to RENDERING
+	if err := validateSegmentTransition(segment.State, SegmentStateRendering); err != nil {
+		m.dataLock.Unlock()
+		return fmt.Errorf("cannot start segment render: %w", err)
+	}
 	segment.State = SegmentStateRendering
 	segment.ErrorMessage = ""
 	session.Segments[segmentID] = segment
@@ -1983,4 +2015,9 @@ func (m *Minio) setSegmentError(ctx context.Context, recorderID, sessionID, segm
 		Stringer("segment-id", segmentID).
 		Str("error", errorMsg).
 		Msg("Segment rendering failed")
+}
+
+// renderSegmentInternal is the synchronous segment render used by the work queue.
+func (m *Minio) renderSegmentInternal(ctx context.Context, recorderID, sessionID, segmentID uuid.UUID) error {
+	return m.renderSegmentSync(ctx, recorderID, sessionID, segmentID)
 }

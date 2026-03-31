@@ -119,6 +119,7 @@ type Storage interface {
 	GetSession(recorderID, sessionID uuid.UUID) (Session, error)
 
 	Start(ctx context.Context) error
+	Stop()
 
 	SafeChunks(ctx context.Context, recorderID, sessionID uuid.UUID, chunkID string, timeCreated time.Time, samples []int16) error
 	EnsureRecorderExists(ctx context.Context, recorderID uuid.UUID, recorderName string)

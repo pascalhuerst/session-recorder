@@ -164,6 +164,7 @@ func (m *mockStorage) deepCopySession(s storage.Session) storage.Session {
 }
 
 func (m *mockStorage) Start(_ context.Context) error { return nil }
+func (m *mockStorage) Stop()                         {}
 
 func (m *mockStorage) SafeChunks(_ context.Context, recorderID, sessionID uuid.UUID, chunkID string, timeCreated time.Time, samples []int16) error {
 	m.mu.Lock()

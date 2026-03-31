@@ -729,7 +729,24 @@ func (m *Minio) SafeChunks(ctx context.Context, recorderID, sessionID uuid.UUID,
 	}
 
 	if _, ok := m.chunks[recorderID]; !ok {
-		m.initSession(ctx, recorderID, sessionID, timeCreated)
+		// Check if session already exists (e.g., after backend restart where
+		// closeSessions didn't set up chunk tracking, or timeout fired then
+		// chunks arrived late). Only resume if still in RECORDING state.
+		if session, exists := m.system.Recorders[recorderID].Sessions[sessionID]; exists && session.State == SessionStateRecording {
+			chunkCount := m.countChunks(ctx, recorderID, sessionID)
+			m.chunks[recorderID] = &minioChunk{
+				number:    chunkCount,
+				sessionID: sessionID,
+				buffer:    new(bytes.Buffer),
+			}
+			log.Info().
+				Stringer("recorder-id", recorderID).
+				Stringer("session-id", sessionID).
+				Int("existing-chunks", chunkCount).
+				Msg("Resuming existing RECORDING session")
+		} else {
+			m.initSession(ctx, recorderID, sessionID, timeCreated)
+		}
 	}
 
 	chunk := m.chunks[recorderID]
@@ -1368,20 +1385,48 @@ func (m *Minio) closeSessions(ctx context.Context, recorderID uuid.UUID) error {
 			continue
 		}
 
-		// Transition RECORDING -> PROCESSING if needed
-		if session.State == SessionStateRecording {
-			if err := m.fireSessionTrigger(ctx, sid, triggerCloseRecording); err != nil {
-				log.Debug().Err(err).Stringer("session-id", sid).Msg("Cannot transition to PROCESSING on startup")
+		switch session.State {
+		case SessionStateRecording:
+			// Don't close immediately — set up chunk tracking so the timeout checker
+			// can close it if no new chunks arrive within the timeout window.
+			// If the recorder is still active, SafeChunks will resume naturally
+			// because m.chunks[recorderID] already exists with the right sessionID.
+			chunkCount := m.countChunks(ctx, recorderID, sid)
+			m.chunks[recorderID] = &minioChunk{
+				number:    chunkCount,
+				sessionID: sid,
+				buffer:    new(bytes.Buffer),
 			}
-		}
+			m.lastChunkTime[recorderID] = time.Now()
+			log.Info().
+				Stringer("recorder-id", recorderID).
+				Stringer("session-id", sid).
+				Int("existing-chunks", chunkCount).
+				Msg("Resuming RECORDING session on startup, waiting for chunks or timeout")
 
-		// Submit render to work queue (bounded, non-blocking)
-		m.renderQueue.submitSessionRender(context.Background(), m, recorderID, sid, nil)
+		case SessionStateProcessing:
+			// Was mid-render when backend crashed — re-submit render
+			m.renderQueue.submitSessionRender(context.Background(), m, recorderID, sid, nil)
+		}
 	}
 
 	log.Debug().Stringer("recorder-id", recorderID).Msg("Submitted session closing jobs for recorder")
 
 	return nil
+}
+
+// countChunks returns the number of chunk objects stored in MinIO for a session.
+func (m *Minio) countChunks(ctx context.Context, recorderID, sessionID uuid.UUID) int {
+	chunksPrefix := fmt.Sprintf("%s/sessions/%s/chunks/", recorderID, sessionID)
+	objectCh := m.client.ListObjects(ctx, bucketName, minio.ListObjectsOptions{Prefix: chunksPrefix, Recursive: true})
+	count := 0
+	for obj := range objectCh {
+		if obj.Err != nil {
+			break
+		}
+		count++
+	}
+	return count
 }
 
 // closeIntermediateSessions finds all sessions in RECORDING or PROCESSING state for a recorder
@@ -1469,6 +1514,21 @@ func (m *Minio) closeSessionAsync(ctx context.Context, recorderID, sessionID uui
 	if m.isSessionClosed(ctx, recorderID, sessionID) {
 		return nil
 	}
+
+	// Check if session was resumed (e.g., recorder reconnected after restart).
+	// If it's back to RECORDING, skip the render — it's still active.
+	m.dataLock.Lock()
+	if recorder, ok := m.system.Recorders[recorderID]; ok {
+		if session, ok := recorder.Sessions[sessionID]; ok && session.State == SessionStateRecording {
+			m.dataLock.Unlock()
+			log.Info().
+				Stringer("recorder-id", recorderID).
+				Stringer("session-id", sessionID).
+				Msg("Session resumed recording, skipping render")
+			return nil
+		}
+	}
+	m.dataLock.Unlock()
 
 	// State transition to PROCESSING was already done by the caller via FSM.
 	// Proceed directly to rendering.

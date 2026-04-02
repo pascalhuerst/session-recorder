@@ -419,6 +419,9 @@ func (m *Minio) onSessionTransition(ctx context.Context, recorderID, sessionID u
 			Msg("onSessionTransition: cannot persist state")
 	}
 
+	// Write updated session back to in-memory map (session is a value copy)
+	m.system.Recorders[recorderID].Sessions[sessionID] = session
+
 	m.dataLock.Unlock()
 
 	// Notify outside all locks to prevent deadlocks
@@ -564,6 +567,9 @@ func (m *Minio) initSession(ctx context.Context, recorderID, sessionID uuid.UUID
 			Msg("Cannot put session metadata")
 		return
 	}
+
+	// Update in-memory map
+	m.system.Recorders[recorderID].Sessions[sessionID] = session
 
 	// Create state machine at RECORDING (already transitioned)
 	m.getOrCreateSessionMachine(recorderID, sessionID, SessionStateRecording)
@@ -729,21 +735,56 @@ func (m *Minio) SafeChunks(ctx context.Context, recorderID, sessionID uuid.UUID,
 	}
 
 	if _, ok := m.chunks[recorderID]; !ok {
-		// Check if session already exists (e.g., after backend restart where
-		// closeSessions didn't set up chunk tracking, or timeout fired then
-		// chunks arrived late). Only resume if still in RECORDING state.
-		if session, exists := m.system.Recorders[recorderID].Sessions[sessionID]; exists && session.State == SessionStateRecording {
+		// Check if session already exists (e.g., after backend restart).
+		// If the recorder is sending chunks for a known session, resume it
+		// regardless of current state — the recorder is the source of truth.
+		if session, exists := m.system.Recorders[recorderID].Sessions[sessionID]; exists {
 			chunkCount := m.countChunks(ctx, recorderID, sessionID)
 			m.chunks[recorderID] = &minioChunk{
 				number:    chunkCount,
 				sessionID: sessionID,
 				buffer:    new(bytes.Buffer),
 			}
-			log.Info().
-				Stringer("recorder-id", recorderID).
-				Stringer("session-id", sessionID).
-				Int("existing-chunks", chunkCount).
-				Msg("Resuming existing RECORDING session")
+
+			if session.State != SessionStateRecording {
+				// Session was in a non-RECORDING state (e.g., PROCESSING from a
+				// previous crash, or FINISHED from a completed render). Reset to
+				// RECORDING since the recorder is still actively sending chunks.
+				previousState := session.State
+				session.State = SessionStateRecording
+				session.IsClosed = false
+				session.ErrorMessage = ""
+				if err := m.putSessionMetadata(ctx, recorderID, sessionID, &session); err != nil {
+					log.Err(err).Msg("Cannot persist resumed session state")
+				}
+				m.system.Recorders[recorderID].Sessions[sessionID] = session
+
+				// Replace FSM to match the corrected state
+				m.removeSessionMachine(sessionID)
+				m.getOrCreateSessionMachine(recorderID, sessionID, SessionStateRecording)
+
+				m.eventBus.EmitSessionStateChanged(SessionStateChangedEvent{
+					RecorderID:    recorderID,
+					SessionID:     sessionID,
+					PreviousState: previousState,
+					NewState:      SessionStateRecording,
+					Trigger:       "resumed-recording",
+					Session:       session,
+				})
+
+				log.Info().
+					Stringer("recorder-id", recorderID).
+					Stringer("session-id", sessionID).
+					Str("previous-state", previousState.String()).
+					Int("existing-chunks", chunkCount).
+					Msg("Resumed session from non-RECORDING state")
+			} else {
+				log.Info().
+					Stringer("recorder-id", recorderID).
+					Stringer("session-id", sessionID).
+					Int("existing-chunks", chunkCount).
+					Msg("Resuming existing RECORDING session")
+			}
 		} else {
 			m.initSession(ctx, recorderID, sessionID, timeCreated)
 		}

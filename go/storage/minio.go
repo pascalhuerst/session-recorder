@@ -1560,11 +1560,10 @@ func (m *Minio) countChunks(ctx context.Context, recorderID, sessionID uuid.UUID
 	return count
 }
 
-// closeIntermediateSessions finds all sessions in RECORDING or PROCESSING state for a recorder
-// and transitions them to be processed. This is called when a new session starts to ensure
-// no sessions are left in an intermediate state.
-// closeIntermediateSessions finds all sessions in RECORDING or PROCESSING state for a recorder
-// and transitions them to be processed. Called while dataLock is held (from initSession).
+// closeIntermediateSessions finds all sessions still in RECORDING state for a recorder
+// and transitions them to PROCESSING with a render job. Sessions already in PROCESSING
+// are left alone — they already have a render job in the queue.
+// Called while dataLock is held (from initSession).
 // State updates are done directly since we hold the lock; FSMs are synced to match.
 func (m *Minio) closeIntermediateSessions(ctx context.Context, recorderID uuid.UUID) {
 	recorder, ok := m.system.Recorders[recorderID]
@@ -1572,10 +1571,11 @@ func (m *Minio) closeIntermediateSessions(ctx context.Context, recorderID uuid.U
 		return
 	}
 
-	// Collect sessions that need rendering (submitted outside this function,
-	// but we can submit to the pool here since it's non-blocking)
+	// Close any sessions still in RECORDING state by transitioning them to
+	// PROCESSING and submitting a render job. Sessions already in PROCESSING
+	// are left alone — they already have a render job in the queue.
 	for sessionID, session := range recorder.Sessions {
-		if session.State == SessionStateRecording || session.State == SessionStateProcessing {
+		if session.State == SessionStateRecording {
 			// Re-read metadata from storage to get the authoritative state.
 			freshMeta, err := m.getSessionMetadata(ctx, recorderID, sessionID)
 			if err == nil && (freshMeta.State == SessionStateFinished || freshMeta.State == SessionStateError) {
@@ -1603,26 +1603,24 @@ func (m *Minio) closeIntermediateSessions(ctx context.Context, recorderID uuid.U
 				Stringer("recorder-id", recorderID).
 				Stringer("session-id", sessionID).
 				Str("state", session.State.String()).
-				Msg("Found session in intermediate state, closing")
+				Msg("Found session in RECORDING state, closing")
 
 			// Transition to PROCESSING directly (we hold dataLock)
-			if session.State == SessionStateRecording {
-				previousState := session.State
-				session.State = SessionStateProcessing
-				if err := m.putSessionMetadata(ctx, recorderID, sessionID, &session); err != nil {
-					log.Err(err).Msg("Cannot update session state to PROCESSING")
-					continue
-				}
-				m.system.Recorders[recorderID].Sessions[sessionID] = session
-				m.eventBus.EmitSessionStateChanged(SessionStateChangedEvent{
-					RecorderID:    recorderID,
-					SessionID:     sessionID,
-					PreviousState: previousState,
-					NewState:      SessionStateProcessing,
-					Trigger:       "startup-close",
-					Session:       session,
-				})
+			previousState := session.State
+			session.State = SessionStateProcessing
+			if err := m.putSessionMetadata(ctx, recorderID, sessionID, &session); err != nil {
+				log.Err(err).Msg("Cannot update session state to PROCESSING")
+				continue
 			}
+			m.system.Recorders[recorderID].Sessions[sessionID] = session
+			m.eventBus.EmitSessionStateChanged(SessionStateChangedEvent{
+				RecorderID:    recorderID,
+				SessionID:     sessionID,
+				PreviousState: previousState,
+				NewState:      SessionStateProcessing,
+				Trigger:       "startup-close",
+				Session:       session,
+			})
 
 			// Create/sync FSM at PROCESSING state
 			m.getOrCreateSessionMachine(recorderID, sessionID, SessionStateProcessing)

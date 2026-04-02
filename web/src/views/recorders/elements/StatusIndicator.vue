@@ -61,12 +61,12 @@ const stateClass = computed(() => {
 }
 
 .text.is-processing {
-  color: var(--text-secondary);
+  color: var(--color-primary, #ed730c);
 }
 
 .indicator.is-processing {
-  animation: pulse-grey 6s infinite;
-  background: var(--text-secondary);
+  animation: pulse-orange 6s infinite;
+  background: var(--color-primary, #ed730c);
 }
 
 @keyframes pulse {
@@ -91,25 +91,25 @@ const stateClass = computed(() => {
   }
 }
 
-@keyframes pulse-grey {
+@keyframes pulse-orange {
   0% {
     transform: scale(0.95);
-    box-shadow: 0 0 0 0 rgba(107, 114, 128, 0.4);
+    box-shadow: 0 0 0 0 rgba(237, 115, 12, 0.4);
   }
 
   25% {
     transform: scale(1);
-    box-shadow: 0 0 0 4px rgba(107, 114, 128, 0.2);
+    box-shadow: 0 0 0 4px rgba(237, 115, 12, 0.2);
   }
 
   50% {
     transform: scale(0.95);
-    box-shadow: 0 0 0 0 rgba(107, 114, 128, 0.4);
+    box-shadow: 0 0 0 0 rgba(237, 115, 12, 0.4);
   }
 
   75% {
     transform: scale(1);
-    box-shadow: 0 0 0 4px rgba(107, 114, 128, 0.2);
+    box-shadow: 0 0 0 4px rgba(237, 115, 12, 0.2);
   }
 }
 </style>

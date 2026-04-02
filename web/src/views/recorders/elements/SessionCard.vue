@@ -33,12 +33,16 @@ const displayName = computed(() => {
 });
 
 const timeRange = computed(() => {
-  const { startedAt, finishedAt } = props.session;
+  const { startedAt, finishedAt, duration } = props.session;
   const formatTime = (date: Date) => useDateFormat(date, 'HH:mm').value;
   const start = formatTime(startedAt);
   if (finishedAt) {
     const end = formatTime(finishedAt);
     return `${start}–${end}`;
+  }
+  if (isProcessing.value && duration) {
+    const endTime = new Date(startedAt.getTime() + duration * 1000);
+    return `${start}–${formatTime(endTime)}`;
   }
   return start;
 });
@@ -243,7 +247,7 @@ const onDeleteProcessing = () => {
 
       <!-- Elapsed time for recording sessions, estimated duration for processing -->
       <span v-if="isRecording" class="elapsed-time">{{ elapsedTime }}</span>
-      <span v-else-if="isProcessing && formattedDuration" class="elapsed-time">{{ formattedDuration }}</span>
+      <span v-else-if="isProcessing && formattedDuration" class="elapsed-time processing">{{ formattedDuration }}</span>
 
       <div class="spacer"></div>
 
@@ -357,6 +361,10 @@ const onDeleteProcessing = () => {
   font-size: var(--scale-1);
   font-weight: var(--weight-semibold);
   color: var(--color-red-500);
+}
+
+.elapsed-time.processing {
+  color: var(--color-primary, #ed730c);
 }
 
 .spacer {

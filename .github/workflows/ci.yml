@@ -135,3 +135,27 @@ jobs:
           name: go-coverage
           path: go/coverage.out
           retention-days: 7
+
+  go-test-render:
+    name: Go Render Tests (Docker)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build test image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: go/Dockerfile.ci-test
+          load: true
+          tags: session-recorder-test:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Run tests
+        run: docker run --rm session-recorder-test:latest

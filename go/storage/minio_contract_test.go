@@ -1,8 +1,10 @@
 package storage
 
 import (
+	"bytes"
 	"context"
 	"encoding/binary"
+	"os/exec"
 	"sync"
 	"testing"
 	"time"
@@ -712,6 +714,166 @@ func TestContractSessionTimeout_ClosesStaleSession(t *testing.T) {
 	}
 	if !foundProcessing {
 		t.Error("Expected stale session to be closed (transitioned to PROCESSING)")
+	}
+}
+
+// =============================================================================
+// Polling Helper
+// =============================================================================
+
+// waitForSessionState polls until the session reaches the target state or timeout.
+func waitForSessionState(t *testing.T, m *Minio, recorderID, sessionID uuid.UUID, target SessionState, timeout time.Duration) {
+	t.Helper()
+	deadline := time.Now().Add(timeout)
+	for time.Now().Before(deadline) {
+		s, err := m.GetSession(recorderID, sessionID)
+		if err == nil && s.State == target {
+			return
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	// Final check with error reporting
+	s, err := m.GetSession(recorderID, sessionID)
+	if err != nil {
+		t.Fatalf("waitForSessionState: GetSession failed: %v", err)
+	}
+	t.Fatalf("Session did not reach %s within %v (current: %s)", target, timeout, s.State)
+}
+
+func audioToolsAvailable() bool {
+	if _, err := exec.LookPath("/usr/bin/sox"); err != nil {
+		return false
+	}
+	if _, err := exec.LookPath("audiowaveform"); err != nil {
+		return false
+	}
+	return true
+}
+
+// =============================================================================
+// Full Render Pipeline (requires sox + audiowaveform)
+// =============================================================================
+
+// TestContractFullRenderPipeline exercises the complete storage flow:
+// SafeChunks → CloseRecordingSession → render → FINISHED with all output files.
+func TestContractFullRenderPipeline(t *testing.T) {
+	if !audioToolsAvailable() {
+		t.Skip("sox and/or audiowaveform not available, skipping render pipeline test")
+	}
+
+	m, fake := newTestStorage(t)
+	ctx := context.Background()
+
+	recorderID := uuid.New()
+	sessionID := uuid.New()
+	m.EnsureRecorderExists(ctx, recorderID, "recorder")
+
+	// Generate enough raw PCM data to exceed minChunkSize (5MB).
+	// Use a simple rising signal pattern (deterministic).
+	sampleCount := minChunkSize/2 + 48000 // a bit over 5MB raw, plus 1 second extra
+	samples := make([]int16, sampleCount)
+	for i := range samples {
+		samples[i] = int16((i * 7) % 32000) // deterministic pseudo-signal
+	}
+
+	if err := m.SafeChunks(ctx, recorderID, sessionID, "001", time.Now(), samples); err != nil {
+		t.Fatalf("SafeChunks failed: %v", err)
+	}
+
+	if err := m.CloseRecordingSession(ctx, recorderID, sessionID); err != nil {
+		t.Fatalf("CloseRecordingSession failed: %v", err)
+	}
+
+	// Poll for FINISHED (rendering takes a few seconds)
+	waitForSessionState(t, m, recorderID, sessionID, SessionStateFinished, 30*time.Second)
+
+	// Verify session metadata
+	session, err := m.GetSession(recorderID, sessionID)
+	if err != nil {
+		t.Fatalf("GetSession failed: %v", err)
+	}
+	if session.State != SessionStateFinished {
+		t.Errorf("Expected FINISHED, got %s", session.State)
+	}
+	if session.Duration <= 0 {
+		t.Errorf("Expected positive duration, got %v", session.Duration)
+	}
+
+	// Verify all expected output objects exist in storage
+	prefix := recorderID.String() + "/sessions/" + sessionID.String() + "/"
+
+	expectedFiles := map[string][]byte{
+		prefix + "data.raw":      nil,
+		prefix + "data.flac":     {0x66, 0x4C, 0x61, 0x43}, // fLaC
+		prefix + "data.ogg":      {0x4F, 0x67, 0x67, 0x53}, // OggS
+		prefix + "waveform.dat":  nil,                       // no standard magic
+		prefix + "overview.png":  {0x89, 0x50, 0x4E, 0x47}, // PNG
+		prefix + "metadata.json": nil,
+	}
+
+	for key, magic := range expectedFiles {
+		data, exists := fake.GetObjectData(bucketName, key)
+		if !exists {
+			t.Errorf("Expected object %q to exist after render", key)
+			continue
+		}
+		if len(data) == 0 {
+			t.Errorf("Object %q is empty", key)
+			continue
+		}
+		if magic != nil && len(data) >= len(magic) {
+			if !bytes.HasPrefix(data, magic) {
+				t.Errorf("Object %q: expected magic %v, got %v", key, magic, data[:len(magic)])
+			}
+		}
+	}
+
+	// Verify data.raw is non-trivial (should contain all our sample data)
+	rawData, _ := fake.GetObjectData(bucketName, prefix+"data.raw")
+	if len(rawData) < minChunkSize {
+		t.Errorf("data.raw too small: %d bytes, expected at least %d", len(rawData), minChunkSize)
+	}
+}
+
+// TestContractCloseRecordingSession_TransitionsToProcessingAndRenders verifies
+// that when audio tools are available, CloseRecordingSession transitions through
+// PROCESSING → FINISHED after rendering all output files.
+// When tools are unavailable, this test is skipped.
+func TestContractCloseRecordingSession_TransitionsToProcessingAndRenders(t *testing.T) {
+	if !audioToolsAvailable() {
+		t.Skip("sox and/or audiowaveform not available")
+	}
+
+	m, _ := newTestStorage(t)
+	ctx := context.Background()
+
+	recorderID := uuid.New()
+	sessionID := uuid.New()
+	m.EnsureRecorderExists(ctx, recorderID, "recorder")
+
+	samples := make([]int16, minChunkSize/2+1)
+	for i := range samples {
+		samples[i] = int16((i * 7) % 32000)
+	}
+	if err := m.SafeChunks(ctx, recorderID, sessionID, "001", time.Now(), samples); err != nil {
+		t.Fatalf("SafeChunks failed: %v", err)
+	}
+
+	if err := m.CloseRecordingSession(ctx, recorderID, sessionID); err != nil {
+		t.Fatalf("CloseRecordingSession failed: %v", err)
+	}
+
+	waitForSessionState(t, m, recorderID, sessionID, SessionStateFinished, 30*time.Second)
+
+	session, err := m.GetSession(recorderID, sessionID)
+	if err != nil {
+		t.Fatalf("GetSession failed: %v", err)
+	}
+	if session.Duration <= 0 {
+		t.Errorf("Expected positive duration, got %v", session.Duration)
+	}
+	if session.ErrorMessage != "" {
+		t.Errorf("Expected no error message, got %q", session.ErrorMessage)
 	}
 }
 

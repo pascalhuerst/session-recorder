@@ -2,8 +2,12 @@ package render
 
 import (
 	"bytes"
+	_ "embed"
 	"testing"
 )
+
+//go:embed test_data/sweep_30_20000_s16le_2ch_48000k.flac
+var goldenFlac []byte
 
 /**
  * Test Plan: FLAC Encoding
@@ -71,6 +75,32 @@ func TestFlac_EmptyInput(t *testing.T) {
 		flacMagic := []byte{0x66, 0x4C, 0x61, 0x43}
 		if !bytes.HasPrefix(got.Bytes(), flacMagic) {
 			t.Errorf("Flac() output does not have FLAC magic header, got %v", got.Bytes()[:min(4, got.Len())])
+		}
+	}
+}
+
+// TestFlac_DeterministicOutput verifies the pure-Go FLAC encoder produces
+// bit-identical output for the same input. This catches encoder regressions
+// without requiring any external tools.
+func TestFlac_DeterministicOutput(t *testing.T) {
+	raw := bytes.NewReader(rawTestAudio)
+
+	got, err := Flac(raw)
+	if err != nil {
+		t.Fatalf("Flac() error = %v", err)
+	}
+
+	if got.Len() != len(goldenFlac) {
+		t.Fatalf("Flac output size differs: got %d bytes, golden %d bytes", got.Len(), len(goldenFlac))
+	}
+
+	if !bytes.Equal(got.Bytes(), goldenFlac) {
+		// Find first differing byte for debugging
+		for i := range goldenFlac {
+			if got.Bytes()[i] != goldenFlac[i] {
+				t.Fatalf("Flac output differs from golden file at byte %d: got 0x%02x, want 0x%02x",
+					i, got.Bytes()[i], goldenFlac[i])
+			}
 		}
 	}
 }

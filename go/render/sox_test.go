@@ -59,6 +59,15 @@ func TestCreateAudioFile_ToOgg(t *testing.T) {
 	if !bytes.HasPrefix(got.Bytes(), oggMagic) {
 		t.Errorf("CreateAudioFile() output does not have OGG magic header, got %v", got.Bytes()[:min(4, got.Len())])
 	}
+
+	// 30 seconds of stereo 48kHz audio should compress to a reasonable OGG size
+	// (typically 200KB-1.5MB depending on content and quality settings)
+	if got.Len() < 100 {
+		t.Errorf("OGG output suspiciously small: %d bytes", got.Len())
+	}
+	if got.Len() > 3*1024*1024 {
+		t.Errorf("OGG output suspiciously large for 30s audio: %d bytes", got.Len())
+	}
 }
 
 func TestCreateAudioFile_ToFlac(t *testing.T) {
@@ -89,6 +98,15 @@ func TestCreateAudioFile_ToFlac(t *testing.T) {
 	flacMagic := []byte{0x66, 0x4C, 0x61, 0x43}
 	if !bytes.HasPrefix(got.Bytes(), flacMagic) {
 		t.Errorf("CreateAudioFile() output does not have FLAC magic header, got %v", got.Bytes()[:min(4, got.Len())])
+	}
+
+	// Sox FLAC encoding of 30s stereo 48kHz audio should be smaller than raw
+	// (raw = 5.76MB, FLAC typically 3-5MB for a frequency sweep)
+	if got.Len() < 100 {
+		t.Errorf("FLAC output suspiciously small: %d bytes", got.Len())
+	}
+	if got.Len() > len(rawTestAudio) {
+		t.Errorf("Sox FLAC output (%d bytes) larger than raw input (%d bytes)", got.Len(), len(rawTestAudio))
 	}
 }
 

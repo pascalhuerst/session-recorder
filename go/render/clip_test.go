@@ -102,6 +102,22 @@ func TestClipAndEncodeOgg(t *testing.T) {
 	if !bytes.HasPrefix(got.Bytes(), oggMagic) {
 		t.Errorf("ClipAndEncodeOgg() output does not have OGG magic header, got %v", got.Bytes()[:min(4, got.Len())])
 	}
+
+	// A 0.5s clip should be much smaller than the full 30s OGG encoding
+	if got.Len() < 50 {
+		t.Errorf("Clipped OGG suspiciously small: %d bytes", got.Len())
+	}
+
+	// Also encode the full file to compare sizes
+	fullRaw := bytes.NewReader(rawTestAudio)
+	fullOgg, err := CreateAudioFile(fullRaw, "ogg")
+	if err != nil {
+		t.Fatalf("CreateAudioFile() for full OGG failed: %v", err)
+	}
+	// A 0.5s clip of 30s audio should be roughly 60x smaller, with generous margin
+	if got.Len() >= fullOgg.Len() {
+		t.Errorf("Clipped OGG (%d bytes) should be smaller than full OGG (%d bytes)", got.Len(), fullOgg.Len())
+	}
 }
 
 func TestClipAndEncodeFlac(t *testing.T) {
@@ -136,6 +152,17 @@ func TestClipAndEncodeFlac(t *testing.T) {
 	flacMagic := []byte{0x66, 0x4C, 0x61, 0x43}
 	if !bytes.HasPrefix(got.Bytes(), flacMagic) {
 		t.Errorf("ClipAndEncodeFlac() output does not have FLAC magic header, got %v", got.Bytes()[:min(4, got.Len())])
+	}
+
+	// A 0.5s FLAC clip should be much smaller than the 30s raw input
+	if got.Len() < 50 {
+		t.Errorf("Clipped FLAC suspiciously small: %d bytes", got.Len())
+	}
+	// 0.5s of raw = 48000 samples/s * 0.5s * 2ch * 2bytes = 96000 bytes
+	// FLAC should be at most that size (lossless)
+	maxExpected := 96000 * 2 // generous margin
+	if got.Len() > maxExpected {
+		t.Errorf("Clipped FLAC (%d bytes) larger than expected max (%d bytes) for 0.5s clip", got.Len(), maxExpected)
 	}
 }
 

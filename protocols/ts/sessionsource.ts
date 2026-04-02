@@ -187,6 +187,19 @@ export interface SessionInfo {
      * @generated from protobuf field: string errorMessage = 13
      */
     errorMessage: string;
+    /**
+     * Estimated recording duration. Set when session transitions to PROCESSING
+     * (estimated from chunk data), updated with exact value after rendering.
+     *
+     * @generated from protobuf field: google.protobuf.Duration duration = 14
+     */
+    duration?: Duration;
+    /**
+     * Render progress (0.0 to 1.0). Only set during PROCESSING state.
+     *
+     * @generated from protobuf field: double renderProgress = 15
+     */
+    renderProgress: number;
 }
 /**
  * @generated from protobuf message sessionsource.SessionInfo.Files
@@ -368,6 +381,19 @@ export interface CutSessionRequest {
      * @generated from protobuf field: string recorderID = 1
      */
     recorderID: string;
+}
+/**
+ * @generated from protobuf message sessionsource.RetryRenderSessionRequest
+ */
+export interface RetryRenderSessionRequest {
+    /**
+     * @generated from protobuf field: string recorderID = 1
+     */
+    recorderID: string;
+    /**
+     * @generated from protobuf field: string sessionID = 2
+     */
+    sessionID: string;
 }
 /**
  * @generated from protobuf message sessionsource.ShareSessionRequest
@@ -951,7 +977,9 @@ class SessionInfo$Type extends MessageType<SessionInfo> {
             { no: 10, name: "segments", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => Segment },
             { no: 11, name: "inlineFiles", kind: "message", T: () => SessionInfo_Files },
             { no: 12, name: "downloadFiles", kind: "message", T: () => SessionInfo_Files },
-            { no: 13, name: "errorMessage", kind: "scalar", T: 9 /*ScalarType.STRING*/ }
+            { no: 13, name: "errorMessage", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 14, name: "duration", kind: "message", T: () => Duration },
+            { no: 15, name: "renderProgress", kind: "scalar", T: 1 /*ScalarType.DOUBLE*/ }
         ]);
     }
     create(value?: PartialMessage<SessionInfo>): SessionInfo {
@@ -961,6 +989,7 @@ class SessionInfo$Type extends MessageType<SessionInfo> {
         message.state = 0;
         message.segments = [];
         message.errorMessage = "";
+        message.renderProgress = 0;
         if (value !== undefined)
             reflectionMergePartial<SessionInfo>(this, message, value);
         return message;
@@ -999,6 +1028,12 @@ class SessionInfo$Type extends MessageType<SessionInfo> {
                     break;
                 case /* string errorMessage */ 13:
                     message.errorMessage = reader.string();
+                    break;
+                case /* google.protobuf.Duration duration */ 14:
+                    message.duration = Duration.internalBinaryRead(reader, reader.uint32(), options, message.duration);
+                    break;
+                case /* double renderProgress */ 15:
+                    message.renderProgress = reader.double();
                     break;
                 default:
                     let u = options.readUnknownField;
@@ -1042,6 +1077,12 @@ class SessionInfo$Type extends MessageType<SessionInfo> {
         /* string errorMessage = 13; */
         if (message.errorMessage !== "")
             writer.tag(13, WireType.LengthDelimited).string(message.errorMessage);
+        /* google.protobuf.Duration duration = 14; */
+        if (message.duration)
+            Duration.internalBinaryWrite(message.duration, writer.tag(14, WireType.LengthDelimited).fork(), options).join();
+        /* double renderProgress = 15; */
+        if (message.renderProgress !== 0)
+            writer.tag(15, WireType.Bit64).double(message.renderProgress);
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
@@ -1716,6 +1757,61 @@ class CutSessionRequest$Type extends MessageType<CutSessionRequest> {
  */
 export const CutSessionRequest = new CutSessionRequest$Type();
 // @generated message type with reflection information, may provide speed optimized methods
+class RetryRenderSessionRequest$Type extends MessageType<RetryRenderSessionRequest> {
+    constructor() {
+        super("sessionsource.RetryRenderSessionRequest", [
+            { no: 1, name: "recorderID", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 2, name: "sessionID", kind: "scalar", T: 9 /*ScalarType.STRING*/ }
+        ]);
+    }
+    create(value?: PartialMessage<RetryRenderSessionRequest>): RetryRenderSessionRequest {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.recorderID = "";
+        message.sessionID = "";
+        if (value !== undefined)
+            reflectionMergePartial<RetryRenderSessionRequest>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: RetryRenderSessionRequest): RetryRenderSessionRequest {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* string recorderID */ 1:
+                    message.recorderID = reader.string();
+                    break;
+                case /* string sessionID */ 2:
+                    message.sessionID = reader.string();
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: RetryRenderSessionRequest, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* string recorderID = 1; */
+        if (message.recorderID !== "")
+            writer.tag(1, WireType.LengthDelimited).string(message.recorderID);
+        /* string sessionID = 2; */
+        if (message.sessionID !== "")
+            writer.tag(2, WireType.LengthDelimited).string(message.sessionID);
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message sessionsource.RetryRenderSessionRequest
+ */
+export const RetryRenderSessionRequest = new RetryRenderSessionRequest$Type();
+// @generated message type with reflection information, may provide speed optimized methods
 class ShareSessionRequest$Type extends MessageType<ShareSessionRequest> {
     constructor() {
         super("sessionsource.ShareSessionRequest", [
@@ -1989,7 +2085,7 @@ export const SessionSource = new ServiceType("sessionsource.SessionSource", [
     { name: "RenderSegment", options: {}, I: RenderSegmentRequest, O: Respone },
     { name: "UpdateSegment", options: {}, I: UpdateSegmentRequest, O: Respone },
     { name: "CutSession", options: {}, I: CutSessionRequest, O: Respone },
-    { name: "RetryRenderSession", options: {}, I: DeleteSessionRequest, O: Respone },
+    { name: "RetryRenderSession", options: {}, I: RetryRenderSessionRequest, O: Respone },
     { name: "ShareSession", options: {}, I: ShareSessionRequest, O: Respone },
     { name: "ShareSegment", options: {}, I: ShareSegmentRequest, O: Respone }
 ]);

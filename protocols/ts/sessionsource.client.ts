@@ -6,6 +6,7 @@ import type { ServiceInfo } from "@protobuf-ts/runtime-rpc";
 import { SessionSource } from "./sessionsource";
 import type { ShareSegmentRequest } from "./sessionsource";
 import type { ShareSessionRequest } from "./sessionsource";
+import type { RetryRenderSessionRequest } from "./sessionsource";
 import type { CutSessionRequest } from "./sessionsource";
 import type { UpdateSegmentRequest } from "./sessionsource";
 import type { RenderSegmentRequest } from "./sessionsource";
@@ -80,7 +81,7 @@ export interface ISessionSourceClient {
     /**
      * @generated from protobuf rpc: RetryRenderSession
      */
-    retryRenderSession(input: DeleteSessionRequest, options?: RpcOptions): UnaryCall<DeleteSessionRequest, Respone>;
+    retryRenderSession(input: RetryRenderSessionRequest, options?: RpcOptions): UnaryCall<RetryRenderSessionRequest, Respone>;
     /**
      * @generated from protobuf rpc: ShareSession
      */
@@ -183,9 +184,9 @@ export class SessionSourceClient implements ISessionSourceClient, ServiceInfo {
     /**
      * @generated from protobuf rpc: RetryRenderSession
      */
-    retryRenderSession(input: DeleteSessionRequest, options?: RpcOptions): UnaryCall<DeleteSessionRequest, Respone> {
+    retryRenderSession(input: RetryRenderSessionRequest, options?: RpcOptions): UnaryCall<RetryRenderSessionRequest, Respone> {
         const method = this.methods[11], opt = this._transport.mergeOptions(options);
-        return stackIntercept<DeleteSessionRequest, Respone>("unary", this._transport, method, opt, input);
+        return stackIntercept<RetryRenderSessionRequest, Respone>("unary", this._transport, method, opt, input);
     }
     /**
      * @generated from protobuf rpc: ShareSession

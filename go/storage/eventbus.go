@@ -8,6 +8,7 @@ import "sync"
 type EventListener interface {
 	OnSessionStateChanged(event SessionStateChangedEvent)
 	OnSegmentStateChanged(event SegmentStateChangedEvent)
+	OnRenderProgress(event RenderProgressEvent)
 }
 
 // EventBus dispatches lifecycle events to registered listeners.
@@ -63,5 +64,14 @@ func (eb *EventBus) EmitSegmentStateChanged(event SegmentStateChangedEvent) {
 	defer eb.mu.RUnlock()
 	for _, l := range eb.listeners {
 		l.OnSegmentStateChanged(event)
+	}
+}
+
+// EmitRenderProgress dispatches a render progress event to all listeners.
+func (eb *EventBus) EmitRenderProgress(event RenderProgressEvent) {
+	eb.mu.RLock()
+	defer eb.mu.RUnlock()
+	for _, l := range eb.listeners {
+		l.OnRenderProgress(event)
 	}
 }

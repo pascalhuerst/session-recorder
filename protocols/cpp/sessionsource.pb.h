@@ -1908,6 +1908,7 @@ class SessionInfo final :
     kDurationFieldNumber = 14,
     kKeepFieldNumber = 8,
     kStateFieldNumber = 9,
+    kRenderProgressFieldNumber = 15,
   };
   // repeated .sessionsource.Segment segments = 10;
   int segments_size() const;
@@ -2081,6 +2082,15 @@ class SessionInfo final :
   void _internal_set_state(::sessionsource::SessionState value);
   public:
 
+  // double renderProgress = 15;
+  void clear_renderprogress();
+  double renderprogress() const;
+  void set_renderprogress(double value);
+  private:
+  double _internal_renderprogress() const;
+  void _internal_set_renderprogress(double value);
+  public:
+
   // @@protoc_insertion_point(class_scope:sessionsource.SessionInfo)
  private:
   class _Internal;
@@ -2099,6 +2109,7 @@ class SessionInfo final :
   ::PROTOBUF_NAMESPACE_ID::Duration* duration_;
   bool keep_;
   int state_;
+  double renderprogress_;
   mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   friend struct ::TableStruct_sessionsource_2eproto;
 };
@@ -6798,6 +6809,26 @@ inline void SessionInfo::set_allocated_duration(::PROTOBUF_NAMESPACE_ID::Duratio
   }
   duration_ = duration;
   // @@protoc_insertion_point(field_set_allocated:sessionsource.SessionInfo.duration)
+}
+
+// double renderProgress = 15;
+inline void SessionInfo::clear_renderprogress() {
+  renderprogress_ = 0;
+}
+inline double SessionInfo::_internal_renderprogress() const {
+  return renderprogress_;
+}
+inline double SessionInfo::renderprogress() const {
+  // @@protoc_insertion_point(field_get:sessionsource.SessionInfo.renderProgress)
+  return _internal_renderprogress();
+}
+inline void SessionInfo::_internal_set_renderprogress(double value) {
+  
+  renderprogress_ = value;
+}
+inline void SessionInfo::set_renderprogress(double value) {
+  _internal_set_renderprogress(value);
+  // @@protoc_insertion_point(field_set:sessionsource.SessionInfo.renderProgress)
 }
 
 // -------------------------------------------------------------------

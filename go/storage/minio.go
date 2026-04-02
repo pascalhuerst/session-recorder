@@ -892,13 +892,62 @@ func (m *Minio) flushChunks(ctx context.Context, recorderID, sessionID uuid.UUID
 	return nil
 }
 
-func (m *Minio) renderFromRawData(ctx context.Context, recorderID, sessionID uuid.UUID, rawData io.Reader) error {
+// progressReader wraps an io.Reader and calls onProgress with the fraction
+// of totalSize that has been read. Calls are throttled to at most once per interval.
+type progressReader struct {
+	reader     io.Reader
+	totalSize  int64
+	bytesRead  int64
+	onProgress func(progress float64)
+	lastEmit   time.Time
+	interval   time.Duration
+}
+
+func (pr *progressReader) Read(p []byte) (int, error) {
+	n, err := pr.reader.Read(p)
+	pr.bytesRead += int64(n)
+	if pr.totalSize > 0 && time.Since(pr.lastEmit) >= pr.interval {
+		progress := float64(pr.bytesRead) / float64(pr.totalSize)
+		if progress > 1.0 {
+			progress = 1.0
+		}
+		pr.onProgress(progress)
+		pr.lastEmit = time.Now()
+	}
+	return n, err
+}
+
+func (m *Minio) renderFromRawData(ctx context.Context, recorderID, sessionID uuid.UUID, rawData io.Reader, totalSize int64) error {
 	readers, writer, closer := makeReaders(4)
 	eg, egCtx := errgroup.WithContext(ctx)
 
+	// Wrap rawData to track and broadcast progress
+	pr := &progressReader{
+		reader:    rawData,
+		totalSize: totalSize,
+		interval:  500 * time.Millisecond,
+		onProgress: func(progress float64) {
+			// Update in-memory session state
+			m.dataLock.Lock()
+			if recorder, ok := m.system.Recorders[recorderID]; ok {
+				if session, ok := recorder.Sessions[sessionID]; ok {
+					session.RenderProgress = progress
+					m.system.Recorders[recorderID].Sessions[sessionID] = session
+				}
+			}
+			m.dataLock.Unlock()
+
+			m.eventBus.EmitRenderProgress(RenderProgressEvent{
+				RecorderID: recorderID,
+				SessionID:  sessionID,
+				Progress:   progress,
+			})
+		},
+	}
+
 	eg.Go(func() error {
 		defer closer.Close()
-		_, err := io.Copy(writer, rawData)
+		_, err := io.Copy(writer, pr)
 		if err != nil {
 			log.Err(err).Msg("Cannot setup multiple readers")
 			return err
@@ -1082,7 +1131,7 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 			return fmt.Errorf("cannot get raw data: %w", err)
 		}
 
-		return m.renderFromRawData(ctx, recorderID, sessionID, rawData)
+		return m.renderFromRawData(ctx, recorderID, sessionID, rawData, rawStat.Size)
 	}
 
 	ui, err := m.client.ComposeObject(ctx, dst, srcs...)
@@ -1124,7 +1173,7 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 		return err
 	}
 
-	if err := m.renderFromRawData(ctx, recorderID, sessionID, rawData); err != nil {
+	if err := m.renderFromRawData(ctx, recorderID, sessionID, rawData, ui.Size); err != nil {
 		return err
 	}
 

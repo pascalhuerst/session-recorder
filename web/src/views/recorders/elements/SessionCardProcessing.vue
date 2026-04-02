@@ -114,11 +114,15 @@ onUnmounted(() => {
 <template>
   <div class="processing-overview">
     <canvas ref="canvasRef" class="waveform-canvas" />
+    <div v-if="session.renderProgress" class="progress-bar">
+      <div class="progress-fill" :style="{ width: `${Math.round(session.renderProgress * 100)}%` }" />
+    </div>
   </div>
 </template>
 
 <style scoped>
 .processing-overview {
+  position: relative;
   display: flex;
   flex-direction: row;
   flex-wrap: nowrap;
@@ -132,5 +136,20 @@ onUnmounted(() => {
   height: 80px;
   border-top: 1px solid var(--border-primary);
   border-bottom: 1px solid var(--border-primary);
+}
+
+.progress-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--color-grey-400);
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--color-primary, #ed730c);
+  transition: width 0.3s ease;
 }
 </style>

@@ -580,9 +580,11 @@ type SessionInfo struct {
 	ErrorMessage  string                 `protobuf:"bytes,13,opt,name=errorMessage,proto3" json:"errorMessage,omitempty"`
 	// Estimated recording duration. Set when session transitions to PROCESSING
 	// (estimated from chunk data), updated with exact value after rendering.
-	Duration      *durationpb.Duration `protobuf:"bytes,14,opt,name=duration,proto3" json:"duration,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Duration *durationpb.Duration `protobuf:"bytes,14,opt,name=duration,proto3" json:"duration,omitempty"`
+	// Render progress (0.0 to 1.0). Only set during PROCESSING state.
+	RenderProgress float64 `protobuf:"fixed64,15,opt,name=renderProgress,proto3" json:"renderProgress,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *SessionInfo) Reset() {
@@ -690,6 +692,13 @@ func (x *SessionInfo) GetDuration() *durationpb.Duration {
 		return x.Duration
 	}
 	return nil
+}
+
+func (x *SessionInfo) GetRenderProgress() float64 {
+	if x != nil {
+		return x.RenderProgress
+	}
+	return 0
 }
 
 type SessionRemoved struct {
@@ -1729,7 +1738,7 @@ const file_sessionsource_proto_rawDesc = "" +
 	"\tsegmentID\x18\x01 \x01(\tR\tsegmentID\x126\n" +
 	"\aupdated\x18\x02 \x01(\v2\x1a.sessionsource.SegmentInfoH\x00R\aupdated\x129\n" +
 	"\aremoved\x18\x03 \x01(\v2\x1d.sessionsource.SegmentRemovedH\x00R\aremovedB\x06\n" +
-	"\x04info\"\x83\x05\n" +
+	"\x04info\"\xab\x05\n" +
 	"\vSessionInfo\x12<\n" +
 	"\vtimeCreated\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\vtimeCreated\x12>\n" +
 	"\ftimeFinished\x18\x03 \x01(\v2\x1a.google.protobuf.TimestampR\ftimeFinished\x125\n" +
@@ -1742,7 +1751,8 @@ const file_sessionsource_proto_rawDesc = "" +
 	"\vinlineFiles\x18\v \x01(\v2 .sessionsource.SessionInfo.FilesR\vinlineFiles\x12F\n" +
 	"\rdownloadFiles\x18\f \x01(\v2 .sessionsource.SessionInfo.FilesR\rdownloadFiles\x12\"\n" +
 	"\ferrorMessage\x18\r \x01(\tR\ferrorMessage\x125\n" +
-	"\bduration\x18\x0e \x01(\v2\x19.google.protobuf.DurationR\bduration\x1aI\n" +
+	"\bduration\x18\x0e \x01(\v2\x19.google.protobuf.DurationR\bduration\x12&\n" +
+	"\x0erenderProgress\x18\x0f \x01(\x01R\x0erenderProgress\x1aI\n" +
 	"\x05Files\x12\x10\n" +
 	"\x03ogg\x18\x01 \x01(\tR\x03ogg\x12\x12\n" +
 	"\x04flac\x18\x02 \x01(\tR\x04flac\x12\x1a\n" +

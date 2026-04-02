@@ -95,6 +95,9 @@ message SessionInfo {
 	// Estimated recording duration. Set when session transitions to PROCESSING
 	// (estimated from chunk data), updated with exact value after rendering.
 	google.protobuf.Duration duration = 14;
+
+	// Render progress (0.0 to 1.0). Only set during PROCESSING state.
+	double renderProgress = 15;
 }
 
 message SessionRemoved {}

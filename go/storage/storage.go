@@ -201,6 +201,11 @@ type Session struct {
 	// IsClosed is deprecated, kept for backward compatibility with existing metadata
 	IsClosed bool `json:"is_closed,omitempty"`
 
+	// RenderProgress tracks rendering progress (0.0 to 1.0).
+	// Only meaningful when State == SessionStateProcessing.
+	// Not persisted to metadata — transient, in-memory only.
+	RenderProgress float64 `json:"-"`
+
 	// key: segment id
 	Segments map[uuid.UUID]Segment `json:"segments"`
 }

@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
+	"net/http"
 	"net/url"
 	"strings"
 	"sync"
@@ -114,9 +116,26 @@ type Minio struct {
 }
 
 func NewMinioStorage(endpoint, localEndpoint, publicEndpoint, accessKey, secretKey string) (*Minio, error) {
+	// Custom transport with a generous ResponseHeaderTimeout for large
+	// ComposeObject operations (server-side multipart copy of many chunks).
+	transport := &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+		MaxIdleConns:          256,
+		MaxIdleConnsPerHost:   16,
+		IdleConnTimeout:       90 * time.Second,
+		TLSHandshakeTimeout:  10 * time.Second,
+		ResponseHeaderTimeout: 10 * time.Minute,
+		ExpectContinueTimeout: 10 * time.Second,
+	}
+
 	c, err := minio.New(endpoint, &minio.Options{
-		Creds:  credentials.NewStaticV4(accessKey, secretKey, ""),
-		Secure: false,
+		Creds:     credentials.NewStaticV4(accessKey, secretKey, ""),
+		Secure:    false,
+		Transport: transport,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("cannot create minio client: %w", err)
@@ -348,6 +367,28 @@ func (m *Minio) removeSessionMachine(sessionID uuid.UUID) {
 }
 
 // fireSessionTrigger fires a trigger on a session's state machine.
+// sanitizeErrorForUser strips internal details (URLs, uploadIds, bucket paths)
+// from error messages before they are stored in session/segment metadata and
+// shown in the UI. The full error is always available in the server logs.
+func sanitizeErrorForUser(raw string) string {
+	// Walk the ": "-delimited chain and drop any segment that looks like an
+	// internal URL or raw HTTP error.
+	parts := strings.Split(raw, ": ")
+	var cleaned []string
+	for _, p := range parts {
+		if strings.Contains(p, "://") || strings.HasPrefix(p, "Post ") ||
+			strings.HasPrefix(p, "Get ") || strings.HasPrefix(p, "Put ") ||
+			strings.HasPrefix(p, "Delete ") || strings.Contains(p, "uploadId=") {
+			continue
+		}
+		cleaned = append(cleaned, p)
+	}
+	if len(cleaned) == 0 {
+		return "internal storage error"
+	}
+	return strings.Join(cleaned, ": ")
+}
+
 func (m *Minio) fireSessionTrigger(ctx context.Context, sessionID uuid.UUID, trigger sessionTrigger, errorMsg ...string) error {
 	m.machineLock.Lock()
 	sm, ok := m.sessionMachines[sessionID]
@@ -1005,7 +1046,7 @@ func (m *Minio) renderFromRawData(ctx context.Context, recorderID, sessionID uui
 
 	if err := eg.Wait(); err != nil {
 		// Transition to ERROR via FSM
-		if fireErr := m.fireSessionTrigger(ctx, sessionID, triggerRenderFailure, err.Error()); fireErr != nil {
+		if fireErr := m.fireSessionTrigger(ctx, sessionID, triggerRenderFailure, sanitizeErrorForUser(err.Error())); fireErr != nil {
 			log.Err(fireErr).Msg("Cannot transition session to ERROR state")
 		}
 		return err
@@ -1625,7 +1666,7 @@ func (m *Minio) closeSessionAsync(ctx context.Context, recorderID, sessionID uui
 	if err := m.renderSession(ctx, recorderID, sessionID); err != nil {
 		// renderFromRawData fires triggerRenderFailure internally, but ComposeObject
 		// failures happen before that. Fire as safety net.
-		m.fireSessionTrigger(ctx, sessionID, triggerRenderFailure, err.Error())
+		m.fireSessionTrigger(ctx, sessionID, triggerRenderFailure, sanitizeErrorForUser(err.Error()))
 		return fmt.Errorf("cannot render session: %w", err)
 	}
 
@@ -2142,7 +2183,7 @@ func (m *Minio) renderSegmentSync(ctx context.Context, recorderID, sessionID, se
 	log.Info().Stringer("segment-id", segmentID).Msg("Waiting for segment encoding to complete")
 	if err := eg.Wait(); err != nil {
 		log.Error().Stringer("segment-id", segmentID).Err(err).Msg("Segment encoding errgroup failed")
-		m.setSegmentError(ctx, recorderID, sessionID, segmentID, err.Error())
+		m.setSegmentError(ctx, recorderID, sessionID, segmentID, sanitizeErrorForUser(err.Error()))
 		return err
 	}
 	log.Info().Stringer("segment-id", segmentID).Msg("Segment encoding completed successfully")

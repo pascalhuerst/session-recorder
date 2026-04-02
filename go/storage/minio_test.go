@@ -330,6 +330,44 @@ func TestSigningOptions(t *testing.T) {
 	}
 }
 
+func TestSanitizeErrorForUser(t *testing.T) {
+	tests := []struct {
+		name string
+		raw  string
+		want string
+	}{
+		{
+			name: "compose timeout with internal URL",
+			raw:  `cannot compose object: Post "http://session-recorder-minio:9000/session-recorder/c42d203b/sessions/d01e7b65/data.raw?uploadId=Mjg1ZDBlMjctZTRjMi00OTg5": net/http: timeout awaiting response headers`,
+			want: "cannot compose object: net/http: timeout awaiting response headers",
+		},
+		{
+			name: "simple error without URL",
+			raw:  "cannot encode session to FLAC: exit status 1",
+			want: "cannot encode session to FLAC: exit status 1",
+		},
+		{
+			name: "PutObject URL stripped",
+			raw:  `cannot upload FLAC: Put "http://minio:9000/bucket/obj": connection refused`,
+			want: "cannot upload FLAC: connection refused",
+		},
+		{
+			name: "all parts are URLs",
+			raw:  `Post "http://minio:9000/bucket/obj?uploadId=abc"`,
+			want: "internal storage error",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := sanitizeErrorForUser(tt.raw)
+			if got != tt.want {
+				t.Errorf("sanitizeErrorForUser() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestMinio_CloseIntermediateSessions_RecorderNotFound(t *testing.T) {
 	m := &Minio{
 		system: &System{

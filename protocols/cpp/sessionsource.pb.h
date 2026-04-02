@@ -1905,6 +1905,7 @@ class SessionInfo final :
     kLifetimeFieldNumber = 4,
     kInlineFilesFieldNumber = 11,
     kDownloadFilesFieldNumber = 12,
+    kDurationFieldNumber = 14,
     kKeepFieldNumber = 8,
     kStateFieldNumber = 9,
   };
@@ -2044,6 +2045,24 @@ class SessionInfo final :
       ::sessionsource::SessionInfo_Files* downloadfiles);
   ::sessionsource::SessionInfo_Files* unsafe_arena_release_downloadfiles();
 
+  // .google.protobuf.Duration duration = 14;
+  bool has_duration() const;
+  private:
+  bool _internal_has_duration() const;
+  public:
+  void clear_duration();
+  const ::PROTOBUF_NAMESPACE_ID::Duration& duration() const;
+  PROTOBUF_NODISCARD ::PROTOBUF_NAMESPACE_ID::Duration* release_duration();
+  ::PROTOBUF_NAMESPACE_ID::Duration* mutable_duration();
+  void set_allocated_duration(::PROTOBUF_NAMESPACE_ID::Duration* duration);
+  private:
+  const ::PROTOBUF_NAMESPACE_ID::Duration& _internal_duration() const;
+  ::PROTOBUF_NAMESPACE_ID::Duration* _internal_mutable_duration();
+  public:
+  void unsafe_arena_set_allocated_duration(
+      ::PROTOBUF_NAMESPACE_ID::Duration* duration);
+  ::PROTOBUF_NAMESPACE_ID::Duration* unsafe_arena_release_duration();
+
   // bool keep = 8;
   void clear_keep();
   bool keep() const;
@@ -2077,6 +2096,7 @@ class SessionInfo final :
   ::PROTOBUF_NAMESPACE_ID::Duration* lifetime_;
   ::sessionsource::SessionInfo_Files* inlinefiles_;
   ::sessionsource::SessionInfo_Files* downloadfiles_;
+  ::PROTOBUF_NAMESPACE_ID::Duration* duration_;
   bool keep_;
   int state_;
   mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
@@ -6692,6 +6712,92 @@ inline void SessionInfo::set_allocated_errormessage(std::string* errormessage) {
   }
 #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
   // @@protoc_insertion_point(field_set_allocated:sessionsource.SessionInfo.errorMessage)
+}
+
+// .google.protobuf.Duration duration = 14;
+inline bool SessionInfo::_internal_has_duration() const {
+  return this != internal_default_instance() && duration_ != nullptr;
+}
+inline bool SessionInfo::has_duration() const {
+  return _internal_has_duration();
+}
+inline const ::PROTOBUF_NAMESPACE_ID::Duration& SessionInfo::_internal_duration() const {
+  const ::PROTOBUF_NAMESPACE_ID::Duration* p = duration_;
+  return p != nullptr ? *p : reinterpret_cast<const ::PROTOBUF_NAMESPACE_ID::Duration&>(
+      ::PROTOBUF_NAMESPACE_ID::_Duration_default_instance_);
+}
+inline const ::PROTOBUF_NAMESPACE_ID::Duration& SessionInfo::duration() const {
+  // @@protoc_insertion_point(field_get:sessionsource.SessionInfo.duration)
+  return _internal_duration();
+}
+inline void SessionInfo::unsafe_arena_set_allocated_duration(
+    ::PROTOBUF_NAMESPACE_ID::Duration* duration) {
+  if (GetArenaForAllocation() == nullptr) {
+    delete reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(duration_);
+  }
+  duration_ = duration;
+  if (duration) {
+    
+  } else {
+    
+  }
+  // @@protoc_insertion_point(field_unsafe_arena_set_allocated:sessionsource.SessionInfo.duration)
+}
+inline ::PROTOBUF_NAMESPACE_ID::Duration* SessionInfo::release_duration() {
+  
+  ::PROTOBUF_NAMESPACE_ID::Duration* temp = duration_;
+  duration_ = nullptr;
+#ifdef PROTOBUF_FORCE_COPY_IN_RELEASE
+  auto* old =  reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(temp);
+  temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
+  if (GetArenaForAllocation() == nullptr) { delete old; }
+#else  // PROTOBUF_FORCE_COPY_IN_RELEASE
+  if (GetArenaForAllocation() != nullptr) {
+    temp = ::PROTOBUF_NAMESPACE_ID::internal::DuplicateIfNonNull(temp);
+  }
+#endif  // !PROTOBUF_FORCE_COPY_IN_RELEASE
+  return temp;
+}
+inline ::PROTOBUF_NAMESPACE_ID::Duration* SessionInfo::unsafe_arena_release_duration() {
+  // @@protoc_insertion_point(field_release:sessionsource.SessionInfo.duration)
+  
+  ::PROTOBUF_NAMESPACE_ID::Duration* temp = duration_;
+  duration_ = nullptr;
+  return temp;
+}
+inline ::PROTOBUF_NAMESPACE_ID::Duration* SessionInfo::_internal_mutable_duration() {
+  
+  if (duration_ == nullptr) {
+    auto* p = CreateMaybeMessage<::PROTOBUF_NAMESPACE_ID::Duration>(GetArenaForAllocation());
+    duration_ = p;
+  }
+  return duration_;
+}
+inline ::PROTOBUF_NAMESPACE_ID::Duration* SessionInfo::mutable_duration() {
+  ::PROTOBUF_NAMESPACE_ID::Duration* _msg = _internal_mutable_duration();
+  // @@protoc_insertion_point(field_mutable:sessionsource.SessionInfo.duration)
+  return _msg;
+}
+inline void SessionInfo::set_allocated_duration(::PROTOBUF_NAMESPACE_ID::Duration* duration) {
+  ::PROTOBUF_NAMESPACE_ID::Arena* message_arena = GetArenaForAllocation();
+  if (message_arena == nullptr) {
+    delete reinterpret_cast< ::PROTOBUF_NAMESPACE_ID::MessageLite*>(duration_);
+  }
+  if (duration) {
+    ::PROTOBUF_NAMESPACE_ID::Arena* submessage_arena =
+        ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper<
+            ::PROTOBUF_NAMESPACE_ID::MessageLite>::GetOwningArena(
+                reinterpret_cast<::PROTOBUF_NAMESPACE_ID::MessageLite*>(duration));
+    if (message_arena != submessage_arena) {
+      duration = ::PROTOBUF_NAMESPACE_ID::internal::GetOwnedMessage(
+          message_arena, duration, submessage_arena);
+    }
+    
+  } else {
+    
+  }
+  duration_ = duration;
+  // @@protoc_insertion_point(field_set_allocated:sessionsource.SessionInfo.duration)
 }
 
 // -------------------------------------------------------------------

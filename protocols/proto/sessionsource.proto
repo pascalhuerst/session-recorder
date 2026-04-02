@@ -91,6 +91,10 @@ message SessionInfo {
 	Files downloadFiles = 12;
 
 	string errorMessage = 13;
+
+	// Estimated recording duration. Set when session transitions to PROCESSING
+	// (estimated from chunk data), updated with exact value after rendering.
+	google.protobuf.Duration duration = 14;
 }
 
 message SessionRemoved {}

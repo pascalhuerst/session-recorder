@@ -187,6 +187,11 @@ func newSessionInfo(ctx context.Context, h *SessionSourceHandler, session *stora
 		Segments:     []*sspb.Segment{},
 	}
 
+	// Set duration if available (estimated at PROCESSING time, exact after render)
+	if session.Duration > 0 {
+		info.Duration = durationpb.New(session.Duration)
+	}
+
 	// Only set TimeFinished for finished sessions
 	if session.State == storage.SessionStateFinished && !session.EndTime.IsZero() {
 		info.TimeFinished = timestamppb.New(session.EndTime)
@@ -445,7 +450,7 @@ func (h *SessionSourceHandler) cutSession(ctx context.Context, request *sspb.Cut
 	return success, nil
 }
 
-func (h *SessionSourceHandler) retryRenderSession(ctx context.Context, request *sspb.DeleteSessionRequest) (*cmpb.Respone, error) {
+func (h *SessionSourceHandler) retryRenderSession(ctx context.Context, request *sspb.RetryRenderSessionRequest) (*cmpb.Respone, error) {
 	recorderID, sessionID, err := parseIDs(request.RecorderID, request.SessionID)
 	if err != nil {
 		log.Err(err).

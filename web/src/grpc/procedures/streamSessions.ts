@@ -88,6 +88,14 @@ export const normalizeSession = (id: string, info: SessionInfo): Session => {
       }
       return Timestamp.toDate(info.timeFinished);
     },
+    duration: () => {
+      if (!info.duration) {
+        return null;
+      }
+      // Convert protobuf Duration to seconds
+      const seconds = Number(info.duration.seconds) + info.duration.nanos / 1e9;
+      return seconds > 0 ? seconds : null;
+    },
     expiresAt: () => {
       if (!info.timeFinished || !info.lifetime) {
         return null;

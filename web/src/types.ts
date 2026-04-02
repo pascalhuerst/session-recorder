@@ -29,6 +29,7 @@ export type Session = {
   startedAt: Date;
   finishedAt: Date | null;
   expiresAt: Date | null;
+  duration: number | null; // seconds (estimated during processing, exact after finished)
   name: string;
   keep: boolean;
   state: SessionState;

@@ -1595,6 +1595,26 @@ func (m *Minio) CloseRecordingSession(ctx context.Context, recorderID, sessionID
 		delete(m.chunks, recorderID)
 		delete(m.lastChunkTime, recorderID)
 	}
+
+	// Estimate duration from known chunk data before transitioning state.
+	// This lets the PROCESSING broadcast include an estimated duration for the UI.
+	if chunkCopy != nil {
+		const bytesPerSecond = 48000.0 * 2.0 * 2.0 // 48kHz, 16-bit, stereo
+		// flushedChunks × minChunkSize + remaining buffer
+		totalBytes := int64(chunkCopy.number)*int64(minChunkSize) + int64(chunkCopy.buffer.Len())
+		estimatedDuration := time.Duration(float64(totalBytes) / bytesPerSecond * float64(time.Second))
+
+		if recorder, ok := m.system.Recorders[recorderID]; ok {
+			if session, ok := recorder.Sessions[sessionID]; ok {
+				session.Duration = estimatedDuration
+				session.EndTime = session.StartTime.Add(estimatedDuration)
+				m.system.Recorders[recorderID].Sessions[sessionID] = session
+				if err := m.putSessionMetadata(ctx, recorderID, sessionID, &session); err != nil {
+					log.Err(err).Msg("Cannot persist estimated duration")
+				}
+			}
+		}
+	}
 	m.dataLock.Unlock()
 
 	// Transition to PROCESSING via FSM

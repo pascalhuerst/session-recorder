@@ -3248,7 +3248,7 @@ func TestRetryRenderSessionSuccess(t *testing.T) {
 	}
 	store.mu.Unlock()
 
-	resp, err := sessionSourceHandler.retryRenderSession(ctx, &sspb.DeleteSessionRequest{
+	resp, err := sessionSourceHandler.retryRenderSession(ctx, &sspb.RetryRenderSessionRequest{
 		RecorderID: recorderID.String(),
 		SessionID:  sessionID.String(),
 	})
@@ -3281,7 +3281,7 @@ func TestRetryRenderSessionStorageFailure(t *testing.T) {
 	store.retryRenderErr = fmt.Errorf("session not found")
 	store.mu.Unlock()
 
-	resp, err := sessionSourceHandler.retryRenderSession(ctx, &sspb.DeleteSessionRequest{
+	resp, err := sessionSourceHandler.retryRenderSession(ctx, &sspb.RetryRenderSessionRequest{
 		RecorderID: uuid.New().String(),
 		SessionID:  uuid.New().String(),
 	})
@@ -3299,7 +3299,7 @@ func TestRetryRenderSessionInvalidUUID(t *testing.T) {
 	_, _, _, sessionSourceHandler, _, _, _ := setupSignalFlow(t)
 	ctx := context.Background()
 
-	_, err := sessionSourceHandler.retryRenderSession(ctx, &sspb.DeleteSessionRequest{
+	_, err := sessionSourceHandler.retryRenderSession(ctx, &sspb.RetryRenderSessionRequest{
 		RecorderID: "bad",
 		SessionID:  uuid.New().String(),
 	})

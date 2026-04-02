@@ -78,6 +78,19 @@ const elapsedTime = computed(() => {
   return `${pad(minutes)}:${pad(seconds % 60)}`;
 });
 
+const formattedDuration = computed(() => {
+  const dur = props.session.duration;
+  if (!dur) return null;
+  const totalSeconds = Math.floor(dur);
+  const minutes = Math.floor(totalSeconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const pad = (n: number) => n.toString().padStart(2, '0');
+  if (hours > 0) {
+    return `${pad(hours)}:${pad(minutes % 60)}:${pad(totalSeconds % 60)}`;
+  }
+  return `${pad(minutes)}:${pad(totalSeconds % 60)}`;
+});
+
 const startEditing = () => {
   if (!canEdit.value) return;
 
@@ -228,8 +241,9 @@ const onDeleteProcessing = () => {
       <StatusIndicator v-if="isRecording" :is-recording="true" />
       <StatusIndicator v-else-if="isProcessing" :is-processing="true" />
 
-      <!-- Elapsed time for recording sessions -->
+      <!-- Elapsed time for recording sessions, estimated duration for processing -->
       <span v-if="isRecording" class="elapsed-time">{{ elapsedTime }}</span>
+      <span v-else-if="isProcessing && formattedDuration" class="elapsed-time">{{ formattedDuration }}</span>
 
       <div class="spacer"></div>
 

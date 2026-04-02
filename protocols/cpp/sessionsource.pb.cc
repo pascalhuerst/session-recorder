@@ -145,6 +145,7 @@ constexpr SessionInfo::SessionInfo(
   , lifetime_(nullptr)
   , inlinefiles_(nullptr)
   , downloadfiles_(nullptr)
+  , duration_(nullptr)
   , keep_(false)
   , state_(0)
 {}
@@ -460,6 +461,7 @@ const uint32_t TableStruct_sessionsource_2eproto::offsets[] PROTOBUF_SECTION_VAR
   PROTOBUF_FIELD_OFFSET(::sessionsource::SessionInfo, inlinefiles_),
   PROTOBUF_FIELD_OFFSET(::sessionsource::SessionInfo, downloadfiles_),
   PROTOBUF_FIELD_OFFSET(::sessionsource::SessionInfo, errormessage_),
+  PROTOBUF_FIELD_OFFSET(::sessionsource::SessionInfo, duration_),
   ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::sessionsource::SessionRemoved, _internal_metadata_),
   ~0u,  // no _extensions_
@@ -603,21 +605,21 @@ static const ::PROTOBUF_NAMESPACE_ID::internal::MigrationSchema schemas[] PROTOB
   { 57, -1, -1, sizeof(::sessionsource::Segment)},
   { 67, -1, -1, sizeof(::sessionsource::SessionInfo_Files)},
   { 76, -1, -1, sizeof(::sessionsource::SessionInfo)},
-  { 92, -1, -1, sizeof(::sessionsource::SessionRemoved)},
-  { 98, -1, -1, sizeof(::sessionsource::Session)},
-  { 108, -1, -1, sizeof(::sessionsource::SetKeepSessionRequest)},
-  { 117, -1, -1, sizeof(::sessionsource::DeleteSessionRequest)},
-  { 125, -1, -1, sizeof(::sessionsource::SetNameRequest)},
-  { 134, -1, -1, sizeof(::sessionsource::CreateSegmentRequest)},
-  { 144, -1, -1, sizeof(::sessionsource::UpdateSegmentRequest)},
-  { 154, -1, -1, sizeof(::sessionsource::DeleteSegmentRequest)},
-  { 163, -1, -1, sizeof(::sessionsource::RenderSegmentRequest)},
-  { 172, -1, -1, sizeof(::sessionsource::CutSessionRequest)},
-  { 179, -1, -1, sizeof(::sessionsource::RetryRenderSessionRequest)},
-  { 187, -1, -1, sizeof(::sessionsource::ShareSessionRequest)},
-  { 196, -1, -1, sizeof(::sessionsource::ShareSegmentRequest)},
-  { 206, -1, -1, sizeof(::sessionsource::StreamSessionAudioRequest)},
-  { 213, -1, -1, sizeof(::sessionsource::AudioChunk)},
+  { 93, -1, -1, sizeof(::sessionsource::SessionRemoved)},
+  { 99, -1, -1, sizeof(::sessionsource::Session)},
+  { 109, -1, -1, sizeof(::sessionsource::SetKeepSessionRequest)},
+  { 118, -1, -1, sizeof(::sessionsource::DeleteSessionRequest)},
+  { 126, -1, -1, sizeof(::sessionsource::SetNameRequest)},
+  { 135, -1, -1, sizeof(::sessionsource::CreateSegmentRequest)},
+  { 145, -1, -1, sizeof(::sessionsource::UpdateSegmentRequest)},
+  { 155, -1, -1, sizeof(::sessionsource::DeleteSegmentRequest)},
+  { 164, -1, -1, sizeof(::sessionsource::RenderSegmentRequest)},
+  { 173, -1, -1, sizeof(::sessionsource::CutSessionRequest)},
+  { 180, -1, -1, sizeof(::sessionsource::RetryRenderSessionRequest)},
+  { 188, -1, -1, sizeof(::sessionsource::ShareSessionRequest)},
+  { 197, -1, -1, sizeof(::sessionsource::ShareSegmentRequest)},
+  { 207, -1, -1, sizeof(::sessionsource::StreamSessionAudioRequest)},
+  { 214, -1, -1, sizeof(::sessionsource::AudioChunk)},
 };
 
 static ::PROTOBUF_NAMESPACE_ID::Message const * const file_default_instances[] = {
@@ -670,7 +672,7 @@ const char descriptor_table_protodef_sessionsource_2eproto[] PROTOBUF_SECTION_VA
   "\007Segment\022\021\n\tsegmentID\030\001 \001(\t\022-\n\007updated\030\002"
   " \001(\0132\032.sessionsource.SegmentInfoH\000\0220\n\007re"
   "moved\030\003 \001(\0132\035.sessionsource.SegmentRemov"
-  "edH\000B\006\n\004info\"\313\003\n\013SessionInfo\022/\n\013timeCrea"
+  "edH\000B\006\n\004info\"\370\003\n\013SessionInfo\022/\n\013timeCrea"
   "ted\030\002 \001(\0132\032.google.protobuf.Timestamp\0220\n"
   "\014timeFinished\030\003 \001(\0132\032.google.protobuf.Ti"
   "mestamp\022+\n\010lifetime\030\004 \001(\0132\031.google.proto"
@@ -680,75 +682,76 @@ const char descriptor_table_protodef_sessionsource_2eproto[] PROTOBUF_SECTION_VA
   "egment\0225\n\013inlineFiles\030\013 \001(\0132 .sessionsou"
   "rce.SessionInfo.Files\0227\n\rdownloadFiles\030\014"
   " \001(\0132 .sessionsource.SessionInfo.Files\022\024"
-  "\n\014errorMessage\030\r \001(\t\0324\n\005Files\022\013\n\003ogg\030\001 \001"
-  "(\t\022\014\n\004flac\030\002 \001(\t\022\020\n\010waveform\030\003 \001(\t\"\020\n\016Se"
-  "ssionRemoved\"~\n\007Session\022\n\n\002ID\030\001 \001(\t\022-\n\007u"
-  "pdated\030\002 \001(\0132\032.sessionsource.SessionInfo"
-  "H\000\0220\n\007removed\030\003 \001(\0132\035.sessionsource.Sess"
-  "ionRemovedH\000B\006\n\004info\"L\n\025SetKeepSessionRe"
-  "quest\022\022\n\nrecorderID\030\001 \001(\t\022\021\n\tsessionID\030\002"
-  " \001(\t\022\014\n\004keep\030\003 \001(\010\"=\n\024DeleteSessionReque"
-  "st\022\022\n\nrecorderID\030\001 \001(\t\022\021\n\tsessionID\030\002 \001("
-  "\t\"E\n\016SetNameRequest\022\022\n\nrecorderID\030\001 \001(\t\022"
-  "\021\n\tsessionID\030\002 \001(\t\022\014\n\004name\030\003 \001(\t\"z\n\024Crea"
-  "teSegmentRequest\022\022\n\nrecorderID\030\001 \001(\t\022\021\n\t"
-  "sessionID\030\002 \001(\t\022\021\n\tsegmentID\030\003 \001(\t\022(\n\004in"
-  "fo\030\004 \001(\0132\032.sessionsource.SegmentInfo\"z\n\024"
-  "UpdateSegmentRequest\022\022\n\nrecorderID\030\001 \001(\t"
-  "\022\021\n\tsessionID\030\002 \001(\t\022\021\n\tsegmentID\030\003 \001(\t\022("
-  "\n\004info\030\004 \001(\0132\032.sessionsource.SegmentInfo"
-  "\"P\n\024DeleteSegmentRequest\022\022\n\nrecorderID\030\001"
-  " \001(\t\022\021\n\tsessionID\030\002 \001(\t\022\021\n\tsegmentID\030\003 \001"
-  "(\t\"P\n\024RenderSegmentRequest\022\022\n\nrecorderID"
-  "\030\001 \001(\t\022\021\n\tsessionID\030\002 \001(\t\022\021\n\tsegmentID\030\003"
-  " \001(\t\"\'\n\021CutSessionRequest\022\022\n\nrecorderID\030"
-  "\001 \001(\t\"B\n\031RetryRenderSessionRequest\022\022\n\nre"
-  "corderID\030\001 \001(\t\022\021\n\tsessionID\030\002 \001(\t\"U\n\023Sha"
-  "reSessionRequest\022\022\n\nrecorderID\030\001 \001(\t\022\021\n\t"
-  "sessionID\030\002 \001(\t\022\027\n\017recipientEmails\030\003 \003(\t"
-  "\"h\n\023ShareSegmentRequest\022\022\n\nrecorderID\030\001 "
-  "\001(\t\022\021\n\tsessionID\030\002 \001(\t\022\021\n\tsegmentID\030\003 \001("
-  "\t\022\027\n\017recipientEmails\030\004 \003(\t\".\n\031StreamSess"
-  "ionAudioRequest\022\021\n\tsessionID\030\001 \001(\t\"t\n\nAu"
-  "dioChunk\022\021\n\tsessionID\030\001 \001(\t\022\017\n\007samples\030\002"
-  " \003(\005\022\023\n\013chunkNumber\030\003 \001(\r\022-\n\ttimestamp\030\004"
-  " \001(\0132\032.google.protobuf.Timestamp*\225\001\n\014Seg"
-  "mentState\022\031\n\025SEGMENT_STATE_UNKNOWN\020\000\022\033\n\027"
-  "SEGMENT_STATE_RENDERING\020\001\022\032\n\026SEGMENT_STA"
-  "TE_FINISHED\020\002\022\027\n\023SEGMENT_STATE_ERROR\020\003\022\030"
-  "\n\024SEGMENT_STATE_QUEUED\020\004*\231\001\n\014SessionStat"
-  "e\022\031\n\025SESSION_STATE_UNKNOWN\020\000\022\033\n\027SESSION_"
-  "STATE_RECORDING\020\001\022\032\n\026SESSION_STATE_FINIS"
-  "HED\020\002\022\034\n\030SESSION_STATE_PROCESSING\020\003\022\027\n\023S"
-  "ESSION_STATE_ERROR\020\0042\225\010\n\rSessionSource\022S"
-  "\n\017StreamRecorders\022%.sessionsource.Stream"
-  "RecordersRequest\032\027.sessionsource.Recorde"
-  "r0\001\022O\n\016StreamSessions\022#.sessionsource.St"
-  "reamSessionRequest\032\026.sessionsource.Sessi"
-  "on0\001\022[\n\022StreamSessionAudio\022(.sessionsour"
-  "ce.StreamSessionAudioRequest\032\031.sessionso"
-  "urce.AudioChunk0\001\022G\n\016SetKeepSession\022$.se"
-  "ssionsource.SetKeepSessionRequest\032\017.comm"
-  "on.Respone\022E\n\rDeleteSession\022#.sessionsou"
-  "rce.DeleteSessionRequest\032\017.common.Respon"
-  "e\0229\n\007SetName\022\035.sessionsource.SetNameRequ"
-  "est\032\017.common.Respone\022E\n\rCreateSegment\022#."
-  "sessionsource.CreateSegmentRequest\032\017.com"
-  "mon.Respone\022E\n\rDeleteSegment\022#.sessionso"
-  "urce.DeleteSegmentRequest\032\017.common.Respo"
-  "ne\022E\n\rRenderSegment\022#.sessionsource.Rend"
-  "erSegmentRequest\032\017.common.Respone\022E\n\rUpd"
-  "ateSegment\022#.sessionsource.UpdateSegment"
-  "Request\032\017.common.Respone\022\?\n\nCutSession\022 "
-  ".sessionsource.CutSessionRequest\032\017.commo"
-  "n.Respone\022O\n\022RetryRenderSession\022(.sessio"
-  "nsource.RetryRenderSessionRequest\032\017.comm"
-  "on.Respone\022C\n\014ShareSession\022\".sessionsour"
-  "ce.ShareSessionRequest\032\017.common.Respone\022"
-  "C\n\014ShareSegment\022\".sessionsource.ShareSeg"
-  "mentRequest\032\017.common.ResponeBEZCgithub.c"
-  "om/pascalhuerst/session-recorder/protoco"
-  "ls/go/sessionsourceb\006proto3"
+  "\n\014errorMessage\030\r \001(\t\022+\n\010duration\030\016 \001(\0132\031"
+  ".google.protobuf.Duration\0324\n\005Files\022\013\n\003og"
+  "g\030\001 \001(\t\022\014\n\004flac\030\002 \001(\t\022\020\n\010waveform\030\003 \001(\t\""
+  "\020\n\016SessionRemoved\"~\n\007Session\022\n\n\002ID\030\001 \001(\t"
+  "\022-\n\007updated\030\002 \001(\0132\032.sessionsource.Sessio"
+  "nInfoH\000\0220\n\007removed\030\003 \001(\0132\035.sessionsource"
+  ".SessionRemovedH\000B\006\n\004info\"L\n\025SetKeepSess"
+  "ionRequest\022\022\n\nrecorderID\030\001 \001(\t\022\021\n\tsessio"
+  "nID\030\002 \001(\t\022\014\n\004keep\030\003 \001(\010\"=\n\024DeleteSession"
+  "Request\022\022\n\nrecorderID\030\001 \001(\t\022\021\n\tsessionID"
+  "\030\002 \001(\t\"E\n\016SetNameRequest\022\022\n\nrecorderID\030\001"
+  " \001(\t\022\021\n\tsessionID\030\002 \001(\t\022\014\n\004name\030\003 \001(\t\"z\n"
+  "\024CreateSegmentRequest\022\022\n\nrecorderID\030\001 \001("
+  "\t\022\021\n\tsessionID\030\002 \001(\t\022\021\n\tsegmentID\030\003 \001(\t\022"
+  "(\n\004info\030\004 \001(\0132\032.sessionsource.SegmentInf"
+  "o\"z\n\024UpdateSegmentRequest\022\022\n\nrecorderID\030"
+  "\001 \001(\t\022\021\n\tsessionID\030\002 \001(\t\022\021\n\tsegmentID\030\003 "
+  "\001(\t\022(\n\004info\030\004 \001(\0132\032.sessionsource.Segmen"
+  "tInfo\"P\n\024DeleteSegmentRequest\022\022\n\nrecorde"
+  "rID\030\001 \001(\t\022\021\n\tsessionID\030\002 \001(\t\022\021\n\tsegmentI"
+  "D\030\003 \001(\t\"P\n\024RenderSegmentRequest\022\022\n\nrecor"
+  "derID\030\001 \001(\t\022\021\n\tsessionID\030\002 \001(\t\022\021\n\tsegmen"
+  "tID\030\003 \001(\t\"\'\n\021CutSessionRequest\022\022\n\nrecord"
+  "erID\030\001 \001(\t\"B\n\031RetryRenderSessionRequest\022"
+  "\022\n\nrecorderID\030\001 \001(\t\022\021\n\tsessionID\030\002 \001(\t\"U"
+  "\n\023ShareSessionRequest\022\022\n\nrecorderID\030\001 \001("
+  "\t\022\021\n\tsessionID\030\002 \001(\t\022\027\n\017recipientEmails\030"
+  "\003 \003(\t\"h\n\023ShareSegmentRequest\022\022\n\nrecorder"
+  "ID\030\001 \001(\t\022\021\n\tsessionID\030\002 \001(\t\022\021\n\tsegmentID"
+  "\030\003 \001(\t\022\027\n\017recipientEmails\030\004 \003(\t\".\n\031Strea"
+  "mSessionAudioRequest\022\021\n\tsessionID\030\001 \001(\t\""
+  "t\n\nAudioChunk\022\021\n\tsessionID\030\001 \001(\t\022\017\n\007samp"
+  "les\030\002 \003(\005\022\023\n\013chunkNumber\030\003 \001(\r\022-\n\ttimest"
+  "amp\030\004 \001(\0132\032.google.protobuf.Timestamp*\225\001"
+  "\n\014SegmentState\022\031\n\025SEGMENT_STATE_UNKNOWN\020"
+  "\000\022\033\n\027SEGMENT_STATE_RENDERING\020\001\022\032\n\026SEGMEN"
+  "T_STATE_FINISHED\020\002\022\027\n\023SEGMENT_STATE_ERRO"
+  "R\020\003\022\030\n\024SEGMENT_STATE_QUEUED\020\004*\231\001\n\014Sessio"
+  "nState\022\031\n\025SESSION_STATE_UNKNOWN\020\000\022\033\n\027SES"
+  "SION_STATE_RECORDING\020\001\022\032\n\026SESSION_STATE_"
+  "FINISHED\020\002\022\034\n\030SESSION_STATE_PROCESSING\020\003"
+  "\022\027\n\023SESSION_STATE_ERROR\020\0042\225\010\n\rSessionSou"
+  "rce\022S\n\017StreamRecorders\022%.sessionsource.S"
+  "treamRecordersRequest\032\027.sessionsource.Re"
+  "corder0\001\022O\n\016StreamSessions\022#.sessionsour"
+  "ce.StreamSessionRequest\032\026.sessionsource."
+  "Session0\001\022[\n\022StreamSessionAudio\022(.sessio"
+  "nsource.StreamSessionAudioRequest\032\031.sess"
+  "ionsource.AudioChunk0\001\022G\n\016SetKeepSession"
+  "\022$.sessionsource.SetKeepSessionRequest\032\017"
+  ".common.Respone\022E\n\rDeleteSession\022#.sessi"
+  "onsource.DeleteSessionRequest\032\017.common.R"
+  "espone\0229\n\007SetName\022\035.sessionsource.SetNam"
+  "eRequest\032\017.common.Respone\022E\n\rCreateSegme"
+  "nt\022#.sessionsource.CreateSegmentRequest\032"
+  "\017.common.Respone\022E\n\rDeleteSegment\022#.sess"
+  "ionsource.DeleteSegmentRequest\032\017.common."
+  "Respone\022E\n\rRenderSegment\022#.sessionsource"
+  ".RenderSegmentRequest\032\017.common.Respone\022E"
+  "\n\rUpdateSegment\022#.sessionsource.UpdateSe"
+  "gmentRequest\032\017.common.Respone\022\?\n\nCutSess"
+  "ion\022 .sessionsource.CutSessionRequest\032\017."
+  "common.Respone\022O\n\022RetryRenderSession\022(.s"
+  "essionsource.RetryRenderSessionRequest\032\017"
+  ".common.Respone\022C\n\014ShareSession\022\".sessio"
+  "nsource.ShareSessionRequest\032\017.common.Res"
+  "pone\022C\n\014ShareSegment\022\".sessionsource.Sha"
+  "reSegmentRequest\032\017.common.ResponeBEZCgit"
+  "hub.com/pascalhuerst/session-recorder/pr"
+  "otocols/go/sessionsourceb\006proto3"
   ;
 static const ::PROTOBUF_NAMESPACE_ID::internal::DescriptorTable*const descriptor_table_sessionsource_2eproto_deps[3] = {
   &::descriptor_table_common_2eproto,
@@ -757,7 +760,7 @@ static const ::PROTOBUF_NAMESPACE_ID::internal::DescriptorTable*const descriptor
 };
 static ::PROTOBUF_NAMESPACE_ID::internal::once_flag descriptor_table_sessionsource_2eproto_once;
 const ::PROTOBUF_NAMESPACE_ID::internal::DescriptorTable descriptor_table_sessionsource_2eproto = {
-  false, false, 3987, descriptor_table_protodef_sessionsource_2eproto, "sessionsource.proto", 
+  false, false, 4032, descriptor_table_protodef_sessionsource_2eproto, "sessionsource.proto", 
   &descriptor_table_sessionsource_2eproto_once, descriptor_table_sessionsource_2eproto_deps, 3, 25,
   schemas, file_default_instances, TableStruct_sessionsource_2eproto::offsets,
   file_level_metadata_sessionsource_2eproto, file_level_enum_descriptors_sessionsource_2eproto, file_level_service_descriptors_sessionsource_2eproto,
@@ -2912,6 +2915,7 @@ class SessionInfo::_Internal {
   static const ::PROTOBUF_NAMESPACE_ID::Duration& lifetime(const SessionInfo* msg);
   static const ::sessionsource::SessionInfo_Files& inlinefiles(const SessionInfo* msg);
   static const ::sessionsource::SessionInfo_Files& downloadfiles(const SessionInfo* msg);
+  static const ::PROTOBUF_NAMESPACE_ID::Duration& duration(const SessionInfo* msg);
 };
 
 const ::PROTOBUF_NAMESPACE_ID::Timestamp&
@@ -2934,6 +2938,10 @@ const ::sessionsource::SessionInfo_Files&
 SessionInfo::_Internal::downloadfiles(const SessionInfo* msg) {
   return *msg->downloadfiles_;
 }
+const ::PROTOBUF_NAMESPACE_ID::Duration&
+SessionInfo::_Internal::duration(const SessionInfo* msg) {
+  return *msg->duration_;
+}
 void SessionInfo::clear_timecreated() {
   if (GetArenaForAllocation() == nullptr && timecreated_ != nullptr) {
     delete timecreated_;
@@ -2951,6 +2959,12 @@ void SessionInfo::clear_lifetime() {
     delete lifetime_;
   }
   lifetime_ = nullptr;
+}
+void SessionInfo::clear_duration() {
+  if (GetArenaForAllocation() == nullptr && duration_ != nullptr) {
+    delete duration_;
+  }
+  duration_ = nullptr;
 }
 SessionInfo::SessionInfo(::PROTOBUF_NAMESPACE_ID::Arena* arena,
                          bool is_message_owned)
@@ -3007,6 +3021,11 @@ SessionInfo::SessionInfo(const SessionInfo& from)
   } else {
     downloadfiles_ = nullptr;
   }
+  if (from._internal_has_duration()) {
+    duration_ = new ::PROTOBUF_NAMESPACE_ID::Duration(*from.duration_);
+  } else {
+    duration_ = nullptr;
+  }
   ::memcpy(&keep_, &from.keep_,
     static_cast<size_t>(reinterpret_cast<char*>(&state_) -
     reinterpret_cast<char*>(&keep_)) + sizeof(state_));
@@ -3044,6 +3063,7 @@ inline void SessionInfo::SharedDtor() {
   if (this != internal_default_instance()) delete lifetime_;
   if (this != internal_default_instance()) delete inlinefiles_;
   if (this != internal_default_instance()) delete downloadfiles_;
+  if (this != internal_default_instance()) delete duration_;
 }
 
 void SessionInfo::ArenaDtor(void* object) {
@@ -3085,6 +3105,10 @@ void SessionInfo::Clear() {
     delete downloadfiles_;
   }
   downloadfiles_ = nullptr;
+  if (GetArenaForAllocation() == nullptr && duration_ != nullptr) {
+    delete duration_;
+  }
+  duration_ = nullptr;
   ::memset(&keep_, 0, static_cast<size_t>(
       reinterpret_cast<char*>(&state_) -
       reinterpret_cast<char*>(&keep_)) + sizeof(state_));
@@ -3183,6 +3207,14 @@ const char* SessionInfo::_InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID
           auto str = _internal_mutable_errormessage();
           ptr = ::PROTOBUF_NAMESPACE_ID::internal::InlineGreedyStringParser(str, ptr, ctx);
           CHK_(::PROTOBUF_NAMESPACE_ID::internal::VerifyUTF8(str, "sessionsource.SessionInfo.errorMessage"));
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // .google.protobuf.Duration duration = 14;
+      case 14:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 114)) {
+          ptr = ctx->ParseMessage(_internal_mutable_duration(), ptr);
           CHK_(ptr);
         } else
           goto handle_unusual;
@@ -3297,6 +3329,14 @@ uint8_t* SessionInfo::_InternalSerialize(
         13, this->_internal_errormessage(), target);
   }
 
+  // .google.protobuf.Duration duration = 14;
+  if (this->_internal_has_duration()) {
+    target = stream->EnsureSpace(target);
+    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::
+      InternalWriteMessage(
+        14, _Internal::duration(this), target, stream);
+  }
+
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
     target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
@@ -3369,6 +3409,13 @@ size_t SessionInfo::ByteSizeLong() const {
         *downloadfiles_);
   }
 
+  // .google.protobuf.Duration duration = 14;
+  if (this->_internal_has_duration()) {
+    total_size += 1 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::MessageSize(
+        *duration_);
+  }
+
   // bool keep = 8;
   if (this->_internal_keep() != 0) {
     total_size += 1 + 1;
@@ -3423,6 +3470,9 @@ void SessionInfo::MergeFrom(const SessionInfo& from) {
   }
   if (from._internal_has_downloadfiles()) {
     _internal_mutable_downloadfiles()->::sessionsource::SessionInfo_Files::MergeFrom(from._internal_downloadfiles());
+  }
+  if (from._internal_has_duration()) {
+    _internal_mutable_duration()->::PROTOBUF_NAMESPACE_ID::Duration::MergeFrom(from._internal_duration());
   }
   if (from._internal_keep() != 0) {
     _internal_set_keep(from._internal_keep());

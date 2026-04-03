@@ -27,21 +27,30 @@ func newFakeObject(key string, data []byte) *fakeObject {
 	}
 }
 
-func (f *fakeObject) Close() error                          { return nil }
-func (f *fakeObject) Stat() (minio.ObjectInfo, error)       { return f.info, nil }
+func (f *fakeObject) Close() error                    { return nil }
+func (f *fakeObject) Stat() (minio.ObjectInfo, error) { return f.info, nil }
+
+// fakeMultipartUpload tracks an in-progress multipart upload.
+type fakeMultipartUpload struct {
+	object string
+	parts  map[int][]byte // partNumber -> data
+}
 
 // FakeMinioClient is an in-memory implementation of MinioClient for testing.
 // It stores objects in maps keyed by "bucket/object". Thread-safe.
 type FakeMinioClient struct {
-	mu      sync.Mutex
-	buckets map[string]bool
-	objects map[string][]byte // key: "bucket/object"
+	mu           sync.Mutex
+	buckets      map[string]bool
+	objects      map[string][]byte              // key: "bucket/object"
+	uploads      map[string]*fakeMultipartUpload // uploadID -> upload
+	nextUploadID int
 }
 
 func NewFakeMinioClient() *FakeMinioClient {
 	return &FakeMinioClient{
 		buckets: make(map[string]bool),
 		objects: make(map[string][]byte),
+		uploads: make(map[string]*fakeMultipartUpload),
 	}
 }
 
@@ -178,23 +187,6 @@ func (f *FakeMinioClient) StatObject(_ context.Context, bucketName, objectName s
 	}, nil
 }
 
-func (f *FakeMinioClient) ComposeObject(_ context.Context, dst minio.CopyDestOptions, srcs ...minio.CopySrcOptions) (minio.UploadInfo, error) {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-
-	var combined []byte
-	for _, src := range srcs {
-		data, ok := f.objects[f.key(src.Bucket, src.Object)]
-		if !ok {
-			return minio.UploadInfo{}, fmt.Errorf("source object %q not found", src.Object)
-		}
-		combined = append(combined, data...)
-	}
-
-	f.objects[f.key(dst.Bucket, dst.Object)] = combined
-	return minio.UploadInfo{Bucket: dst.Bucket, Key: dst.Object, Size: int64(len(combined))}, nil
-}
-
 func (f *FakeMinioClient) PresignedGetObject(_ context.Context, bucketName, objectName string, _ time.Duration, reqParams url.Values) (*url.URL, error) {
 	// Return a deterministic fake URL
 	u := &url.URL{
@@ -204,6 +196,143 @@ func (f *FakeMinioClient) PresignedGetObject(_ context.Context, bucketName, obje
 		RawQuery: reqParams.Encode(),
 	}
 	return u, nil
+}
+
+// Multipart upload operations
+
+func (f *FakeMinioClient) NewMultipartUpload(_ context.Context, _ string, object string, _ minio.PutObjectOptions) (string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.nextUploadID++
+	uploadID := fmt.Sprintf("upload-%d", f.nextUploadID)
+	f.uploads[uploadID] = &fakeMultipartUpload{
+		object: object,
+		parts:  make(map[int][]byte),
+	}
+	return uploadID, nil
+}
+
+func (f *FakeMinioClient) PutObjectPart(_ context.Context, _, _, uploadID string, partID int, data io.Reader, _ int64, _ minio.PutObjectPartOptions) (minio.ObjectPart, error) {
+	partData, err := io.ReadAll(data)
+	if err != nil {
+		return minio.ObjectPart{}, fmt.Errorf("cannot read part data: %w", err)
+	}
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	upload, ok := f.uploads[uploadID]
+	if !ok {
+		return minio.ObjectPart{}, fmt.Errorf("upload %q not found", uploadID)
+	}
+	upload.parts[partID] = partData
+	return minio.ObjectPart{
+		PartNumber: partID,
+		ETag:       fmt.Sprintf("etag-%s-%d", uploadID, partID),
+		Size:       int64(len(partData)),
+	}, nil
+}
+
+func (f *FakeMinioClient) CompleteMultipartUpload(_ context.Context, bucketName, object, uploadID string, parts []minio.CompletePart, _ minio.PutObjectOptions) (minio.UploadInfo, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	upload, ok := f.uploads[uploadID]
+	if !ok {
+		return minio.UploadInfo{}, fmt.Errorf("upload %q not found", uploadID)
+	}
+
+	// Sort parts by part number and concatenate
+	sortedParts := make([]minio.CompletePart, len(parts))
+	copy(sortedParts, parts)
+	sort.Slice(sortedParts, func(i, j int) bool {
+		return sortedParts[i].PartNumber < sortedParts[j].PartNumber
+	})
+
+	var combined []byte
+	for _, p := range sortedParts {
+		data, exists := upload.parts[p.PartNumber]
+		if !exists {
+			return minio.UploadInfo{}, fmt.Errorf("part %d not found in upload %q", p.PartNumber, uploadID)
+		}
+		combined = append(combined, data...)
+	}
+
+	f.objects[f.key(bucketName, object)] = combined
+	delete(f.uploads, uploadID)
+	return minio.UploadInfo{Bucket: bucketName, Key: object, Size: int64(len(combined))}, nil
+}
+
+func (f *FakeMinioClient) AbortMultipartUpload(_ context.Context, _, _, uploadID string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	delete(f.uploads, uploadID)
+	return nil
+}
+
+func (f *FakeMinioClient) ListObjectParts(_ context.Context, _, _, uploadID string, partNumberMarker, maxParts int) (minio.ListObjectPartsResult, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	upload, ok := f.uploads[uploadID]
+	if !ok {
+		return minio.ListObjectPartsResult{}, fmt.Errorf("upload %q not found", uploadID)
+	}
+
+	// Collect and sort part numbers
+	var partNumbers []int
+	for pn := range upload.parts {
+		if pn > partNumberMarker {
+			partNumbers = append(partNumbers, pn)
+		}
+	}
+	sort.Ints(partNumbers)
+
+	truncated := false
+	if maxParts > 0 && len(partNumbers) > maxParts {
+		partNumbers = partNumbers[:maxParts]
+		truncated = true
+	}
+
+	var objectParts []minio.ObjectPart
+	for _, pn := range partNumbers {
+		objectParts = append(objectParts, minio.ObjectPart{
+			PartNumber: pn,
+			ETag:       fmt.Sprintf("etag-%s-%d", uploadID, pn),
+			Size:       int64(len(upload.parts[pn])),
+		})
+	}
+
+	nextMarker := 0
+	if len(partNumbers) > 0 {
+		nextMarker = partNumbers[len(partNumbers)-1]
+	}
+
+	return minio.ListObjectPartsResult{
+		UploadID:             uploadID,
+		ObjectParts:          objectParts,
+		IsTruncated:          truncated,
+		NextPartNumberMarker: nextMarker,
+	}, nil
+}
+
+func (f *FakeMinioClient) ListMultipartUploads(_ context.Context, bucketName, prefix, _, _, _ string, maxUploads int) (minio.ListMultipartUploadsResult, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+
+	var uploads []minio.ObjectMultipartInfo
+	for uploadID, upload := range f.uploads {
+		if strings.HasPrefix(upload.object, prefix) {
+			uploads = append(uploads, minio.ObjectMultipartInfo{
+				Key:      upload.object,
+				UploadID: uploadID,
+			})
+			if maxUploads > 0 && len(uploads) >= maxUploads {
+				break
+			}
+		}
+	}
+
+	return minio.ListMultipartUploadsResult{
+		Bucket:  bucketName,
+		Uploads: uploads,
+	}, nil
 }
 
 // ObjectCount returns the number of objects stored (for test assertions).
@@ -227,4 +356,22 @@ func (f *FakeMinioClient) GetObjectData(bucket, object string) ([]byte, bool) {
 	defer f.mu.Unlock()
 	data, ok := f.objects[f.key(bucket, object)]
 	return data, ok
+}
+
+// MultipartUploadCount returns the number of in-progress multipart uploads (for test assertions).
+func (f *FakeMinioClient) MultipartUploadCount() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return len(f.uploads)
+}
+
+// MultipartPartCount returns the number of parts in a given upload (for test assertions).
+func (f *FakeMinioClient) MultipartPartCount(uploadID string) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	upload, ok := f.uploads[uploadID]
+	if !ok {
+		return 0
+	}
+	return len(upload.parts)
 }

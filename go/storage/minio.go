@@ -73,9 +73,12 @@ const publicAccessFormula = `
 `
 
 type minioChunk struct {
-	number    int
-	sessionID uuid.UUID
-	buffer    *bytes.Buffer
+	number     int // next part number (1-based for S3 multipart)
+	sessionID  uuid.UUID
+	buffer     *bytes.Buffer
+	uploadID   string               // multipart upload ID for data.raw
+	parts      []minio.CompletePart // accumulated completed parts
+	totalBytes int64                // total bytes uploaded so far (for duration estimation)
 }
 
 // Default session timeout - if no chunks arrive for this duration, the session is automatically closed
@@ -116,8 +119,6 @@ type Minio struct {
 }
 
 func NewMinioStorage(endpoint, localEndpoint, publicEndpoint, accessKey, secretKey string) (*Minio, error) {
-	// Custom transport with a generous ResponseHeaderTimeout for large
-	// ComposeObject operations (server-side multipart copy of many chunks).
 	transport := &http.Transport{
 		Proxy: http.ProxyFromEnvironment,
 		DialContext: (&net.Dialer{
@@ -128,7 +129,7 @@ func NewMinioStorage(endpoint, localEndpoint, publicEndpoint, accessKey, secretK
 		MaxIdleConnsPerHost:   16,
 		IdleConnTimeout:       90 * time.Second,
 		TLSHandshakeTimeout:  10 * time.Second,
-		ResponseHeaderTimeout: 10 * time.Minute,
+		ResponseHeaderTimeout: 30 * time.Second,
 		ExpectContinueTimeout: 10 * time.Second,
 	}
 
@@ -579,10 +580,24 @@ func (m *Minio) initSession(ctx context.Context, recorderID, sessionID uuid.UUID
 	// Before creating a new session, ensure all previous sessions are closed
 	m.closeIntermediateSessions(ctx, recorderID)
 
+	// Start multipart upload for data.raw
+	rawDataObjectName := fmt.Sprintf("%s/sessions/%s/data.raw", recorderID, sessionID)
+	uploadID, err := m.client.NewMultipartUpload(ctx, bucketName, rawDataObjectName, minio.PutObjectOptions{})
+	if err != nil {
+		log.Err(err).
+			Stringer("recorder-id", recorderID).
+			Stringer("session-id", sessionID).
+			Msg("Cannot initiate multipart upload")
+		return
+	}
+
 	m.chunks[recorderID] = &minioChunk{
-		number:    0,
-		sessionID: sessionID,
-		buffer:    new(bytes.Buffer),
+		number:     1, // S3 part numbers are 1-based
+		sessionID:  sessionID,
+		buffer:     new(bytes.Buffer),
+		uploadID:   uploadID,
+		parts:      make([]minio.CompletePart, 0),
+		totalBytes: 0,
 	}
 
 	// Create session directly at RECORDING state.
@@ -780,11 +795,27 @@ func (m *Minio) SafeChunks(ctx context.Context, recorderID, sessionID uuid.UUID,
 		// If the recorder is sending chunks for a known session, resume it
 		// regardless of current state — the recorder is the source of truth.
 		if session, exists := m.system.Recorders[recorderID].Sessions[sessionID]; exists {
-			chunkCount := m.countChunks(ctx, recorderID, sessionID)
+			// Try to find an existing multipart upload for this session
+			uploadID, parts, totalBytes := m.findExistingMultipartUpload(ctx, recorderID, sessionID)
+			if uploadID == "" {
+				// No existing multipart upload; start a new one
+				rawDataObjectName := fmt.Sprintf("%s/sessions/%s/data.raw", recorderID, sessionID)
+				var err error
+				uploadID, err = m.client.NewMultipartUpload(ctx, bucketName, rawDataObjectName, minio.PutObjectOptions{})
+				if err != nil {
+					m.dataLock.Unlock()
+					return fmt.Errorf("cannot initiate multipart upload for resumed session: %w", err)
+				}
+				parts = make([]minio.CompletePart, 0)
+			}
+			partCount := len(parts)
 			m.chunks[recorderID] = &minioChunk{
-				number:    chunkCount,
-				sessionID: sessionID,
-				buffer:    new(bytes.Buffer),
+				number:     partCount + 1, // next part number (1-based)
+				sessionID:  sessionID,
+				buffer:     new(bytes.Buffer),
+				uploadID:   uploadID,
+				parts:      parts,
+				totalBytes: totalBytes,
 			}
 
 			if session.State != SessionStateRecording {
@@ -817,13 +848,13 @@ func (m *Minio) SafeChunks(ctx context.Context, recorderID, sessionID uuid.UUID,
 					Stringer("recorder-id", recorderID).
 					Stringer("session-id", sessionID).
 					Str("previous-state", previousState.String()).
-					Int("existing-chunks", chunkCount).
+					Int("existing-parts", partCount).
 					Msg("Resumed session from non-RECORDING state")
 			} else {
 				log.Info().
 					Stringer("recorder-id", recorderID).
 					Stringer("session-id", sessionID).
-					Int("existing-chunks", chunkCount).
+					Int("existing-parts", partCount).
 					Msg("Resuming existing RECORDING session")
 			}
 		} else {
@@ -856,21 +887,23 @@ func (m *Minio) SafeChunks(ctx context.Context, recorderID, sessionID uuid.UUID,
 		Stringer("session-id", sessionID).
 		Msgf("Added %d|%d (%.1f %%) samples", chunk.buffer.Len(), minChunkSize, float64(chunk.buffer.Len())/float64(minChunkSize)*100.0)
 
-	// To be able to concatinate the chunks, we need to make sure that the chunk size is at least 5MB
+	// Upload as a multipart part when buffer reaches 5MB (S3 minimum for non-final parts)
 	if chunk.buffer.Len() >= minChunkSize {
 		log.Debug().
 			Stringer("recorder-id", recorderID).
 			Stringer("session-id", sessionID).
-			Msg("Chunk is full")
+			Msg("Chunk is full, uploading part")
 
-		objectName := fmt.Sprintf("%s/sessions/%s/chunks/%s", recorderID, sessionID, fmt.Sprintf("%016d", chunk.number))
-		chunk.number++
-
-		_, err := m.client.PutObject(ctx, bucketName, objectName, chunk.buffer, int64(chunk.buffer.Len()), minio.PutObjectOptions{})
+		rawDataObjectName := fmt.Sprintf("%s/sessions/%s/data.raw", recorderID, sessionID)
+		partSize := int64(chunk.buffer.Len())
+		part, err := m.client.PutObjectPart(ctx, bucketName, rawDataObjectName, chunk.uploadID, chunk.number, chunk.buffer, partSize, minio.PutObjectPartOptions{})
 		if err != nil {
 			m.dataLock.Unlock()
-			return fmt.Errorf("cannot put object: %w", err)
+			return fmt.Errorf("cannot put object part: %w", err)
 		}
+		chunk.parts = append(chunk.parts, minio.CompletePart{PartNumber: part.PartNumber, ETag: part.ETag})
+		chunk.totalBytes += partSize
+		chunk.number++
 	}
 
 	m.dataLock.Unlock()
@@ -890,42 +923,96 @@ func (m *Minio) SafeChunks(ctx context.Context, recorderID, sessionID uuid.UUID,
 	return nil
 }
 
+// findExistingMultipartUpload looks for an in-progress multipart upload for
+// this session's data.raw and returns its uploadID, accumulated parts, and
+// total bytes. Returns empty uploadID if no upload is found.
+func (m *Minio) findExistingMultipartUpload(ctx context.Context, recorderID, sessionID uuid.UUID) (string, []minio.CompletePart, int64) {
+	rawDataObjectName := fmt.Sprintf("%s/sessions/%s/data.raw", recorderID, sessionID)
+
+	result, err := m.client.ListMultipartUploads(ctx, bucketName, rawDataObjectName, "", "", "", 1000)
+	if err != nil {
+		return "", nil, 0
+	}
+
+	for _, upload := range result.Uploads {
+		if upload.Key == rawDataObjectName {
+			// Found an in-progress upload; list its parts
+			var parts []minio.CompletePart
+			var totalBytes int64
+			partMarker := 0
+			for {
+				partsResult, err := m.client.ListObjectParts(ctx, bucketName, rawDataObjectName, upload.UploadID, partMarker, 1000)
+				if err != nil {
+					break
+				}
+				for _, p := range partsResult.ObjectParts {
+					parts = append(parts, minio.CompletePart{PartNumber: p.PartNumber, ETag: p.ETag})
+					totalBytes += p.Size
+				}
+				if !partsResult.IsTruncated {
+					break
+				}
+				partMarker = partsResult.NextPartNumberMarker
+			}
+			return upload.UploadID, parts, totalBytes
+		}
+	}
+	return "", nil, 0
+}
+
 func (m *Minio) isSessionClosed(ctx context.Context, recorderID, sessionID uuid.UUID) bool {
-	// Check metadata first — if the session is already FINISHED or ERROR, it's closed
-	// regardless of whether chunk objects still exist (they may not have been cleaned up).
+	// A session is "closed" (no render needed) if it reached a terminal state.
+	// PROCESSING means render is needed. data.raw existing just means audio was
+	// assembled, not that encoding (OGG/FLAC/waveform) is complete.
 	sm, err := m.getSessionMetadata(ctx, recorderID, sessionID)
-	if err == nil && (sm.State == SessionStateFinished || sm.State == SessionStateError) {
-		return true
+	if err != nil {
+		return true // can't read metadata — treat as closed
 	}
-
-	chunksPrefix := fmt.Sprintf("%s/sessions/%s/chunks/", recorderID, sessionID)
-
-	objectCh := m.client.ListObjects(ctx, bucketName, minio.ListObjectsOptions{Prefix: chunksPrefix, Recursive: false})
-
-	// If chunks folder exists, the session is not closed
-	for range objectCh {
-		return false
-	}
-
-	return true
+	return sm.State == SessionStateFinished || sm.State == SessionStateError
 }
 
 func (m *Minio) flushChunks(ctx context.Context, recorderID, sessionID uuid.UUID, chunk *minioChunk) error {
 	log.Debug().Stringer("recorder-id", recorderID).Stringer("session-id", sessionID).Msg("Flushing chunks")
 
-	// If we have samples left for this session, let's push those first
-	objectName := fmt.Sprintf("%s/sessions/%s/chunks/%s", recorderID, sessionID, fmt.Sprintf("%016d", chunk.number))
+	rawDataObjectName := fmt.Sprintf("%s/sessions/%s/data.raw", recorderID, sessionID)
 
+	// If data.raw already exists, the multipart upload was already completed
+	// (e.g., by completeOrphanedUpload during a concurrent session close). Skip.
+	if _, err := m.client.StatObject(ctx, bucketName, rawDataObjectName, minio.StatObjectOptions{}); err == nil {
+		log.Info().Stringer("recorder-id", recorderID).Stringer("session-id", sessionID).Msg("data.raw already exists, skipping flush")
+		return nil
+	}
+
+	// Upload remaining buffer as the final part (no 5MB minimum for the last part)
 	if chunk.buffer.Len() > 0 {
-		if chunk.buffer.Len() < minChunkSize {
-			// If the last chunk is smaller than 5MB, we need to pad it with zeros
-			chunk.buffer.Write(make([]byte, minChunkSize-chunk.buffer.Len()))
-		}
-
-		_, err := m.client.PutObject(ctx, bucketName, objectName, chunk.buffer, int64(chunk.buffer.Len()), minio.PutObjectOptions{})
+		partSize := int64(chunk.buffer.Len())
+		part, err := m.client.PutObjectPart(ctx, bucketName, rawDataObjectName, chunk.uploadID, chunk.number, chunk.buffer, partSize, minio.PutObjectPartOptions{})
 		if err != nil {
-			return fmt.Errorf("cannot put object: %w", err)
+			// Upload may have been completed by a concurrent close — check if data.raw exists
+			if _, statErr := m.client.StatObject(ctx, bucketName, rawDataObjectName, minio.StatObjectOptions{}); statErr == nil {
+				log.Info().Stringer("recorder-id", recorderID).Stringer("session-id", sessionID).Msg("Multipart upload already completed, skipping flush")
+				return nil
+			}
+			return fmt.Errorf("cannot put final object part: %w", err)
 		}
+		chunk.parts = append(chunk.parts, minio.CompletePart{PartNumber: part.PartNumber, ETag: part.ETag})
+		chunk.totalBytes += partSize
+	}
+
+	// Complete the multipart upload to assemble data.raw
+	if len(chunk.parts) > 0 {
+		_, err := m.client.CompleteMultipartUpload(ctx, bucketName, rawDataObjectName, chunk.uploadID, chunk.parts, minio.PutObjectOptions{})
+		if err != nil {
+			// May have been completed concurrently
+			if _, statErr := m.client.StatObject(ctx, bucketName, rawDataObjectName, minio.StatObjectOptions{}); statErr == nil {
+				log.Info().Stringer("recorder-id", recorderID).Stringer("session-id", sessionID).Msg("Multipart upload already completed concurrently")
+				return nil
+			}
+			return fmt.Errorf("cannot complete multipart upload: %w", err)
+		}
+	} else {
+		// No parts at all (empty session) — abort the upload
+		_ = m.client.AbortMultipartUpload(ctx, bucketName, rawDataObjectName, chunk.uploadID)
 	}
 
 	log.Info().Stringer("recorder-id", recorderID).Stringer("session-id", sessionID).Msg("Done flushing chunks")
@@ -1065,129 +1152,30 @@ func (m *Minio) renderFromRawData(ctx context.Context, recorderID, sessionID uui
 func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UUID) error {
 	log.Debug().Stringer("recorder-id", recorderID).Stringer("session-id", sessionID).Msg("Rendering session")
 
-	chunksPrefix := fmt.Sprintf("%s/sessions/%s/chunks", recorderID, sessionID)
 	rawDataObjectName := fmt.Sprintf("%s/sessions/%s/data.raw", recorderID, sessionID)
 
-	// I need to double check this, but this dance does not seem to be necessary...
-	//rawPreRenderedObjectName := fmt.Sprintf("%s/sessions/%s/pre_rendered_data.raw", RecorderID, sessionID)
-	//
-	//havePreRenderedData := false
-	//
-	//// There is an edge case. If the chunk-sink-server crashed, the current session is closed on m.Start()
-	//// If the chunk-source still sends data for the same session, we just create a chunks folder again and drop
-	//// the data. We can however check, if there is a chunks folder AND a data.raw. If that's the case, we can just append
-	//// the data and regenerate the ogg and the flac file
-	//_, err := m.client.StatObject(ctx, bucketName, rawDataObjectName, minio.StatObjectOptions{})
-	//if minio.ToErrorResponse(err).Code != "NoSuchKey" {
-	//	havePreRenderedData = true
-	//
-	//	log.Info().
-	//		Stringer("recorder-id", RecorderID).
-	//		Stringer("session-id", sessionID).
-	//		Msg("Session already rendered, but more chunks found. Will re-render.")
-	//
-	//	dst := minio.CopyDestOptions{
-	//		Bucket: bucketName,
-	//		Object: rawPreRenderedObjectName,
-	//	}
-	//
-	//	src := minio.CopySrcOptions{
-	//		Bucket: bucketName,
-	//		Object: rawDataObjectName,
-	//	}
-	//
-	//	_, err = m.client.CopyObject(ctx, dst, src)
-	//	if err != nil {
-	//		log.Err(err).Msg("Could not extend pre-rendered data")
-	//	}
-	//}
-
-	objectCh := m.client.ListObjects(ctx, bucketName, minio.ListObjectsOptions{Prefix: chunksPrefix, Recursive: true})
-	srcs := make([]minio.CopySrcOptions, 0)
-
-	// Just add the pre-rendered data to the list of sources first
-	// that way, the new chunks should be appended
-	//if havePreRenderedData {
-	//	srcs = append(srcs, minio.CopySrcOptions{
-	//		Bucket: bucketName,
-	//		Object: rawPreRenderedObjectName,
-	//	})
-	//}
-
-	for objectInfo := range objectCh {
-		if objectInfo.Err != nil {
-			log.Err(objectInfo.Err).Msg("Cannot list objects")
-
-			return objectInfo.Err
-		}
-
-		srcs = append(srcs, minio.CopySrcOptions{
-			Bucket: bucketName,
-			Object: objectInfo.Key,
-		})
-	}
-
-	dst := minio.CopyDestOptions{
-		Bucket: bucketName,
-		Object: rawDataObjectName,
-	}
-
-	if len(srcs) == 0 {
-		// No chunks — check if data.raw already exists (e.g. from a previous failed render)
-		rawStat, err := m.client.StatObject(ctx, bucketName, rawDataObjectName, minio.StatObjectOptions{})
-		if err != nil {
-			log.Warn().
-				Stringer("recorder-id", recorderID).
-				Stringer("session-id", sessionID).
-				Msg("No chunks found and no data.raw, nothing to render")
-			return fmt.Errorf("no chunks to compose for session %s", sessionID)
-		}
-
-		log.Info().
+	// data.raw should already exist — assembled via multipart upload in flushChunks
+	rawStat, err := m.client.StatObject(ctx, bucketName, rawDataObjectName, minio.StatObjectOptions{})
+	if err != nil {
+		log.Warn().
 			Stringer("recorder-id", recorderID).
 			Stringer("session-id", sessionID).
-			Int64("size", rawStat.Size).
-			Msg("No chunks found, but data.raw exists. Re-rendering from existing raw data.")
-
-		sm, err := m.getSessionMetadata(ctx, recorderID, sessionID)
-		if err != nil {
-			return fmt.Errorf("cannot get session metadata: %w", err)
-		}
-
-		const bytesPerSecond float64 = 48000.0 * 2.0 * 2.0
-		durationSeconds := float64(rawStat.Size) / bytesPerSecond
-		sm.Duration = time.Duration(durationSeconds) * time.Second
-		sm.EndTime = sm.StartTime.Add(sm.Duration)
-
-		// Persist duration/endtime before rendering
-		m.dataLock.Lock()
-		if err := m.putSessionMetadata(ctx, recorderID, sessionID, sm); err != nil {
-			m.dataLock.Unlock()
-			return fmt.Errorf("cannot persist session duration: %w", err)
-		}
-		m.dataLock.Unlock()
-
-		var rawData ObjectHandle
-		if rawData, err = m.client.GetObject(ctx, bucketName, rawDataObjectName, minio.GetObjectOptions{}); err != nil {
-			return fmt.Errorf("cannot get raw data: %w", err)
-		}
-
-		return m.renderFromRawData(ctx, recorderID, sessionID, rawData, rawStat.Size)
+			Msg("No data.raw found, nothing to render")
+		return fmt.Errorf("no data.raw for session %s: %w", sessionID, err)
 	}
 
-	ui, err := m.batchComposeObject(ctx, dst, srcs, recorderID, sessionID)
-	if err != nil {
-		return err
-	}
+	log.Info().
+		Stringer("recorder-id", recorderID).
+		Stringer("session-id", sessionID).
+		Int64("size", rawStat.Size).
+		Msg("Rendering from data.raw")
 
-	// We need to make this generic and nicer, hack for now to get teh exact end time for the session
-	// raw samples for 48000hz, 2 Bytes (16bit), 2 channels
+	// Calculate duration from raw PCM size: 48kHz, 16-bit (2 bytes), stereo (2 channels)
 	const bytesPerSecond float64 = 48000.0 * 2.0 * 2.0
-	durationSeconds := float64(ui.Size) / bytesPerSecond
+	durationSeconds := float64(rawStat.Size) / bytesPerSecond
 
 	sm, err := m.getSessionMetadata(ctx, recorderID, sessionID)
 	if err != nil {
-		log.Err(err).Msg("Cannot get session metadata")
 		return fmt.Errorf("cannot get session metadata: %w", err)
 	}
 
@@ -1202,114 +1190,12 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 	}
 	m.dataLock.Unlock()
 
-	var rawData ObjectHandle
-	if rawData, err = m.client.GetObject(ctx, bucketName, dst.Object, minio.GetObjectOptions{}); err != nil {
-		log.Err(err).Str("object", dst.Object).Msg("Cannot get object")
-
-		return err
-	}
-
-	if err := m.renderFromRawData(ctx, recorderID, sessionID, rawData, ui.Size); err != nil {
-		return err
-	}
-
-	if err := m.client.RemoveObject(ctx, bucketName, chunksPrefix, minio.RemoveObjectOptions{ForceDelete: true}); err != nil {
-		log.Err(err).Str("object", chunksPrefix).Msg("Cannot remove object")
-	}
-
-	return nil
-}
-
-// batchComposeObject composes sources in batches to avoid timeouts on large sessions.
-// MinIO's ComposeObject can struggle with hundreds of sources in a single call,
-// so we compose in groups of up to maxComposeBatch, creating temporary intermediate
-// objects, then compose those together into the final destination.
-const maxComposeBatch = 100
-
-func (m *Minio) batchComposeObject(ctx context.Context, dst minio.CopyDestOptions, srcs []minio.CopySrcOptions, recorderID, sessionID uuid.UUID) (minio.UploadInfo, error) {
-	if len(srcs) <= maxComposeBatch {
-		ui, err := m.client.ComposeObject(ctx, dst, srcs...)
-		if err != nil {
-			log.Err(err).
-				Stringer("recorder-id", recorderID).
-				Stringer("session-id", sessionID).
-				Int("chunks", len(srcs)).
-				Msg("Cannot compose object")
-			return minio.UploadInfo{}, fmt.Errorf("cannot compose object: %w", err)
-		}
-		return ui, nil
-	}
-
-	log.Info().
-		Stringer("recorder-id", recorderID).
-		Stringer("session-id", sessionID).
-		Int("chunks", len(srcs)).
-		Int("batch-size", maxComposeBatch).
-		Msg("Composing chunks in batches")
-
-	// Compose in batches, producing temporary intermediate objects.
-	var intermediates []minio.CopySrcOptions
-	var tempObjects []string
-
-	for i := 0; i < len(srcs); i += maxComposeBatch {
-		end := i + maxComposeBatch
-		if end > len(srcs) {
-			end = len(srcs)
-		}
-		batch := srcs[i:end]
-
-		tmpObject := fmt.Sprintf("%s/sessions/%s/_compose_tmp_%d", recorderID, sessionID, i/maxComposeBatch)
-		tmpDst := minio.CopyDestOptions{
-			Bucket: dst.Bucket,
-			Object: tmpObject,
-		}
-
-		_, err := m.client.ComposeObject(ctx, tmpDst, batch...)
-		if err != nil {
-			// Clean up any temp objects we already created.
-			for _, obj := range tempObjects {
-				_ = m.client.RemoveObject(ctx, dst.Bucket, obj, minio.RemoveObjectOptions{})
-			}
-			log.Err(err).
-				Stringer("recorder-id", recorderID).
-				Stringer("session-id", sessionID).
-				Int("batch-start", i).
-				Int("batch-size", len(batch)).
-				Msg("Cannot compose batch")
-			return minio.UploadInfo{}, fmt.Errorf("cannot compose batch starting at chunk %d: %w", i, err)
-		}
-
-		tempObjects = append(tempObjects, tmpObject)
-		intermediates = append(intermediates, minio.CopySrcOptions{
-			Bucket: dst.Bucket,
-			Object: tmpObject,
-		})
-
-		log.Debug().
-			Stringer("session-id", sessionID).
-			Int("batch", i/maxComposeBatch).
-			Int("chunks", len(batch)).
-			Msg("Composed batch")
-	}
-
-	// Now compose the intermediates into the final destination.
-	// If intermediates themselves exceed the batch size, recurse.
-	ui, err := m.batchComposeObject(ctx, dst, intermediates, recorderID, sessionID)
+	rawData, err := m.client.GetObject(ctx, bucketName, rawDataObjectName, minio.GetObjectOptions{})
 	if err != nil {
-		for _, obj := range tempObjects {
-			_ = m.client.RemoveObject(ctx, dst.Bucket, obj, minio.RemoveObjectOptions{})
-		}
-		return minio.UploadInfo{}, err
+		return fmt.Errorf("cannot get raw data: %w", err)
 	}
 
-	// Clean up intermediate objects.
-	for _, obj := range tempObjects {
-		if err := m.client.RemoveObject(ctx, dst.Bucket, obj, minio.RemoveObjectOptions{}); err != nil {
-			log.Warn().Err(err).Str("object", obj).Msg("Cannot remove temp compose object")
-		}
-	}
-
-	return ui, nil
+	return m.renderFromRawData(ctx, recorderID, sessionID, rawData, rawStat.Size)
 }
 
 func (m *Minio) FindRecorderIDs(ctx context.Context) ([]uuid.UUID, error) {
@@ -1618,17 +1504,32 @@ func (m *Minio) closeSessions(ctx context.Context, recorderID uuid.UUID) error {
 			// can close it if no new chunks arrive within the timeout window.
 			// If the recorder is still active, SafeChunks will resume naturally
 			// because m.chunks[recorderID] already exists with the right sessionID.
-			chunkCount := m.countChunks(ctx, recorderID, sid)
+			uploadID, parts, totalBytes := m.findExistingMultipartUpload(ctx, recorderID, sid)
+			if uploadID == "" {
+				// No existing multipart upload; start a new one
+				rawDataObjectName := fmt.Sprintf("%s/sessions/%s/data.raw", recorderID, sid)
+				var err error
+				uploadID, err = m.client.NewMultipartUpload(ctx, bucketName, rawDataObjectName, minio.PutObjectOptions{})
+				if err != nil {
+					log.Err(err).Stringer("session-id", sid).Msg("Cannot initiate multipart upload on startup resume")
+					continue
+				}
+				parts = make([]minio.CompletePart, 0)
+			}
+			partCount := len(parts)
 			m.chunks[recorderID] = &minioChunk{
-				number:    chunkCount,
-				sessionID: sid,
-				buffer:    new(bytes.Buffer),
+				number:     partCount + 1,
+				sessionID:  sid,
+				buffer:     new(bytes.Buffer),
+				uploadID:   uploadID,
+				parts:      parts,
+				totalBytes: totalBytes,
 			}
 			m.lastChunkTime[recorderID] = time.Now()
 			log.Info().
 				Stringer("recorder-id", recorderID).
 				Stringer("session-id", sid).
-				Int("existing-chunks", chunkCount).
+				Int("existing-parts", partCount).
 				Msg("Resuming RECORDING session on startup, waiting for chunks or timeout")
 
 		case SessionStateProcessing:
@@ -1643,19 +1544,6 @@ func (m *Minio) closeSessions(ctx context.Context, recorderID uuid.UUID) error {
 }
 
 // countChunks returns the number of chunk objects stored in MinIO for a session.
-func (m *Minio) countChunks(ctx context.Context, recorderID, sessionID uuid.UUID) int {
-	chunksPrefix := fmt.Sprintf("%s/sessions/%s/chunks/", recorderID, sessionID)
-	objectCh := m.client.ListObjects(ctx, bucketName, minio.ListObjectsOptions{Prefix: chunksPrefix, Recursive: true})
-	count := 0
-	for obj := range objectCh {
-		if obj.Err != nil {
-			break
-		}
-		count++
-	}
-	return count
-}
-
 // closeIntermediateSessions finds all sessions still in RECORDING state for a recorder
 // and transitions them to PROCESSING with a render job. Sessions already in PROCESSING
 // are left alone — they already have a render job in the queue.
@@ -1734,6 +1622,11 @@ func (m *Minio) closeSessionAsync(ctx context.Context, recorderID, sessionID uui
 		if err := m.flushChunks(ctx, recorderID, sessionID, chunk); err != nil {
 			return fmt.Errorf("cannot flush session: %w", err)
 		}
+	} else {
+		// No in-memory chunk (e.g., restart recovery). Try to complete any orphaned multipart upload.
+		if err := m.completeOrphanedUpload(ctx, recorderID, sessionID); err != nil {
+			return fmt.Errorf("cannot complete orphaned upload: %w", err)
+		}
 	}
 
 	if m.isSessionClosed(ctx, recorderID, sessionID) {
@@ -1758,13 +1651,47 @@ func (m *Minio) closeSessionAsync(ctx context.Context, recorderID, sessionID uui
 	// State transition to PROCESSING was already done by the caller via FSM.
 	// Proceed directly to rendering.
 	if err := m.renderSession(ctx, recorderID, sessionID); err != nil {
-		// renderFromRawData fires triggerRenderFailure internally, but ComposeObject
-		// failures happen before that. Fire as safety net.
 		m.fireSessionTrigger(ctx, sessionID, triggerRenderFailure, sanitizeErrorForUser(err.Error()))
 		return fmt.Errorf("cannot render session: %w", err)
 	}
 
 	log.Debug().Stringer("recorder-id", recorderID).Stringer("session-id", sessionID).Msg("Session closed")
+
+	return nil
+}
+
+// completeOrphanedUpload tries to complete an in-progress multipart upload
+// that has no in-memory chunk state (e.g., after a backend restart).
+func (m *Minio) completeOrphanedUpload(ctx context.Context, recorderID, sessionID uuid.UUID) error {
+	rawDataObjectName := fmt.Sprintf("%s/sessions/%s/data.raw", recorderID, sessionID)
+
+	// Check if data.raw already exists (previous render succeeded)
+	if _, err := m.client.StatObject(ctx, bucketName, rawDataObjectName, minio.StatObjectOptions{}); err == nil {
+		return nil // already complete
+	}
+
+	uploadID, parts, _ := m.findExistingMultipartUpload(ctx, recorderID, sessionID)
+	if uploadID == "" {
+		return nil // no orphaned upload
+	}
+
+	if len(parts) > 0 {
+		_, err := m.client.CompleteMultipartUpload(ctx, bucketName, rawDataObjectName, uploadID, parts, minio.PutObjectOptions{})
+		if err != nil {
+			return fmt.Errorf("cannot complete orphaned multipart upload: %w", err)
+		}
+		log.Info().
+			Stringer("recorder-id", recorderID).
+			Stringer("session-id", sessionID).
+			Int("parts", len(parts)).
+			Msg("Completed orphaned multipart upload")
+	} else {
+		_ = m.client.AbortMultipartUpload(ctx, bucketName, rawDataObjectName, uploadID)
+		log.Info().
+			Stringer("recorder-id", recorderID).
+			Stringer("session-id", sessionID).
+			Msg("Aborted empty orphaned multipart upload")
+	}
 
 	return nil
 }
@@ -1785,7 +1712,7 @@ func (m *Minio) CloseRecordingSession(ctx context.Context, recorderID, sessionID
 	if chunkCopy != nil {
 		const bytesPerSecond = 48000.0 * 2.0 * 2.0 // 48kHz, 16-bit, stereo
 		// flushedChunks × minChunkSize + remaining buffer
-		totalBytes := int64(chunkCopy.number)*int64(minChunkSize) + int64(chunkCopy.buffer.Len())
+		totalBytes := chunkCopy.totalBytes + int64(chunkCopy.buffer.Len())
 		estimatedDuration := time.Duration(float64(totalBytes) / bytesPerSecond * float64(time.Second))
 
 		if recorder, ok := m.system.Recorders[recorderID]; ok {

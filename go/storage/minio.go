@@ -1175,14 +1175,9 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 		return m.renderFromRawData(ctx, recorderID, sessionID, rawData, rawStat.Size)
 	}
 
-	ui, err := m.client.ComposeObject(ctx, dst, srcs...)
+	ui, err := m.batchComposeObject(ctx, dst, srcs, recorderID, sessionID)
 	if err != nil {
-		log.Err(err).
-			Stringer("recorder-id", recorderID).
-			Stringer("session-id", sessionID).
-			Int("chunks", len(srcs)).
-			Msg("Cannot compose object")
-		return fmt.Errorf("cannot compose object: %w", err)
+		return err
 	}
 
 	// We need to make this generic and nicer, hack for now to get teh exact end time for the session
@@ -1225,6 +1220,98 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 	return nil
 }
 
+// batchComposeObject composes sources in batches to avoid timeouts on large sessions.
+// MinIO's ComposeObject can struggle with hundreds of sources in a single call,
+// so we compose in groups of up to maxComposeBatch, creating temporary intermediate
+// objects, then compose those together into the final destination.
+const maxComposeBatch = 100
+
+func (m *Minio) batchComposeObject(ctx context.Context, dst minio.CopyDestOptions, srcs []minio.CopySrcOptions, recorderID, sessionID uuid.UUID) (minio.UploadInfo, error) {
+	if len(srcs) <= maxComposeBatch {
+		ui, err := m.client.ComposeObject(ctx, dst, srcs...)
+		if err != nil {
+			log.Err(err).
+				Stringer("recorder-id", recorderID).
+				Stringer("session-id", sessionID).
+				Int("chunks", len(srcs)).
+				Msg("Cannot compose object")
+			return minio.UploadInfo{}, fmt.Errorf("cannot compose object: %w", err)
+		}
+		return ui, nil
+	}
+
+	log.Info().
+		Stringer("recorder-id", recorderID).
+		Stringer("session-id", sessionID).
+		Int("chunks", len(srcs)).
+		Int("batch-size", maxComposeBatch).
+		Msg("Composing chunks in batches")
+
+	// Compose in batches, producing temporary intermediate objects.
+	var intermediates []minio.CopySrcOptions
+	var tempObjects []string
+
+	for i := 0; i < len(srcs); i += maxComposeBatch {
+		end := i + maxComposeBatch
+		if end > len(srcs) {
+			end = len(srcs)
+		}
+		batch := srcs[i:end]
+
+		tmpObject := fmt.Sprintf("%s/sessions/%s/_compose_tmp_%d", recorderID, sessionID, i/maxComposeBatch)
+		tmpDst := minio.CopyDestOptions{
+			Bucket: dst.Bucket,
+			Object: tmpObject,
+		}
+
+		_, err := m.client.ComposeObject(ctx, tmpDst, batch...)
+		if err != nil {
+			// Clean up any temp objects we already created.
+			for _, obj := range tempObjects {
+				_ = m.client.RemoveObject(ctx, dst.Bucket, obj, minio.RemoveObjectOptions{})
+			}
+			log.Err(err).
+				Stringer("recorder-id", recorderID).
+				Stringer("session-id", sessionID).
+				Int("batch-start", i).
+				Int("batch-size", len(batch)).
+				Msg("Cannot compose batch")
+			return minio.UploadInfo{}, fmt.Errorf("cannot compose batch starting at chunk %d: %w", i, err)
+		}
+
+		tempObjects = append(tempObjects, tmpObject)
+		intermediates = append(intermediates, minio.CopySrcOptions{
+			Bucket: dst.Bucket,
+			Object: tmpObject,
+		})
+
+		log.Debug().
+			Stringer("session-id", sessionID).
+			Int("batch", i/maxComposeBatch).
+			Int("chunks", len(batch)).
+			Msg("Composed batch")
+	}
+
+	// Now compose the intermediates into the final destination.
+	// If intermediates themselves exceed the batch size, recurse.
+	ui, err := m.batchComposeObject(ctx, dst, intermediates, recorderID, sessionID)
+	if err != nil {
+		for _, obj := range tempObjects {
+			_ = m.client.RemoveObject(ctx, dst.Bucket, obj, minio.RemoveObjectOptions{})
+		}
+		return minio.UploadInfo{}, err
+	}
+
+	// Clean up intermediate objects.
+	for _, obj := range tempObjects {
+		if err := m.client.RemoveObject(ctx, dst.Bucket, obj, minio.RemoveObjectOptions{}); err != nil {
+			log.Warn().Err(err).Str("object", obj).Msg("Cannot remove temp compose object")
+		}
+	}
+
+	return ui, nil
+}
+
 func (m *Minio) FindRecorderIDs(ctx context.Context) ([]uuid.UUID, error) {
 	recorders := make([]uuid.UUID, 0)
 
@@ -1264,14 +1351,23 @@ func (m *Minio) GetRecorders() map[uuid.UUID]Recorder {
 	m.dataLock.Lock()
 	defer m.dataLock.Unlock()
 
-	return m.system.Recorders
+	result := make(map[uuid.UUID]Recorder, len(m.system.Recorders))
+	for k, v := range m.system.Recorders {
+		result[k] = v
+	}
+	return result
 }
 
 func (m *Minio) GetSessions(recorderID uuid.UUID) map[uuid.UUID]Session {
 	m.dataLock.Lock()
 	defer m.dataLock.Unlock()
 
-	return m.system.Recorders[recorderID].Sessions
+	sessions := m.system.Recorders[recorderID].Sessions
+	result := make(map[uuid.UUID]Session, len(sessions))
+	for k, v := range sessions {
+		result[k] = v
+	}
+	return result
 }
 
 func (m *Minio) GetSession(recorderID, sessionID uuid.UUID) (Session, error) {

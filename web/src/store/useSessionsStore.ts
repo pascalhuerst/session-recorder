@@ -30,8 +30,13 @@ export const useSessionsStore = defineStore('sessions', () => {
 
       handle = reconnectingStream({
         name: `sessions(${recorderID})`,
-        connect: (handlers) =>
-          streamSessions({
+        connect: (handlers) => {
+          // Track which session IDs the server sends on this (re)connect
+          // so we can prune any that no longer exist on the backend.
+          const seen = new Set<string>();
+          let pruned = false;
+
+          return streamSessions({
             request: { recorderID },
             onMessage: (msg) => {
               handlers.onMessage();
@@ -45,6 +50,23 @@ export const useSessionsStore = defineStore('sessions', () => {
                 }
 
                 case 'updated': {
+                  seen.add(msg.session.id);
+
+                  // After the initial snapshot burst, prune sessions the
+                  // server didn't mention (they were deleted while we were
+                  // disconnected). We do this once, on the first "updated"
+                  // message that arrives after a short gap — the server
+                  // sends the full snapshot synchronously, so a microtask
+                  // boundary marks the end of the burst.
+                  if (!pruned) {
+                    pruned = true;
+                    queueMicrotask(() => {
+                      sessions.value = sessions.value.filter((s) =>
+                        seen.has(s.id)
+                      );
+                    });
+                  }
+
                   const excludeUpdated = sessions.value.filter(
                     (s) => s.id !== msg.session.id
                   );
@@ -54,10 +76,7 @@ export const useSessionsStore = defineStore('sessions', () => {
             },
             onError: handlers.onError,
             onEnd: handlers.onEnd,
-          }),
-        onReconnecting: () => {
-          // Clear stale sessions on reconnect so we get fresh state
-          sessions.value = [];
+          });
         },
       });
     },

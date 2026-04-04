@@ -2,13 +2,16 @@ package render
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"os/exec"
 
 	"github.com/rs/zerolog/log"
 )
 
-func CreateAudioFile(raw io.Reader, outFile string) (*bytes.Buffer, error) {
+// CreateAudioFileStream converts raw PCM audio to the specified format,
+// writing the output directly to w instead of buffering in memory.
+func CreateAudioFileStream(raw io.Reader, outFormat string, w io.Writer) error {
 	soxCmd := exec.Command(
 		"/usr/bin/sox",
 		"-t", "raw",
@@ -17,51 +20,48 @@ func CreateAudioFile(raw io.Reader, outFile string) (*bytes.Buffer, error) {
 		"-c", "2",
 		"--endian=little",
 		"--encoding=signed-integer",
-		"-", //Red from STDIN
-		"-t", outFile,
-		"-", //Write to STDOUT
+		"-",
+		"-t", outFormat,
+		"-",
 	)
 
 	soxStdin, err := soxCmd.StdinPipe()
 	if err != nil {
-		log.Err(err).Msg("Cannot get stdin pipe")
-
-		return nil, err
+		return fmt.Errorf("cannot get stdin pipe: %w", err)
 	}
 
 	soxStdout, err := soxCmd.StdoutPipe()
 	if err != nil {
-		log.Err(err).Msg("Cannot get stdout pipe")
-
-		return nil, err
+		return fmt.Errorf("cannot get stdout pipe: %w", err)
 	}
 
 	go func() {
 		defer soxStdin.Close()
-
-		_, err := io.Copy(soxStdin, raw)
-		if err != nil {
+		if _, err := io.Copy(soxStdin, raw); err != nil {
 			log.Err(err).Msg("Cannot write to stdin")
 		}
 	}()
 
 	if err := soxCmd.Start(); err != nil {
-		log.Err(err).Msg("Cannot create file")
+		return fmt.Errorf("cannot start sox: %w", err)
+	}
 
+	if _, err := io.Copy(w, soxStdout); err != nil {
+		return fmt.Errorf("cannot read from sox stdout: %w", err)
+	}
+
+	if err := soxCmd.Wait(); err != nil {
+		return fmt.Errorf("sox failed: %w", err)
+	}
+
+	return nil
+}
+
+// CreateAudioFile converts raw PCM audio to the specified format, returning the result as a buffer.
+func CreateAudioFile(raw io.Reader, outFile string) (*bytes.Buffer, error) {
+	buf := new(bytes.Buffer)
+	if err := CreateAudioFileStream(raw, outFile, buf); err != nil {
 		return nil, err
 	}
-
-	buffer, err := io.ReadAll(soxStdout)
-	if err != nil {
-		log.Err(err).Msg("Cannot read from stdout")
-
-		return nil, err
-	}
-
-	err = soxCmd.Wait()
-	if err != nil {
-		log.Err(err).Msg("Cannot create file")
-	}
-
-	return bytes.NewBuffer(buffer), nil
+	return buf, nil
 }

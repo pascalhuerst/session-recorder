@@ -11,7 +11,8 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-func CreateWaveform(ctx context.Context, raw io.Reader, zoom, width, height int) (*bytes.Buffer, error) {
+// CreateWaveformStream writes waveform data directly to w.
+func CreateWaveformStream(ctx context.Context, raw io.Reader, zoom, width, height int, w io.Writer) error {
 	cmd := exec.Command("audiowaveform",
 		"--input-filename", "-",
 		"--input-format", "raw",
@@ -25,10 +26,19 @@ func CreateWaveform(ctx context.Context, raw io.Reader, zoom, width, height int)
 
 	cmd.Stdin = raw
 
-	return run(ctx, cmd)
+	return runStream(ctx, cmd, w)
 }
 
-func CreateOverview(ctx context.Context, raw io.Reader, zoom, width, height int) (*bytes.Buffer, error) {
+func CreateWaveform(ctx context.Context, raw io.Reader, zoom, width, height int) (*bytes.Buffer, error) {
+	buf := new(bytes.Buffer)
+	if err := CreateWaveformStream(ctx, raw, zoom, width, height, buf); err != nil {
+		return nil, err
+	}
+	return buf, nil
+}
+
+// CreateOverviewStream writes overview PNG directly to w.
+func CreateOverviewStream(ctx context.Context, raw io.Reader, zoom, width, height int, w io.Writer) error {
 	const (
 		backgroundColor = "333333fe"
 		waveformColor   = "ed730cfe"
@@ -55,59 +65,57 @@ func CreateOverview(ctx context.Context, raw io.Reader, zoom, width, height int)
 
 	cmd.Stdin = raw
 
-	return run(ctx, cmd)
+	return runStream(ctx, cmd, w)
 }
 
-func run(ctx context.Context, cmd *exec.Cmd) (*bytes.Buffer, error) {
+func CreateOverview(ctx context.Context, raw io.Reader, zoom, width, height int) (*bytes.Buffer, error) {
+	buf := new(bytes.Buffer)
+	if err := CreateOverviewStream(ctx, raw, zoom, width, height, buf); err != nil {
+		return nil, err
+	}
+	return buf, nil
+}
+
+func runStream(ctx context.Context, cmd *exec.Cmd, w io.Writer) error {
 	eg, _ := errgroup.WithContext(ctx)
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		return nil, fmt.Errorf("Cannot get stdout pipe: %w", err)
+		return fmt.Errorf("cannot get stdout pipe: %w", err)
 	}
 
-	stdoutBuffer := new(bytes.Buffer)
-
-	// Read from stdout
 	eg.Go(func() error {
-		_, err := io.Copy(stdoutBuffer, stdout)
-		if err != nil {
-			return fmt.Errorf("Cannot read from stdout: %w", err)
+		if _, err := io.Copy(w, stdout); err != nil {
+			return fmt.Errorf("cannot read from stdout: %w", err)
 		}
-
 		return nil
 	})
 
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		return nil, fmt.Errorf("Cannot get stderr pipe: %w", err)
+		return fmt.Errorf("cannot get stderr pipe: %w", err)
 	}
 
 	stderrBuffer := new(bytes.Buffer)
 
-	// Read from stderr
 	eg.Go(func() error {
-		_, err := io.Copy(stderrBuffer, stderr)
-		if err != nil {
-			return fmt.Errorf("Cannot read from stderr: %w", err)
+		if _, err := io.Copy(stderrBuffer, stderr); err != nil {
+			return fmt.Errorf("cannot read from stderr: %w", err)
 		}
-
 		return nil
 	})
 
-	err = cmd.Start()
-	if err != nil {
-		return nil, fmt.Errorf("Failed to execute: %w", err)
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("failed to execute: %w", err)
 	}
 
 	if err := eg.Wait(); err != nil {
-		return nil, fmt.Errorf("Failed to execute: %w", err)
+		return fmt.Errorf("failed to execute: %w", err)
 	}
 
-	err = cmd.Wait()
-	if err != nil {
-		return nil, fmt.Errorf("Failed to execute: %w", err)
+	if err := cmd.Wait(); err != nil {
+		return fmt.Errorf("failed to execute: %w", err)
 	}
 
-	return stdoutBuffer, nil
+	return nil
 }

@@ -23,6 +23,18 @@ func SamplePositionToDuration(samplePosition int64) time.Duration {
 	return time.Duration(seconds * float64(time.Second))
 }
 
+// SamplePositionToByteOffset converts a sample position (frame index) to a byte offset
+// in raw PCM data (48kHz, 16-bit, stereo).
+func SamplePositionToByteOffset(samplePosition int64) int64 {
+	return samplePosition * channels * 2 // 2 bytes per sample, 2 channels
+}
+
+// EncodeStream encodes raw PCM audio to the specified format, writing directly to w.
+// The input should already be clipped to the desired range (e.g. via S3 range request).
+func EncodeStream(raw io.Reader, outputFormat string, w io.Writer) error {
+	return CreateAudioFileStream(raw, outputFormat, w)
+}
+
 // ClipAndEncodeOgg clips raw audio data and encodes to OGG format.
 // startPos and endPos are sample positions (frame indices).
 func ClipAndEncodeOgg(raw io.Reader, startPos, endPos int64) (*bytes.Buffer, error) {

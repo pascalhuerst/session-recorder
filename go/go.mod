@@ -5,6 +5,7 @@ go 1.24.0
 toolchain go1.24.3
 
 require (
+	github.com/alitto/pond/v2 v2.7.0
 	github.com/bogem/id3v2 v1.2.0
 	github.com/fsnotify/fsnotify v1.4.9
 	github.com/godbus/dbus/v5 v5.1.0
@@ -14,10 +15,9 @@ require (
 	github.com/holoplot/go-avahi v1.0.1
 	github.com/mattn/go-colorable v0.1.13
 	github.com/mattn/go-isatty v0.0.20
-	github.com/mewkiz/flac v1.0.10
 	github.com/minio/minio-go/v7 v7.0.66
 	github.com/pascalhuerst/session-recorder/protocols/go v0.0.0-20240420153411-21708cdb8a48
-	github.com/pkg/errors v0.9.1
+	github.com/qmuntal/stateless v1.8.0
 	github.com/rs/zerolog v1.31.0
 	golang.org/x/sync v0.19.0
 	google.golang.org/grpc v1.77.0
@@ -25,19 +25,16 @@ require (
 )
 
 require (
-	github.com/alitto/pond/v2 v2.7.0 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/hashicorp/errwrap v1.0.0 // indirect
-	github.com/icza/bitio v1.1.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/compress v1.17.4 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.6 // indirect
-	github.com/mewkiz/pkg v0.0.0-20230226050401-4010bf0fec14 // indirect
 	github.com/minio/md5-simd v1.1.2 // indirect
 	github.com/minio/sha256-simd v1.0.1 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
-	github.com/qmuntal/stateless v1.8.0 // indirect
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/rs/xid v1.5.0 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/stretchr/testify v1.11.1 // indirect

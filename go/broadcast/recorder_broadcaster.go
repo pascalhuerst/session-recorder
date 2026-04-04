@@ -10,6 +10,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+
 const (
 	// DefaultRecorderStatusTimeout is the default duration after which a recorder
 	// is considered stale if no status updates are received.
@@ -36,6 +37,7 @@ type RecorderBroadcaster struct {
 	statusTimeout time.Duration
 	// Signal to stop the timeout checker goroutine
 	stopTimeout chan struct{}
+	stopOnce    sync.Once
 }
 
 // NewRecorderBroadcaster creates a new RecorderBroadcaster.
@@ -60,9 +62,11 @@ func (b *RecorderBroadcaster) Start(ctx context.Context) {
 	go b.runTimeoutChecker(ctx)
 }
 
-// Stop stops the timeout checker goroutine.
+// Stop stops the timeout checker goroutine. Safe to call multiple times.
 func (b *RecorderBroadcaster) Stop() {
-	close(b.stopTimeout)
+	b.stopOnce.Do(func() {
+		close(b.stopTimeout)
+	})
 }
 
 // Subscribe creates a new subscription and returns the channel and unsubscribe function.

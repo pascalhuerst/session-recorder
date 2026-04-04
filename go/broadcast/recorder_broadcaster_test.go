@@ -355,6 +355,20 @@ func TestRecorderBroadcaster_Timeout_AlreadyNoSignalNotBroadcastAgain(t *testing
 	}
 }
 
+func TestRecorderBroadcaster_Stop_DoubleCallDoesNotPanic(t *testing.T) {
+	b := NewRecorderBroadcaster(5)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	b.Start(ctx)
+
+	// First Stop should succeed
+	b.Stop()
+
+	// Second Stop must not panic
+	b.Stop()
+}
+
 func TestRecorderBroadcaster_Timeout_FreshUpdateResetsTimer(t *testing.T) {
 	b := NewRecorderBroadcaster(5)
 	b.SetStatusTimeout(100 * time.Millisecond)

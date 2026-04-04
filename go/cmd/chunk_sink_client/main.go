@@ -81,11 +81,13 @@ func main() {
 	}
 
 	go func() {
+		chunkTicker := time.NewTicker(time.Millisecond * 500)
+		defer chunkTicker.Stop()
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case <-time.Tick(time.Millisecond * 500):
+			case <-chunkTicker.C:
 				c := proto.Clone(&chunks).(*cspb.Chunks)
 
 				c.Data = chunkData
@@ -104,13 +106,15 @@ func main() {
 	}()
 
 	go func() {
+		statusTicker := time.NewTicker(time.Millisecond * 500)
+		defer statusTicker.Stop()
 		i := 0
 
 		for {
 			select {
 			case <-ctx.Done():
 				return
-			case <-time.Tick(time.Millisecond * 500):
+			case <-statusTicker.C:
 				s := proto.Clone(&status).(*cmpb.RecorderStatus)
 
 				_, err = client.SetRecorderStatus(ctx, s, grpc.EmptyCallOption{})

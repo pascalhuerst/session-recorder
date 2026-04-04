@@ -143,10 +143,10 @@ func (h *ChunkSinkHandler) setChunks(ctx context.Context, chunks *cspb.Chunks) e
 	state.recording = true
 	h.lock.Unlock()
 
-	// We have s16 samples, but stored int u32
-	samples := make([]int16, 0, len(chunks.Data))
-	for _, sample := range chunks.Data {
-		samples = append(samples, int16(sample))
+	// We have s16 samples, but stored in u32
+	samples := make([]int16, len(chunks.Data))
+	for i, sample := range chunks.Data {
+		samples[i] = int16(sample)
 	}
 
 	timeCreated := time.Now()

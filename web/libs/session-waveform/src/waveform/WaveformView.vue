@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watchEffect, computed, nextTick } from 'vue';
+import { ref, watchEffect, computed, nextTick, onBeforeUnmount } from 'vue';
 import VirtualizedItem from '../lib/disclosure/VirtualizedItem.vue';
 import { usePeaksContext } from '../context/usePeaksContext';
 import Overview from '../elements/Overview/Overview.vue';
@@ -65,6 +65,10 @@ const toggleExpanded = async () => {
     context.commandEmitter.emit('setExpanded', false);
   }
 };
+
+onBeforeUnmount(() => {
+  context.commandEmitter.emit('destroy');
+});
 
 defineExpose({
   toggleExpanded,

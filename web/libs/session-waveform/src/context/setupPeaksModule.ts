@@ -1,5 +1,5 @@
 import { CustomSegmentMarker } from '../elements/CustomSegmentMarker';
-import type { PeaksOptions, SegmentMarker } from 'peaks.js';
+import type { PeaksInstance, PeaksOptions, SegmentMarker } from 'peaks.js';
 import Peaks from 'peaks.js';
 import type { createPeaksModule } from './createPeaksModule';
 
@@ -80,6 +80,8 @@ export const setupPeaksModule = ({
       return;
     }
 
+    const audioContext = waveformUrl ? undefined : new AudioContext();
+
     const options = {
       overview: {
         container: elements.overview,
@@ -98,7 +100,7 @@ export const setupPeaksModule = ({
           }
         : {
             webAudio: {
-              audioContext: new AudioContext(),
+              audioContext: audioContext!,
               multiChannel: false,
             },
           }),
@@ -109,6 +111,8 @@ export const setupPeaksModule = ({
       },
     } satisfies PeaksOptions;
 
+    let peaksInstance: PeaksInstance | null = null;
+
     Peaks.init(options, function (err, peaks) {
       if (err || !peaks) {
         // When scrolling fast, containers may lose dimensions before Peaks.js
@@ -118,13 +122,24 @@ export const setupPeaksModule = ({
           err instanceof Error &&
           err.message.includes('must be visible and have non-zero width');
         if (isContainerError) {
+          audioContext?.close();
           return;
         }
         console.error(err);
+        audioContext?.close();
         return;
       }
 
+      peaksInstance = peaks;
       eventEmitter.emit('ready', peaks);
+    });
+
+    commandEmitter.on('destroy', () => {
+      if (peaksInstance) {
+        peaksInstance.destroy();
+        peaksInstance = null;
+      }
+      audioContext?.close();
     });
   });
 };

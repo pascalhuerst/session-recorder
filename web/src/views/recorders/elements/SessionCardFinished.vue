@@ -123,10 +123,16 @@ const onShareConfirm = (emails: string[]) => {
 
 // Sync segment state changes from session to peaks context
 // This is needed because the peaks context has its own copy of segments
-// and needs to be updated when the backend broadcasts state changes
+// and needs to be updated when the backend broadcasts state changes.
+// We derive a lightweight key from just the fields we care about (state, errorMessage,
+// downloadFiles) to avoid deep-watching the entire segments array.
 watch(
-  () => props.session.segments,
-  (newSegments) => {
+  () =>
+    props.session.segments
+      .map((s) => `${s.id}:${s.state}:${s.errorMessage ?? ''}:${s.downloadFiles?.ogg ?? ''}`)
+      .join('|'),
+  () => {
+    const newSegments = props.session.segments;
     ctx.state.update((state) => ({
       ...state,
       segments: state.segments.map((ctxSegment) => {
@@ -148,8 +154,7 @@ watch(
         };
       }),
     }));
-  },
-  { deep: true }
+  }
 );
 
 ctx.eventEmitter.on('expandedChanged', (expanded) => {

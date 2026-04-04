@@ -8,14 +8,14 @@ import { useRecordersStore } from '../../../../store/useRecordersStore';
 const { recorders, selectedRecorderId } = storeToRefs(useRecordersStore());
 
 watch(
-  [recorders, selectedRecorderId],
+  [() => recorders.value.size, selectedRecorderId],
   () => {
     if (!selectedRecorderId.value && recorders.value.size) {
       const keys = Array.from(recorders.value.keys());
       selectedRecorderId.value = keys[0];
     }
   },
-  { immediate: true, deep: true }
+  { immediate: true }
 );
 </script>
 

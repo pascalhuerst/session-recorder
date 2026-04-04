@@ -39,6 +39,12 @@ export const useSessionsStore = defineStore('sessions', () => {
           return streamSessions({
             request: { recorderID },
             onMessage: (msg) => {
+              // Guard against messages from a stale stream arriving after
+              // the user switched to a different recorder tab. The async
+              // iterator in streamSessions may have buffered a message
+              // before the AbortController signal was processed.
+              if (selectedRecorderId.value !== recorderID) return;
+
               handlers.onMessage();
 
               switch (msg.type) {

@@ -318,6 +318,30 @@ func (m *Minio) Start(ctx context.Context) error {
 				}
 			}
 
+			// Recovery: segments stuck in RENDERING after a crash should be
+			// moved to ERROR so the user can retry them.
+			segmentsChanged := false
+			for segID, seg := range sessionMetadata.Segments {
+				if seg.State == SegmentStateRendering {
+					log.Warn().
+						Stringer("session-id", sessionID).
+						Stringer("segment-id", segID).
+						Msg("Recovering segment stuck in RENDERING state, moving to ERROR")
+					seg.State = SegmentStateError
+					seg.ErrorMessage = "interrupted by server restart"
+					sessionMetadata.Segments[segID] = seg
+					segmentsChanged = true
+				}
+			}
+			if segmentsChanged {
+				if err := m.putSessionMetadata(ctx, recorderID, sessionID, sessionMetadata); err != nil {
+					log.Warn().
+						Err(err).
+						Stringer("session-id", sessionID).
+						Msg("Cannot save recovered segment states")
+				}
+			}
+
 			m.system.Recorders[recorderID].Sessions[sessionID] = *sessionMetadata
 
 			// Create a state machine for each loaded session
@@ -1620,11 +1644,13 @@ func (m *Minio) closeIntermediateSessions(ctx context.Context, recorderID uuid.U
 func (m *Minio) closeSessionAsync(ctx context.Context, recorderID, sessionID uuid.UUID, chunk *minioChunk) error {
 	if chunk != nil {
 		if err := m.flushChunks(ctx, recorderID, sessionID, chunk); err != nil {
+			m.fireSessionTrigger(ctx, sessionID, triggerRenderFailure, sanitizeErrorForUser(err.Error()))
 			return fmt.Errorf("cannot flush session: %w", err)
 		}
 	} else {
 		// No in-memory chunk (e.g., restart recovery). Try to complete any orphaned multipart upload.
 		if err := m.completeOrphanedUpload(ctx, recorderID, sessionID); err != nil {
+			m.fireSessionTrigger(ctx, sessionID, triggerRenderFailure, sanitizeErrorForUser(err.Error()))
 			return fmt.Errorf("cannot complete orphaned upload: %w", err)
 		}
 	}
@@ -1649,9 +1675,9 @@ func (m *Minio) closeSessionAsync(ctx context.Context, recorderID, sessionID uui
 	m.dataLock.Unlock()
 
 	// State transition to PROCESSING was already done by the caller via FSM.
-	// Proceed directly to rendering.
+	// Proceed directly to rendering. renderSession (via renderFromRawData)
+	// handles the FSM transition to ERROR or FINISHED internally.
 	if err := m.renderSession(ctx, recorderID, sessionID); err != nil {
-		m.fireSessionTrigger(ctx, sessionID, triggerRenderFailure, sanitizeErrorForUser(err.Error()))
 		return fmt.Errorf("cannot render session: %w", err)
 	}
 

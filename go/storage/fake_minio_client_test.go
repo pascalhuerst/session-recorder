@@ -358,6 +358,13 @@ func (f *FakeMinioClient) GetObjectData(bucket, object string) ([]byte, bool) {
 	return data, ok
 }
 
+// RemoveUpload deletes a multipart upload by ID (for sabotaging uploads in tests).
+func (f *FakeMinioClient) RemoveUpload(uploadID string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	delete(f.uploads, uploadID)
+}
+
 // MultipartUploadCount returns the number of in-progress multipart uploads (for test assertions).
 func (f *FakeMinioClient) MultipartUploadCount() int {
 	f.mu.Lock()

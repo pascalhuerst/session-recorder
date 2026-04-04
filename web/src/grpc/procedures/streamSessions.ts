@@ -50,7 +50,7 @@ const mapSessionState = (protoState: ProtoSessionState): SessionState => {
     case ProtoSessionState.ERROR:
       return 'error';
     default:
-      return 'recording';
+      return 'error';
   }
 };
 

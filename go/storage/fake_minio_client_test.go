@@ -17,7 +17,8 @@ import (
 // fakeObject implements ObjectHandle backed by an in-memory byte slice.
 type fakeObject struct {
 	*bytes.Reader
-	info minio.ObjectInfo
+	info   minio.ObjectInfo
+	closed bool
 }
 
 func newFakeObject(key string, data []byte) *fakeObject {
@@ -27,7 +28,7 @@ func newFakeObject(key string, data []byte) *fakeObject {
 	}
 }
 
-func (f *fakeObject) Close() error                    { return nil }
+func (f *fakeObject) Close() error                    { f.closed = true; return nil }
 func (f *fakeObject) Stat() (minio.ObjectInfo, error) { return f.info, nil }
 
 // fakeMultipartUpload tracks an in-progress multipart upload.
@@ -44,6 +45,7 @@ type FakeMinioClient struct {
 	objects      map[string][]byte              // key: "bucket/object"
 	uploads      map[string]*fakeMultipartUpload // uploadID -> upload
 	nextUploadID int
+	lastObjects  []*fakeObject // tracks objects returned by GetObject for close assertions
 }
 
 func NewFakeMinioClient() *FakeMinioClient {
@@ -137,7 +139,9 @@ func (f *FakeMinioClient) GetObject(_ context.Context, bucketName, objectName st
 	// Return a copy so concurrent reads don't interfere
 	dataCopy := make([]byte, len(data))
 	copy(dataCopy, data)
-	return newFakeObject(objectName, dataCopy), nil
+	obj := newFakeObject(objectName, dataCopy)
+	f.lastObjects = append(f.lastObjects, obj)
+	return obj, nil
 }
 
 func (f *FakeMinioClient) PutObject(_ context.Context, bucketName, objectName string, reader io.Reader, _ int64, _ minio.PutObjectOptions) (minio.UploadInfo, error) {
@@ -381,4 +385,24 @@ func (f *FakeMinioClient) MultipartPartCount(uploadID string) int {
 		return 0
 	}
 	return len(upload.parts)
+}
+
+// UnclosedObjects returns fakeObjects returned by GetObject that were never closed.
+func (f *FakeMinioClient) UnclosedObjects() []*fakeObject {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var unclosed []*fakeObject
+	for _, obj := range f.lastObjects {
+		if !obj.closed {
+			unclosed = append(unclosed, obj)
+		}
+	}
+	return unclosed
+}
+
+// ResetObjectTracking clears the list of tracked GetObject results.
+func (f *FakeMinioClient) ResetObjectTracking() {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.lastObjects = nil
 }

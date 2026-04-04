@@ -1021,3 +1021,59 @@ func (l *testSessionListener) OnRenderProgress(event RenderProgressEvent) {
 		l.onProgress(event)
 	}
 }
+
+// =============================================================================
+// Reader Close Verification
+// =============================================================================
+
+// TestFix_GetObjectReadersAreClosed verifies that metadata-fetching functions
+// close the ObjectHandle returned by GetObject, preventing file descriptor leaks.
+func TestFix_GetObjectReadersAreClosed(t *testing.T) {
+	m, fake := newTestStorage(t)
+	ctx := context.Background()
+
+	recorderID := uuid.New()
+	sessionID := uuid.New()
+	m.EnsureRecorderExists(ctx, recorderID, "recorder")
+
+	// Create a session so getSessionMetadata has something to read
+	samples := make([]int16, 100)
+	if err := m.SafeChunks(ctx, recorderID, sessionID, "001", time.Now(), samples); err != nil {
+		t.Fatalf("SafeChunks failed: %v", err)
+	}
+
+	// Reset tracking after setup (SafeChunks may have called GetObject internally)
+	fake.ResetObjectTracking()
+
+	// Call getSystemMetadata
+	m.dataLock.Lock()
+	_, err := m.getSystemMetadata(ctx)
+	m.dataLock.Unlock()
+	if err != nil {
+		t.Fatalf("getSystemMetadata failed: %v", err)
+	}
+
+	// Call getSessionMetadata
+	m.dataLock.Lock()
+	_, err = m.getSessionMetadata(ctx, recorderID, sessionID)
+	m.dataLock.Unlock()
+	if err != nil {
+		t.Fatalf("getSessionMetadata failed: %v", err)
+	}
+
+	// Call getRecorderMetadata
+	m.dataLock.Lock()
+	_, err = m.getRecorderMetadata(ctx, recorderID)
+	m.dataLock.Unlock()
+	if err != nil {
+		t.Fatalf("getRecorderMetadata failed: %v", err)
+	}
+
+	// All three should have closed their readers
+	unclosed := fake.UnclosedObjects()
+	if len(unclosed) > 0 {
+		for _, obj := range unclosed {
+			t.Errorf("GetObject reader for %q was not closed", obj.info.Key)
+		}
+	}
+}

@@ -2184,91 +2184,72 @@ func (m *Minio) renderSegmentSync(ctx context.Context, recorderID, sessionID, se
 		return fmt.Errorf("%s", errMsg)
 	}
 
-	// Get the raw audio file
+	// Fetch only the byte range needed for this segment via S3 range request
 	rawDataObjectName := fmt.Sprintf("%s/sessions/%s/data.raw", recorderID, sessionID)
-	log.Info().Stringer("segment-id", segmentID).Str("object", rawDataObjectName).Msg("Fetching raw audio for segment")
-	rawData, err := m.client.GetObject(ctx, bucketName, rawDataObjectName, minio.GetObjectOptions{})
+	startByte := render.SamplePositionToByteOffset(segment.StartPoint)
+	endByte := render.SamplePositionToByteOffset(segment.EndPoint) - 1 // inclusive end for Range header
+
+	log.Info().
+		Stringer("segment-id", segmentID).
+		Str("object", rawDataObjectName).
+		Int64("startByte", startByte).
+		Int64("endByte", endByte).
+		Msg("Fetching raw audio range for segment")
+
+	opts := minio.GetObjectOptions{}
+	if err := opts.SetRange(startByte, endByte); err != nil {
+		m.setSegmentError(ctx, recorderID, sessionID, segmentID, fmt.Sprintf("cannot set range: %v", err))
+		return fmt.Errorf("cannot set range: %w", err)
+	}
+
+	rawData, err := m.client.GetObject(ctx, bucketName, rawDataObjectName, opts)
 	if err != nil {
 		m.setSegmentError(ctx, recorderID, sessionID, segmentID, fmt.Sprintf("cannot get raw audio: %v", err))
 		return fmt.Errorf("cannot get raw audio: %w", err)
 	}
 	defer rawData.Close()
-	log.Info().Stringer("segment-id", segmentID).Msg("Got raw audio handle, starting encoding")
+	log.Info().Stringer("segment-id", segmentID).Msg("Got raw audio range, starting encoding")
 
-	// Setup readers for parallel encoding
+	// Fan out the pre-clipped range to parallel encoders
 	readers, writer, closer := makeReaders(2)
 	eg, egCtx := errgroup.WithContext(ctx)
 
-	// Copy raw data to multiple readers
 	eg.Go(func() error {
 		defer closer.Close()
-		log.Info().Stringer("segment-id", segmentID).Msg("Starting raw audio copy to encoders")
 		n, err := io.Copy(writer, rawData)
-		log.Info().Stringer("segment-id", segmentID).Int64("bytes", n).Err(err).Msg("Raw audio copy complete")
-		// Ignore closed pipe errors - this is expected when sox finishes early
-		// (sox only reads what it needs for the trim, then closes the pipe)
-		if err != nil && (strings.Contains(err.Error(), "closed pipe") || strings.Contains(err.Error(), "broken pipe")) {
-			log.Debug().Stringer("segment-id", segmentID).Msg("Pipe closed by encoder (expected)")
-			return nil
-		}
+		log.Debug().Stringer("segment-id", segmentID).Int64("bytes", n).Msg("Raw audio range copy complete")
 		return err
 	})
 
-	// Encode to OGG
+	// Encode to OGG — data is already clipped, just convert format
 	eg.Go(func() error {
-		log.Info().Stringer("segment-id", segmentID).Msg("Starting OGG encoding")
-		oggBuffer, err := render.ClipAndEncodeOgg(readers[0], segment.StartPoint, segment.EndPoint)
-		// Close the pipe reader to unblock the copy goroutine
-		// (sox only reads what it needs, leaving the rest unread)
-		if rc, ok := readers[0].(io.Closer); ok {
-			rc.Close()
-		}
-		if err != nil {
-			log.Error().Stringer("segment-id", segmentID).Err(err).Msg("OGG encoding failed")
-			return fmt.Errorf("cannot encode segment to OGG: %w", err)
-		}
-		log.Info().Stringer("segment-id", segmentID).Int("size", oggBuffer.Len()).Msg("OGG encoding complete")
-
+		oggPR, oggPW := io.Pipe()
+		defer oggPR.Close()
+		go func() {
+			oggPW.CloseWithError(render.EncodeStream(readers[0], "ogg", oggPW))
+		}()
 		oggObject := fmt.Sprintf("%s/sessions/%s/segments/%s/%s", recorderID, sessionID, segmentID, SEGMENT_FILENAME_OGG)
-		if _, err := m.client.PutObject(egCtx, bucketName, oggObject, oggBuffer, int64(oggBuffer.Len()), minio.PutObjectOptions{}); err != nil {
+		if _, err := m.client.PutObject(egCtx, bucketName, oggObject, oggPR, -1, minio.PutObjectOptions{}); err != nil {
 			log.Error().Stringer("segment-id", segmentID).Err(err).Msg("OGG upload failed")
 			return fmt.Errorf("cannot upload OGG: %w", err)
 		}
-
-		log.Info().
-			Stringer("segment-id", segmentID).
-			Int("size", oggBuffer.Len()).
-			Msg("Segment OGG uploaded")
-
+		log.Info().Stringer("segment-id", segmentID).Msg("Segment OGG uploaded")
 		return nil
 	})
 
-	// Encode to FLAC
+	// Encode to FLAC — data is already clipped, just convert format
 	eg.Go(func() error {
-		log.Info().Stringer("segment-id", segmentID).Msg("Starting FLAC encoding")
-		flacBuffer, err := render.ClipAndEncodeFlac(readers[1], segment.StartPoint, segment.EndPoint)
-		// Close the pipe reader to unblock the copy goroutine
-		// (sox only reads what it needs, leaving the rest unread)
-		if rc, ok := readers[1].(io.Closer); ok {
-			rc.Close()
-		}
-		if err != nil {
-			log.Error().Stringer("segment-id", segmentID).Err(err).Msg("FLAC encoding failed")
-			return fmt.Errorf("cannot encode segment to FLAC: %w", err)
-		}
-		log.Info().Stringer("segment-id", segmentID).Int("size", flacBuffer.Len()).Msg("FLAC encoding complete")
-
+		flacPR, flacPW := io.Pipe()
+		defer flacPR.Close()
+		go func() {
+			flacPW.CloseWithError(render.EncodeStream(readers[1], "flac", flacPW))
+		}()
 		flacObject := fmt.Sprintf("%s/sessions/%s/segments/%s/%s", recorderID, sessionID, segmentID, SEGMENT_FILENAME_FLAC)
-		if _, err := m.client.PutObject(egCtx, bucketName, flacObject, flacBuffer, int64(flacBuffer.Len()), minio.PutObjectOptions{}); err != nil {
+		if _, err := m.client.PutObject(egCtx, bucketName, flacObject, flacPR, -1, minio.PutObjectOptions{}); err != nil {
 			log.Error().Stringer("segment-id", segmentID).Err(err).Msg("FLAC upload failed")
 			return fmt.Errorf("cannot upload FLAC: %w", err)
 		}
-
-		log.Info().
-			Stringer("segment-id", segmentID).
-			Int("size", flacBuffer.Len()).
-			Msg("Segment FLAC uploaded")
-
+		log.Info().Stringer("segment-id", segmentID).Msg("Segment FLAC uploaded")
 		return nil
 	})
 

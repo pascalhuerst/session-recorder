@@ -2,34 +2,29 @@ package render
 
 import (
 	"bytes"
-	_ "embed"
 	"testing"
 )
 
-//go:embed test_data/sweep_30_20000_s16le_2ch_48000k.flac
-var goldenFlac []byte
-
 /**
- * Test Plan: FLAC Encoding
+ * Test Plan: FLAC Encoding (via sox)
  *
  * Scenario: Encode valid raw audio to FLAC
  *   Given raw PCM audio data (s16le, 2ch, 48kHz)
  *   When Flac() is called
  *   Then a valid FLAC buffer is returned with fLaC magic header
  *
- * Scenario: Handle empty input gracefully
- *   Given an empty byte slice as input
- *   When Flac() is called
- *   Then a valid FLAC buffer with headers is returned (no panic)
- *
  * Scenario: Encode small audio samples
  *   Given minimal stereo 16-bit samples
  *   When Flac() is called
  *   Then a valid FLAC buffer is returned with fLaC magic header
+ *
+ * Scenario: Deterministic output
+ *   Given the same raw PCM input
+ *   When Flac() is called twice
+ *   Then both outputs are bit-identical
  */
 
 func TestFlac_ValidInput(t *testing.T) {
-	// Use embedded test data from waveform_test.go
 	raw := bytes.NewReader(rawTestAudio)
 
 	got, err := Flac(raw)
@@ -70,7 +65,6 @@ func TestFlac_EmptyInput(t *testing.T) {
 	}
 
 	// Empty input should produce valid FLAC with just headers
-	// Verify FLAC magic bytes (fLaC)
 	if got.Len() > 0 {
 		flacMagic := []byte{0x66, 0x4C, 0x61, 0x43}
 		if !bytes.HasPrefix(got.Bytes(), flacMagic) {
@@ -79,29 +73,21 @@ func TestFlac_EmptyInput(t *testing.T) {
 	}
 }
 
-// TestFlac_DeterministicOutput verifies the pure-Go FLAC encoder produces
-// bit-identical output for the same input. This catches encoder regressions
-// without requiring any external tools.
+// TestFlac_DeterministicOutput verifies the FLAC encoder produces
+// identical output for the same input across two runs.
 func TestFlac_DeterministicOutput(t *testing.T) {
-	raw := bytes.NewReader(rawTestAudio)
-
-	got, err := Flac(raw)
+	first, err := Flac(bytes.NewReader(rawTestAudio))
 	if err != nil {
-		t.Fatalf("Flac() error = %v", err)
+		t.Fatalf("Flac() first run error = %v", err)
 	}
 
-	if got.Len() != len(goldenFlac) {
-		t.Fatalf("Flac output size differs: got %d bytes, golden %d bytes", got.Len(), len(goldenFlac))
+	second, err := Flac(bytes.NewReader(rawTestAudio))
+	if err != nil {
+		t.Fatalf("Flac() second run error = %v", err)
 	}
 
-	if !bytes.Equal(got.Bytes(), goldenFlac) {
-		// Find first differing byte for debugging
-		for i := range goldenFlac {
-			if got.Bytes()[i] != goldenFlac[i] {
-				t.Fatalf("Flac output differs from golden file at byte %d: got 0x%02x, want 0x%02x",
-					i, got.Bytes()[i], goldenFlac[i])
-			}
-		}
+	if !bytes.Equal(first.Bytes(), second.Bytes()) {
+		t.Fatalf("Flac output is not deterministic: first %d bytes, second %d bytes", first.Len(), second.Len())
 	}
 }
 

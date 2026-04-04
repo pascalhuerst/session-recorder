@@ -114,6 +114,11 @@ type Minio struct {
 	sessionMachines map[uuid.UUID]*stateless.StateMachine
 	machineLock     sync.Mutex
 
+	// deletedSessions tracks session IDs that have been deleted. Checked by
+	// onSessionTransition to avoid resurrecting sessions when a stale render
+	// callback fires after deletion.
+	deletedSessions map[uuid.UUID]struct{}
+
 	// Work queue for async rendering (sessions + segments)
 	renderQueue *workQueue
 }
@@ -164,6 +169,7 @@ func NewMinioStorage(endpoint, localEndpoint, publicEndpoint, accessKey, secretK
 		stopTimeout:     make(chan struct{}),
 		eventBus:        NewEventBus(),
 		sessionMachines: make(map[uuid.UUID]*stateless.StateMachine),
+		deletedSessions: make(map[uuid.UUID]struct{}),
 		renderQueue:     newWorkQueue(DefaultMaxRenderWorkers),
 	}, nil
 }
@@ -188,6 +194,7 @@ func NewMinioStorageWithClient(client MinioClient, endpoint, localEndpoint, publ
 		stopTimeout:     make(chan struct{}),
 		eventBus:        NewEventBus(),
 		sessionMachines: make(map[uuid.UUID]*stateless.StateMachine),
+		deletedSessions: make(map[uuid.UUID]struct{}),
 		renderQueue:     newWorkQueue(DefaultMaxRenderWorkers),
 	}
 }
@@ -444,6 +451,17 @@ type renderErrorKey struct{}
 func (m *Minio) onSessionTransition(ctx context.Context, recorderID, sessionID uuid.UUID, trigger sessionTrigger, source, destination SessionState) {
 	m.dataLock.Lock()
 
+	// If the session was deleted while a render was in-flight, the stale SM
+	// reference can still fire. Bail out to avoid resurrecting the session.
+	if _, deleted := m.deletedSessions[sessionID]; deleted {
+		m.dataLock.Unlock()
+		log.Warn().
+			Stringer("session-id", sessionID).
+			Str("trigger", string(trigger)).
+			Msg("onSessionTransition: session was deleted, ignoring stale transition")
+		return
+	}
+
 	recorder, ok := m.system.Recorders[recorderID]
 	if !ok {
 		m.dataLock.Unlock()
@@ -537,7 +555,7 @@ func (m *Minio) checkAndCloseStaleSession(ctx context.Context) {
 	var staleRecorders []struct {
 		recorderID uuid.UUID
 		sessionID  uuid.UUID
-		chunk      minioChunk
+		chunk      *minioChunk
 	}
 
 	for recorderID, chunk := range m.chunks {
@@ -556,8 +574,8 @@ func (m *Minio) checkAndCloseStaleSession(ctx context.Context) {
 			staleRecorders = append(staleRecorders, struct {
 				recorderID uuid.UUID
 				sessionID  uuid.UUID
-				chunk      minioChunk
-			}{recorderID, chunk.sessionID, *chunk})
+				chunk      *minioChunk
+			}{recorderID, chunk.sessionID, chunk})
 
 			// Remove from tracking maps
 			delete(m.chunks, recorderID)
@@ -576,8 +594,7 @@ func (m *Minio) checkAndCloseStaleSession(ctx context.Context) {
 				Msg("Cannot transition timed-out session to PROCESSING")
 		}
 
-		chunkCopy := stale.chunk
-		m.renderQueue.submitSessionRender(context.Background(), m, stale.recorderID, stale.sessionID, &chunkCopy)
+		m.renderQueue.submitSessionRender(context.Background(), m, stale.recorderID, stale.sessionID, stale.chunk)
 	}
 }
 
@@ -595,14 +612,18 @@ func (m *Minio) RegisterOnAudioChunkCallback(cb OnAudioChunkCb) error {
 	return nil
 }
 
-func (m *Minio) initSession(ctx context.Context, recorderID, sessionID uuid.UUID, timeCreated time.Time) {
+// initSession creates a new session. Must be called while dataLock is held.
+// Returns deferred work (intermediate session closings) that must be executed
+// after dataLock is released.
+func (m *Minio) initSession(ctx context.Context, recorderID, sessionID uuid.UUID, timeCreated time.Time) []intermediateSessionClose {
 	log.Info().
 		Stringer("recorder-id", recorderID).
 		Stringer("session-id", sessionID).
 		Msg("Creating new session")
 
-	// Before creating a new session, ensure all previous sessions are closed
-	m.closeIntermediateSessions(ctx, recorderID)
+	// Before creating a new session, find previous sessions to close.
+	// The actual FSM transitions are deferred until after dataLock is released.
+	deferred := m.closeIntermediateSessions(ctx, recorderID)
 
 	// Start multipart upload for data.raw
 	rawDataObjectName := fmt.Sprintf("%s/sessions/%s/data.raw", recorderID, sessionID)
@@ -612,7 +633,7 @@ func (m *Minio) initSession(ctx context.Context, recorderID, sessionID uuid.UUID
 			Stringer("recorder-id", recorderID).
 			Stringer("session-id", sessionID).
 			Msg("Cannot initiate multipart upload")
-		return
+		return deferred
 	}
 
 	m.chunks[recorderID] = &minioChunk{
@@ -645,7 +666,7 @@ func (m *Minio) initSession(ctx context.Context, recorderID, sessionID uuid.UUID
 			Stringer("recorder-id", recorderID).
 			Stringer("session-id", sessionID).
 			Msg("Cannot put session metadata")
-		return
+		return deferred
 	}
 
 	// Update in-memory map
@@ -664,6 +685,8 @@ func (m *Minio) initSession(ctx context.Context, recorderID, sessionID uuid.UUID
 		Trigger:       string(triggerStartRecording),
 		Session:       session,
 	})
+
+	return deferred
 }
 
 func (m *Minio) initRecorder(ctx context.Context, recorderID uuid.UUID, recorderName string) {
@@ -693,6 +716,11 @@ func (m *Minio) initRecorder(ctx context.Context, recorderID uuid.UUID, recorder
 func (m *Minio) DeleteSession(ctx context.Context, recorderID, sessionID uuid.UUID) error {
 	m.dataLock.Lock()
 	defer m.dataLock.Unlock()
+
+	// Mark as deleted before removing the state machine so that any in-flight
+	// render callback (onSessionTransition) that fires after this point will
+	// detect the deletion and bail out instead of resurrecting the session.
+	m.deletedSessions[sessionID] = struct{}{}
 
 	m.removeSessionMachine(sessionID)
 
@@ -802,6 +830,7 @@ func (m *Minio) SafeChunks(ctx context.Context, recorderID, sessionID uuid.UUID,
 	var oldSessionID uuid.UUID
 	var lastChunk *minioChunk
 	var needsSessionSwitch bool
+	var deferredCloses []intermediateSessionClose
 
 	m.dataLock.Lock()
 
@@ -882,7 +911,7 @@ func (m *Minio) SafeChunks(ctx context.Context, recorderID, sessionID uuid.UUID,
 					Msg("Resuming existing RECORDING session")
 			}
 		} else {
-			m.initSession(ctx, recorderID, sessionID, timeCreated)
+			deferredCloses = m.initSession(ctx, recorderID, sessionID, timeCreated)
 		}
 	}
 
@@ -895,7 +924,7 @@ func (m *Minio) SafeChunks(ctx context.Context, recorderID, sessionID uuid.UUID,
 		lastChunk = &lc
 		needsSessionSwitch = true
 
-		m.initSession(ctx, recorderID, sessionID, timeCreated)
+		deferredCloses = m.initSession(ctx, recorderID, sessionID, timeCreated)
 		chunk = m.chunks[recorderID]
 	}
 
@@ -931,6 +960,20 @@ func (m *Minio) SafeChunks(ctx context.Context, recorderID, sessionID uuid.UUID,
 	}
 
 	m.dataLock.Unlock()
+
+	// Fire deferred FSM transitions for intermediate sessions that were in
+	// RECORDING state when a new session started. These transitions use the FSM
+	// (which acquires dataLock in its callback), so they must happen after
+	// dataLock is released.
+	for _, ic := range deferredCloses {
+		if err := m.fireSessionTrigger(ctx, ic.sessionID, triggerCloseRecording); err != nil {
+			log.Warn().Err(err).
+				Stringer("session-id", ic.sessionID).
+				Msg("Cannot transition intermediate session to PROCESSING (may already be closed)")
+		}
+		// Submit render to work queue (non-blocking)
+		m.renderQueue.submitSessionRender(context.Background(), m, ic.recorderID, ic.sessionID, nil)
+	}
 
 	// Handle session switch outside dataLock — fireSessionTrigger's callback acquires it
 	if needsSessionSwitch {
@@ -1108,49 +1151,53 @@ func (m *Minio) renderFromRawData(ctx context.Context, recorderID, sessionID uui
 	})
 
 	eg.Go(func() error {
-		waveformData, err := render.CreateWaveform(egCtx, readers[0], 300, 10000, 200)
-		if err != nil {
-			return fmt.Errorf("cannot create waveform: %w", err)
-		}
+		waveformPR, waveformPW := io.Pipe()
+		defer waveformPR.Close()
+		go func() {
+			waveformPW.CloseWithError(render.CreateWaveformStream(egCtx, readers[0], 300, 10000, 200, waveformPW))
+		}()
 		waveformObject := fmt.Sprintf("%s/sessions/%s/waveform.dat", recorderID, sessionID)
-		if _, err := m.client.PutObject(ctx, bucketName, waveformObject, waveformData, int64(waveformData.Len()), minio.PutObjectOptions{}); err != nil {
-			return err
+		if _, err := m.client.PutObject(ctx, bucketName, waveformObject, waveformPR, -1, minio.PutObjectOptions{}); err != nil {
+			return fmt.Errorf("cannot upload waveform: %w", err)
 		}
 		return nil
 	})
 
 	eg.Go(func() error {
-		overviewData, err := render.CreateOverview(egCtx, readers[1], 300, 1000, 200)
-		if err != nil {
-			return fmt.Errorf("cannot create waveform overview: %w", err)
-		}
+		overviewPR, overviewPW := io.Pipe()
+		defer overviewPR.Close()
+		go func() {
+			overviewPW.CloseWithError(render.CreateOverviewStream(egCtx, readers[1], 300, 1000, 200, overviewPW))
+		}()
 		overviewObject := fmt.Sprintf("%s/sessions/%s/overview.png", recorderID, sessionID)
-		if _, err := m.client.PutObject(ctx, bucketName, overviewObject, overviewData, int64(overviewData.Len()), minio.PutObjectOptions{}); err != nil {
-			return err
+		if _, err := m.client.PutObject(ctx, bucketName, overviewObject, overviewPR, -1, minio.PutObjectOptions{}); err != nil {
+			return fmt.Errorf("cannot upload overview: %w", err)
 		}
 		return nil
 	})
 
 	eg.Go(func() error {
-		flacBuffer, err := render.Flac(readers[2])
-		if err != nil {
-			return err
-		}
+		flacPR, flacPW := io.Pipe()
+		defer flacPR.Close()
+		go func() {
+			flacPW.CloseWithError(render.FlacStream(readers[2], flacPW))
+		}()
 		flacObject := fmt.Sprintf("%s/sessions/%s/data.flac", recorderID, sessionID)
-		if _, err := m.client.PutObject(ctx, bucketName, flacObject, flacBuffer, int64(flacBuffer.Len()), minio.PutObjectOptions{}); err != nil {
-			return err
+		if _, err := m.client.PutObject(ctx, bucketName, flacObject, flacPR, -1, minio.PutObjectOptions{}); err != nil {
+			return fmt.Errorf("cannot upload FLAC: %w", err)
 		}
 		return nil
 	})
 
 	eg.Go(func() error {
-		buffer, err := render.CreateAudioFile(readers[3], "ogg")
-		if err != nil {
-			return err
-		}
+		oggPR, oggPW := io.Pipe()
+		defer oggPR.Close()
+		go func() {
+			oggPW.CloseWithError(render.CreateAudioFileStream(readers[3], "ogg", oggPW))
+		}()
 		object := fmt.Sprintf("%s/sessions/%s/data.ogg", recorderID, sessionID)
-		if _, err := m.client.PutObject(ctx, bucketName, object, buffer, int64(buffer.Len()), minio.PutObjectOptions{}); err != nil {
-			return err
+		if _, err := m.client.PutObject(ctx, bucketName, object, oggPR, -1, minio.PutObjectOptions{}); err != nil {
+			return fmt.Errorf("cannot upload OGG: %w", err)
 		}
 		return nil
 	})
@@ -1218,6 +1265,7 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 	if err != nil {
 		return fmt.Errorf("cannot get raw data: %w", err)
 	}
+	defer rawData.Close()
 
 	return m.renderFromRawData(ctx, recorderID, sessionID, rawData, rawStat.Size)
 }
@@ -1350,6 +1398,7 @@ func (m *Minio) getSystemMetadata(ctx context.Context) (*System, error) {
 	if err != nil {
 		return nil, fmt.Errorf("cannot get object: %w", err)
 	}
+	defer obj.Close()
 
 	buffer := new(bytes.Buffer)
 	if _, err := buffer.ReadFrom(obj); err != nil {
@@ -1391,6 +1440,7 @@ func (m *Minio) getSessionMetadata(ctx context.Context, recorderID, sessionID uu
 	if err != nil {
 		return nil, fmt.Errorf("cannot get object: %w", err)
 	}
+	defer obj.Close()
 
 	buffer := new(bytes.Buffer)
 	_, err = buffer.ReadFrom(obj)
@@ -1474,6 +1524,7 @@ func (m *Minio) getRecorderMetadata(ctx context.Context, recorderID uuid.UUID) (
 	if err != nil {
 		return nil, fmt.Errorf("cannot get object: %w", err)
 	}
+	defer obj.Close()
 
 	buffer := new(bytes.Buffer)
 	_, err = buffer.ReadFrom(obj)
@@ -1567,21 +1618,26 @@ func (m *Minio) closeSessions(ctx context.Context, recorderID uuid.UUID) error {
 	return nil
 }
 
-// countChunks returns the number of chunk objects stored in MinIO for a session.
+// intermediateSessionClose represents a session that needs to be closed via FSM
+// after dataLock is released.
+type intermediateSessionClose struct {
+	recorderID uuid.UUID
+	sessionID  uuid.UUID
+}
+
 // closeIntermediateSessions finds all sessions still in RECORDING state for a recorder
-// and transitions them to PROCESSING with a render job. Sessions already in PROCESSING
-// are left alone — they already have a render job in the queue.
+// and prepares them for closing. Sessions already in terminal states are synced in-memory.
+// Sessions needing FSM transitions are returned so the caller can fire triggers after
+// releasing dataLock (the FSM callback needs dataLock).
 // Called while dataLock is held (from initSession).
-// State updates are done directly since we hold the lock; FSMs are synced to match.
-func (m *Minio) closeIntermediateSessions(ctx context.Context, recorderID uuid.UUID) {
+func (m *Minio) closeIntermediateSessions(ctx context.Context, recorderID uuid.UUID) []intermediateSessionClose {
 	recorder, ok := m.system.Recorders[recorderID]
 	if !ok {
-		return
+		return nil
 	}
 
-	// Close any sessions still in RECORDING state by transitioning them to
-	// PROCESSING and submitting a render job. Sessions already in PROCESSING
-	// are left alone — they already have a render job in the queue.
+	var toClose []intermediateSessionClose
+
 	for sessionID, session := range recorder.Sessions {
 		if session.State == SessionStateRecording {
 			// Re-read metadata from storage to get the authoritative state.
@@ -1613,30 +1669,17 @@ func (m *Minio) closeIntermediateSessions(ctx context.Context, recorderID uuid.U
 				Str("state", session.State.String()).
 				Msg("Found session in RECORDING state, closing")
 
-			// Transition to PROCESSING directly (we hold dataLock)
-			previousState := session.State
-			session.State = SessionStateProcessing
-			if err := m.putSessionMetadata(ctx, recorderID, sessionID, &session); err != nil {
-				log.Err(err).Msg("Cannot update session state to PROCESSING")
-				continue
-			}
-			m.system.Recorders[recorderID].Sessions[sessionID] = session
-			m.eventBus.EmitSessionStateChanged(SessionStateChangedEvent{
-				RecorderID:    recorderID,
-				SessionID:     sessionID,
-				PreviousState: previousState,
-				NewState:      SessionStateProcessing,
-				Trigger:       "startup-close",
-				Session:       session,
+			// Ensure FSM exists at RECORDING so the trigger can transition it.
+			m.getOrCreateSessionMachine(recorderID, sessionID, SessionStateRecording)
+
+			toClose = append(toClose, intermediateSessionClose{
+				recorderID: recorderID,
+				sessionID:  sessionID,
 			})
-
-			// Create/sync FSM at PROCESSING state
-			m.getOrCreateSessionMachine(recorderID, sessionID, SessionStateProcessing)
-
-			// Submit render to work queue (non-blocking, safe to call while holding dataLock)
-			m.renderQueue.submitSessionRender(context.Background(), m, recorderID, sessionID, nil)
 		}
 	}
+
+	return toClose
 }
 
 // closeSessionAsync handles session closing when state was already transitioned to PROCESSING.
@@ -2101,6 +2144,7 @@ func (m *Minio) renderSegmentSync(ctx context.Context, recorderID, sessionID, se
 		m.dataLock.Unlock()
 		return fmt.Errorf("cannot start segment render: %w", err)
 	}
+	previousSegmentState := segment.State
 	segment.State = SegmentStateRendering
 	segment.ErrorMessage = ""
 	session.Segments[segmentID] = segment
@@ -2115,7 +2159,7 @@ func (m *Minio) renderSegmentSync(ctx context.Context, recorderID, sessionID, se
 		RecorderID:    recorderID,
 		SessionID:     sessionID,
 		SegmentID:     segmentID,
-		PreviousState: SegmentStateQueued,
+		PreviousState: previousSegmentState,
 		NewState:      SegmentStateRendering,
 		Session:       session,
 	})
@@ -2148,6 +2192,7 @@ func (m *Minio) renderSegmentSync(ctx context.Context, recorderID, sessionID, se
 		m.setSegmentError(ctx, recorderID, sessionID, segmentID, fmt.Sprintf("cannot get raw audio: %v", err))
 		return fmt.Errorf("cannot get raw audio: %w", err)
 	}
+	defer rawData.Close()
 	log.Info().Stringer("segment-id", segmentID).Msg("Got raw audio handle, starting encoding")
 
 	// Setup readers for parallel encoding
@@ -2284,6 +2329,16 @@ func (m *Minio) setSegmentError(ctx context.Context, recorderID, sessionID, segm
 	segment, ok := session.Segments[segmentID]
 	if !ok {
 		m.dataLock.Unlock()
+		return
+	}
+
+	if err := validateSegmentTransition(segment.State, SegmentStateError); err != nil {
+		m.dataLock.Unlock()
+		log.Warn().
+			Stringer("segment-id", segmentID).
+			Stringer("from-state", segment.State).
+			Str("error", errorMsg).
+			Msg("setSegmentError: invalid transition to ERROR, ignoring")
 		return
 	}
 

@@ -3,7 +3,16 @@ import { computed, ref, onMounted, onUnmounted } from 'vue';
 import { useDateFormat } from '@vueuse/core';
 import SessionCardRecording from './SessionCardRecording.vue';
 import StatusIndicator from './StatusIndicator.vue';
+import PeakMeter from './PeakMeter.vue';
 import type { Session } from '@/types';
+
+const peakLevel = ref(0);
+const peakClipping = ref(false);
+
+const onPeakUpdate = (level: number, clipping: boolean) => {
+  peakLevel.value = level;
+  peakClipping.value = clipping;
+};
 
 const props = defineProps<{
   session: Session;
@@ -55,10 +64,12 @@ const startTime = computed(() => {
       <StatusIndicator :is-recording="true" />
       <span class="duration">{{ elapsedTime }}</span>
       <span class="since">since {{ startTime }}</span>
+      <PeakMeter :level="peakLevel" :clipping="peakClipping" />
     </div>
     <SessionCardRecording
       :session="session"
       :recorder-id="recorderId"
+      @peak-update="onPeakUpdate"
     />
   </div>
 </template>
@@ -89,5 +100,16 @@ const startTime = computed(() => {
 .since {
   font-size: var(--scale-0);
   color: var(--text-muted);
+}
+
+@media (max-width: 768px) {
+  .recording-card {
+    margin: calc(-1 * var(--size-3));
+    margin-bottom: var(--size-3);
+  }
+
+  .recording-header {
+    padding: var(--size-2);
+  }
 }
 </style>

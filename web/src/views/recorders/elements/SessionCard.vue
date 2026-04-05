@@ -400,4 +400,23 @@ const onDeleteProcessing = () => {
 .expand-toggle.expanded {
   transform: rotate(90deg);
 }
+
+@media (max-width: 768px) {
+  .header {
+    flex-wrap: wrap;
+  }
+
+  .title {
+    font-size: var(--scale-1);
+  }
+
+  .spacer {
+    display: none;
+  }
+
+  .actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
 </style>

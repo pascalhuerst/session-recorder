@@ -133,4 +133,15 @@ const sessionsByDate = computed(() => {
   gap: var(--size-6);
   padding-left: var(--size-4);
 }
+
+@media (max-width: 768px) {
+  .list {
+    gap: var(--size-4);
+  }
+
+  .sessions {
+    padding-left: 0;
+    gap: var(--size-4);
+  }
+}
 </style>

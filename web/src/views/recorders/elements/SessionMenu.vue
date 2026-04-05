@@ -169,4 +169,15 @@ const onShareClose = () => {
   color: var(--text-muted);
   margin: 0 var(--size-1);
 }
+
+@media (max-width: 768px) {
+  .menu {
+    flex-wrap: wrap;
+  }
+
+  .expiry {
+    width: 100%;
+    margin: 0;
+  }
+}
 </style>

@@ -1,20 +1,32 @@
 <script setup lang="ts">
 import { ref } from 'vue';
+import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import SettingsModal from '../components/SettingsModal.vue';
 
 const settingsOpen = ref(false);
+const sidebarOpen = ref(false);
 </script>
 
 <template>
   <div class="page-shell">
-    <aside class="sidebar">
+    <div class="mobile-header">
+      <button class="hamburger" @click="sidebarOpen = !sidebarOpen" aria-label="Toggle sidebar">
+        <font-awesome-icon :icon="sidebarOpen ? 'fa-solid fa-xmark' : 'fa-solid fa-bars'" />
+      </button>
+      <router-link to="/" class="logo">
+        <img src="/assets/logo.png" alt="Session Recorder logo" />
+        <span class="logo-text">Session Recorder</span>
+      </router-link>
+    </div>
+    <div class="sidebar-overlay" :class="{ visible: sidebarOpen }" @click="sidebarOpen = false" />
+    <aside class="sidebar" :class="{ open: sidebarOpen }">
       <div class="sidebar-header">
         <router-link to="/" class="logo">
           <img src="/assets/logo.png" alt="Session Recorder logo" />
           <span class="logo-text">Session Recorder</span>
         </router-link>
       </div>
-      <div class="sidebar-content">
+      <div class="sidebar-content" @click="sidebarOpen = false">
         <slot name="sidebar" />
       </div>
       <div class="sidebar-footer">
@@ -38,6 +50,14 @@ const settingsOpen = ref(false);
   display: flex;
   height: 100vh;
   overflow: hidden;
+}
+
+.mobile-header {
+  display: none;
+}
+
+.sidebar-overlay {
+  display: none;
 }
 
 .sidebar {
@@ -121,5 +141,76 @@ const settingsOpen = ref(false);
 main {
   flex: 1;
   padding: var(--size-4);
+}
+
+@media (max-width: 768px) {
+  .page-shell {
+    flex-direction: column;
+  }
+
+  .mobile-header {
+    display: flex;
+    align-items: center;
+    gap: var(--size-2);
+    padding: var(--size-2) var(--size-3);
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-primary);
+    flex-shrink: 0;
+  }
+
+  .hamburger {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    border: none;
+    background: transparent;
+    color: var(--text-primary);
+    font-size: var(--scale-2);
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+  }
+
+  .hamburger:hover {
+    background: var(--bg-hover);
+  }
+
+  .sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 40;
+  }
+
+  .sidebar-overlay.visible {
+    display: block;
+  }
+
+  .sidebar {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 280px;
+    min-width: 280px;
+    z-index: 50;
+    box-shadow: 4px 0 12px rgba(0, 0, 0, 0.15);
+  }
+
+  .sidebar.open {
+    display: flex;
+  }
+
+  .main-wrapper {
+    height: 0;
+    flex: 1;
+  }
+
+  main {
+    padding: var(--size-3);
+  }
 }
 </style>

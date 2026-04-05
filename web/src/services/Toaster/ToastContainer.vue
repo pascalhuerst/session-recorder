@@ -182,4 +182,16 @@ const removeToast = (id: string) => {
 .toast-move {
   transition: transform 0.3s ease;
 }
+
+@media (max-width: 768px) {
+  .toast-container {
+    right: var(--size-3);
+    left: var(--size-3);
+    max-width: none;
+  }
+
+  .toast {
+    min-width: 0;
+  }
+}
 </style>

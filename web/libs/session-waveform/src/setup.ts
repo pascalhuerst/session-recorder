@@ -27,6 +27,8 @@ import { faCheck } from '@fortawesome/free-solid-svg-icons/faCheck';
 import { faRedo } from '@fortawesome/free-solid-svg-icons/faRedo';
 import { faShare } from '@fortawesome/free-solid-svg-icons/faShare';
 import { faGear } from '@fortawesome/free-solid-svg-icons/faGear';
+import { faBars } from '@fortawesome/free-solid-svg-icons/faBars';
+import { faXmark } from '@fortawesome/free-solid-svg-icons/faXmark';
 
 export const setup = () => {
   library.add(
@@ -56,6 +58,8 @@ export const setup = () => {
     faInfoCircle,
     faRedo,
     faShare,
-    faGear
+    faGear,
+    faBars,
+    faXmark
   );
 };

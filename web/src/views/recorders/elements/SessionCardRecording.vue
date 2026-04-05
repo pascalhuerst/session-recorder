@@ -10,12 +10,15 @@ import {
 } from '../../../grpc/procedures/streamWaveformPeaks';
 import { reconnectingStream } from '../../../grpc/reconnectingStream';
 import { useSessionsStore } from '../../../store/useSessionsStore';
-import PeakMeter from './PeakMeter.vue';
 import type { Session } from '@/types';
 
 const props = defineProps<{
   session: Session;
   recorderId: string;
+}>();
+
+const emit = defineEmits<{
+  (e: 'peakUpdate', level: number, clipping: boolean): void;
 }>();
 
 const sessionsStore = useSessionsStore();
@@ -103,6 +106,7 @@ const onWaveformPeaks = (msg: WaveformPeakMessage) => {
 
   // Update peak level meter
   peakLevel.value = msg.peakLevel;
+  emit('peakUpdate', msg.peakLevel, msg.clipping);
   if (msg.clipping) {
     clipping.value = true;
     // Hold clipping indicator for 1 second
@@ -244,8 +248,6 @@ watch(
       </Button>
     </div>
     <canvas ref="canvasRef" class="waveform-canvas" />
-    <PeakMeter :level="peakLevel" :clipping="clipping" />
-
   </div>
 </template>
 

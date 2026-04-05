@@ -6,28 +6,36 @@ const props = defineProps<{
   clipping: boolean;
 }>();
 
-// Peak hold: tracks the highest recent level with slow decay
+// Peak hold: tracks the highest recent level with hold time before decay
 const peakHold = ref(0);
 let decayInterval: ReturnType<typeof setInterval> | null = null;
+let holdTimer: ReturnType<typeof setTimeout> | null = null;
+let isHolding = false;
 
 watch(
   () => props.level,
   (newLevel) => {
     if (newLevel > peakHold.value) {
       peakHold.value = newLevel;
+      isHolding = true;
+      if (holdTimer) clearTimeout(holdTimer);
+      holdTimer = setTimeout(() => {
+        isHolding = false;
+      }, 1500);
     }
   }
 );
 
-// Decay the peak hold indicator over time
+// Decay the peak hold indicator over time (only after hold period)
 decayInterval = setInterval(() => {
-  if (peakHold.value > 0) {
+  if (!isHolding && peakHold.value > 0) {
     peakHold.value = Math.max(0, peakHold.value - 0.02);
   }
 }, 50);
 
 onUnmounted(() => {
   if (decayInterval) clearInterval(decayInterval);
+  if (holdTimer) clearTimeout(holdTimer);
 });
 </script>
 
@@ -52,11 +60,10 @@ onUnmounted(() => {
 
 <style scoped>
 .peak-meter {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 80px;
-  height: 6px;
+  margin-left: auto;
+  width: 120px;
+  height: 4px;
+  flex-shrink: 0;
 }
 
 .meter-track {
@@ -88,8 +95,8 @@ onUnmounted(() => {
   position: absolute;
   top: 0;
   bottom: 0;
-  width: 2px;
-  background-color: white;
+  width: 1px;
+  background-color: rgba(255, 255, 255, 0.8);
   transition: left 0.05s linear;
 }
 

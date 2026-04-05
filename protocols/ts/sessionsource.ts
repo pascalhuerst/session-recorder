@@ -194,12 +194,6 @@ export interface SessionInfo {
      * @generated from protobuf field: google.protobuf.Duration duration = 14
      */
     duration?: Duration;
-    /**
-     * Render progress (0.0 to 1.0). Only set during PROCESSING state.
-     *
-     * @generated from protobuf field: double renderProgress = 15
-     */
-    renderProgress: number;
 }
 /**
  * @generated from protobuf message sessionsource.SessionInfo.Files
@@ -978,8 +972,7 @@ class SessionInfo$Type extends MessageType<SessionInfo> {
             { no: 11, name: "inlineFiles", kind: "message", T: () => SessionInfo_Files },
             { no: 12, name: "downloadFiles", kind: "message", T: () => SessionInfo_Files },
             { no: 13, name: "errorMessage", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
-            { no: 14, name: "duration", kind: "message", T: () => Duration },
-            { no: 15, name: "renderProgress", kind: "scalar", T: 1 /*ScalarType.DOUBLE*/ }
+            { no: 14, name: "duration", kind: "message", T: () => Duration }
         ]);
     }
     create(value?: PartialMessage<SessionInfo>): SessionInfo {
@@ -989,7 +982,6 @@ class SessionInfo$Type extends MessageType<SessionInfo> {
         message.state = 0;
         message.segments = [];
         message.errorMessage = "";
-        message.renderProgress = 0;
         if (value !== undefined)
             reflectionMergePartial<SessionInfo>(this, message, value);
         return message;
@@ -1031,9 +1023,6 @@ class SessionInfo$Type extends MessageType<SessionInfo> {
                     break;
                 case /* google.protobuf.Duration duration */ 14:
                     message.duration = Duration.internalBinaryRead(reader, reader.uint32(), options, message.duration);
-                    break;
-                case /* double renderProgress */ 15:
-                    message.renderProgress = reader.double();
                     break;
                 default:
                     let u = options.readUnknownField;
@@ -1080,9 +1069,6 @@ class SessionInfo$Type extends MessageType<SessionInfo> {
         /* google.protobuf.Duration duration = 14; */
         if (message.duration)
             Duration.internalBinaryWrite(message.duration, writer.tag(14, WireType.LengthDelimited).fork(), options).join();
-        /* double renderProgress = 15; */
-        if (message.renderProgress !== 0)
-            writer.tag(15, WireType.Bit64).double(message.renderProgress);
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);

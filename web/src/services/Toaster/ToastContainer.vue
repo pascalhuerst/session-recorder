@@ -25,7 +25,7 @@ const removeToast = (id: string) => {
 
 <template>
   <div class="toast-container">
-    <transition-group name="toast" tag="div">
+    <transition-group name="toast" tag="div" class="toast-list">
       <div
         v-for="toast in toasts"
         :key="toast.id"
@@ -53,13 +53,16 @@ const removeToast = (id: string) => {
   top: var(--size-6);
   right: var(--size-6);
   z-index: 1000;
-  display: flex;
-  flex-direction: column;
-  gap: var(--size-3);
   max-width: 400px;
   max-height: 600px;
   pointer-events: none;
   overflow: hidden;
+}
+
+.toast-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-3);
 }
 
 .toast {
@@ -73,39 +76,23 @@ const removeToast = (id: string) => {
 }
 
 .toast--success {
-  border-color: var(--color-green-500);
-  background: var(--color-green-50);
-}
-
-:global(.theme-dark) .toast--success {
-  background: var(--color-green-950);
+  border-color: #22c55e;
+  background: #f0fdf4;
 }
 
 .toast--error {
-  border-color: var(--color-red-500);
-  background: var(--color-red-50);
-}
-
-:global(.theme-dark) .toast--error {
-  background: var(--color-red-950);
+  border-color: #ef4444;
+  background: #fef2f2;
 }
 
 .toast--warning {
-  border-color: var(--color-yellow-500);
-  background: var(--color-yellow-50);
-}
-
-:global(.theme-dark) .toast--warning {
-  background: var(--color-yellow-950);
+  border-color: #eab308;
+  background: #fefce8;
 }
 
 .toast--info {
-  border-color: var(--color-blue-500);
-  background: var(--color-blue-50);
-}
-
-:global(.theme-dark) .toast--info {
-  background: var(--color-blue-950);
+  border-color: #3b82f6;
+  background: #eff6ff;
 }
 
 .toast__content {
@@ -119,25 +106,24 @@ const removeToast = (id: string) => {
 }
 
 .toast--success .toast__icon {
-  color: var(--color-green-500);
+  color: #22c55e;
 }
 
 .toast--error .toast__icon {
-  color: var(--color-red-500);
+  color: #ef4444;
 }
 
 .toast--warning .toast__icon {
-  color: var(--color-yellow-500);
+  color: #eab308;
 }
 
 .toast--info .toast__icon {
-  color: var(--color-blue-500);
+  color: #3b82f6;
 }
 
 .toast__message {
   flex: 1;
   font-size: var(--scale-1);
-  color: var(--text-primary);
 }
 
 .toast__close {
@@ -193,5 +179,32 @@ const removeToast = (id: string) => {
   .toast {
     min-width: 0;
   }
+}
+</style>
+
+<style>
+.theme-dark .toast--success {
+  background: #14532d;
+  color: white;
+}
+
+.theme-dark .toast--error {
+  background: #7f1d1d;
+  color: white;
+}
+
+.theme-dark .toast--warning {
+  background: #713f12;
+  color: white;
+}
+
+.theme-dark .toast--info {
+  background: #1e3a5f;
+  color: white;
+}
+
+.theme-dark .toast .toast__message,
+.theme-dark .toast .toast__close {
+  color: white;
 }
 </style>

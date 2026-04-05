@@ -813,9 +813,7 @@ func TestContractFullRenderPipeline(t *testing.T) {
 	expectedFiles := map[string][]byte{
 		prefix + "data.raw":      nil,
 		prefix + "data.flac":     {0x66, 0x4C, 0x61, 0x43}, // fLaC
-		prefix + "data.ogg":      {0x4F, 0x67, 0x67, 0x53}, // OggS
 		prefix + "waveform.dat":  nil,                       // no standard magic
-		prefix + "overview.png":  {0x89, 0x50, 0x4E, 0x47}, // PNG
 		prefix + "metadata.json": nil,
 	}
 

@@ -195,6 +195,63 @@ func TestRemoveSession(t *testing.T) {
 	}
 }
 
+func TestAddSamples_EmptyInput(t *testing.T) {
+	pa := NewPeakAccumulator(4)
+
+	result := pa.AddSamples("s1", []int16{})
+	if len(result.Peaks) != 0 {
+		t.Fatalf("expected 0 peaks for empty input, got %d", len(result.Peaks))
+	}
+	if result.PeakLevel != 0 {
+		t.Errorf("expected peakLevel=0 for empty input, got %f", result.PeakLevel)
+	}
+	if result.Clipping {
+		t.Error("expected clipping=false for empty input")
+	}
+	if pa.GetAccumulatedCount("s1") != 0 {
+		t.Errorf("expected 0 accumulated peaks, got %d", pa.GetAccumulatedCount("s1"))
+	}
+}
+
+func TestAddSamples_SingleSample(t *testing.T) {
+	pa := NewPeakAccumulator(4)
+
+	result := pa.AddSamples("s1", []int16{500})
+	if len(result.Peaks) != 0 {
+		t.Fatalf("expected 0 peaks for single sample (window=4), got %d", len(result.Peaks))
+	}
+
+	expected := float32(500) / 32767.0
+	if result.PeakLevel < expected-0.001 || result.PeakLevel > expected+0.001 {
+		t.Errorf("peakLevel = %f, want ~%f", result.PeakLevel, expected)
+	}
+
+	// Pending should hold the sample
+	result = pa.AddSamples("s1", []int16{100, 200, -600})
+	if len(result.Peaks) != 1 {
+		t.Fatalf("expected 1 peak after completing window, got %d", len(result.Peaks))
+	}
+	if result.Peaks[0].Min != scaleInt16ToInt8(-600) {
+		t.Errorf("min = %d, want %d", result.Peaks[0].Min, scaleInt16ToInt8(-600))
+	}
+	if result.Peaks[0].Max != scaleInt16ToInt8(500) {
+		t.Errorf("max = %d, want %d", result.Peaks[0].Max, scaleInt16ToInt8(500))
+	}
+}
+
+func TestAddSamples_NegativePeakLevel(t *testing.T) {
+	pa := NewPeakAccumulator(4)
+
+	// Negative samples should still produce correct peak level
+	samples := []int16{0, 0, -20000, 0}
+	result := pa.AddSamples("s1", samples)
+
+	expected := float32(20000) / 32767.0
+	if result.PeakLevel < expected-0.001 || result.PeakLevel > expected+0.001 {
+		t.Errorf("peakLevel = %f, want ~%f", result.PeakLevel, expected)
+	}
+}
+
 func TestMultipleSessions(t *testing.T) {
 	pa := NewPeakAccumulator(2)
 

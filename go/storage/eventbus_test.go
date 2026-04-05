@@ -27,10 +27,6 @@ func (l *testListener) OnSegmentStateChanged(event SegmentStateChangedEvent) {
 	l.segmentEvents = append(l.segmentEvents, event)
 }
 
-func (l *testListener) OnRenderProgress(_ RenderProgressEvent) {
-	// Not tracked in this test helper
-}
-
 func (l *testListener) getSessionEvents() []SessionStateChangedEvent {
 	l.mu.Lock()
 	defer l.mu.Unlock()
@@ -294,6 +290,3 @@ func (l *countingListener) OnSegmentStateChanged(_ SegmentStateChangedEvent) {
 	l.count.Add(1)
 }
 
-func (l *countingListener) OnRenderProgress(_ RenderProgressEvent) {
-	l.count.Add(1)
-}

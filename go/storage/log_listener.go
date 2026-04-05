@@ -27,10 +27,3 @@ func (l *LogListener) OnSegmentStateChanged(event SegmentStateChangedEvent) {
 		Msg("Segment state changed")
 }
 
-func (l *LogListener) OnRenderProgress(event RenderProgressEvent) {
-	// Progress is emitted frequently — only log at debug level
-	log.Debug().
-		Stringer("session-id", event.SessionID).
-		Float64("progress", event.Progress).
-		Msg("Render progress")
-}

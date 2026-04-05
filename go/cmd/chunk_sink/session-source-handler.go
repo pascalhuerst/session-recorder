@@ -192,10 +192,6 @@ func newSessionInfo(ctx context.Context, h *SessionSourceHandler, session *stora
 		info.Duration = durationpb.New(session.Duration)
 	}
 
-	// Set render progress for PROCESSING sessions
-	if session.State == storage.SessionStateProcessing && session.RenderProgress > 0 {
-		info.RenderProgress = session.RenderProgress
-	}
 
 	// Only set TimeFinished for finished sessions
 	if session.State == storage.SessionStateFinished && !session.EndTime.IsZero() {
@@ -281,16 +277,6 @@ func (h *SessionSourceHandler) OnSegmentStateChanged(event storage.SegmentStateC
 	h.broadcastSessionUpdate(context.Background(), event.RecorderID, &session)
 }
 
-// OnRenderProgress implements storage.EventListener.
-// Broadcasts a session update with the current render progress so the UI can show a progress bar.
-func (h *SessionSourceHandler) OnRenderProgress(event storage.RenderProgressEvent) {
-	session, err := h.sessionStorage.GetSession(event.RecorderID, event.SessionID)
-	if err != nil {
-		return
-	}
-	session.RenderProgress = event.Progress
-	h.broadcastSessionUpdate(context.Background(), event.RecorderID, &session)
-}
 
 // onAudioChunk is called when audio samples are received. Broadcasts to audio subscribers.
 func (h *SessionSourceHandler) onAudioChunk(recorderID, sessionID uuid.UUID, samples []int16, chunkNumber int, timestamp time.Time) {

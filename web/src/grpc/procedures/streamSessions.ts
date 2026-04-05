@@ -96,9 +96,6 @@ export const normalizeSession = (id: string, info: SessionInfo): Session => {
       const seconds = Number(info.duration.seconds) + info.duration.nanos / 1e9;
       return seconds > 0 ? seconds : null;
     },
-    renderProgress: () => {
-      return info.renderProgress > 0 ? info.renderProgress : null;
-    },
     expiresAt: () => {
       if (!info.timeFinished || !info.lifetime) {
         return null;

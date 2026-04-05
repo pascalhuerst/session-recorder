@@ -30,7 +30,6 @@ export type Session = {
   finishedAt: Date | null;
   expiresAt: Date | null;
   duration: number | null; // seconds (estimated during processing, exact after finished)
-  renderProgress: number | null; // 0.0 to 1.0 during processing, null otherwise
   name: string;
   keep: boolean;
   state: SessionState;

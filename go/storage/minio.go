@@ -992,31 +992,6 @@ func (m *Minio) isSessionClosed(ctx context.Context, recorderID, sessionID uuid.
 }
 
 
-// progressReader wraps an io.Reader and calls onProgress with the fraction
-// of totalSize that has been read. Calls are throttled to at most once per interval.
-type progressReader struct {
-	reader     io.Reader
-	totalSize  int64
-	bytesRead  int64
-	onProgress func(progress float64)
-	lastEmit   time.Time
-	interval   time.Duration
-}
-
-func (pr *progressReader) Read(p []byte) (int, error) {
-	n, err := pr.reader.Read(p)
-	pr.bytesRead += int64(n)
-	if pr.totalSize > 0 && time.Since(pr.lastEmit) >= pr.interval {
-		progress := float64(pr.bytesRead) / float64(pr.totalSize)
-		if progress > 1.0 {
-			progress = 1.0
-		}
-		pr.onProgress(progress)
-		pr.lastEmit = time.Now()
-	}
-	return n, err
-}
-
 // startStreamingSession creates concurrent encoding pipelines that stay open
 // for the duration of a recording. Each pipeline reads PCM data from an
 // io.Pipe, encodes it (or passes it through for raw), and streams the result
@@ -1087,37 +1062,13 @@ func (m *Minio) startStreamingSession(_ context.Context, recorderID, sessionID u
 	}
 }
 
-func (m *Minio) renderFromRawData(ctx context.Context, recorderID, sessionID uuid.UUID, rawData io.Reader, totalSize int64) error {
+func (m *Minio) renderFromRawData(ctx context.Context, recorderID, sessionID uuid.UUID, rawData io.Reader, _ int64) error {
 	readers, writer, closer := makeReaders(3)
 	eg, egCtx := errgroup.WithContext(ctx)
 
-	// Wrap rawData to track and broadcast progress
-	pr := &progressReader{
-		reader:    rawData,
-		totalSize: totalSize,
-		interval:  500 * time.Millisecond,
-		onProgress: func(progress float64) {
-			// Update in-memory session state
-			m.dataLock.Lock()
-			if recorder, ok := m.system.Recorders[recorderID]; ok {
-				if session, ok := recorder.Sessions[sessionID]; ok {
-					session.RenderProgress = progress
-					m.system.Recorders[recorderID].Sessions[sessionID] = session
-				}
-			}
-			m.dataLock.Unlock()
-
-			m.eventBus.EmitRenderProgress(RenderProgressEvent{
-				RecorderID: recorderID,
-				SessionID:  sessionID,
-				Progress:   progress,
-			})
-		},
-	}
-
 	eg.Go(func() error {
 		defer closer.Close()
-		_, err := io.Copy(writer, pr)
+		_, err := io.Copy(writer, rawData)
 		if err != nil {
 			log.Err(err).Msg("Cannot setup multiple readers")
 			return err

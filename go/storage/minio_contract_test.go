@@ -976,9 +976,8 @@ func TestContractSessionSwitch_ConcurrentCloseDoesNotFailRender(t *testing.T) {
 
 // testSessionListener is a test helper that implements EventListener.
 type testSessionListener struct {
-	onSession  func(SessionStateChangedEvent)
-	onSegment  func(SegmentStateChangedEvent)
-	onProgress func(RenderProgressEvent)
+	onSession func(SessionStateChangedEvent)
+	onSegment func(SegmentStateChangedEvent)
 }
 
 func (l *testSessionListener) OnSessionStateChanged(event SessionStateChangedEvent) {
@@ -990,12 +989,6 @@ func (l *testSessionListener) OnSessionStateChanged(event SessionStateChangedEve
 func (l *testSessionListener) OnSegmentStateChanged(event SegmentStateChangedEvent) {
 	if l.onSegment != nil {
 		l.onSegment(event)
-	}
-}
-
-func (l *testSessionListener) OnRenderProgress(event RenderProgressEvent) {
-	if l.onProgress != nil {
-		l.onProgress(event)
 	}
 }
 

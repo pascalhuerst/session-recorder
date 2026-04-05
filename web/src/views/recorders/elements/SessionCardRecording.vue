@@ -5,11 +5,12 @@ import { Button } from '@session-recorder/session-waveform';
 import { cutSession } from '../../../grpc/procedures/cutSession';
 import { toastService } from '../../../services/Toaster/ToastService';
 import {
-  streamSessionAudio,
-  type AudioChunkMessage,
-} from '../../../grpc/procedures/streamSessionAudio';
+  streamWaveformPeaks,
+  type WaveformPeakMessage,
+} from '../../../grpc/procedures/streamWaveformPeaks';
 import { reconnectingStream } from '../../../grpc/reconnectingStream';
 import { useSessionsStore } from '../../../store/useSessionsStore';
+import PeakMeter from './PeakMeter.vue';
 import type { Session } from '@/types';
 
 const props = defineProps<{
@@ -42,44 +43,74 @@ const handleCutSession = async () => {
   }
 };
 
-// Canvas-based waveform with real audio data
+// Canvas-based waveform with server-computed peaks
 const canvasRef = ref<HTMLCanvasElement | null>(null);
 let animationId: number | null = null;
-let audioStream: { stop: () => void } | null = null;
+let peakStream: { stop: () => void } | null = null;
 
-// Store computed peaks for rendering
-// Each peak is a normalized value 0-1 representing max amplitude in a time window
-const peaks = ref<number[]>([]);
+// Store min/max peaks from server (int8 values, -128 to 127)
+const minPeaks = ref<Int8Array>(new Int8Array(0));
+const maxPeaks = ref<Int8Array>(new Int8Array(0));
 
-// Compute peaks from int16 samples
-// windowSize: number of samples per peak
-const computePeaks = (samples: Int16Array, windowSize: number): number[] => {
-  const result: number[] = [];
-  for (let i = 0; i < samples.length; i += windowSize) {
-    let max = 0;
-    const end = Math.min(i + windowSize, samples.length);
-    for (let j = i; j < end; j++) {
-      max = Math.max(max, Math.abs(samples[j]));
-    }
-    // Normalize to 0-1 (int16 max is 32767)
-    result.push(max / 32767);
-  }
-  return result;
-};
+// Peak level meter state
+const peakLevel = ref(0);
+const clipping = ref(false);
+let clippingTimeout: ReturnType<typeof setTimeout> | null = null;
 
 // Track canvas width for peak trimming
 let lastCanvasWidth = 0;
 
-const onAudioChunk = (chunk: AudioChunkMessage) => {
-  // Compute peaks from samples
-  // With 48kHz stereo, each chunk is about 48000 samples per 500ms
-  // We want ~10 peaks per chunk for smooth scrolling
-  const windowSize = Math.max(1, Math.floor(chunk.samples.length / 10));
-  const newPeaks = computePeaks(chunk.samples, windowSize);
+const onWaveformPeaks = (msg: WaveformPeakMessage) => {
+  const newPairCount = msg.peaks.length / 2;
 
-  // Append new peaks, trim to canvas width once full
-  const maxPeaks = lastCanvasWidth || 400;
-  peaks.value = [...peaks.value, ...newPeaks].slice(-maxPeaks);
+  if (msg.isInitial) {
+    // Replace all data (reconnect backfill)
+    const mins = new Int8Array(newPairCount);
+    const maxs = new Int8Array(newPairCount);
+    for (let i = 0; i < newPairCount; i++) {
+      mins[i] = msg.peaks[i * 2];
+      maxs[i] = msg.peaks[i * 2 + 1];
+    }
+    minPeaks.value = mins;
+    maxPeaks.value = maxs;
+  } else {
+    // Append incremental peaks, trim to canvas width
+    const maxPeakCount = lastCanvasWidth || 400;
+    const oldLen = minPeaks.value.length;
+    const totalLen = oldLen + newPairCount;
+    const trimStart = Math.max(0, totalLen - maxPeakCount);
+
+    const newMins = new Int8Array(totalLen - trimStart);
+    const newMaxs = new Int8Array(totalLen - trimStart);
+
+    // Copy old data (trimmed from the start)
+    const oldStart = Math.max(0, trimStart);
+    if (oldLen > oldStart) {
+      newMins.set(minPeaks.value.subarray(oldStart), 0);
+      newMaxs.set(maxPeaks.value.subarray(oldStart), 0);
+    }
+
+    // Append new data
+    const writeOffset = Math.max(0, oldLen - oldStart);
+    for (let i = 0; i < newPairCount; i++) {
+      newMins[writeOffset + i] = msg.peaks[i * 2];
+      newMaxs[writeOffset + i] = msg.peaks[i * 2 + 1];
+    }
+
+    minPeaks.value = newMins;
+    maxPeaks.value = newMaxs;
+  }
+
+  // Update peak level meter
+  peakLevel.value = msg.peakLevel;
+  if (msg.clipping) {
+    clipping.value = true;
+    // Hold clipping indicator for 1 second
+    if (clippingTimeout) clearTimeout(clippingTimeout);
+    clippingTimeout = setTimeout(() => {
+      clipping.value = false;
+    }, 1000);
+  }
 };
 
 const drawWaveform = () => {
@@ -93,7 +124,6 @@ const drawWaveform = () => {
   const width = canvas.clientWidth;
   const height = canvas.clientHeight;
 
-  // Update canvas width for peak trimming
   lastCanvasWidth = Math.floor(width);
 
   // Set canvas resolution for sharp rendering
@@ -103,36 +133,32 @@ const drawWaveform = () => {
     ctx.scale(dpr, dpr);
   }
 
-  // Clear canvas
   ctx.clearRect(0, 0, width, height);
 
   const centerY = height / 2;
-  const maxAmplitudeHeight = height * 0.4; // Half of 80% since we draw both up and down
+  const halfHeight = height * 0.45; // Use 90% of height (45% each side)
 
-  // Use same slate grey as the finished session waveforms
   ctx.fillStyle = '#94a3b8';
 
-  const peaksData = peaks.value;
-  const peaksLength = peaksData.length;
+  const mins = minPeaks.value;
+  const maxs = maxPeaks.value;
+  const peaksLength = mins.length;
 
-  // If we have no peaks yet, nothing to draw
   if (peaksLength === 0) {
     animationId = requestAnimationFrame(drawWaveform);
     return;
   }
 
-  // Draw from left side, 1 pixel per peak
-  // Peaks grow from left to right, scroll right when full
+  // Peaks grow from left to right, scroll when full
   const startX = Math.max(0, peaksLength - width);
 
-  // Draw filled waveform path (Peaks.js style)
   ctx.beginPath();
 
-  // Forward pass: draw top edge (positive amplitude) from left to right
+  // Forward pass: draw max values (positive peaks) from left to right
   for (let i = startX; i < peaksLength; i++) {
-    const amplitude = peaksData[i] || 0;
     const x = i - startX + 0.5;
-    const y = centerY - amplitude * maxAmplitudeHeight + 0.5;
+    // max values are positive (0 to 127), draw upward from center
+    const y = centerY - (maxs[i] / 127) * halfHeight;
 
     if (i === startX) {
       ctx.moveTo(x, y);
@@ -141,11 +167,11 @@ const drawWaveform = () => {
     }
   }
 
-  // Reverse pass: draw bottom edge (negative amplitude) from right to left
+  // Reverse pass: draw min values (negative peaks) from right to left
   for (let i = peaksLength - 1; i >= startX; i--) {
-    const amplitude = peaksData[i] || 0;
     const x = i - startX + 0.5;
-    const y = centerY + amplitude * maxAmplitudeHeight + 0.5;
+    // min values are negative (-128 to 0), draw downward from center
+    const y = centerY - (mins[i] / 127) * halfHeight;
 
     ctx.lineTo(x, y);
   }
@@ -156,15 +182,15 @@ const drawWaveform = () => {
   animationId = requestAnimationFrame(drawWaveform);
 };
 
-const subscribeAudio = (sessionID: string) => {
+const subscribePeaks = (sessionID: string) => {
   return reconnectingStream({
-    name: `sessionAudio(${sessionID})`,
+    name: `waveformPeaks(${sessionID})`,
     connect: (handlers) =>
-      streamSessionAudio({
+      streamWaveformPeaks({
         sessionID,
-        onChunk: (chunk) => {
+        onPeaks: (msg) => {
           handlers.onMessage();
-          onAudioChunk(chunk);
+          onWaveformPeaks(msg);
         },
         onError: handlers.onError,
         onEnd: handlers.onEnd,
@@ -173,18 +199,16 @@ const subscribeAudio = (sessionID: string) => {
 };
 
 onMounted(() => {
-  // Start animation loop
   animationId = requestAnimationFrame(drawWaveform);
-
-  // Subscribe to audio stream for this session (with reconnection)
-  audioStream = subscribeAudio(props.session.id);
+  peakStream = subscribePeaks(props.session.id);
 });
 
 onUnmounted(() => {
   if (animationId !== null) {
     cancelAnimationFrame(animationId);
   }
-  audioStream?.stop();
+  peakStream?.stop();
+  if (clippingTimeout) clearTimeout(clippingTimeout);
 });
 
 // Re-subscribe if session changes
@@ -192,14 +216,13 @@ watch(
   () => props.session.id,
   (newId, oldId) => {
     if (newId !== oldId) {
-      // Clear existing peaks
-      peaks.value = [];
+      minPeaks.value = new Int8Array(0);
+      maxPeaks.value = new Int8Array(0);
+      peakLevel.value = 0;
+      clipping.value = false;
 
-      // Unsubscribe from old session
-      audioStream?.stop();
-
-      // Subscribe to new session (with reconnection)
-      audioStream = subscribeAudio(newId);
+      peakStream?.stop();
+      peakStream = subscribePeaks(newId);
     }
   }
 );
@@ -221,11 +244,14 @@ watch(
       </Button>
     </div>
     <canvas ref="canvasRef" class="waveform-canvas" />
+    <PeakMeter :level="peakLevel" :clipping="clipping" />
+
   </div>
 </template>
 
 <style scoped>
 .recording-overview {
+  position: relative;
   display: flex;
   flex-direction: row;
   flex-wrap: nowrap;
@@ -252,5 +278,21 @@ watch(
   flex: 1;
   min-width: 0; /* Prevent Firefox overflow */
   height: 80px;
+}
+
+@media (max-width: 768px) {
+  .recording-overview,
+  .recording-overview > * {
+    height: 60px;
+  }
+
+  .controls {
+    width: 60px;
+    height: 60px;
+  }
+
+  .waveform-canvas {
+    height: 60px;
+  }
 }
 </style>

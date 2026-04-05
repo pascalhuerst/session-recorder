@@ -32,6 +32,8 @@ tmp/
 
 # Go
 bin/
+go/chunk_sink
+go/chunk_sink_client
 *.exe
 *.exe~
 *.dll

@@ -184,11 +184,30 @@ message AudioChunk {
 	google.protobuf.Timestamp timestamp = 4;
 }
 
+message StreamWaveformPeaksRequest {
+	string sessionID = 1;
+}
+
+message WaveformPeakData {
+	string sessionID = 1;
+	// Interleaved [min, max, min, max, ...] int8 values encoded as int32 (proto has no int8)
+	repeated int32 peaks = 2;
+	// True for initial backfill message on connect
+	bool isInitial = 3;
+	// Total accumulated peak pairs (for consistency checks)
+	uint32 totalPeakPairs = 4;
+	// Peak level of this batch: max absolute sample value normalized to 0.0-1.0
+	float peakLevel = 5;
+	// True if any sample in this batch hit int16 max/min
+	bool clipping = 6;
+}
+
 service SessionSource {
 	// Stream
 	rpc StreamRecorders(StreamRecordersRequest) returns (stream Recorder);
 	rpc StreamSessions(StreamSessionRequest) returns (stream Session);
 	rpc StreamSessionAudio(StreamSessionAudioRequest) returns (stream AudioChunk);
+	rpc StreamWaveformPeaks(StreamWaveformPeaksRequest) returns (stream WaveformPeakData);
 
 	// Unary
 	rpc SetKeepSession(SetKeepSessionRequest) returns (common.Respone);

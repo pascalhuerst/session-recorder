@@ -148,8 +148,7 @@ constexpr SessionInfo::SessionInfo(
   , duration_(nullptr)
   , keep_(false)
   , state_(0)
-
-  , renderprogress_(0){}
+{}
 struct SessionInfoDefaultTypeInternal {
   constexpr SessionInfoDefaultTypeInternal()
     : _instance(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized{}) {}
@@ -364,8 +363,38 @@ struct AudioChunkDefaultTypeInternal {
   };
 };
 PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT AudioChunkDefaultTypeInternal _AudioChunk_default_instance_;
+constexpr StreamWaveformPeaksRequest::StreamWaveformPeaksRequest(
+  ::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized)
+  : sessionid_(&::PROTOBUF_NAMESPACE_ID::internal::fixed_address_empty_string){}
+struct StreamWaveformPeaksRequestDefaultTypeInternal {
+  constexpr StreamWaveformPeaksRequestDefaultTypeInternal()
+    : _instance(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized{}) {}
+  ~StreamWaveformPeaksRequestDefaultTypeInternal() {}
+  union {
+    StreamWaveformPeaksRequest _instance;
+  };
+};
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT StreamWaveformPeaksRequestDefaultTypeInternal _StreamWaveformPeaksRequest_default_instance_;
+constexpr WaveformPeakData::WaveformPeakData(
+  ::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized)
+  : peaks_()
+  , _peaks_cached_byte_size_(0)
+  , sessionid_(&::PROTOBUF_NAMESPACE_ID::internal::fixed_address_empty_string)
+  , totalpeakpairs_(0u)
+  , isinitial_(false)
+  , clipping_(false)
+  , peaklevel_(0){}
+struct WaveformPeakDataDefaultTypeInternal {
+  constexpr WaveformPeakDataDefaultTypeInternal()
+    : _instance(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized{}) {}
+  ~WaveformPeakDataDefaultTypeInternal() {}
+  union {
+    WaveformPeakData _instance;
+  };
+};
+PROTOBUF_ATTRIBUTE_NO_DESTROY PROTOBUF_CONSTINIT WaveformPeakDataDefaultTypeInternal _WaveformPeakData_default_instance_;
 }  // namespace sessionsource
-static ::PROTOBUF_NAMESPACE_ID::Metadata file_level_metadata_sessionsource_2eproto[25];
+static ::PROTOBUF_NAMESPACE_ID::Metadata file_level_metadata_sessionsource_2eproto[27];
 static const ::PROTOBUF_NAMESPACE_ID::EnumDescriptor* file_level_enum_descriptors_sessionsource_2eproto[2];
 static constexpr ::PROTOBUF_NAMESPACE_ID::ServiceDescriptor const** file_level_service_descriptors_sessionsource_2eproto = nullptr;
 
@@ -463,7 +492,6 @@ const uint32_t TableStruct_sessionsource_2eproto::offsets[] PROTOBUF_SECTION_VAR
   PROTOBUF_FIELD_OFFSET(::sessionsource::SessionInfo, downloadfiles_),
   PROTOBUF_FIELD_OFFSET(::sessionsource::SessionInfo, errormessage_),
   PROTOBUF_FIELD_OFFSET(::sessionsource::SessionInfo, duration_),
-  PROTOBUF_FIELD_OFFSET(::sessionsource::SessionInfo, renderprogress_),
   ~0u,  // no _has_bits_
   PROTOBUF_FIELD_OFFSET(::sessionsource::SessionRemoved, _internal_metadata_),
   ~0u,  // no _extensions_
@@ -595,6 +623,25 @@ const uint32_t TableStruct_sessionsource_2eproto::offsets[] PROTOBUF_SECTION_VAR
   PROTOBUF_FIELD_OFFSET(::sessionsource::AudioChunk, samples_),
   PROTOBUF_FIELD_OFFSET(::sessionsource::AudioChunk, chunknumber_),
   PROTOBUF_FIELD_OFFSET(::sessionsource::AudioChunk, timestamp_),
+  ~0u,  // no _has_bits_
+  PROTOBUF_FIELD_OFFSET(::sessionsource::StreamWaveformPeaksRequest, _internal_metadata_),
+  ~0u,  // no _extensions_
+  ~0u,  // no _oneof_case_
+  ~0u,  // no _weak_field_map_
+  ~0u,  // no _inlined_string_donated_
+  PROTOBUF_FIELD_OFFSET(::sessionsource::StreamWaveformPeaksRequest, sessionid_),
+  ~0u,  // no _has_bits_
+  PROTOBUF_FIELD_OFFSET(::sessionsource::WaveformPeakData, _internal_metadata_),
+  ~0u,  // no _extensions_
+  ~0u,  // no _oneof_case_
+  ~0u,  // no _weak_field_map_
+  ~0u,  // no _inlined_string_donated_
+  PROTOBUF_FIELD_OFFSET(::sessionsource::WaveformPeakData, sessionid_),
+  PROTOBUF_FIELD_OFFSET(::sessionsource::WaveformPeakData, peaks_),
+  PROTOBUF_FIELD_OFFSET(::sessionsource::WaveformPeakData, isinitial_),
+  PROTOBUF_FIELD_OFFSET(::sessionsource::WaveformPeakData, totalpeakpairs_),
+  PROTOBUF_FIELD_OFFSET(::sessionsource::WaveformPeakData, peaklevel_),
+  PROTOBUF_FIELD_OFFSET(::sessionsource::WaveformPeakData, clipping_),
 };
 static const ::PROTOBUF_NAMESPACE_ID::internal::MigrationSchema schemas[] PROTOBUF_SECTION_VARIABLE(protodesc_cold) = {
   { 0, -1, -1, sizeof(::sessionsource::StreamRecordersRequest)},
@@ -607,21 +654,23 @@ static const ::PROTOBUF_NAMESPACE_ID::internal::MigrationSchema schemas[] PROTOB
   { 57, -1, -1, sizeof(::sessionsource::Segment)},
   { 67, -1, -1, sizeof(::sessionsource::SessionInfo_Files)},
   { 76, -1, -1, sizeof(::sessionsource::SessionInfo)},
-  { 94, -1, -1, sizeof(::sessionsource::SessionRemoved)},
-  { 100, -1, -1, sizeof(::sessionsource::Session)},
-  { 110, -1, -1, sizeof(::sessionsource::SetKeepSessionRequest)},
-  { 119, -1, -1, sizeof(::sessionsource::DeleteSessionRequest)},
-  { 127, -1, -1, sizeof(::sessionsource::SetNameRequest)},
-  { 136, -1, -1, sizeof(::sessionsource::CreateSegmentRequest)},
-  { 146, -1, -1, sizeof(::sessionsource::UpdateSegmentRequest)},
-  { 156, -1, -1, sizeof(::sessionsource::DeleteSegmentRequest)},
-  { 165, -1, -1, sizeof(::sessionsource::RenderSegmentRequest)},
-  { 174, -1, -1, sizeof(::sessionsource::CutSessionRequest)},
-  { 181, -1, -1, sizeof(::sessionsource::RetryRenderSessionRequest)},
-  { 189, -1, -1, sizeof(::sessionsource::ShareSessionRequest)},
-  { 198, -1, -1, sizeof(::sessionsource::ShareSegmentRequest)},
-  { 208, -1, -1, sizeof(::sessionsource::StreamSessionAudioRequest)},
-  { 215, -1, -1, sizeof(::sessionsource::AudioChunk)},
+  { 93, -1, -1, sizeof(::sessionsource::SessionRemoved)},
+  { 99, -1, -1, sizeof(::sessionsource::Session)},
+  { 109, -1, -1, sizeof(::sessionsource::SetKeepSessionRequest)},
+  { 118, -1, -1, sizeof(::sessionsource::DeleteSessionRequest)},
+  { 126, -1, -1, sizeof(::sessionsource::SetNameRequest)},
+  { 135, -1, -1, sizeof(::sessionsource::CreateSegmentRequest)},
+  { 145, -1, -1, sizeof(::sessionsource::UpdateSegmentRequest)},
+  { 155, -1, -1, sizeof(::sessionsource::DeleteSegmentRequest)},
+  { 164, -1, -1, sizeof(::sessionsource::RenderSegmentRequest)},
+  { 173, -1, -1, sizeof(::sessionsource::CutSessionRequest)},
+  { 180, -1, -1, sizeof(::sessionsource::RetryRenderSessionRequest)},
+  { 188, -1, -1, sizeof(::sessionsource::ShareSessionRequest)},
+  { 197, -1, -1, sizeof(::sessionsource::ShareSegmentRequest)},
+  { 207, -1, -1, sizeof(::sessionsource::StreamSessionAudioRequest)},
+  { 214, -1, -1, sizeof(::sessionsource::AudioChunk)},
+  { 224, -1, -1, sizeof(::sessionsource::StreamWaveformPeaksRequest)},
+  { 231, -1, -1, sizeof(::sessionsource::WaveformPeakData)},
 };
 
 static ::PROTOBUF_NAMESPACE_ID::Message const * const file_default_instances[] = {
@@ -650,6 +699,8 @@ static ::PROTOBUF_NAMESPACE_ID::Message const * const file_default_instances[] =
   reinterpret_cast<const ::PROTOBUF_NAMESPACE_ID::Message*>(&::sessionsource::_ShareSegmentRequest_default_instance_),
   reinterpret_cast<const ::PROTOBUF_NAMESPACE_ID::Message*>(&::sessionsource::_StreamSessionAudioRequest_default_instance_),
   reinterpret_cast<const ::PROTOBUF_NAMESPACE_ID::Message*>(&::sessionsource::_AudioChunk_default_instance_),
+  reinterpret_cast<const ::PROTOBUF_NAMESPACE_ID::Message*>(&::sessionsource::_StreamWaveformPeaksRequest_default_instance_),
+  reinterpret_cast<const ::PROTOBUF_NAMESPACE_ID::Message*>(&::sessionsource::_WaveformPeakData_default_instance_),
 };
 
 const char descriptor_table_protodef_sessionsource_2eproto[] PROTOBUF_SECTION_VARIABLE(protodesc_cold) =
@@ -674,7 +725,7 @@ const char descriptor_table_protodef_sessionsource_2eproto[] PROTOBUF_SECTION_VA
   "\007Segment\022\021\n\tsegmentID\030\001 \001(\t\022-\n\007updated\030\002"
   " \001(\0132\032.sessionsource.SegmentInfoH\000\0220\n\007re"
   "moved\030\003 \001(\0132\035.sessionsource.SegmentRemov"
-  "edH\000B\006\n\004info\"\220\004\n\013SessionInfo\022/\n\013timeCrea"
+  "edH\000B\006\n\004info\"\370\003\n\013SessionInfo\022/\n\013timeCrea"
   "ted\030\002 \001(\0132\032.google.protobuf.Timestamp\0220\n"
   "\014timeFinished\030\003 \001(\0132\032.google.protobuf.Ti"
   "mestamp\022+\n\010lifetime\030\004 \001(\0132\031.google.proto"
@@ -685,40 +736,44 @@ const char descriptor_table_protodef_sessionsource_2eproto[] PROTOBUF_SECTION_VA
   "rce.SessionInfo.Files\0227\n\rdownloadFiles\030\014"
   " \001(\0132 .sessionsource.SessionInfo.Files\022\024"
   "\n\014errorMessage\030\r \001(\t\022+\n\010duration\030\016 \001(\0132\031"
-  ".google.protobuf.Duration\022\026\n\016renderProgr"
-  "ess\030\017 \001(\001\0324\n\005Files\022\013\n\003ogg\030\001 \001(\t\022\014\n\004flac\030"
-  "\002 \001(\t\022\020\n\010waveform\030\003 \001(\t\"\020\n\016SessionRemove"
-  "d\"~\n\007Session\022\n\n\002ID\030\001 \001(\t\022-\n\007updated\030\002 \001("
-  "\0132\032.sessionsource.SessionInfoH\000\0220\n\007remov"
-  "ed\030\003 \001(\0132\035.sessionsource.SessionRemovedH"
-  "\000B\006\n\004info\"L\n\025SetKeepSessionRequest\022\022\n\nre"
-  "corderID\030\001 \001(\t\022\021\n\tsessionID\030\002 \001(\t\022\014\n\004kee"
-  "p\030\003 \001(\010\"=\n\024DeleteSessionRequest\022\022\n\nrecor"
-  "derID\030\001 \001(\t\022\021\n\tsessionID\030\002 \001(\t\"E\n\016SetNam"
-  "eRequest\022\022\n\nrecorderID\030\001 \001(\t\022\021\n\tsessionI"
-  "D\030\002 \001(\t\022\014\n\004name\030\003 \001(\t\"z\n\024CreateSegmentRe"
-  "quest\022\022\n\nrecorderID\030\001 \001(\t\022\021\n\tsessionID\030\002"
-  " \001(\t\022\021\n\tsegmentID\030\003 \001(\t\022(\n\004info\030\004 \001(\0132\032."
-  "sessionsource.SegmentInfo\"z\n\024UpdateSegme"
-  "ntRequest\022\022\n\nrecorderID\030\001 \001(\t\022\021\n\tsession"
-  "ID\030\002 \001(\t\022\021\n\tsegmentID\030\003 \001(\t\022(\n\004info\030\004 \001("
-  "\0132\032.sessionsource.SegmentInfo\"P\n\024DeleteS"
-  "egmentRequest\022\022\n\nrecorderID\030\001 \001(\t\022\021\n\tses"
-  "sionID\030\002 \001(\t\022\021\n\tsegmentID\030\003 \001(\t\"P\n\024Rende"
-  "rSegmentRequest\022\022\n\nrecorderID\030\001 \001(\t\022\021\n\ts"
-  "essionID\030\002 \001(\t\022\021\n\tsegmentID\030\003 \001(\t\"\'\n\021Cut"
-  "SessionRequest\022\022\n\nrecorderID\030\001 \001(\t\"B\n\031Re"
-  "tryRenderSessionRequest\022\022\n\nrecorderID\030\001 "
-  "\001(\t\022\021\n\tsessionID\030\002 \001(\t\"U\n\023ShareSessionRe"
-  "quest\022\022\n\nrecorderID\030\001 \001(\t\022\021\n\tsessionID\030\002"
-  " \001(\t\022\027\n\017recipientEmails\030\003 \003(\t\"h\n\023ShareSe"
-  "gmentRequest\022\022\n\nrecorderID\030\001 \001(\t\022\021\n\tsess"
-  "ionID\030\002 \001(\t\022\021\n\tsegmentID\030\003 \001(\t\022\027\n\017recipi"
-  "entEmails\030\004 \003(\t\".\n\031StreamSessionAudioReq"
-  "uest\022\021\n\tsessionID\030\001 \001(\t\"t\n\nAudioChunk\022\021\n"
-  "\tsessionID\030\001 \001(\t\022\017\n\007samples\030\002 \003(\005\022\023\n\013chu"
-  "nkNumber\030\003 \001(\r\022-\n\ttimestamp\030\004 \001(\0132\032.goog"
-  "le.protobuf.Timestamp*\225\001\n\014SegmentState\022\031"
+  ".google.protobuf.Duration\0324\n\005Files\022\013\n\003og"
+  "g\030\001 \001(\t\022\014\n\004flac\030\002 \001(\t\022\020\n\010waveform\030\003 \001(\t\""
+  "\020\n\016SessionRemoved\"~\n\007Session\022\n\n\002ID\030\001 \001(\t"
+  "\022-\n\007updated\030\002 \001(\0132\032.sessionsource.Sessio"
+  "nInfoH\000\0220\n\007removed\030\003 \001(\0132\035.sessionsource"
+  ".SessionRemovedH\000B\006\n\004info\"L\n\025SetKeepSess"
+  "ionRequest\022\022\n\nrecorderID\030\001 \001(\t\022\021\n\tsessio"
+  "nID\030\002 \001(\t\022\014\n\004keep\030\003 \001(\010\"=\n\024DeleteSession"
+  "Request\022\022\n\nrecorderID\030\001 \001(\t\022\021\n\tsessionID"
+  "\030\002 \001(\t\"E\n\016SetNameRequest\022\022\n\nrecorderID\030\001"
+  " \001(\t\022\021\n\tsessionID\030\002 \001(\t\022\014\n\004name\030\003 \001(\t\"z\n"
+  "\024CreateSegmentRequest\022\022\n\nrecorderID\030\001 \001("
+  "\t\022\021\n\tsessionID\030\002 \001(\t\022\021\n\tsegmentID\030\003 \001(\t\022"
+  "(\n\004info\030\004 \001(\0132\032.sessionsource.SegmentInf"
+  "o\"z\n\024UpdateSegmentRequest\022\022\n\nrecorderID\030"
+  "\001 \001(\t\022\021\n\tsessionID\030\002 \001(\t\022\021\n\tsegmentID\030\003 "
+  "\001(\t\022(\n\004info\030\004 \001(\0132\032.sessionsource.Segmen"
+  "tInfo\"P\n\024DeleteSegmentRequest\022\022\n\nrecorde"
+  "rID\030\001 \001(\t\022\021\n\tsessionID\030\002 \001(\t\022\021\n\tsegmentI"
+  "D\030\003 \001(\t\"P\n\024RenderSegmentRequest\022\022\n\nrecor"
+  "derID\030\001 \001(\t\022\021\n\tsessionID\030\002 \001(\t\022\021\n\tsegmen"
+  "tID\030\003 \001(\t\"\'\n\021CutSessionRequest\022\022\n\nrecord"
+  "erID\030\001 \001(\t\"B\n\031RetryRenderSessionRequest\022"
+  "\022\n\nrecorderID\030\001 \001(\t\022\021\n\tsessionID\030\002 \001(\t\"U"
+  "\n\023ShareSessionRequest\022\022\n\nrecorderID\030\001 \001("
+  "\t\022\021\n\tsessionID\030\002 \001(\t\022\027\n\017recipientEmails\030"
+  "\003 \003(\t\"h\n\023ShareSegmentRequest\022\022\n\nrecorder"
+  "ID\030\001 \001(\t\022\021\n\tsessionID\030\002 \001(\t\022\021\n\tsegmentID"
+  "\030\003 \001(\t\022\027\n\017recipientEmails\030\004 \003(\t\".\n\031Strea"
+  "mSessionAudioRequest\022\021\n\tsessionID\030\001 \001(\t\""
+  "t\n\nAudioChunk\022\021\n\tsessionID\030\001 \001(\t\022\017\n\007samp"
+  "les\030\002 \003(\005\022\023\n\013chunkNumber\030\003 \001(\r\022-\n\ttimest"
+  "amp\030\004 \001(\0132\032.google.protobuf.Timestamp\"/\n"
+  "\032StreamWaveformPeaksRequest\022\021\n\tsessionID"
+  "\030\001 \001(\t\"\204\001\n\020WaveformPeakData\022\021\n\tsessionID"
+  "\030\001 \001(\t\022\r\n\005peaks\030\002 \003(\005\022\021\n\tisInitial\030\003 \001(\010"
+  "\022\026\n\016totalPeakPairs\030\004 \001(\r\022\021\n\tpeakLevel\030\005 "
+  "\001(\002\022\020\n\010clipping\030\006 \001(\010*\225\001\n\014SegmentState\022\031"
   "\n\025SEGMENT_STATE_UNKNOWN\020\000\022\033\n\027SEGMENT_STA"
   "TE_RENDERING\020\001\022\032\n\026SEGMENT_STATE_FINISHED"
   "\020\002\022\027\n\023SEGMENT_STATE_ERROR\020\003\022\030\n\024SEGMENT_S"
@@ -726,35 +781,37 @@ const char descriptor_table_protodef_sessionsource_2eproto[] PROTOBUF_SECTION_VA
   "N_STATE_UNKNOWN\020\000\022\033\n\027SESSION_STATE_RECOR"
   "DING\020\001\022\032\n\026SESSION_STATE_FINISHED\020\002\022\034\n\030SE"
   "SSION_STATE_PROCESSING\020\003\022\027\n\023SESSION_STAT"
-  "E_ERROR\020\0042\225\010\n\rSessionSource\022S\n\017StreamRec"
+  "E_ERROR\020\0042\372\010\n\rSessionSource\022S\n\017StreamRec"
   "orders\022%.sessionsource.StreamRecordersRe"
   "quest\032\027.sessionsource.Recorder0\001\022O\n\016Stre"
   "amSessions\022#.sessionsource.StreamSession"
   "Request\032\026.sessionsource.Session0\001\022[\n\022Str"
   "eamSessionAudio\022(.sessionsource.StreamSe"
   "ssionAudioRequest\032\031.sessionsource.AudioC"
-  "hunk0\001\022G\n\016SetKeepSession\022$.sessionsource"
-  ".SetKeepSessionRequest\032\017.common.Respone\022"
-  "E\n\rDeleteSession\022#.sessionsource.DeleteS"
-  "essionRequest\032\017.common.Respone\0229\n\007SetNam"
-  "e\022\035.sessionsource.SetNameRequest\032\017.commo"
-  "n.Respone\022E\n\rCreateSegment\022#.sessionsour"
-  "ce.CreateSegmentRequest\032\017.common.Respone"
-  "\022E\n\rDeleteSegment\022#.sessionsource.Delete"
-  "SegmentRequest\032\017.common.Respone\022E\n\rRende"
-  "rSegment\022#.sessionsource.RenderSegmentRe"
-  "quest\032\017.common.Respone\022E\n\rUpdateSegment\022"
-  "#.sessionsource.UpdateSegmentRequest\032\017.c"
-  "ommon.Respone\022\?\n\nCutSession\022 .sessionsou"
-  "rce.CutSessionRequest\032\017.common.Respone\022O"
-  "\n\022RetryRenderSession\022(.sessionsource.Ret"
-  "ryRenderSessionRequest\032\017.common.Respone\022"
-  "C\n\014ShareSession\022\".sessionsource.ShareSes"
-  "sionRequest\032\017.common.Respone\022C\n\014ShareSeg"
-  "ment\022\".sessionsource.ShareSegmentRequest"
-  "\032\017.common.ResponeBEZCgithub.com/pascalhu"
-  "erst/session-recorder/protocols/go/sessi"
-  "onsourceb\006proto3"
+  "hunk0\001\022c\n\023StreamWaveformPeaks\022).sessions"
+  "ource.StreamWaveformPeaksRequest\032\037.sessi"
+  "onsource.WaveformPeakData0\001\022G\n\016SetKeepSe"
+  "ssion\022$.sessionsource.SetKeepSessionRequ"
+  "est\032\017.common.Respone\022E\n\rDeleteSession\022#."
+  "sessionsource.DeleteSessionRequest\032\017.com"
+  "mon.Respone\0229\n\007SetName\022\035.sessionsource.S"
+  "etNameRequest\032\017.common.Respone\022E\n\rCreate"
+  "Segment\022#.sessionsource.CreateSegmentReq"
+  "uest\032\017.common.Respone\022E\n\rDeleteSegment\022#"
+  ".sessionsource.DeleteSegmentRequest\032\017.co"
+  "mmon.Respone\022E\n\rRenderSegment\022#.sessions"
+  "ource.RenderSegmentRequest\032\017.common.Resp"
+  "one\022E\n\rUpdateSegment\022#.sessionsource.Upd"
+  "ateSegmentRequest\032\017.common.Respone\022\?\n\nCu"
+  "tSession\022 .sessionsource.CutSessionReque"
+  "st\032\017.common.Respone\022O\n\022RetryRenderSessio"
+  "n\022(.sessionsource.RetryRenderSessionRequ"
+  "est\032\017.common.Respone\022C\n\014ShareSession\022\".s"
+  "essionsource.ShareSessionRequest\032\017.commo"
+  "n.Respone\022C\n\014ShareSegment\022\".sessionsourc"
+  "e.ShareSegmentRequest\032\017.common.ResponeBE"
+  "ZCgithub.com/pascalhuerst/session-record"
+  "er/protocols/go/sessionsourceb\006proto3"
   ;
 static const ::PROTOBUF_NAMESPACE_ID::internal::DescriptorTable*const descriptor_table_sessionsource_2eproto_deps[3] = {
   &::descriptor_table_common_2eproto,
@@ -763,8 +820,8 @@ static const ::PROTOBUF_NAMESPACE_ID::internal::DescriptorTable*const descriptor
 };
 static ::PROTOBUF_NAMESPACE_ID::internal::once_flag descriptor_table_sessionsource_2eproto_once;
 const ::PROTOBUF_NAMESPACE_ID::internal::DescriptorTable descriptor_table_sessionsource_2eproto = {
-  false, false, 4056, descriptor_table_protodef_sessionsource_2eproto, "sessionsource.proto", 
-  &descriptor_table_sessionsource_2eproto_once, descriptor_table_sessionsource_2eproto_deps, 3, 25,
+  false, false, 4317, descriptor_table_protodef_sessionsource_2eproto, "sessionsource.proto", 
+  &descriptor_table_sessionsource_2eproto_once, descriptor_table_sessionsource_2eproto_deps, 3, 27,
   schemas, file_default_instances, TableStruct_sessionsource_2eproto::offsets,
   file_level_metadata_sessionsource_2eproto, file_level_enum_descriptors_sessionsource_2eproto, file_level_service_descriptors_sessionsource_2eproto,
 };
@@ -3030,8 +3087,8 @@ SessionInfo::SessionInfo(const SessionInfo& from)
     duration_ = nullptr;
   }
   ::memcpy(&keep_, &from.keep_,
-    static_cast<size_t>(reinterpret_cast<char*>(&renderprogress_) -
-    reinterpret_cast<char*>(&keep_)) + sizeof(renderprogress_));
+    static_cast<size_t>(reinterpret_cast<char*>(&state_) -
+    reinterpret_cast<char*>(&keep_)) + sizeof(state_));
   // @@protoc_insertion_point(copy_constructor:sessionsource.SessionInfo)
 }
 
@@ -3046,8 +3103,8 @@ errormessage_.UnsafeSetDefault(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStrin
 #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
 ::memset(reinterpret_cast<char*>(this) + static_cast<size_t>(
     reinterpret_cast<char*>(&timecreated_) - reinterpret_cast<char*>(this)),
-    0, static_cast<size_t>(reinterpret_cast<char*>(&renderprogress_) -
-    reinterpret_cast<char*>(&timecreated_)) + sizeof(renderprogress_));
+    0, static_cast<size_t>(reinterpret_cast<char*>(&state_) -
+    reinterpret_cast<char*>(&timecreated_)) + sizeof(state_));
 }
 
 SessionInfo::~SessionInfo() {
@@ -3113,8 +3170,8 @@ void SessionInfo::Clear() {
   }
   duration_ = nullptr;
   ::memset(&keep_, 0, static_cast<size_t>(
-      reinterpret_cast<char*>(&renderprogress_) -
-      reinterpret_cast<char*>(&keep_)) + sizeof(renderprogress_));
+      reinterpret_cast<char*>(&state_) -
+      reinterpret_cast<char*>(&keep_)) + sizeof(state_));
   _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
 }
 
@@ -3219,14 +3276,6 @@ const char* SessionInfo::_InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID
         if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 114)) {
           ptr = ctx->ParseMessage(_internal_mutable_duration(), ptr);
           CHK_(ptr);
-        } else
-          goto handle_unusual;
-        continue;
-      // double renderProgress = 15;
-      case 15:
-        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 121)) {
-          renderprogress_ = ::PROTOBUF_NAMESPACE_ID::internal::UnalignedLoad<double>(ptr);
-          ptr += sizeof(double);
         } else
           goto handle_unusual;
         continue;
@@ -3348,16 +3397,6 @@ uint8_t* SessionInfo::_InternalSerialize(
         14, _Internal::duration(this), target, stream);
   }
 
-  // double renderProgress = 15;
-  static_assert(sizeof(uint64_t) == sizeof(double), "Code assumes uint64_t and double are the same size.");
-  double tmp_renderprogress = this->_internal_renderprogress();
-  uint64_t raw_renderprogress;
-  memcpy(&raw_renderprogress, &tmp_renderprogress, sizeof(tmp_renderprogress));
-  if (raw_renderprogress != 0) {
-    target = stream->EnsureSpace(target);
-    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::WriteDoubleToArray(15, this->_internal_renderprogress(), target);
-  }
-
   if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
     target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormat::InternalSerializeUnknownFieldsToArray(
         _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
@@ -3448,15 +3487,6 @@ size_t SessionInfo::ByteSizeLong() const {
       ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::EnumSize(this->_internal_state());
   }
 
-  // double renderProgress = 15;
-  static_assert(sizeof(uint64_t) == sizeof(double), "Code assumes uint64_t and double are the same size.");
-  double tmp_renderprogress = this->_internal_renderprogress();
-  uint64_t raw_renderprogress;
-  memcpy(&raw_renderprogress, &tmp_renderprogress, sizeof(tmp_renderprogress));
-  if (raw_renderprogress != 0) {
-    total_size += 1 + 8;
-  }
-
   return MaybeComputeUnknownFieldsSize(total_size, &_cached_size_);
 }
 
@@ -3510,13 +3540,6 @@ void SessionInfo::MergeFrom(const SessionInfo& from) {
   if (from._internal_state() != 0) {
     _internal_set_state(from._internal_state());
   }
-  static_assert(sizeof(uint64_t) == sizeof(double), "Code assumes uint64_t and double are the same size.");
-  double tmp_renderprogress = from._internal_renderprogress();
-  uint64_t raw_renderprogress;
-  memcpy(&raw_renderprogress, &tmp_renderprogress, sizeof(tmp_renderprogress));
-  if (raw_renderprogress != 0) {
-    _internal_set_renderprogress(from._internal_renderprogress());
-  }
   _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
 }
 
@@ -3548,8 +3571,8 @@ void SessionInfo::InternalSwap(SessionInfo* other) {
       &other->errormessage_, rhs_arena
   );
   ::PROTOBUF_NAMESPACE_ID::internal::memswap<
-      PROTOBUF_FIELD_OFFSET(SessionInfo, renderprogress_)
-      + sizeof(SessionInfo::renderprogress_)
+      PROTOBUF_FIELD_OFFSET(SessionInfo, state_)
+      + sizeof(SessionInfo::state_)
       - PROTOBUF_FIELD_OFFSET(SessionInfo, timecreated_)>(
           reinterpret_cast<char*>(&timecreated_),
           reinterpret_cast<char*>(&other->timecreated_));
@@ -7683,6 +7706,568 @@ void AudioChunk::InternalSwap(AudioChunk* other) {
       file_level_metadata_sessionsource_2eproto[24]);
 }
 
+// ===================================================================
+
+class StreamWaveformPeaksRequest::_Internal {
+ public:
+};
+
+StreamWaveformPeaksRequest::StreamWaveformPeaksRequest(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                         bool is_message_owned)
+  : ::PROTOBUF_NAMESPACE_ID::Message(arena, is_message_owned) {
+  SharedCtor();
+  if (!is_message_owned) {
+    RegisterArenaDtor(arena);
+  }
+  // @@protoc_insertion_point(arena_constructor:sessionsource.StreamWaveformPeaksRequest)
+}
+StreamWaveformPeaksRequest::StreamWaveformPeaksRequest(const StreamWaveformPeaksRequest& from)
+  : ::PROTOBUF_NAMESPACE_ID::Message() {
+  _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+  sessionid_.UnsafeSetDefault(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited());
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    sessionid_.Set(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), "", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (!from._internal_sessionid().empty()) {
+    sessionid_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, from._internal_sessionid(), 
+      GetArenaForAllocation());
+  }
+  // @@protoc_insertion_point(copy_constructor:sessionsource.StreamWaveformPeaksRequest)
+}
+
+inline void StreamWaveformPeaksRequest::SharedCtor() {
+sessionid_.UnsafeSetDefault(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited());
+#ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  sessionid_.Set(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), "", GetArenaForAllocation());
+#endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+}
+
+StreamWaveformPeaksRequest::~StreamWaveformPeaksRequest() {
+  // @@protoc_insertion_point(destructor:sessionsource.StreamWaveformPeaksRequest)
+  if (GetArenaForAllocation() != nullptr) return;
+  SharedDtor();
+  _internal_metadata_.Delete<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
+}
+
+inline void StreamWaveformPeaksRequest::SharedDtor() {
+  GOOGLE_DCHECK(GetArenaForAllocation() == nullptr);
+  sessionid_.DestroyNoArena(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited());
+}
+
+void StreamWaveformPeaksRequest::ArenaDtor(void* object) {
+  StreamWaveformPeaksRequest* _this = reinterpret_cast< StreamWaveformPeaksRequest* >(object);
+  (void)_this;
+}
+void StreamWaveformPeaksRequest::RegisterArenaDtor(::PROTOBUF_NAMESPACE_ID::Arena*) {
+}
+void StreamWaveformPeaksRequest::SetCachedSize(int size) const {
+  _cached_size_.Set(size);
+}
+
+void StreamWaveformPeaksRequest::Clear() {
+// @@protoc_insertion_point(message_clear_start:sessionsource.StreamWaveformPeaksRequest)
+  uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  sessionid_.ClearToEmpty();
+  _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
+}
+
+const char* StreamWaveformPeaksRequest::_InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID::internal::ParseContext* ctx) {
+#define CHK_(x) if (PROTOBUF_PREDICT_FALSE(!(x))) goto failure
+  while (!ctx->Done(&ptr)) {
+    uint32_t tag;
+    ptr = ::PROTOBUF_NAMESPACE_ID::internal::ReadTag(ptr, &tag);
+    switch (tag >> 3) {
+      // string sessionID = 1;
+      case 1:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 10)) {
+          auto str = _internal_mutable_sessionid();
+          ptr = ::PROTOBUF_NAMESPACE_ID::internal::InlineGreedyStringParser(str, ptr, ctx);
+          CHK_(::PROTOBUF_NAMESPACE_ID::internal::VerifyUTF8(str, "sessionsource.StreamWaveformPeaksRequest.sessionID"));
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      default:
+        goto handle_unusual;
+    }  // switch
+  handle_unusual:
+    if ((tag == 0) || ((tag & 7) == 4)) {
+      CHK_(ptr);
+      ctx->SetLastTag(tag);
+      goto message_done;
+    }
+    ptr = UnknownFieldParse(
+        tag,
+        _internal_metadata_.mutable_unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(),
+        ptr, ctx);
+    CHK_(ptr != nullptr);
+  }  // while
+message_done:
+  return ptr;
+failure:
+  ptr = nullptr;
+  goto message_done;
+#undef CHK_
+}
+
+uint8_t* StreamWaveformPeaksRequest::_InternalSerialize(
+    uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const {
+  // @@protoc_insertion_point(serialize_to_array_start:sessionsource.StreamWaveformPeaksRequest)
+  uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  // string sessionID = 1;
+  if (!this->_internal_sessionid().empty()) {
+    ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::VerifyUtf8String(
+      this->_internal_sessionid().data(), static_cast<int>(this->_internal_sessionid().length()),
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::SERIALIZE,
+      "sessionsource.StreamWaveformPeaksRequest.sessionID");
+    target = stream->WriteStringMaybeAliased(
+        1, this->_internal_sessionid(), target);
+  }
+
+  if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
+    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormat::InternalSerializeUnknownFieldsToArray(
+        _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:sessionsource.StreamWaveformPeaksRequest)
+  return target;
+}
+
+size_t StreamWaveformPeaksRequest::ByteSizeLong() const {
+// @@protoc_insertion_point(message_byte_size_start:sessionsource.StreamWaveformPeaksRequest)
+  size_t total_size = 0;
+
+  uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  // string sessionID = 1;
+  if (!this->_internal_sessionid().empty()) {
+    total_size += 1 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
+        this->_internal_sessionid());
+  }
+
+  return MaybeComputeUnknownFieldsSize(total_size, &_cached_size_);
+}
+
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData StreamWaveformPeaksRequest::_class_data_ = {
+    ::PROTOBUF_NAMESPACE_ID::Message::CopyWithSizeCheck,
+    StreamWaveformPeaksRequest::MergeImpl
+};
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*StreamWaveformPeaksRequest::GetClassData() const { return &_class_data_; }
+
+void StreamWaveformPeaksRequest::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message* to,
+                      const ::PROTOBUF_NAMESPACE_ID::Message& from) {
+  static_cast<StreamWaveformPeaksRequest *>(to)->MergeFrom(
+      static_cast<const StreamWaveformPeaksRequest &>(from));
+}
+
+
+void StreamWaveformPeaksRequest::MergeFrom(const StreamWaveformPeaksRequest& from) {
+// @@protoc_insertion_point(class_specific_merge_from_start:sessionsource.StreamWaveformPeaksRequest)
+  GOOGLE_DCHECK_NE(&from, this);
+  uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  if (!from._internal_sessionid().empty()) {
+    _internal_set_sessionid(from._internal_sessionid());
+  }
+  _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+}
+
+void StreamWaveformPeaksRequest::CopyFrom(const StreamWaveformPeaksRequest& from) {
+// @@protoc_insertion_point(class_specific_copy_from_start:sessionsource.StreamWaveformPeaksRequest)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+bool StreamWaveformPeaksRequest::IsInitialized() const {
+  return true;
+}
+
+void StreamWaveformPeaksRequest::InternalSwap(StreamWaveformPeaksRequest* other) {
+  using std::swap;
+  auto* lhs_arena = GetArenaForAllocation();
+  auto* rhs_arena = other->GetArenaForAllocation();
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
+      &::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(),
+      &sessionid_, lhs_arena,
+      &other->sessionid_, rhs_arena
+  );
+}
+
+::PROTOBUF_NAMESPACE_ID::Metadata StreamWaveformPeaksRequest::GetMetadata() const {
+  return ::PROTOBUF_NAMESPACE_ID::internal::AssignDescriptors(
+      &descriptor_table_sessionsource_2eproto_getter, &descriptor_table_sessionsource_2eproto_once,
+      file_level_metadata_sessionsource_2eproto[25]);
+}
+
+// ===================================================================
+
+class WaveformPeakData::_Internal {
+ public:
+};
+
+WaveformPeakData::WaveformPeakData(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                         bool is_message_owned)
+  : ::PROTOBUF_NAMESPACE_ID::Message(arena, is_message_owned),
+  peaks_(arena) {
+  SharedCtor();
+  if (!is_message_owned) {
+    RegisterArenaDtor(arena);
+  }
+  // @@protoc_insertion_point(arena_constructor:sessionsource.WaveformPeakData)
+}
+WaveformPeakData::WaveformPeakData(const WaveformPeakData& from)
+  : ::PROTOBUF_NAMESPACE_ID::Message(),
+      peaks_(from.peaks_) {
+  _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+  sessionid_.UnsafeSetDefault(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited());
+  #ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+    sessionid_.Set(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), "", GetArenaForAllocation());
+  #endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (!from._internal_sessionid().empty()) {
+    sessionid_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, from._internal_sessionid(), 
+      GetArenaForAllocation());
+  }
+  ::memcpy(&totalpeakpairs_, &from.totalpeakpairs_,
+    static_cast<size_t>(reinterpret_cast<char*>(&peaklevel_) -
+    reinterpret_cast<char*>(&totalpeakpairs_)) + sizeof(peaklevel_));
+  // @@protoc_insertion_point(copy_constructor:sessionsource.WaveformPeakData)
+}
+
+inline void WaveformPeakData::SharedCtor() {
+sessionid_.UnsafeSetDefault(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited());
+#ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  sessionid_.Set(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), "", GetArenaForAllocation());
+#endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+::memset(reinterpret_cast<char*>(this) + static_cast<size_t>(
+    reinterpret_cast<char*>(&totalpeakpairs_) - reinterpret_cast<char*>(this)),
+    0, static_cast<size_t>(reinterpret_cast<char*>(&peaklevel_) -
+    reinterpret_cast<char*>(&totalpeakpairs_)) + sizeof(peaklevel_));
+}
+
+WaveformPeakData::~WaveformPeakData() {
+  // @@protoc_insertion_point(destructor:sessionsource.WaveformPeakData)
+  if (GetArenaForAllocation() != nullptr) return;
+  SharedDtor();
+  _internal_metadata_.Delete<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
+}
+
+inline void WaveformPeakData::SharedDtor() {
+  GOOGLE_DCHECK(GetArenaForAllocation() == nullptr);
+  sessionid_.DestroyNoArena(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited());
+}
+
+void WaveformPeakData::ArenaDtor(void* object) {
+  WaveformPeakData* _this = reinterpret_cast< WaveformPeakData* >(object);
+  (void)_this;
+}
+void WaveformPeakData::RegisterArenaDtor(::PROTOBUF_NAMESPACE_ID::Arena*) {
+}
+void WaveformPeakData::SetCachedSize(int size) const {
+  _cached_size_.Set(size);
+}
+
+void WaveformPeakData::Clear() {
+// @@protoc_insertion_point(message_clear_start:sessionsource.WaveformPeakData)
+  uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  peaks_.Clear();
+  sessionid_.ClearToEmpty();
+  ::memset(&totalpeakpairs_, 0, static_cast<size_t>(
+      reinterpret_cast<char*>(&peaklevel_) -
+      reinterpret_cast<char*>(&totalpeakpairs_)) + sizeof(peaklevel_));
+  _internal_metadata_.Clear<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>();
+}
+
+const char* WaveformPeakData::_InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID::internal::ParseContext* ctx) {
+#define CHK_(x) if (PROTOBUF_PREDICT_FALSE(!(x))) goto failure
+  while (!ctx->Done(&ptr)) {
+    uint32_t tag;
+    ptr = ::PROTOBUF_NAMESPACE_ID::internal::ReadTag(ptr, &tag);
+    switch (tag >> 3) {
+      // string sessionID = 1;
+      case 1:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 10)) {
+          auto str = _internal_mutable_sessionid();
+          ptr = ::PROTOBUF_NAMESPACE_ID::internal::InlineGreedyStringParser(str, ptr, ctx);
+          CHK_(::PROTOBUF_NAMESPACE_ID::internal::VerifyUTF8(str, "sessionsource.WaveformPeakData.sessionID"));
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // repeated int32 peaks = 2;
+      case 2:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 18)) {
+          ptr = ::PROTOBUF_NAMESPACE_ID::internal::PackedInt32Parser(_internal_mutable_peaks(), ptr, ctx);
+          CHK_(ptr);
+        } else if (static_cast<uint8_t>(tag) == 16) {
+          _internal_add_peaks(::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr));
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // bool isInitial = 3;
+      case 3:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 24)) {
+          isinitial_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // uint32 totalPeakPairs = 4;
+      case 4:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 32)) {
+          totalpeakpairs_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint32(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      // float peakLevel = 5;
+      case 5:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 45)) {
+          peaklevel_ = ::PROTOBUF_NAMESPACE_ID::internal::UnalignedLoad<float>(ptr);
+          ptr += sizeof(float);
+        } else
+          goto handle_unusual;
+        continue;
+      // bool clipping = 6;
+      case 6:
+        if (PROTOBUF_PREDICT_TRUE(static_cast<uint8_t>(tag) == 48)) {
+          clipping_ = ::PROTOBUF_NAMESPACE_ID::internal::ReadVarint64(&ptr);
+          CHK_(ptr);
+        } else
+          goto handle_unusual;
+        continue;
+      default:
+        goto handle_unusual;
+    }  // switch
+  handle_unusual:
+    if ((tag == 0) || ((tag & 7) == 4)) {
+      CHK_(ptr);
+      ctx->SetLastTag(tag);
+      goto message_done;
+    }
+    ptr = UnknownFieldParse(
+        tag,
+        _internal_metadata_.mutable_unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(),
+        ptr, ctx);
+    CHK_(ptr != nullptr);
+  }  // while
+message_done:
+  return ptr;
+failure:
+  ptr = nullptr;
+  goto message_done;
+#undef CHK_
+}
+
+uint8_t* WaveformPeakData::_InternalSerialize(
+    uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const {
+  // @@protoc_insertion_point(serialize_to_array_start:sessionsource.WaveformPeakData)
+  uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  // string sessionID = 1;
+  if (!this->_internal_sessionid().empty()) {
+    ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::VerifyUtf8String(
+      this->_internal_sessionid().data(), static_cast<int>(this->_internal_sessionid().length()),
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::SERIALIZE,
+      "sessionsource.WaveformPeakData.sessionID");
+    target = stream->WriteStringMaybeAliased(
+        1, this->_internal_sessionid(), target);
+  }
+
+  // repeated int32 peaks = 2;
+  {
+    int byte_size = _peaks_cached_byte_size_.load(std::memory_order_relaxed);
+    if (byte_size > 0) {
+      target = stream->WriteInt32Packed(
+          2, _internal_peaks(), byte_size, target);
+    }
+  }
+
+  // bool isInitial = 3;
+  if (this->_internal_isinitial() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::WriteBoolToArray(3, this->_internal_isinitial(), target);
+  }
+
+  // uint32 totalPeakPairs = 4;
+  if (this->_internal_totalpeakpairs() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::WriteUInt32ToArray(4, this->_internal_totalpeakpairs(), target);
+  }
+
+  // float peakLevel = 5;
+  static_assert(sizeof(uint32_t) == sizeof(float), "Code assumes uint32_t and float are the same size.");
+  float tmp_peaklevel = this->_internal_peaklevel();
+  uint32_t raw_peaklevel;
+  memcpy(&raw_peaklevel, &tmp_peaklevel, sizeof(tmp_peaklevel));
+  if (raw_peaklevel != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::WriteFloatToArray(5, this->_internal_peaklevel(), target);
+  }
+
+  // bool clipping = 6;
+  if (this->_internal_clipping() != 0) {
+    target = stream->EnsureSpace(target);
+    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::WriteBoolToArray(6, this->_internal_clipping(), target);
+  }
+
+  if (PROTOBUF_PREDICT_FALSE(_internal_metadata_.have_unknown_fields())) {
+    target = ::PROTOBUF_NAMESPACE_ID::internal::WireFormat::InternalSerializeUnknownFieldsToArray(
+        _internal_metadata_.unknown_fields<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(::PROTOBUF_NAMESPACE_ID::UnknownFieldSet::default_instance), target, stream);
+  }
+  // @@protoc_insertion_point(serialize_to_array_end:sessionsource.WaveformPeakData)
+  return target;
+}
+
+size_t WaveformPeakData::ByteSizeLong() const {
+// @@protoc_insertion_point(message_byte_size_start:sessionsource.WaveformPeakData)
+  size_t total_size = 0;
+
+  uint32_t cached_has_bits = 0;
+  // Prevent compiler warnings about cached_has_bits being unused
+  (void) cached_has_bits;
+
+  // repeated int32 peaks = 2;
+  {
+    size_t data_size = ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::
+      Int32Size(this->peaks_);
+    if (data_size > 0) {
+      total_size += 1 +
+        ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::Int32Size(
+            static_cast<int32_t>(data_size));
+    }
+    int cached_size = ::PROTOBUF_NAMESPACE_ID::internal::ToCachedSize(data_size);
+    _peaks_cached_byte_size_.store(cached_size,
+                                    std::memory_order_relaxed);
+    total_size += data_size;
+  }
+
+  // string sessionID = 1;
+  if (!this->_internal_sessionid().empty()) {
+    total_size += 1 +
+      ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::StringSize(
+        this->_internal_sessionid());
+  }
+
+  // uint32 totalPeakPairs = 4;
+  if (this->_internal_totalpeakpairs() != 0) {
+    total_size += ::PROTOBUF_NAMESPACE_ID::internal::WireFormatLite::UInt32SizePlusOne(this->_internal_totalpeakpairs());
+  }
+
+  // bool isInitial = 3;
+  if (this->_internal_isinitial() != 0) {
+    total_size += 1 + 1;
+  }
+
+  // bool clipping = 6;
+  if (this->_internal_clipping() != 0) {
+    total_size += 1 + 1;
+  }
+
+  // float peakLevel = 5;
+  static_assert(sizeof(uint32_t) == sizeof(float), "Code assumes uint32_t and float are the same size.");
+  float tmp_peaklevel = this->_internal_peaklevel();
+  uint32_t raw_peaklevel;
+  memcpy(&raw_peaklevel, &tmp_peaklevel, sizeof(tmp_peaklevel));
+  if (raw_peaklevel != 0) {
+    total_size += 1 + 4;
+  }
+
+  return MaybeComputeUnknownFieldsSize(total_size, &_cached_size_);
+}
+
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData WaveformPeakData::_class_data_ = {
+    ::PROTOBUF_NAMESPACE_ID::Message::CopyWithSizeCheck,
+    WaveformPeakData::MergeImpl
+};
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*WaveformPeakData::GetClassData() const { return &_class_data_; }
+
+void WaveformPeakData::MergeImpl(::PROTOBUF_NAMESPACE_ID::Message* to,
+                      const ::PROTOBUF_NAMESPACE_ID::Message& from) {
+  static_cast<WaveformPeakData *>(to)->MergeFrom(
+      static_cast<const WaveformPeakData &>(from));
+}
+
+
+void WaveformPeakData::MergeFrom(const WaveformPeakData& from) {
+// @@protoc_insertion_point(class_specific_merge_from_start:sessionsource.WaveformPeakData)
+  GOOGLE_DCHECK_NE(&from, this);
+  uint32_t cached_has_bits = 0;
+  (void) cached_has_bits;
+
+  peaks_.MergeFrom(from.peaks_);
+  if (!from._internal_sessionid().empty()) {
+    _internal_set_sessionid(from._internal_sessionid());
+  }
+  if (from._internal_totalpeakpairs() != 0) {
+    _internal_set_totalpeakpairs(from._internal_totalpeakpairs());
+  }
+  if (from._internal_isinitial() != 0) {
+    _internal_set_isinitial(from._internal_isinitial());
+  }
+  if (from._internal_clipping() != 0) {
+    _internal_set_clipping(from._internal_clipping());
+  }
+  static_assert(sizeof(uint32_t) == sizeof(float), "Code assumes uint32_t and float are the same size.");
+  float tmp_peaklevel = from._internal_peaklevel();
+  uint32_t raw_peaklevel;
+  memcpy(&raw_peaklevel, &tmp_peaklevel, sizeof(tmp_peaklevel));
+  if (raw_peaklevel != 0) {
+    _internal_set_peaklevel(from._internal_peaklevel());
+  }
+  _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
+}
+
+void WaveformPeakData::CopyFrom(const WaveformPeakData& from) {
+// @@protoc_insertion_point(class_specific_copy_from_start:sessionsource.WaveformPeakData)
+  if (&from == this) return;
+  Clear();
+  MergeFrom(from);
+}
+
+bool WaveformPeakData::IsInitialized() const {
+  return true;
+}
+
+void WaveformPeakData::InternalSwap(WaveformPeakData* other) {
+  using std::swap;
+  auto* lhs_arena = GetArenaForAllocation();
+  auto* rhs_arena = other->GetArenaForAllocation();
+  _internal_metadata_.InternalSwap(&other->_internal_metadata_);
+  peaks_.InternalSwap(&other->peaks_);
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::InternalSwap(
+      &::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(),
+      &sessionid_, lhs_arena,
+      &other->sessionid_, rhs_arena
+  );
+  ::PROTOBUF_NAMESPACE_ID::internal::memswap<
+      PROTOBUF_FIELD_OFFSET(WaveformPeakData, peaklevel_)
+      + sizeof(WaveformPeakData::peaklevel_)
+      - PROTOBUF_FIELD_OFFSET(WaveformPeakData, totalpeakpairs_)>(
+          reinterpret_cast<char*>(&totalpeakpairs_),
+          reinterpret_cast<char*>(&other->totalpeakpairs_));
+}
+
+::PROTOBUF_NAMESPACE_ID::Metadata WaveformPeakData::GetMetadata() const {
+  return ::PROTOBUF_NAMESPACE_ID::internal::AssignDescriptors(
+      &descriptor_table_sessionsource_2eproto_getter, &descriptor_table_sessionsource_2eproto_once,
+      file_level_metadata_sessionsource_2eproto[26]);
+}
+
 // @@protoc_insertion_point(namespace_scope)
 }  // namespace sessionsource
 PROTOBUF_NAMESPACE_OPEN
@@ -7760,6 +8345,12 @@ template<> PROTOBUF_NOINLINE ::sessionsource::StreamSessionAudioRequest* Arena::
 }
 template<> PROTOBUF_NOINLINE ::sessionsource::AudioChunk* Arena::CreateMaybeMessage< ::sessionsource::AudioChunk >(Arena* arena) {
   return Arena::CreateMessageInternal< ::sessionsource::AudioChunk >(arena);
+}
+template<> PROTOBUF_NOINLINE ::sessionsource::StreamWaveformPeaksRequest* Arena::CreateMaybeMessage< ::sessionsource::StreamWaveformPeaksRequest >(Arena* arena) {
+  return Arena::CreateMessageInternal< ::sessionsource::StreamWaveformPeaksRequest >(arena);
+}
+template<> PROTOBUF_NOINLINE ::sessionsource::WaveformPeakData* Arena::CreateMaybeMessage< ::sessionsource::WaveformPeakData >(Arena* arena) {
+  return Arena::CreateMessageInternal< ::sessionsource::WaveformPeakData >(arena);
 }
 PROTOBUF_NAMESPACE_CLOSE
 

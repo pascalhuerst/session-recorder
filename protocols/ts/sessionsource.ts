@@ -458,6 +458,54 @@ export interface AudioChunk {
     timestamp?: Timestamp;
 }
 /**
+ * @generated from protobuf message sessionsource.StreamWaveformPeaksRequest
+ */
+export interface StreamWaveformPeaksRequest {
+    /**
+     * @generated from protobuf field: string sessionID = 1
+     */
+    sessionID: string;
+}
+/**
+ * @generated from protobuf message sessionsource.WaveformPeakData
+ */
+export interface WaveformPeakData {
+    /**
+     * @generated from protobuf field: string sessionID = 1
+     */
+    sessionID: string;
+    /**
+     * Interleaved [min, max, min, max, ...] int8 values encoded as int32 (proto has no int8)
+     *
+     * @generated from protobuf field: repeated int32 peaks = 2
+     */
+    peaks: number[];
+    /**
+     * True for initial backfill message on connect
+     *
+     * @generated from protobuf field: bool isInitial = 3
+     */
+    isInitial: boolean;
+    /**
+     * Total accumulated peak pairs (for consistency checks)
+     *
+     * @generated from protobuf field: uint32 totalPeakPairs = 4
+     */
+    totalPeakPairs: number;
+    /**
+     * Peak level of this batch: max absolute sample value normalized to 0.0-1.0
+     *
+     * @generated from protobuf field: float peakLevel = 5
+     */
+    peakLevel: number;
+    /**
+     * True if any sample in this batch hit int16 max/min
+     *
+     * @generated from protobuf field: bool clipping = 6
+     */
+    clipping: boolean;
+}
+/**
  * @generated from protobuf enum sessionsource.SegmentState
  */
 export enum SegmentState {
@@ -2056,6 +2104,148 @@ class AudioChunk$Type extends MessageType<AudioChunk> {
  * @generated MessageType for protobuf message sessionsource.AudioChunk
  */
 export const AudioChunk = new AudioChunk$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class StreamWaveformPeaksRequest$Type extends MessageType<StreamWaveformPeaksRequest> {
+    constructor() {
+        super("sessionsource.StreamWaveformPeaksRequest", [
+            { no: 1, name: "sessionID", kind: "scalar", T: 9 /*ScalarType.STRING*/ }
+        ]);
+    }
+    create(value?: PartialMessage<StreamWaveformPeaksRequest>): StreamWaveformPeaksRequest {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.sessionID = "";
+        if (value !== undefined)
+            reflectionMergePartial<StreamWaveformPeaksRequest>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: StreamWaveformPeaksRequest): StreamWaveformPeaksRequest {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* string sessionID */ 1:
+                    message.sessionID = reader.string();
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: StreamWaveformPeaksRequest, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* string sessionID = 1; */
+        if (message.sessionID !== "")
+            writer.tag(1, WireType.LengthDelimited).string(message.sessionID);
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message sessionsource.StreamWaveformPeaksRequest
+ */
+export const StreamWaveformPeaksRequest = new StreamWaveformPeaksRequest$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class WaveformPeakData$Type extends MessageType<WaveformPeakData> {
+    constructor() {
+        super("sessionsource.WaveformPeakData", [
+            { no: 1, name: "sessionID", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 2, name: "peaks", kind: "scalar", repeat: 1 /*RepeatType.PACKED*/, T: 5 /*ScalarType.INT32*/ },
+            { no: 3, name: "isInitial", kind: "scalar", T: 8 /*ScalarType.BOOL*/ },
+            { no: 4, name: "totalPeakPairs", kind: "scalar", T: 13 /*ScalarType.UINT32*/ },
+            { no: 5, name: "peakLevel", kind: "scalar", T: 2 /*ScalarType.FLOAT*/ },
+            { no: 6, name: "clipping", kind: "scalar", T: 8 /*ScalarType.BOOL*/ }
+        ]);
+    }
+    create(value?: PartialMessage<WaveformPeakData>): WaveformPeakData {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.sessionID = "";
+        message.peaks = [];
+        message.isInitial = false;
+        message.totalPeakPairs = 0;
+        message.peakLevel = 0;
+        message.clipping = false;
+        if (value !== undefined)
+            reflectionMergePartial<WaveformPeakData>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: WaveformPeakData): WaveformPeakData {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* string sessionID */ 1:
+                    message.sessionID = reader.string();
+                    break;
+                case /* repeated int32 peaks */ 2:
+                    if (wireType === WireType.LengthDelimited)
+                        for (let e = reader.int32() + reader.pos; reader.pos < e;)
+                            message.peaks.push(reader.int32());
+                    else
+                        message.peaks.push(reader.int32());
+                    break;
+                case /* bool isInitial */ 3:
+                    message.isInitial = reader.bool();
+                    break;
+                case /* uint32 totalPeakPairs */ 4:
+                    message.totalPeakPairs = reader.uint32();
+                    break;
+                case /* float peakLevel */ 5:
+                    message.peakLevel = reader.float();
+                    break;
+                case /* bool clipping */ 6:
+                    message.clipping = reader.bool();
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: WaveformPeakData, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* string sessionID = 1; */
+        if (message.sessionID !== "")
+            writer.tag(1, WireType.LengthDelimited).string(message.sessionID);
+        /* repeated int32 peaks = 2; */
+        if (message.peaks.length) {
+            writer.tag(2, WireType.LengthDelimited).fork();
+            for (let i = 0; i < message.peaks.length; i++)
+                writer.int32(message.peaks[i]);
+            writer.join();
+        }
+        /* bool isInitial = 3; */
+        if (message.isInitial !== false)
+            writer.tag(3, WireType.Varint).bool(message.isInitial);
+        /* uint32 totalPeakPairs = 4; */
+        if (message.totalPeakPairs !== 0)
+            writer.tag(4, WireType.Varint).uint32(message.totalPeakPairs);
+        /* float peakLevel = 5; */
+        if (message.peakLevel !== 0)
+            writer.tag(5, WireType.Bit32).float(message.peakLevel);
+        /* bool clipping = 6; */
+        if (message.clipping !== false)
+            writer.tag(6, WireType.Varint).bool(message.clipping);
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message sessionsource.WaveformPeakData
+ */
+export const WaveformPeakData = new WaveformPeakData$Type();
 /**
  * @generated ServiceType for protobuf service sessionsource.SessionSource
  */
@@ -2063,6 +2253,7 @@ export const SessionSource = new ServiceType("sessionsource.SessionSource", [
     { name: "StreamRecorders", serverStreaming: true, options: {}, I: StreamRecordersRequest, O: Recorder },
     { name: "StreamSessions", serverStreaming: true, options: {}, I: StreamSessionRequest, O: Session },
     { name: "StreamSessionAudio", serverStreaming: true, options: {}, I: StreamSessionAudioRequest, O: AudioChunk },
+    { name: "StreamWaveformPeaks", serverStreaming: true, options: {}, I: StreamWaveformPeaksRequest, O: WaveformPeakData },
     { name: "SetKeepSession", options: {}, I: SetKeepSessionRequest, O: Respone },
     { name: "DeleteSession", options: {}, I: DeleteSessionRequest, O: Respone },
     { name: "SetName", options: {}, I: SetNameRequest, O: Respone },

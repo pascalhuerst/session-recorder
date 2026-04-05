@@ -138,6 +138,8 @@ func main() {
 	recorderBroadcaster.Start(ctx)
 	sessionBroadcaster := broadcast.NewSessionBroadcaster(10)
 	audioBroadcaster := broadcast.NewAudioBroadcaster(10)
+	peakAccumulator := broadcast.NewPeakAccumulator(512)  // 256 stereo frames
+	peakBroadcaster := broadcast.NewPeakBroadcaster(10)
 
 	chunkSinkHandler := NewChunkSinkHandler(sessionStorage, recorderBroadcaster)
 
@@ -179,14 +181,15 @@ func main() {
 	eventBus := minio.EventBus()
 	eventBus.AddListener(&storage.LogListener{})
 
-	sessionSourceHandler := NewSessionSourceHandler(sessionStorage, eventBus, chunkSinkServer, recorderBroadcaster, sessionBroadcaster, audioBroadcaster, emailSender, fileSharer)
+	sessionSourceHandler := NewSessionSourceHandler(sessionStorage, eventBus, chunkSinkServer, recorderBroadcaster, sessionBroadcaster, audioBroadcaster, peakAccumulator, peakBroadcaster, emailSender, fileSharer)
 
 	sessionSourceServer := grpc.NewSessionSourceServer(&grpc.SessionSourceServerConfig{
 		Name:                 hostname,
 		Version:              version,
 		StreamRecordersCB:    sessionSourceHandler.streamRecorders,
 		StreamSessionsCB:     sessionSourceHandler.streamSessions,
-		StreamSessionAudioCB: sessionSourceHandler.streamSessionAudio,
+		StreamSessionAudioCB:  sessionSourceHandler.streamSessionAudio,
+		StreamWaveformPeaksCB: sessionSourceHandler.streamWaveformPeaks,
 		DeleteSessionCB:      sessionSourceHandler.deleteSession,
 		SetKeepSessionCB:     sessionSourceHandler.setKeepSession,
 		SetNameCB:            sessionSourceHandler.setName,

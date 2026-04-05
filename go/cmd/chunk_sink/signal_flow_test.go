@@ -536,6 +536,9 @@ func setupSignalFlow(t *testing.T) (
 		OnRecorderDisconnectedCB: chunkSinkHandler.OnRecorderDisconnected,
 	})
 
+	peakAccumulator := broadcast.NewPeakAccumulator(512)
+	peakBroadcaster := broadcast.NewPeakBroadcaster(10)
+
 	sessionSourceHandler := NewSessionSourceHandler(
 		store,
 		store.EventBus(),
@@ -543,6 +546,8 @@ func setupSignalFlow(t *testing.T) (
 		recorderBroadcaster,
 		sessionBroadcaster,
 		audioBroadcaster,
+		peakAccumulator,
+		peakBroadcaster,
 		nil, // no email sender
 		&mockFileSharer{},
 	)

@@ -32,6 +32,8 @@ type SessionSourceHandler struct {
 	recorderBroadcaster *broadcast.RecorderBroadcaster
 	sessionBroadcaster  *broadcast.SessionBroadcaster
 	audioBroadcaster    *broadcast.AudioBroadcaster
+	peakAccumulator     *broadcast.PeakAccumulator
+	peakBroadcaster     *broadcast.PeakBroadcaster
 	emailSender         *email.Sender
 	fileSharer          fileshare.FileSharer
 }
@@ -43,6 +45,8 @@ func NewSessionSourceHandler(
 	recorderBroadcaster *broadcast.RecorderBroadcaster,
 	sessionBroadcaster *broadcast.SessionBroadcaster,
 	audioBroadcaster *broadcast.AudioBroadcaster,
+	peakAccumulator *broadcast.PeakAccumulator,
+	peakBroadcaster *broadcast.PeakBroadcaster,
 	emailSender *email.Sender,
 	fileSharer fileshare.FileSharer,
 ) *SessionSourceHandler {
@@ -52,6 +56,8 @@ func NewSessionSourceHandler(
 		recorderBroadcaster: recorderBroadcaster,
 		sessionBroadcaster:  sessionBroadcaster,
 		audioBroadcaster:    audioBroadcaster,
+		peakAccumulator:     peakAccumulator,
+		peakBroadcaster:     peakBroadcaster,
 		emailSender:         emailSender,
 		fileSharer:          fileSharer,
 	}
@@ -269,6 +275,11 @@ func (h *SessionSourceHandler) broadcastSessionUpdate(ctx context.Context, recor
 func (h *SessionSourceHandler) OnSessionStateChanged(event storage.SessionStateChangedEvent) {
 	session := event.Session
 	h.broadcastSessionUpdate(context.Background(), event.RecorderID, &session)
+
+	// Clean up peak data when session leaves RECORDING state
+	if event.PreviousState == storage.SessionStateRecording && event.NewState != storage.SessionStateRecording {
+		h.peakAccumulator.RemoveSession(event.SessionID.String())
+	}
 }
 
 // OnSegmentStateChanged implements storage.EventListener.
@@ -278,7 +289,7 @@ func (h *SessionSourceHandler) OnSegmentStateChanged(event storage.SegmentStateC
 }
 
 
-// onAudioChunk is called when audio samples are received. Broadcasts to audio subscribers.
+// onAudioChunk is called when audio samples are received. Broadcasts to audio and peak subscribers.
 func (h *SessionSourceHandler) onAudioChunk(recorderID, sessionID uuid.UUID, samples []int16, chunkNumber int, timestamp time.Time) {
 	// Convert int16 samples to int32 for proto (proto doesn't have int16)
 	int32Samples := make([]int32, len(samples))
@@ -292,6 +303,25 @@ func (h *SessionSourceHandler) onAudioChunk(recorderID, sessionID uuid.UUID, sam
 		ChunkNumber: uint32(chunkNumber),
 		Timestamp:   timestamppb.New(timestamp),
 	})
+
+	// Compute and broadcast waveform peaks
+	sid := sessionID.String()
+	result := h.peakAccumulator.AddSamples(sid, samples)
+	if len(result.Peaks) > 0 {
+		peakValues := make([]int32, len(result.Peaks)*2)
+		for i, p := range result.Peaks {
+			peakValues[i*2] = int32(p.Min)
+			peakValues[i*2+1] = int32(p.Max)
+		}
+		h.peakBroadcaster.Broadcast(&sspb.WaveformPeakData{
+			SessionID:      sid,
+			Peaks:          peakValues,
+			IsInitial:      false,
+			TotalPeakPairs: uint32(h.peakAccumulator.GetAccumulatedCount(sid)),
+			PeakLevel:      result.PeakLevel,
+			Clipping:       result.Clipping,
+		})
+	}
 }
 
 func (h *SessionSourceHandler) streamSessionAudio(ctx context.Context, request *sspb.StreamSessionAudioRequest, server sspb.SessionSource_StreamSessionAudioServer) error {
@@ -319,6 +349,53 @@ func (h *SessionSourceHandler) streamSessionAudio(ctx context.Context, request *
 			}
 		case <-ctx.Done():
 			log.Debug().Str("session-id", request.SessionID).Msg("Done streaming session audio")
+			return nil
+		}
+	}
+}
+
+func (h *SessionSourceHandler) streamWaveformPeaks(ctx context.Context, request *sspb.StreamWaveformPeaksRequest, server sspb.SessionSource_StreamWaveformPeaksServer) error {
+	log.Debug().Str("session-id", request.SessionID).Msg("Streaming waveform peaks")
+
+	requestedSessionID := request.SessionID
+
+	// Send accumulated peaks as initial backfill
+	accumulated := h.peakAccumulator.GetAccumulated(requestedSessionID)
+	if len(accumulated) > 0 {
+		peakValues := make([]int32, len(accumulated)*2)
+		for i, p := range accumulated {
+			peakValues[i*2] = int32(p.Min)
+			peakValues[i*2+1] = int32(p.Max)
+		}
+		if err := server.Send(&sspb.WaveformPeakData{
+			SessionID:      requestedSessionID,
+			Peaks:          peakValues,
+			IsInitial:      true,
+			TotalPeakPairs: uint32(len(accumulated)),
+		}); err != nil {
+			return err
+		}
+	}
+
+	// Subscribe for incremental updates
+	updateCh, unsubscribe := h.peakBroadcaster.Subscribe()
+	defer unsubscribe()
+
+	for {
+		select {
+		case data, ok := <-updateCh:
+			if !ok {
+				return nil
+			}
+			// Filter by session ID
+			if data.SessionID == requestedSessionID {
+				if err := server.Send(data); err != nil {
+					log.Err(err).Msg("Cannot send peak data")
+					return err
+				}
+			}
+		case <-ctx.Done():
+			log.Debug().Str("session-id", request.SessionID).Msg("Done streaming waveform peaks")
 			return nil
 		}
 	}

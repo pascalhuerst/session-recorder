@@ -17,6 +17,8 @@ import type { DeleteSessionRequest } from "./sessionsource";
 import type { Respone } from "./common";
 import type { SetKeepSessionRequest } from "./sessionsource";
 import type { UnaryCall } from "@protobuf-ts/runtime-rpc";
+import type { WaveformPeakData } from "./sessionsource";
+import type { StreamWaveformPeaksRequest } from "./sessionsource";
 import type { AudioChunk } from "./sessionsource";
 import type { StreamSessionAudioRequest } from "./sessionsource";
 import type { Session } from "./sessionsource";
@@ -44,6 +46,10 @@ export interface ISessionSourceClient {
      * @generated from protobuf rpc: StreamSessionAudio
      */
     streamSessionAudio(input: StreamSessionAudioRequest, options?: RpcOptions): ServerStreamingCall<StreamSessionAudioRequest, AudioChunk>;
+    /**
+     * @generated from protobuf rpc: StreamWaveformPeaks
+     */
+    streamWaveformPeaks(input: StreamWaveformPeaksRequest, options?: RpcOptions): ServerStreamingCall<StreamWaveformPeaksRequest, WaveformPeakData>;
     /**
      * Unary
      *
@@ -124,82 +130,89 @@ export class SessionSourceClient implements ISessionSourceClient, ServiceInfo {
         return stackIntercept<StreamSessionAudioRequest, AudioChunk>("serverStreaming", this._transport, method, opt, input);
     }
     /**
+     * @generated from protobuf rpc: StreamWaveformPeaks
+     */
+    streamWaveformPeaks(input: StreamWaveformPeaksRequest, options?: RpcOptions): ServerStreamingCall<StreamWaveformPeaksRequest, WaveformPeakData> {
+        const method = this.methods[3], opt = this._transport.mergeOptions(options);
+        return stackIntercept<StreamWaveformPeaksRequest, WaveformPeakData>("serverStreaming", this._transport, method, opt, input);
+    }
+    /**
      * Unary
      *
      * @generated from protobuf rpc: SetKeepSession
      */
     setKeepSession(input: SetKeepSessionRequest, options?: RpcOptions): UnaryCall<SetKeepSessionRequest, Respone> {
-        const method = this.methods[3], opt = this._transport.mergeOptions(options);
+        const method = this.methods[4], opt = this._transport.mergeOptions(options);
         return stackIntercept<SetKeepSessionRequest, Respone>("unary", this._transport, method, opt, input);
     }
     /**
      * @generated from protobuf rpc: DeleteSession
      */
     deleteSession(input: DeleteSessionRequest, options?: RpcOptions): UnaryCall<DeleteSessionRequest, Respone> {
-        const method = this.methods[4], opt = this._transport.mergeOptions(options);
+        const method = this.methods[5], opt = this._transport.mergeOptions(options);
         return stackIntercept<DeleteSessionRequest, Respone>("unary", this._transport, method, opt, input);
     }
     /**
      * @generated from protobuf rpc: SetName
      */
     setName(input: SetNameRequest, options?: RpcOptions): UnaryCall<SetNameRequest, Respone> {
-        const method = this.methods[5], opt = this._transport.mergeOptions(options);
+        const method = this.methods[6], opt = this._transport.mergeOptions(options);
         return stackIntercept<SetNameRequest, Respone>("unary", this._transport, method, opt, input);
     }
     /**
      * @generated from protobuf rpc: CreateSegment
      */
     createSegment(input: CreateSegmentRequest, options?: RpcOptions): UnaryCall<CreateSegmentRequest, Respone> {
-        const method = this.methods[6], opt = this._transport.mergeOptions(options);
+        const method = this.methods[7], opt = this._transport.mergeOptions(options);
         return stackIntercept<CreateSegmentRequest, Respone>("unary", this._transport, method, opt, input);
     }
     /**
      * @generated from protobuf rpc: DeleteSegment
      */
     deleteSegment(input: DeleteSegmentRequest, options?: RpcOptions): UnaryCall<DeleteSegmentRequest, Respone> {
-        const method = this.methods[7], opt = this._transport.mergeOptions(options);
+        const method = this.methods[8], opt = this._transport.mergeOptions(options);
         return stackIntercept<DeleteSegmentRequest, Respone>("unary", this._transport, method, opt, input);
     }
     /**
      * @generated from protobuf rpc: RenderSegment
      */
     renderSegment(input: RenderSegmentRequest, options?: RpcOptions): UnaryCall<RenderSegmentRequest, Respone> {
-        const method = this.methods[8], opt = this._transport.mergeOptions(options);
+        const method = this.methods[9], opt = this._transport.mergeOptions(options);
         return stackIntercept<RenderSegmentRequest, Respone>("unary", this._transport, method, opt, input);
     }
     /**
      * @generated from protobuf rpc: UpdateSegment
      */
     updateSegment(input: UpdateSegmentRequest, options?: RpcOptions): UnaryCall<UpdateSegmentRequest, Respone> {
-        const method = this.methods[9], opt = this._transport.mergeOptions(options);
+        const method = this.methods[10], opt = this._transport.mergeOptions(options);
         return stackIntercept<UpdateSegmentRequest, Respone>("unary", this._transport, method, opt, input);
     }
     /**
      * @generated from protobuf rpc: CutSession
      */
     cutSession(input: CutSessionRequest, options?: RpcOptions): UnaryCall<CutSessionRequest, Respone> {
-        const method = this.methods[10], opt = this._transport.mergeOptions(options);
+        const method = this.methods[11], opt = this._transport.mergeOptions(options);
         return stackIntercept<CutSessionRequest, Respone>("unary", this._transport, method, opt, input);
     }
     /**
      * @generated from protobuf rpc: RetryRenderSession
      */
     retryRenderSession(input: RetryRenderSessionRequest, options?: RpcOptions): UnaryCall<RetryRenderSessionRequest, Respone> {
-        const method = this.methods[11], opt = this._transport.mergeOptions(options);
+        const method = this.methods[12], opt = this._transport.mergeOptions(options);
         return stackIntercept<RetryRenderSessionRequest, Respone>("unary", this._transport, method, opt, input);
     }
     /**
      * @generated from protobuf rpc: ShareSession
      */
     shareSession(input: ShareSessionRequest, options?: RpcOptions): UnaryCall<ShareSessionRequest, Respone> {
-        const method = this.methods[12], opt = this._transport.mergeOptions(options);
+        const method = this.methods[13], opt = this._transport.mergeOptions(options);
         return stackIntercept<ShareSessionRequest, Respone>("unary", this._transport, method, opt, input);
     }
     /**
      * @generated from protobuf rpc: ShareSegment
      */
     shareSegment(input: ShareSegmentRequest, options?: RpcOptions): UnaryCall<ShareSegmentRequest, Respone> {
-        const method = this.methods[13], opt = this._transport.mergeOptions(options);
+        const method = this.methods[14], opt = this._transport.mergeOptions(options);
         return stackIntercept<ShareSegmentRequest, Respone>("unary", this._transport, method, opt, input);
     }
 }

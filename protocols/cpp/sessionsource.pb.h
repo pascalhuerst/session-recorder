@@ -51,7 +51,7 @@ struct TableStruct_sessionsource_2eproto {
     PROTOBUF_SECTION_VARIABLE(protodesc_cold);
   static const ::PROTOBUF_NAMESPACE_ID::internal::AuxiliaryParseTableField aux[]
     PROTOBUF_SECTION_VARIABLE(protodesc_cold);
-  static const ::PROTOBUF_NAMESPACE_ID::internal::ParseTable schema[25]
+  static const ::PROTOBUF_NAMESPACE_ID::internal::ParseTable schema[27]
     PROTOBUF_SECTION_VARIABLE(protodesc_cold);
   static const ::PROTOBUF_NAMESPACE_ID::internal::FieldMetadata field_metadata[];
   static const ::PROTOBUF_NAMESPACE_ID::internal::SerializationTable serialization_table[];
@@ -131,9 +131,15 @@ extern StreamSessionAudioRequestDefaultTypeInternal _StreamSessionAudioRequest_d
 class StreamSessionRequest;
 struct StreamSessionRequestDefaultTypeInternal;
 extern StreamSessionRequestDefaultTypeInternal _StreamSessionRequest_default_instance_;
+class StreamWaveformPeaksRequest;
+struct StreamWaveformPeaksRequestDefaultTypeInternal;
+extern StreamWaveformPeaksRequestDefaultTypeInternal _StreamWaveformPeaksRequest_default_instance_;
 class UpdateSegmentRequest;
 struct UpdateSegmentRequestDefaultTypeInternal;
 extern UpdateSegmentRequestDefaultTypeInternal _UpdateSegmentRequest_default_instance_;
+class WaveformPeakData;
+struct WaveformPeakDataDefaultTypeInternal;
+extern WaveformPeakDataDefaultTypeInternal _WaveformPeakData_default_instance_;
 }  // namespace sessionsource
 PROTOBUF_NAMESPACE_OPEN
 template<> ::sessionsource::AudioChunk* Arena::CreateMaybeMessage<::sessionsource::AudioChunk>(Arena*);
@@ -160,7 +166,9 @@ template<> ::sessionsource::ShareSessionRequest* Arena::CreateMaybeMessage<::ses
 template<> ::sessionsource::StreamRecordersRequest* Arena::CreateMaybeMessage<::sessionsource::StreamRecordersRequest>(Arena*);
 template<> ::sessionsource::StreamSessionAudioRequest* Arena::CreateMaybeMessage<::sessionsource::StreamSessionAudioRequest>(Arena*);
 template<> ::sessionsource::StreamSessionRequest* Arena::CreateMaybeMessage<::sessionsource::StreamSessionRequest>(Arena*);
+template<> ::sessionsource::StreamWaveformPeaksRequest* Arena::CreateMaybeMessage<::sessionsource::StreamWaveformPeaksRequest>(Arena*);
 template<> ::sessionsource::UpdateSegmentRequest* Arena::CreateMaybeMessage<::sessionsource::UpdateSegmentRequest>(Arena*);
+template<> ::sessionsource::WaveformPeakData* Arena::CreateMaybeMessage<::sessionsource::WaveformPeakData>(Arena*);
 PROTOBUF_NAMESPACE_CLOSE
 namespace sessionsource {
 
@@ -1908,7 +1916,6 @@ class SessionInfo final :
     kDurationFieldNumber = 14,
     kKeepFieldNumber = 8,
     kStateFieldNumber = 9,
-    kRenderProgressFieldNumber = 15,
   };
   // repeated .sessionsource.Segment segments = 10;
   int segments_size() const;
@@ -2082,15 +2089,6 @@ class SessionInfo final :
   void _internal_set_state(::sessionsource::SessionState value);
   public:
 
-  // double renderProgress = 15;
-  void clear_renderprogress();
-  double renderprogress() const;
-  void set_renderprogress(double value);
-  private:
-  double _internal_renderprogress() const;
-  void _internal_set_renderprogress(double value);
-  public:
-
   // @@protoc_insertion_point(class_scope:sessionsource.SessionInfo)
  private:
   class _Internal;
@@ -2109,7 +2107,6 @@ class SessionInfo final :
   ::PROTOBUF_NAMESPACE_ID::Duration* duration_;
   bool keep_;
   int state_;
-  double renderprogress_;
   mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   friend struct ::TableStruct_sessionsource_2eproto;
 };
@@ -4819,6 +4816,377 @@ class AudioChunk final :
   mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
   friend struct ::TableStruct_sessionsource_2eproto;
 };
+// -------------------------------------------------------------------
+
+class StreamWaveformPeaksRequest final :
+    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:sessionsource.StreamWaveformPeaksRequest) */ {
+ public:
+  inline StreamWaveformPeaksRequest() : StreamWaveformPeaksRequest(nullptr) {}
+  ~StreamWaveformPeaksRequest() override;
+  explicit constexpr StreamWaveformPeaksRequest(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
+
+  StreamWaveformPeaksRequest(const StreamWaveformPeaksRequest& from);
+  StreamWaveformPeaksRequest(StreamWaveformPeaksRequest&& from) noexcept
+    : StreamWaveformPeaksRequest() {
+    *this = ::std::move(from);
+  }
+
+  inline StreamWaveformPeaksRequest& operator=(const StreamWaveformPeaksRequest& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline StreamWaveformPeaksRequest& operator=(StreamWaveformPeaksRequest&& from) noexcept {
+    if (this == &from) return *this;
+    if (GetOwningArena() == from.GetOwningArena()
+  #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
+        && GetOwningArena() != nullptr
+  #endif  // !PROTOBUF_FORCE_COPY_IN_MOVE
+    ) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* descriptor() {
+    return GetDescriptor();
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  static const StreamWaveformPeaksRequest& default_instance() {
+    return *internal_default_instance();
+  }
+  static inline const StreamWaveformPeaksRequest* internal_default_instance() {
+    return reinterpret_cast<const StreamWaveformPeaksRequest*>(
+               &_StreamWaveformPeaksRequest_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages =
+    25;
+
+  friend void swap(StreamWaveformPeaksRequest& a, StreamWaveformPeaksRequest& b) {
+    a.Swap(&b);
+  }
+  inline void Swap(StreamWaveformPeaksRequest* other) {
+    if (other == this) return;
+  #ifdef PROTOBUF_FORCE_COPY_IN_SWAP
+    if (GetOwningArena() != nullptr &&
+        GetOwningArena() == other->GetOwningArena()) {
+   #else  // PROTOBUF_FORCE_COPY_IN_SWAP
+    if (GetOwningArena() == other->GetOwningArena()) {
+  #endif  // !PROTOBUF_FORCE_COPY_IN_SWAP
+      InternalSwap(other);
+    } else {
+      ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(StreamWaveformPeaksRequest* other) {
+    if (other == this) return;
+    GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  StreamWaveformPeaksRequest* New(::PROTOBUF_NAMESPACE_ID::Arena* arena = nullptr) const final {
+    return CreateMaybeMessage<StreamWaveformPeaksRequest>(arena);
+  }
+  using ::PROTOBUF_NAMESPACE_ID::Message::CopyFrom;
+  void CopyFrom(const StreamWaveformPeaksRequest& from);
+  using ::PROTOBUF_NAMESPACE_ID::Message::MergeFrom;
+  void MergeFrom(const StreamWaveformPeaksRequest& from);
+  private:
+  static void MergeImpl(::PROTOBUF_NAMESPACE_ID::Message* to, const ::PROTOBUF_NAMESPACE_ID::Message& from);
+  public:
+  PROTOBUF_ATTRIBUTE_REINITIALIZES void Clear() final;
+  bool IsInitialized() const final;
+
+  size_t ByteSizeLong() const final;
+  const char* _InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID::internal::ParseContext* ctx) final;
+  uint8_t* _InternalSerialize(
+      uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const final;
+  int GetCachedSize() const final { return _cached_size_.Get(); }
+
+  private:
+  void SharedCtor();
+  void SharedDtor();
+  void SetCachedSize(int size) const final;
+  void InternalSwap(StreamWaveformPeaksRequest* other);
+
+  private:
+  friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
+  static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
+    return "sessionsource.StreamWaveformPeaksRequest";
+  }
+  protected:
+  explicit StreamWaveformPeaksRequest(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                       bool is_message_owned = false);
+  private:
+  static void ArenaDtor(void* object);
+  inline void RegisterArenaDtor(::PROTOBUF_NAMESPACE_ID::Arena* arena);
+  public:
+
+  static const ClassData _class_data_;
+  const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*GetClassData() const final;
+
+  ::PROTOBUF_NAMESPACE_ID::Metadata GetMetadata() const final;
+
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+
+  enum : int {
+    kSessionIDFieldNumber = 1,
+  };
+  // string sessionID = 1;
+  void clear_sessionid();
+  const std::string& sessionid() const;
+  template <typename ArgT0 = const std::string&, typename... ArgT>
+  void set_sessionid(ArgT0&& arg0, ArgT... args);
+  std::string* mutable_sessionid();
+  PROTOBUF_NODISCARD std::string* release_sessionid();
+  void set_allocated_sessionid(std::string* sessionid);
+  private:
+  const std::string& _internal_sessionid() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_sessionid(const std::string& value);
+  std::string* _internal_mutable_sessionid();
+  public:
+
+  // @@protoc_insertion_point(class_scope:sessionsource.StreamWaveformPeaksRequest)
+ private:
+  class _Internal;
+
+  template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
+  typedef void InternalArenaConstructable_;
+  typedef void DestructorSkippable_;
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr sessionid_;
+  mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
+  friend struct ::TableStruct_sessionsource_2eproto;
+};
+// -------------------------------------------------------------------
+
+class WaveformPeakData final :
+    public ::PROTOBUF_NAMESPACE_ID::Message /* @@protoc_insertion_point(class_definition:sessionsource.WaveformPeakData) */ {
+ public:
+  inline WaveformPeakData() : WaveformPeakData(nullptr) {}
+  ~WaveformPeakData() override;
+  explicit constexpr WaveformPeakData(::PROTOBUF_NAMESPACE_ID::internal::ConstantInitialized);
+
+  WaveformPeakData(const WaveformPeakData& from);
+  WaveformPeakData(WaveformPeakData&& from) noexcept
+    : WaveformPeakData() {
+    *this = ::std::move(from);
+  }
+
+  inline WaveformPeakData& operator=(const WaveformPeakData& from) {
+    CopyFrom(from);
+    return *this;
+  }
+  inline WaveformPeakData& operator=(WaveformPeakData&& from) noexcept {
+    if (this == &from) return *this;
+    if (GetOwningArena() == from.GetOwningArena()
+  #ifdef PROTOBUF_FORCE_COPY_IN_MOVE
+        && GetOwningArena() != nullptr
+  #endif  // !PROTOBUF_FORCE_COPY_IN_MOVE
+    ) {
+      InternalSwap(&from);
+    } else {
+      CopyFrom(from);
+    }
+    return *this;
+  }
+
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* descriptor() {
+    return GetDescriptor();
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Descriptor* GetDescriptor() {
+    return default_instance().GetMetadata().descriptor;
+  }
+  static const ::PROTOBUF_NAMESPACE_ID::Reflection* GetReflection() {
+    return default_instance().GetMetadata().reflection;
+  }
+  static const WaveformPeakData& default_instance() {
+    return *internal_default_instance();
+  }
+  static inline const WaveformPeakData* internal_default_instance() {
+    return reinterpret_cast<const WaveformPeakData*>(
+               &_WaveformPeakData_default_instance_);
+  }
+  static constexpr int kIndexInFileMessages =
+    26;
+
+  friend void swap(WaveformPeakData& a, WaveformPeakData& b) {
+    a.Swap(&b);
+  }
+  inline void Swap(WaveformPeakData* other) {
+    if (other == this) return;
+  #ifdef PROTOBUF_FORCE_COPY_IN_SWAP
+    if (GetOwningArena() != nullptr &&
+        GetOwningArena() == other->GetOwningArena()) {
+   #else  // PROTOBUF_FORCE_COPY_IN_SWAP
+    if (GetOwningArena() == other->GetOwningArena()) {
+  #endif  // !PROTOBUF_FORCE_COPY_IN_SWAP
+      InternalSwap(other);
+    } else {
+      ::PROTOBUF_NAMESPACE_ID::internal::GenericSwap(this, other);
+    }
+  }
+  void UnsafeArenaSwap(WaveformPeakData* other) {
+    if (other == this) return;
+    GOOGLE_DCHECK(GetOwningArena() == other->GetOwningArena());
+    InternalSwap(other);
+  }
+
+  // implements Message ----------------------------------------------
+
+  WaveformPeakData* New(::PROTOBUF_NAMESPACE_ID::Arena* arena = nullptr) const final {
+    return CreateMaybeMessage<WaveformPeakData>(arena);
+  }
+  using ::PROTOBUF_NAMESPACE_ID::Message::CopyFrom;
+  void CopyFrom(const WaveformPeakData& from);
+  using ::PROTOBUF_NAMESPACE_ID::Message::MergeFrom;
+  void MergeFrom(const WaveformPeakData& from);
+  private:
+  static void MergeImpl(::PROTOBUF_NAMESPACE_ID::Message* to, const ::PROTOBUF_NAMESPACE_ID::Message& from);
+  public:
+  PROTOBUF_ATTRIBUTE_REINITIALIZES void Clear() final;
+  bool IsInitialized() const final;
+
+  size_t ByteSizeLong() const final;
+  const char* _InternalParse(const char* ptr, ::PROTOBUF_NAMESPACE_ID::internal::ParseContext* ctx) final;
+  uint8_t* _InternalSerialize(
+      uint8_t* target, ::PROTOBUF_NAMESPACE_ID::io::EpsCopyOutputStream* stream) const final;
+  int GetCachedSize() const final { return _cached_size_.Get(); }
+
+  private:
+  void SharedCtor();
+  void SharedDtor();
+  void SetCachedSize(int size) const final;
+  void InternalSwap(WaveformPeakData* other);
+
+  private:
+  friend class ::PROTOBUF_NAMESPACE_ID::internal::AnyMetadata;
+  static ::PROTOBUF_NAMESPACE_ID::StringPiece FullMessageName() {
+    return "sessionsource.WaveformPeakData";
+  }
+  protected:
+  explicit WaveformPeakData(::PROTOBUF_NAMESPACE_ID::Arena* arena,
+                       bool is_message_owned = false);
+  private:
+  static void ArenaDtor(void* object);
+  inline void RegisterArenaDtor(::PROTOBUF_NAMESPACE_ID::Arena* arena);
+  public:
+
+  static const ClassData _class_data_;
+  const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*GetClassData() const final;
+
+  ::PROTOBUF_NAMESPACE_ID::Metadata GetMetadata() const final;
+
+  // nested types ----------------------------------------------------
+
+  // accessors -------------------------------------------------------
+
+  enum : int {
+    kPeaksFieldNumber = 2,
+    kSessionIDFieldNumber = 1,
+    kTotalPeakPairsFieldNumber = 4,
+    kIsInitialFieldNumber = 3,
+    kClippingFieldNumber = 6,
+    kPeakLevelFieldNumber = 5,
+  };
+  // repeated int32 peaks = 2;
+  int peaks_size() const;
+  private:
+  int _internal_peaks_size() const;
+  public:
+  void clear_peaks();
+  private:
+  int32_t _internal_peaks(int index) const;
+  const ::PROTOBUF_NAMESPACE_ID::RepeatedField< int32_t >&
+      _internal_peaks() const;
+  void _internal_add_peaks(int32_t value);
+  ::PROTOBUF_NAMESPACE_ID::RepeatedField< int32_t >*
+      _internal_mutable_peaks();
+  public:
+  int32_t peaks(int index) const;
+  void set_peaks(int index, int32_t value);
+  void add_peaks(int32_t value);
+  const ::PROTOBUF_NAMESPACE_ID::RepeatedField< int32_t >&
+      peaks() const;
+  ::PROTOBUF_NAMESPACE_ID::RepeatedField< int32_t >*
+      mutable_peaks();
+
+  // string sessionID = 1;
+  void clear_sessionid();
+  const std::string& sessionid() const;
+  template <typename ArgT0 = const std::string&, typename... ArgT>
+  void set_sessionid(ArgT0&& arg0, ArgT... args);
+  std::string* mutable_sessionid();
+  PROTOBUF_NODISCARD std::string* release_sessionid();
+  void set_allocated_sessionid(std::string* sessionid);
+  private:
+  const std::string& _internal_sessionid() const;
+  inline PROTOBUF_ALWAYS_INLINE void _internal_set_sessionid(const std::string& value);
+  std::string* _internal_mutable_sessionid();
+  public:
+
+  // uint32 totalPeakPairs = 4;
+  void clear_totalpeakpairs();
+  uint32_t totalpeakpairs() const;
+  void set_totalpeakpairs(uint32_t value);
+  private:
+  uint32_t _internal_totalpeakpairs() const;
+  void _internal_set_totalpeakpairs(uint32_t value);
+  public:
+
+  // bool isInitial = 3;
+  void clear_isinitial();
+  bool isinitial() const;
+  void set_isinitial(bool value);
+  private:
+  bool _internal_isinitial() const;
+  void _internal_set_isinitial(bool value);
+  public:
+
+  // bool clipping = 6;
+  void clear_clipping();
+  bool clipping() const;
+  void set_clipping(bool value);
+  private:
+  bool _internal_clipping() const;
+  void _internal_set_clipping(bool value);
+  public:
+
+  // float peakLevel = 5;
+  void clear_peaklevel();
+  float peaklevel() const;
+  void set_peaklevel(float value);
+  private:
+  float _internal_peaklevel() const;
+  void _internal_set_peaklevel(float value);
+  public:
+
+  // @@protoc_insertion_point(class_scope:sessionsource.WaveformPeakData)
+ private:
+  class _Internal;
+
+  template <typename T> friend class ::PROTOBUF_NAMESPACE_ID::Arena::InternalHelper;
+  typedef void InternalArenaConstructable_;
+  typedef void DestructorSkippable_;
+  ::PROTOBUF_NAMESPACE_ID::RepeatedField< int32_t > peaks_;
+  mutable std::atomic<int> _peaks_cached_byte_size_;
+  ::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr sessionid_;
+  uint32_t totalpeakpairs_;
+  bool isinitial_;
+  bool clipping_;
+  float peaklevel_;
+  mutable ::PROTOBUF_NAMESPACE_ID::internal::CachedSize _cached_size_;
+  friend struct ::TableStruct_sessionsource_2eproto;
+};
 // ===================================================================
 
 
@@ -6809,26 +7177,6 @@ inline void SessionInfo::set_allocated_duration(::PROTOBUF_NAMESPACE_ID::Duratio
   }
   duration_ = duration;
   // @@protoc_insertion_point(field_set_allocated:sessionsource.SessionInfo.duration)
-}
-
-// double renderProgress = 15;
-inline void SessionInfo::clear_renderprogress() {
-  renderprogress_ = 0;
-}
-inline double SessionInfo::_internal_renderprogress() const {
-  return renderprogress_;
-}
-inline double SessionInfo::renderprogress() const {
-  // @@protoc_insertion_point(field_get:sessionsource.SessionInfo.renderProgress)
-  return _internal_renderprogress();
-}
-inline void SessionInfo::_internal_set_renderprogress(double value) {
-  
-  renderprogress_ = value;
-}
-inline void SessionInfo::set_renderprogress(double value) {
-  _internal_set_renderprogress(value);
-  // @@protoc_insertion_point(field_set:sessionsource.SessionInfo.renderProgress)
 }
 
 // -------------------------------------------------------------------
@@ -9081,9 +9429,250 @@ inline void AudioChunk::set_allocated_timestamp(::PROTOBUF_NAMESPACE_ID::Timesta
   // @@protoc_insertion_point(field_set_allocated:sessionsource.AudioChunk.timestamp)
 }
 
+// -------------------------------------------------------------------
+
+// StreamWaveformPeaksRequest
+
+// string sessionID = 1;
+inline void StreamWaveformPeaksRequest::clear_sessionid() {
+  sessionid_.ClearToEmpty();
+}
+inline const std::string& StreamWaveformPeaksRequest::sessionid() const {
+  // @@protoc_insertion_point(field_get:sessionsource.StreamWaveformPeaksRequest.sessionID)
+  return _internal_sessionid();
+}
+template <typename ArgT0, typename... ArgT>
+inline PROTOBUF_ALWAYS_INLINE
+void StreamWaveformPeaksRequest::set_sessionid(ArgT0&& arg0, ArgT... args) {
+ 
+ sessionid_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set:sessionsource.StreamWaveformPeaksRequest.sessionID)
+}
+inline std::string* StreamWaveformPeaksRequest::mutable_sessionid() {
+  std::string* _s = _internal_mutable_sessionid();
+  // @@protoc_insertion_point(field_mutable:sessionsource.StreamWaveformPeaksRequest.sessionID)
+  return _s;
+}
+inline const std::string& StreamWaveformPeaksRequest::_internal_sessionid() const {
+  return sessionid_.Get();
+}
+inline void StreamWaveformPeaksRequest::_internal_set_sessionid(const std::string& value) {
+  
+  sessionid_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, value, GetArenaForAllocation());
+}
+inline std::string* StreamWaveformPeaksRequest::_internal_mutable_sessionid() {
+  
+  return sessionid_.Mutable(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, GetArenaForAllocation());
+}
+inline std::string* StreamWaveformPeaksRequest::release_sessionid() {
+  // @@protoc_insertion_point(field_release:sessionsource.StreamWaveformPeaksRequest.sessionID)
+  return sessionid_.Release(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), GetArenaForAllocation());
+}
+inline void StreamWaveformPeaksRequest::set_allocated_sessionid(std::string* sessionid) {
+  if (sessionid != nullptr) {
+    
+  } else {
+    
+  }
+  sessionid_.SetAllocated(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), sessionid,
+      GetArenaForAllocation());
+#ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (sessionid_.IsDefault(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited())) {
+    sessionid_.Set(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), "", GetArenaForAllocation());
+  }
+#endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  // @@protoc_insertion_point(field_set_allocated:sessionsource.StreamWaveformPeaksRequest.sessionID)
+}
+
+// -------------------------------------------------------------------
+
+// WaveformPeakData
+
+// string sessionID = 1;
+inline void WaveformPeakData::clear_sessionid() {
+  sessionid_.ClearToEmpty();
+}
+inline const std::string& WaveformPeakData::sessionid() const {
+  // @@protoc_insertion_point(field_get:sessionsource.WaveformPeakData.sessionID)
+  return _internal_sessionid();
+}
+template <typename ArgT0, typename... ArgT>
+inline PROTOBUF_ALWAYS_INLINE
+void WaveformPeakData::set_sessionid(ArgT0&& arg0, ArgT... args) {
+ 
+ sessionid_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, static_cast<ArgT0 &&>(arg0), args..., GetArenaForAllocation());
+  // @@protoc_insertion_point(field_set:sessionsource.WaveformPeakData.sessionID)
+}
+inline std::string* WaveformPeakData::mutable_sessionid() {
+  std::string* _s = _internal_mutable_sessionid();
+  // @@protoc_insertion_point(field_mutable:sessionsource.WaveformPeakData.sessionID)
+  return _s;
+}
+inline const std::string& WaveformPeakData::_internal_sessionid() const {
+  return sessionid_.Get();
+}
+inline void WaveformPeakData::_internal_set_sessionid(const std::string& value) {
+  
+  sessionid_.Set(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, value, GetArenaForAllocation());
+}
+inline std::string* WaveformPeakData::_internal_mutable_sessionid() {
+  
+  return sessionid_.Mutable(::PROTOBUF_NAMESPACE_ID::internal::ArenaStringPtr::EmptyDefault{}, GetArenaForAllocation());
+}
+inline std::string* WaveformPeakData::release_sessionid() {
+  // @@protoc_insertion_point(field_release:sessionsource.WaveformPeakData.sessionID)
+  return sessionid_.Release(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), GetArenaForAllocation());
+}
+inline void WaveformPeakData::set_allocated_sessionid(std::string* sessionid) {
+  if (sessionid != nullptr) {
+    
+  } else {
+    
+  }
+  sessionid_.SetAllocated(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), sessionid,
+      GetArenaForAllocation());
+#ifdef PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  if (sessionid_.IsDefault(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited())) {
+    sessionid_.Set(&::PROTOBUF_NAMESPACE_ID::internal::GetEmptyStringAlreadyInited(), "", GetArenaForAllocation());
+  }
+#endif // PROTOBUF_FORCE_COPY_DEFAULT_STRING
+  // @@protoc_insertion_point(field_set_allocated:sessionsource.WaveformPeakData.sessionID)
+}
+
+// repeated int32 peaks = 2;
+inline int WaveformPeakData::_internal_peaks_size() const {
+  return peaks_.size();
+}
+inline int WaveformPeakData::peaks_size() const {
+  return _internal_peaks_size();
+}
+inline void WaveformPeakData::clear_peaks() {
+  peaks_.Clear();
+}
+inline int32_t WaveformPeakData::_internal_peaks(int index) const {
+  return peaks_.Get(index);
+}
+inline int32_t WaveformPeakData::peaks(int index) const {
+  // @@protoc_insertion_point(field_get:sessionsource.WaveformPeakData.peaks)
+  return _internal_peaks(index);
+}
+inline void WaveformPeakData::set_peaks(int index, int32_t value) {
+  peaks_.Set(index, value);
+  // @@protoc_insertion_point(field_set:sessionsource.WaveformPeakData.peaks)
+}
+inline void WaveformPeakData::_internal_add_peaks(int32_t value) {
+  peaks_.Add(value);
+}
+inline void WaveformPeakData::add_peaks(int32_t value) {
+  _internal_add_peaks(value);
+  // @@protoc_insertion_point(field_add:sessionsource.WaveformPeakData.peaks)
+}
+inline const ::PROTOBUF_NAMESPACE_ID::RepeatedField< int32_t >&
+WaveformPeakData::_internal_peaks() const {
+  return peaks_;
+}
+inline const ::PROTOBUF_NAMESPACE_ID::RepeatedField< int32_t >&
+WaveformPeakData::peaks() const {
+  // @@protoc_insertion_point(field_list:sessionsource.WaveformPeakData.peaks)
+  return _internal_peaks();
+}
+inline ::PROTOBUF_NAMESPACE_ID::RepeatedField< int32_t >*
+WaveformPeakData::_internal_mutable_peaks() {
+  return &peaks_;
+}
+inline ::PROTOBUF_NAMESPACE_ID::RepeatedField< int32_t >*
+WaveformPeakData::mutable_peaks() {
+  // @@protoc_insertion_point(field_mutable_list:sessionsource.WaveformPeakData.peaks)
+  return _internal_mutable_peaks();
+}
+
+// bool isInitial = 3;
+inline void WaveformPeakData::clear_isinitial() {
+  isinitial_ = false;
+}
+inline bool WaveformPeakData::_internal_isinitial() const {
+  return isinitial_;
+}
+inline bool WaveformPeakData::isinitial() const {
+  // @@protoc_insertion_point(field_get:sessionsource.WaveformPeakData.isInitial)
+  return _internal_isinitial();
+}
+inline void WaveformPeakData::_internal_set_isinitial(bool value) {
+  
+  isinitial_ = value;
+}
+inline void WaveformPeakData::set_isinitial(bool value) {
+  _internal_set_isinitial(value);
+  // @@protoc_insertion_point(field_set:sessionsource.WaveformPeakData.isInitial)
+}
+
+// uint32 totalPeakPairs = 4;
+inline void WaveformPeakData::clear_totalpeakpairs() {
+  totalpeakpairs_ = 0u;
+}
+inline uint32_t WaveformPeakData::_internal_totalpeakpairs() const {
+  return totalpeakpairs_;
+}
+inline uint32_t WaveformPeakData::totalpeakpairs() const {
+  // @@protoc_insertion_point(field_get:sessionsource.WaveformPeakData.totalPeakPairs)
+  return _internal_totalpeakpairs();
+}
+inline void WaveformPeakData::_internal_set_totalpeakpairs(uint32_t value) {
+  
+  totalpeakpairs_ = value;
+}
+inline void WaveformPeakData::set_totalpeakpairs(uint32_t value) {
+  _internal_set_totalpeakpairs(value);
+  // @@protoc_insertion_point(field_set:sessionsource.WaveformPeakData.totalPeakPairs)
+}
+
+// float peakLevel = 5;
+inline void WaveformPeakData::clear_peaklevel() {
+  peaklevel_ = 0;
+}
+inline float WaveformPeakData::_internal_peaklevel() const {
+  return peaklevel_;
+}
+inline float WaveformPeakData::peaklevel() const {
+  // @@protoc_insertion_point(field_get:sessionsource.WaveformPeakData.peakLevel)
+  return _internal_peaklevel();
+}
+inline void WaveformPeakData::_internal_set_peaklevel(float value) {
+  
+  peaklevel_ = value;
+}
+inline void WaveformPeakData::set_peaklevel(float value) {
+  _internal_set_peaklevel(value);
+  // @@protoc_insertion_point(field_set:sessionsource.WaveformPeakData.peakLevel)
+}
+
+// bool clipping = 6;
+inline void WaveformPeakData::clear_clipping() {
+  clipping_ = false;
+}
+inline bool WaveformPeakData::_internal_clipping() const {
+  return clipping_;
+}
+inline bool WaveformPeakData::clipping() const {
+  // @@protoc_insertion_point(field_get:sessionsource.WaveformPeakData.clipping)
+  return _internal_clipping();
+}
+inline void WaveformPeakData::_internal_set_clipping(bool value) {
+  
+  clipping_ = value;
+}
+inline void WaveformPeakData::set_clipping(bool value) {
+  _internal_set_clipping(value);
+  // @@protoc_insertion_point(field_set:sessionsource.WaveformPeakData.clipping)
+}
+
 #ifdef __GNUC__
   #pragma GCC diagnostic pop
 #endif  // __GNUC__
+// -------------------------------------------------------------------
+
+// -------------------------------------------------------------------
+
 // -------------------------------------------------------------------
 
 // -------------------------------------------------------------------

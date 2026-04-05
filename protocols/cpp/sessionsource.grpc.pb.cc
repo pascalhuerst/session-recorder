@@ -25,6 +25,7 @@ static const char* SessionSource_method_names[] = {
   "/sessionsource.SessionSource/StreamRecorders",
   "/sessionsource.SessionSource/StreamSessions",
   "/sessionsource.SessionSource/StreamSessionAudio",
+  "/sessionsource.SessionSource/StreamWaveformPeaks",
   "/sessionsource.SessionSource/SetKeepSession",
   "/sessionsource.SessionSource/DeleteSession",
   "/sessionsource.SessionSource/SetName",
@@ -48,17 +49,18 @@ SessionSource::Stub::Stub(const std::shared_ptr< ::grpc::ChannelInterface>& chan
   : channel_(channel), rpcmethod_StreamRecorders_(SessionSource_method_names[0], options.suffix_for_stats(),::grpc::internal::RpcMethod::SERVER_STREAMING, channel)
   , rpcmethod_StreamSessions_(SessionSource_method_names[1], options.suffix_for_stats(),::grpc::internal::RpcMethod::SERVER_STREAMING, channel)
   , rpcmethod_StreamSessionAudio_(SessionSource_method_names[2], options.suffix_for_stats(),::grpc::internal::RpcMethod::SERVER_STREAMING, channel)
-  , rpcmethod_SetKeepSession_(SessionSource_method_names[3], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
-  , rpcmethod_DeleteSession_(SessionSource_method_names[4], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
-  , rpcmethod_SetName_(SessionSource_method_names[5], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
-  , rpcmethod_CreateSegment_(SessionSource_method_names[6], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
-  , rpcmethod_DeleteSegment_(SessionSource_method_names[7], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
-  , rpcmethod_RenderSegment_(SessionSource_method_names[8], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
-  , rpcmethod_UpdateSegment_(SessionSource_method_names[9], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
-  , rpcmethod_CutSession_(SessionSource_method_names[10], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
-  , rpcmethod_RetryRenderSession_(SessionSource_method_names[11], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
-  , rpcmethod_ShareSession_(SessionSource_method_names[12], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
-  , rpcmethod_ShareSegment_(SessionSource_method_names[13], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
+  , rpcmethod_StreamWaveformPeaks_(SessionSource_method_names[3], options.suffix_for_stats(),::grpc::internal::RpcMethod::SERVER_STREAMING, channel)
+  , rpcmethod_SetKeepSession_(SessionSource_method_names[4], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
+  , rpcmethod_DeleteSession_(SessionSource_method_names[5], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
+  , rpcmethod_SetName_(SessionSource_method_names[6], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
+  , rpcmethod_CreateSegment_(SessionSource_method_names[7], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
+  , rpcmethod_DeleteSegment_(SessionSource_method_names[8], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
+  , rpcmethod_RenderSegment_(SessionSource_method_names[9], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
+  , rpcmethod_UpdateSegment_(SessionSource_method_names[10], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
+  , rpcmethod_CutSession_(SessionSource_method_names[11], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
+  , rpcmethod_RetryRenderSession_(SessionSource_method_names[12], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
+  , rpcmethod_ShareSession_(SessionSource_method_names[13], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
+  , rpcmethod_ShareSegment_(SessionSource_method_names[14], options.suffix_for_stats(),::grpc::internal::RpcMethod::NORMAL_RPC, channel)
   {}
 
 ::grpc::ClientReader< ::sessionsource::Recorder>* SessionSource::Stub::StreamRecordersRaw(::grpc::ClientContext* context, const ::sessionsource::StreamRecordersRequest& request) {
@@ -107,6 +109,22 @@ void SessionSource::Stub::async::StreamSessionAudio(::grpc::ClientContext* conte
 
 ::grpc::ClientAsyncReader< ::sessionsource::AudioChunk>* SessionSource::Stub::PrepareAsyncStreamSessionAudioRaw(::grpc::ClientContext* context, const ::sessionsource::StreamSessionAudioRequest& request, ::grpc::CompletionQueue* cq) {
   return ::grpc::internal::ClientAsyncReaderFactory< ::sessionsource::AudioChunk>::Create(channel_.get(), cq, rpcmethod_StreamSessionAudio_, context, request, false, nullptr);
+}
+
+::grpc::ClientReader< ::sessionsource::WaveformPeakData>* SessionSource::Stub::StreamWaveformPeaksRaw(::grpc::ClientContext* context, const ::sessionsource::StreamWaveformPeaksRequest& request) {
+  return ::grpc::internal::ClientReaderFactory< ::sessionsource::WaveformPeakData>::Create(channel_.get(), rpcmethod_StreamWaveformPeaks_, context, request);
+}
+
+void SessionSource::Stub::async::StreamWaveformPeaks(::grpc::ClientContext* context, const ::sessionsource::StreamWaveformPeaksRequest* request, ::grpc::ClientReadReactor< ::sessionsource::WaveformPeakData>* reactor) {
+  ::grpc::internal::ClientCallbackReaderFactory< ::sessionsource::WaveformPeakData>::Create(stub_->channel_.get(), stub_->rpcmethod_StreamWaveformPeaks_, context, request, reactor);
+}
+
+::grpc::ClientAsyncReader< ::sessionsource::WaveformPeakData>* SessionSource::Stub::AsyncStreamWaveformPeaksRaw(::grpc::ClientContext* context, const ::sessionsource::StreamWaveformPeaksRequest& request, ::grpc::CompletionQueue* cq, void* tag) {
+  return ::grpc::internal::ClientAsyncReaderFactory< ::sessionsource::WaveformPeakData>::Create(channel_.get(), cq, rpcmethod_StreamWaveformPeaks_, context, request, true, tag);
+}
+
+::grpc::ClientAsyncReader< ::sessionsource::WaveformPeakData>* SessionSource::Stub::PrepareAsyncStreamWaveformPeaksRaw(::grpc::ClientContext* context, const ::sessionsource::StreamWaveformPeaksRequest& request, ::grpc::CompletionQueue* cq) {
+  return ::grpc::internal::ClientAsyncReaderFactory< ::sessionsource::WaveformPeakData>::Create(channel_.get(), cq, rpcmethod_StreamWaveformPeaks_, context, request, false, nullptr);
 }
 
 ::grpc::Status SessionSource::Stub::SetKeepSession(::grpc::ClientContext* context, const ::sessionsource::SetKeepSessionRequest& request, ::common::Respone* response) {
@@ -395,6 +413,16 @@ SessionSource::Service::Service() {
              }, this)));
   AddMethod(new ::grpc::internal::RpcServiceMethod(
       SessionSource_method_names[3],
+      ::grpc::internal::RpcMethod::SERVER_STREAMING,
+      new ::grpc::internal::ServerStreamingHandler< SessionSource::Service, ::sessionsource::StreamWaveformPeaksRequest, ::sessionsource::WaveformPeakData>(
+          [](SessionSource::Service* service,
+             ::grpc::ServerContext* ctx,
+             const ::sessionsource::StreamWaveformPeaksRequest* req,
+             ::grpc::ServerWriter<::sessionsource::WaveformPeakData>* writer) {
+               return service->StreamWaveformPeaks(ctx, req, writer);
+             }, this)));
+  AddMethod(new ::grpc::internal::RpcServiceMethod(
+      SessionSource_method_names[4],
       ::grpc::internal::RpcMethod::NORMAL_RPC,
       new ::grpc::internal::RpcMethodHandler< SessionSource::Service, ::sessionsource::SetKeepSessionRequest, ::common::Respone, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(
           [](SessionSource::Service* service,
@@ -404,7 +432,7 @@ SessionSource::Service::Service() {
                return service->SetKeepSession(ctx, req, resp);
              }, this)));
   AddMethod(new ::grpc::internal::RpcServiceMethod(
-      SessionSource_method_names[4],
+      SessionSource_method_names[5],
       ::grpc::internal::RpcMethod::NORMAL_RPC,
       new ::grpc::internal::RpcMethodHandler< SessionSource::Service, ::sessionsource::DeleteSessionRequest, ::common::Respone, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(
           [](SessionSource::Service* service,
@@ -414,7 +442,7 @@ SessionSource::Service::Service() {
                return service->DeleteSession(ctx, req, resp);
              }, this)));
   AddMethod(new ::grpc::internal::RpcServiceMethod(
-      SessionSource_method_names[5],
+      SessionSource_method_names[6],
       ::grpc::internal::RpcMethod::NORMAL_RPC,
       new ::grpc::internal::RpcMethodHandler< SessionSource::Service, ::sessionsource::SetNameRequest, ::common::Respone, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(
           [](SessionSource::Service* service,
@@ -424,7 +452,7 @@ SessionSource::Service::Service() {
                return service->SetName(ctx, req, resp);
              }, this)));
   AddMethod(new ::grpc::internal::RpcServiceMethod(
-      SessionSource_method_names[6],
+      SessionSource_method_names[7],
       ::grpc::internal::RpcMethod::NORMAL_RPC,
       new ::grpc::internal::RpcMethodHandler< SessionSource::Service, ::sessionsource::CreateSegmentRequest, ::common::Respone, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(
           [](SessionSource::Service* service,
@@ -434,7 +462,7 @@ SessionSource::Service::Service() {
                return service->CreateSegment(ctx, req, resp);
              }, this)));
   AddMethod(new ::grpc::internal::RpcServiceMethod(
-      SessionSource_method_names[7],
+      SessionSource_method_names[8],
       ::grpc::internal::RpcMethod::NORMAL_RPC,
       new ::grpc::internal::RpcMethodHandler< SessionSource::Service, ::sessionsource::DeleteSegmentRequest, ::common::Respone, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(
           [](SessionSource::Service* service,
@@ -444,7 +472,7 @@ SessionSource::Service::Service() {
                return service->DeleteSegment(ctx, req, resp);
              }, this)));
   AddMethod(new ::grpc::internal::RpcServiceMethod(
-      SessionSource_method_names[8],
+      SessionSource_method_names[9],
       ::grpc::internal::RpcMethod::NORMAL_RPC,
       new ::grpc::internal::RpcMethodHandler< SessionSource::Service, ::sessionsource::RenderSegmentRequest, ::common::Respone, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(
           [](SessionSource::Service* service,
@@ -454,7 +482,7 @@ SessionSource::Service::Service() {
                return service->RenderSegment(ctx, req, resp);
              }, this)));
   AddMethod(new ::grpc::internal::RpcServiceMethod(
-      SessionSource_method_names[9],
+      SessionSource_method_names[10],
       ::grpc::internal::RpcMethod::NORMAL_RPC,
       new ::grpc::internal::RpcMethodHandler< SessionSource::Service, ::sessionsource::UpdateSegmentRequest, ::common::Respone, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(
           [](SessionSource::Service* service,
@@ -464,7 +492,7 @@ SessionSource::Service::Service() {
                return service->UpdateSegment(ctx, req, resp);
              }, this)));
   AddMethod(new ::grpc::internal::RpcServiceMethod(
-      SessionSource_method_names[10],
+      SessionSource_method_names[11],
       ::grpc::internal::RpcMethod::NORMAL_RPC,
       new ::grpc::internal::RpcMethodHandler< SessionSource::Service, ::sessionsource::CutSessionRequest, ::common::Respone, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(
           [](SessionSource::Service* service,
@@ -474,7 +502,7 @@ SessionSource::Service::Service() {
                return service->CutSession(ctx, req, resp);
              }, this)));
   AddMethod(new ::grpc::internal::RpcServiceMethod(
-      SessionSource_method_names[11],
+      SessionSource_method_names[12],
       ::grpc::internal::RpcMethod::NORMAL_RPC,
       new ::grpc::internal::RpcMethodHandler< SessionSource::Service, ::sessionsource::RetryRenderSessionRequest, ::common::Respone, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(
           [](SessionSource::Service* service,
@@ -484,7 +512,7 @@ SessionSource::Service::Service() {
                return service->RetryRenderSession(ctx, req, resp);
              }, this)));
   AddMethod(new ::grpc::internal::RpcServiceMethod(
-      SessionSource_method_names[12],
+      SessionSource_method_names[13],
       ::grpc::internal::RpcMethod::NORMAL_RPC,
       new ::grpc::internal::RpcMethodHandler< SessionSource::Service, ::sessionsource::ShareSessionRequest, ::common::Respone, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(
           [](SessionSource::Service* service,
@@ -494,7 +522,7 @@ SessionSource::Service::Service() {
                return service->ShareSession(ctx, req, resp);
              }, this)));
   AddMethod(new ::grpc::internal::RpcServiceMethod(
-      SessionSource_method_names[13],
+      SessionSource_method_names[14],
       ::grpc::internal::RpcMethod::NORMAL_RPC,
       new ::grpc::internal::RpcMethodHandler< SessionSource::Service, ::sessionsource::ShareSegmentRequest, ::common::Respone, ::grpc::protobuf::MessageLite, ::grpc::protobuf::MessageLite>(
           [](SessionSource::Service* service,
@@ -523,6 +551,13 @@ SessionSource::Service::~Service() {
 }
 
 ::grpc::Status SessionSource::Service::StreamSessionAudio(::grpc::ServerContext* context, const ::sessionsource::StreamSessionAudioRequest* request, ::grpc::ServerWriter< ::sessionsource::AudioChunk>* writer) {
+  (void) context;
+  (void) request;
+  (void) writer;
+  return ::grpc::Status(::grpc::StatusCode::UNIMPLEMENTED, "");
+}
+
+::grpc::Status SessionSource::Service::StreamWaveformPeaks(::grpc::ServerContext* context, const ::sessionsource::StreamWaveformPeaksRequest* request, ::grpc::ServerWriter< ::sessionsource::WaveformPeakData>* writer) {
   (void) context;
   (void) request;
   (void) writer;

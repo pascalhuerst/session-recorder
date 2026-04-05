@@ -14,6 +14,7 @@ import (
 type StreamSessionsCB func(ctx context.Context, request *sspb.StreamSessionRequest, server sspb.SessionSource_StreamSessionsServer) error
 type StreamRecordersCB func(ctx context.Context, request *sspb.StreamRecordersRequest, server sspb.SessionSource_StreamRecordersServer) error
 type StreamSessionAudioCB func(ctx context.Context, request *sspb.StreamSessionAudioRequest, server sspb.SessionSource_StreamSessionAudioServer) error
+type StreamWaveformPeaksCB func(ctx context.Context, request *sspb.StreamWaveformPeaksRequest, server sspb.SessionSource_StreamWaveformPeaksServer) error
 type DeleteSessionCB func(ctx context.Context, request *sspb.DeleteSessionRequest) (*cmpb.Respone, error)
 type SetKeepSessionCB func(ctx context.Context, request *sspb.SetKeepSessionRequest) (*cmpb.Respone, error)
 type SetNameCB func(ctx context.Context, request *sspb.SetNameRequest) (*cmpb.Respone, error)
@@ -37,8 +38,9 @@ type SessionSourceServerConfig struct {
 
 	StreamRecordersCB    StreamRecordersCB
 	StreamSessionsCB     StreamSessionsCB
-	StreamSessionAudioCB StreamSessionAudioCB
-	DeleteSessionCB      DeleteSessionCB
+	StreamSessionAudioCB  StreamSessionAudioCB
+	StreamWaveformPeaksCB StreamWaveformPeaksCB
+	DeleteSessionCB       DeleteSessionCB
 	SetKeepSessionCB     SetKeepSessionCB
 	SetNameCB            SetNameCB
 	CutSessionCB         CutSessionCB
@@ -98,6 +100,14 @@ func (s *SessionSourceServer) StreamSessions(request *sspb.StreamSessionRequest,
 func (s *SessionSourceServer) StreamSessionAudio(request *sspb.StreamSessionAudioRequest, server sspb.SessionSource_StreamSessionAudioServer) error {
 	if s.config.StreamSessionAudioCB != nil {
 		return s.config.StreamSessionAudioCB(server.Context(), request, server)
+	}
+
+	return nil
+}
+
+func (s *SessionSourceServer) StreamWaveformPeaks(request *sspb.StreamWaveformPeaksRequest, server sspb.SessionSource_StreamWaveformPeaksServer) error {
+	if s.config.StreamWaveformPeaksCB != nil {
+		return s.config.StreamWaveformPeaksCB(server.Context(), request, server)
 	}
 
 	return nil

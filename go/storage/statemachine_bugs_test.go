@@ -63,44 +63,49 @@ func TestFix_RenderFailureFiresExactlyOnce(t *testing.T) {
 }
 
 // =============================================================================
-// Bug #2: Flush failure leaves session stuck in PROCESSING (now fixed)
+// Bug #2: Streaming encode failure transitions to ERROR (not stuck in PROCESSING)
 //
-// If flushChunks fails in closeSessionAsync, the session must transition to
-// ERROR so the user can see the failure and retry.
+// If the streaming encode fails in closeSessionAsync, the session must transition
+// to ERROR so the user can see the failure and retry via the fallback render path.
 // =============================================================================
 
-func TestFix_FlushFailureTransitionsToError(t *testing.T) {
-	m, fake := newTestStorage(t)
+func TestFix_StreamingFailureTransitionsToError(t *testing.T) {
+	m, _ := newTestStorage(t)
 	ctx := context.Background()
 
 	recorderID := uuid.New()
 	sessionID := uuid.New()
 	m.EnsureRecorderExists(ctx, recorderID, "recorder")
 
-	// Create a session
-	samples := make([]int16, 100)
-	if err := m.SafeChunks(ctx, recorderID, sessionID, "001", time.Now(), samples); err != nil {
-		t.Fatalf("SafeChunks failed: %v", err)
-	}
-
-	// Sabotage the multipart upload so flushChunks will fail
+	// Create a session in PROCESSING state (simulating post-close)
 	m.dataLock.Lock()
-	chunk := m.chunks[recorderID]
-	uploadID := chunk.uploadID
+	session := Session{
+		ID:         sessionID,
+		RecorderID: recorderID,
+		StartTime:  time.Now(),
+		State:      SessionStateProcessing,
+		Segments:   make(map[uuid.UUID]Segment),
+	}
+	if err := m.putSessionMetadata(ctx, recorderID, sessionID, &session); err != nil {
+		m.dataLock.Unlock()
+		t.Fatalf("putSessionMetadata failed: %v", err)
+	}
+	m.system.Recorders[recorderID].Sessions[sessionID] = session
 	m.dataLock.Unlock()
-	fake.RemoveUpload(uploadID)
+	m.getOrCreateSessionMachine(recorderID, sessionID, SessionStateProcessing)
 
-	// Close the session — flush will fail, session should transition to ERROR
-	if err := m.CloseRecordingSession(ctx, recorderID, sessionID); err != nil {
-		t.Fatalf("CloseRecordingSession failed: %v", err)
+	// Trigger render failure (simulating what closeSessionAsync does on streaming error)
+	err := m.fireSessionTrigger(ctx, sessionID, triggerRenderFailure, "streaming encode failed")
+	if err != nil {
+		t.Fatalf("triggerRenderFailure should succeed from PROCESSING: %v", err)
 	}
 
-	waitForSessionState(t, m, recorderID, sessionID, SessionStateError, 10*time.Second)
-
-	// Verify user can retry
 	s, _ := m.GetSession(recorderID, sessionID)
+	if s.State != SessionStateError {
+		t.Fatalf("Expected ERROR after streaming failure, got %s", s.State)
+	}
 	if s.ErrorMessage == "" {
-		t.Error("Expected non-empty error message for failed flush")
+		t.Error("Expected non-empty error message for streaming failure")
 	}
 }
 

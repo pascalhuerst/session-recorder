@@ -180,39 +180,49 @@ func TestContractSafeChunks_FiresAudioCallback(t *testing.T) {
 	}
 }
 
-func TestContractSafeChunks_BuffersInMemoryThenFlushes(t *testing.T) {
-	m, fake := newTestStorage(t)
+func TestContractSafeChunks_BuffersInMemoryThenStreams(t *testing.T) {
+	m, _ := newTestStorage(t)
 	ctx := context.Background()
 
 	recorderID := uuid.New()
 	sessionID := uuid.New()
 	m.EnsureRecorderExists(ctx, recorderID, "recorder")
 
-	// Send small chunk — should stay in memory, not flushed as a multipart part yet
+	// Send small chunk — should stay in buffer (below 1s threshold)
 	smallSamples := make([]int16, 100)
 	if err := m.SafeChunks(ctx, recorderID, sessionID, "001", time.Now(), smallSamples); err != nil {
 		t.Fatalf("SafeChunks failed: %v", err)
 	}
 
-	// With multipart uploads, parts are uploaded but data.raw doesn't exist until CompleteMultipartUpload.
-	// A multipart upload should be in progress but with zero parts (data still in memory buffer).
-	if fake.MultipartUploadCount() != 1 {
-		t.Errorf("Expected 1 in-progress multipart upload, got %d", fake.MultipartUploadCount())
+	// Verify chunk exists in memory with data buffered
+	m.dataLock.Lock()
+	chunk := m.chunks[recorderID]
+	if chunk == nil {
+		m.dataLock.Unlock()
+		t.Fatal("Expected chunk to exist")
 	}
+	if chunk.buffer.Len() != 200 { // 100 int16 samples × 2 bytes each
+		t.Errorf("Expected 200 bytes in buffer, got %d", chunk.buffer.Len())
+	}
+	if chunk.streaming == nil {
+		t.Error("Expected streaming session to be active")
+	}
+	m.dataLock.Unlock()
 
-	// Send enough data to exceed minChunkSize (5MB)
-	// Each int16 = 2 bytes via binary.Write, so need 5MB/2 = 2.5M samples
-	largeSamples := make([]int16, minChunkSize/2+1)
+	// Send enough data to exceed streamFlushSize (1s of audio = 192000 bytes)
+	// Each int16 = 2 bytes via binary.Write, so need 192000/2 = 96000 samples
+	largeSamples := make([]int16, streamFlushSize/2+1)
 	if err := m.SafeChunks(ctx, recorderID, sessionID, "002", time.Now(), largeSamples); err != nil {
 		t.Fatalf("SafeChunks (large) failed: %v", err)
 	}
 
-	// Now a part should have been uploaded to the multipart upload.
-	// The multipart upload is still in progress (not completed), so data.raw
-	// doesn't exist as an object yet, but the fake tracks parts internally.
-	if fake.MultipartUploadCount() != 1 {
-		t.Errorf("Expected 1 in-progress multipart upload after large chunk, got %d", fake.MultipartUploadCount())
+	// After exceeding streamFlushSize, buffer should have been flushed to streaming pipes
+	m.dataLock.Lock()
+	chunk = m.chunks[recorderID]
+	if chunk.buffer.Len() >= streamFlushSize {
+		t.Errorf("Buffer should have been flushed (got %d bytes, threshold %d)", chunk.buffer.Len(), streamFlushSize)
 	}
+	m.dataLock.Unlock()
 }
 
 func TestContractSafeChunks_NoRecorderReturnsError(t *testing.T) {
@@ -227,6 +237,10 @@ func TestContractSafeChunks_NoRecorderReturnsError(t *testing.T) {
 }
 
 func TestContractSafeChunks_SamplesPersistedCorrectly(t *testing.T) {
+	if !audioToolsAvailable() {
+		t.Skip("sox and/or audiowaveform not available, skipping streaming test")
+	}
+
 	m, fake := newTestStorage(t)
 	ctx := context.Background()
 
@@ -234,8 +248,8 @@ func TestContractSafeChunks_SamplesPersistedCorrectly(t *testing.T) {
 	sessionID := uuid.New()
 	m.EnsureRecorderExists(ctx, recorderID, "recorder")
 
-	// Send enough data to flush a multipart part
-	samples := make([]int16, minChunkSize/2+1)
+	// Send enough data to trigger at least one stream flush
+	samples := make([]int16, streamFlushSize/2+1)
 	for i := range samples {
 		samples[i] = int16(i % 32000)
 	}
@@ -243,13 +257,13 @@ func TestContractSafeChunks_SamplesPersistedCorrectly(t *testing.T) {
 		t.Fatalf("SafeChunks failed: %v", err)
 	}
 
-	// Close the session to complete the multipart upload, which assembles data.raw
+	// Close the session to finalize streaming uploads
 	if err := m.CloseRecordingSession(ctx, recorderID, sessionID); err != nil {
 		t.Fatalf("CloseRecordingSession failed: %v", err)
 	}
 
-	// Wait for async flush
-	time.Sleep(3 * time.Second)
+	// Wait for streaming uploads to complete
+	waitForSessionState(t, m, recorderID, sessionID, SessionStateFinished, 30*time.Second)
 
 	// Read back the completed data.raw and verify data
 	rawDataKey := recorderID.String() + "/sessions/" + sessionID.String() + "/data.raw"
@@ -475,7 +489,11 @@ func TestContractCloseRecordingSession_TransitionsToProcessing(t *testing.T) {
 	}
 }
 
-func TestContractCloseRecordingSession_FlushesLargeChunksToStorage(t *testing.T) {
+func TestContractCloseRecordingSession_StreamsDataToStorage(t *testing.T) {
+	if !audioToolsAvailable() {
+		t.Skip("sox and/or audiowaveform not available, skipping streaming test")
+	}
+
 	m, fake := newTestStorage(t)
 	ctx := context.Background()
 
@@ -483,8 +501,8 @@ func TestContractCloseRecordingSession_FlushesLargeChunksToStorage(t *testing.T)
 	sessionID := uuid.New()
 	m.EnsureRecorderExists(ctx, recorderID, "recorder")
 
-	// Send enough data that at least one multipart part is uploaded before close.
-	largeSamples := make([]int16, minChunkSize/2+1)
+	// Send enough data to trigger at least one stream flush (>1s of audio)
+	largeSamples := make([]int16, streamFlushSize/2+1)
 	for i := range largeSamples {
 		largeSamples[i] = int16(i % 32000)
 	}
@@ -492,19 +510,14 @@ func TestContractCloseRecordingSession_FlushesLargeChunksToStorage(t *testing.T)
 		t.Fatalf("SafeChunks failed: %v", err)
 	}
 
-	// Verify multipart upload is in progress before close
-	if fake.MultipartUploadCount() != 1 {
-		t.Fatalf("Expected 1 in-progress multipart upload before close, got %d", fake.MultipartUploadCount())
-	}
-
 	if err := m.CloseRecordingSession(ctx, recorderID, sessionID); err != nil {
 		t.Fatalf("CloseRecordingSession failed: %v", err)
 	}
 
-	// Wait for async flush + render (render will fail without sox, that's OK)
-	time.Sleep(3 * time.Second)
+	// Wait for streaming uploads to complete
+	waitForSessionState(t, m, recorderID, sessionID, SessionStateFinished, 30*time.Second)
 
-	// After close, data.raw should exist (assembled via CompleteMultipartUpload)
+	// After close, data.raw should exist (streamed via PutObject)
 	rawDataKey := recorderID.String() + "/sessions/" + sessionID.String() + "/data.raw"
 	if !fake.ObjectExists(bucketName, rawDataKey) {
 		sessionPrefix := recorderID.String() + "/sessions/" + sessionID.String() + "/"
@@ -517,10 +530,14 @@ func TestContractCloseRecordingSession_FlushesLargeChunksToStorage(t *testing.T)
 	}
 }
 
-// TestContractCloseRecordingSession_SmallChunksStillFlushed verifies that even
-// when all chunks are still in memory (below minChunkSize), CloseRecordingSession
-// flushes them to storage before checking isSessionClosed.
-func TestContractCloseRecordingSession_SmallChunksStillFlushed(t *testing.T) {
+// TestContractCloseRecordingSession_SmallChunksStillStreamed verifies that even
+// when all chunks are still in the buffer (below streamFlushSize), CloseRecordingSession
+// flushes them through the streaming pipelines to storage.
+func TestContractCloseRecordingSession_SmallChunksStillStreamed(t *testing.T) {
+	if !audioToolsAvailable() {
+		t.Skip("sox and/or audiowaveform not available, skipping streaming test")
+	}
+
 	m, fake := newTestStorage(t)
 	ctx := context.Background()
 
@@ -528,7 +545,7 @@ func TestContractCloseRecordingSession_SmallChunksStillFlushed(t *testing.T) {
 	sessionID := uuid.New()
 	m.EnsureRecorderExists(ctx, recorderID, "recorder")
 
-	// Send very small amount of data (stays in memory)
+	// Send very small amount of data (stays in buffer, never hits streamFlushSize)
 	if err := m.SafeChunks(ctx, recorderID, sessionID, "001", time.Now(), []int16{1, 2, 3}); err != nil {
 		t.Fatalf("SafeChunks failed: %v", err)
 	}
@@ -537,11 +554,10 @@ func TestContractCloseRecordingSession_SmallChunksStillFlushed(t *testing.T) {
 		t.Fatalf("CloseRecordingSession failed: %v", err)
 	}
 
-	// Wait for async flush + compose
-	time.Sleep(3 * time.Second)
+	// Wait for streaming uploads to complete
+	waitForSessionState(t, m, recorderID, sessionID, SessionStateFinished, 30*time.Second)
 
-	// The small chunk should still have been flushed (padded to minChunkSize)
-	// and composed into data.raw
+	// The small chunk should still have been streamed to data.raw
 	rawDataKey := recorderID.String() + "/sessions/" + sessionID.String() + "/data.raw"
 	if !fake.ObjectExists(bucketName, rawDataKey) {
 		sessionPrefix := recorderID.String() + "/sessions/" + sessionID.String() + "/"
@@ -873,45 +889,6 @@ func TestContractCloseRecordingSession_TransitionsToProcessingAndRenders(t *test
 // Multipart Upload Race Conditions
 // =============================================================================
 
-// TestContractFlushChunks_SkipsWhenDataRawAlreadyExists verifies that flushChunks
-// returns success (not an error) when data.raw was already assembled by a concurrent
-// close (e.g., completeOrphanedUpload). This prevents the "multipart upload does not
-// exist" error that occurs when two close paths race.
-func TestContractFlushChunks_SkipsWhenDataRawAlreadyExists(t *testing.T) {
-	m, fake := newTestStorage(t)
-	ctx := context.Background()
-
-	recorderID := uuid.New()
-	sessionID := uuid.New()
-	m.EnsureRecorderExists(ctx, recorderID, "recorder")
-
-	// Send enough data to flush at least one multipart part
-	largeSamples := make([]int16, minChunkSize/2+1)
-	if err := m.SafeChunks(ctx, recorderID, sessionID, "001", time.Now(), largeSamples); err != nil {
-		t.Fatalf("SafeChunks failed: %v", err)
-	}
-
-	// Grab the chunk state
-	m.dataLock.Lock()
-	chunk := m.chunks[recorderID]
-	if chunk == nil {
-		m.dataLock.Unlock()
-		t.Fatal("Expected chunk to exist")
-	}
-	chunkCopy := *chunk
-	m.dataLock.Unlock()
-
-	// Simulate a concurrent close: put data.raw directly so it exists before flushChunks.
-	rawDataObjectName := recorderID.String() + "/sessions/" + sessionID.String() + "/data.raw"
-	fake.PutObject(ctx, bucketName, rawDataObjectName, bytes.NewReader([]byte("already-assembled")), 17, minio.PutObjectOptions{})
-
-	// flushChunks should detect data.raw exists and return nil (not error).
-	err := m.flushChunks(ctx, recorderID, sessionID, &chunkCopy)
-	if err != nil {
-		t.Fatalf("flushChunks should succeed when data.raw already exists, got: %v", err)
-	}
-}
-
 // TestContractIsSessionClosed_ProcessingWithDataRawIsNotClosed verifies that
 // a session in PROCESSING state is NOT considered closed even if data.raw exists.
 // This ensures rendering proceeds after the multipart upload is completed.
@@ -973,8 +950,8 @@ func TestContractSessionSwitch_ConcurrentCloseDoesNotFailRender(t *testing.T) {
 	session2 := uuid.New()
 	m.EnsureRecorderExists(ctx, recorderID, "recorder")
 
-	// Record enough data for session 1 to have at least one part
-	largeSamples := make([]int16, minChunkSize/2+1)
+	// Record enough data for session 1 to trigger at least one stream flush
+	largeSamples := make([]int16, streamFlushSize/2+1)
 	for i := range largeSamples {
 		largeSamples[i] = int16(i % 32000)
 	}

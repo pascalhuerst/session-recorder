@@ -1,0 +1,7 @@
+{
+  "database": "dolt",
+  "backend": "dolt",
+  "dolt_mode": "embedded",
+  "dolt_database": "session_recorder_bak",
+  "project_id": "21a0b367-45ba-4d02-b539-4b16d0cc218e"
+}

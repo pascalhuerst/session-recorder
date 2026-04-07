@@ -102,3 +102,8 @@ docker-compose.override.yml.local
 # Local data directories
 data/
 systemd
+
+# Beads / Dolt files (added by bd init)
+.dolt/
+*.db
+.beads-credential-key

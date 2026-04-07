@@ -102,6 +102,8 @@ docker-compose.override.yml.local
 # Local data directories
 data/
 systemd
+.wolf
+.claude/rules/openwolf.md
 
 # Beads / Dolt files (added by bd init)
 .dolt/

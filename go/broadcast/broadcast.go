@@ -78,3 +78,15 @@ func (b *Broadcaster[T]) SubscriberCount() int {
 	defer b.mu.RUnlock()
 	return len(b.subscribers)
 }
+
+// Close closes all subscriber channels and clears the subscriber map.
+// After Close, subscribers reading from their channels will receive the
+// zero value and ok=false, unblocking any goroutines waiting on them.
+func (b *Broadcaster[T]) Close() {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	for ch := range b.subscribers {
+		close(ch)
+		delete(b.subscribers, ch)
+	}
+}

@@ -95,19 +95,26 @@ func (s *ChunkSinkServer) GetCommands(request *cspb.GetCommandRequest, server cs
 
 	s.mu.Lock()
 	s.sendCommandFunc[recorderID] = server.Send
-	if s.config.OnRecorderConnectedCB != nil {
-		go s.config.OnRecorderConnectedCB(recorderID)
-	}
 	s.mu.Unlock()
+
+	// Fire callback after releasing the lock so the handler can call
+	// IsRecorderConnected without deadlocking, and synchronously so
+	// the connection is fully initialized before we start receiving data.
+	if s.config.OnRecorderConnectedCB != nil {
+		s.config.OnRecorderConnectedCB(recorderID)
+	}
 
 	<-server.Context().Done()
 
 	s.mu.Lock()
 	delete(s.sendCommandFunc, recorderID)
-	if s.config.OnRecorderDisconnectedCB != nil {
-		go s.config.OnRecorderDisconnectedCB(recorderID)
-	}
 	s.mu.Unlock()
+
+	// Fire callback after releasing the lock, synchronously so cleanup
+	// completes before GetCommands returns.
+	if s.config.OnRecorderDisconnectedCB != nil {
+		s.config.OnRecorderDisconnectedCB(recorderID)
+	}
 
 	return server.Context().Err()
 }

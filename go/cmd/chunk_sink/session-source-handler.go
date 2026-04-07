@@ -277,8 +277,10 @@ func (h *SessionSourceHandler) OnSessionStateChanged(event storage.SessionStateC
 	session := event.Session
 	h.broadcastSessionUpdate(context.Background(), event.RecorderID, &session)
 
-	// Clean up peak data when session leaves RECORDING state
-	if event.PreviousState == storage.SessionStateRecording && event.NewState != storage.SessionStateRecording {
+	// Clean up peak data when session is no longer actively recording.
+	// This covers all transitions out of RECORDING, plus terminal states
+	// (FINISHED, ERROR) that may be reached from PROCESSING.
+	if event.NewState != storage.SessionStateRecording {
 		h.peakAccumulator.RemoveSession(event.SessionID.String())
 	}
 }

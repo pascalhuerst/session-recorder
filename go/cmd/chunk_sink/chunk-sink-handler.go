@@ -201,7 +201,9 @@ func (h *ChunkSinkHandler) OnRecorderDisconnected(recorderID uuid.UUID) {
 	h.lock.Unlock()
 
 	if sessionToClose != uuid.Nil {
-		if closed, err := h.closeRecorderSession(context.Background(), recorderID, sessionToClose); err != nil {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		if closed, err := h.closeRecorderSession(ctx, recorderID, sessionToClose); err != nil {
 			log.Err(err).
 				Str("recorder-id", recorderID.String()).
 				Str("session-id", sessionToClose.String()).

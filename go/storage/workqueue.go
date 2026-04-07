@@ -140,6 +140,9 @@ func (wq *workQueue) stop() {
 }
 
 // stopAndWait gracefully shuts down, waiting for in-flight jobs to complete.
+// The context is NOT cancelled until the pool has drained, so in-flight jobs
+// can finish their S3 uploads before the context is invalidated.
 func (wq *workQueue) stopAndWait() {
 	wq.pool.StopAndWait()
+	wq.cancel() // Cancel context only after all jobs are done
 }

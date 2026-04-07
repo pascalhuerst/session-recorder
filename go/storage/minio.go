@@ -89,8 +89,10 @@ type Minio struct {
 	lastChunkTime map[uuid.UUID]time.Time // Track when each recorder last received chunks
 	dataLock      sync.Mutex
 
-	sessionTimeout time.Duration
-	stopTimeout    chan struct{}
+	sessionTimeout  time.Duration
+	stopTimeout     chan struct{}
+	shutdownCtx     context.Context    // Cancelled when Stop() is called; used for long-lived uploads
+	shutdownCancel  context.CancelFunc
 
 	onAudioChunkCb OnAudioChunkCb
 
@@ -144,6 +146,7 @@ func NewMinioStorage(endpoint, localEndpoint, publicEndpoint, accessKey, secretK
 		publicEndpoint = localEndpoint
 	}
 
+	shutdownCtx, shutdownCancel := context.WithCancel(context.Background())
 	return &Minio{
 		endpoint:        endpoint,
 		localEndpoint:   localEndpoint,
@@ -155,6 +158,8 @@ func NewMinioStorage(endpoint, localEndpoint, publicEndpoint, accessKey, secretK
 		lastChunkTime:   make(map[uuid.UUID]time.Time),
 		sessionTimeout:  DefaultSessionTimeout,
 		stopTimeout:     make(chan struct{}),
+		shutdownCtx:     shutdownCtx,
+		shutdownCancel:  shutdownCancel,
 		eventBus:        NewEventBus(),
 		sessionMachines: make(map[uuid.UUID]*stateless.StateMachine),
 		deletedSessions: make(map[uuid.UUID]time.Time),
@@ -171,6 +176,7 @@ func NewMinioStorageWithClient(client MinioClient, endpoint, localEndpoint, publ
 	if publicEndpoint == "" {
 		publicEndpoint = localEndpoint
 	}
+	shutdownCtx, shutdownCancel := context.WithCancel(context.Background())
 	return &Minio{
 		endpoint:        endpoint,
 		localEndpoint:   localEndpoint,
@@ -180,6 +186,8 @@ func NewMinioStorageWithClient(client MinioClient, endpoint, localEndpoint, publ
 		lastChunkTime:   make(map[uuid.UUID]time.Time),
 		sessionTimeout:  DefaultSessionTimeout,
 		stopTimeout:     make(chan struct{}),
+		shutdownCtx:     shutdownCtx,
+		shutdownCancel:  shutdownCancel,
 		eventBus:        NewEventBus(),
 		sessionMachines: make(map[uuid.UUID]*stateless.StateMachine),
 		deletedSessions: make(map[uuid.UUID]time.Time),
@@ -357,10 +365,15 @@ func (m *Minio) Start(ctx context.Context) error {
 }
 
 // Stop stops the session timeout checker and drains the work queue.
+// It waits for in-flight render jobs to complete before returning,
+// preventing sessions from getting stuck in PROCESSING state.
 func (m *Minio) Stop() {
 	close(m.stopTimeout)
 	if m.renderQueue != nil {
-		m.renderQueue.stop()
+		m.renderQueue.stopAndWait()
+	}
+	if m.shutdownCancel != nil {
+		m.shutdownCancel()
 	}
 }
 
@@ -549,6 +562,19 @@ func (m *Minio) runSessionTimeoutChecker(ctx context.Context) {
 			return
 		case <-ticker.C:
 			m.checkAndCloseStaleSession(ctx)
+			m.sweepDeletedSessions()
+		}
+	}
+}
+
+// sweepDeletedSessions cleans up stale tombstone entries from the deletedSessions map.
+// Called periodically by the timeout checker so entries don't accumulate between deletes.
+func (m *Minio) sweepDeletedSessions() {
+	m.dataLock.Lock()
+	defer m.dataLock.Unlock()
+	for id, ts := range m.deletedSessions {
+		if time.Since(ts) > time.Minute {
+			delete(m.deletedSessions, id)
 		}
 	}
 }
@@ -1019,9 +1045,10 @@ func (m *Minio) isSessionClosed(ctx context.Context, recorderID, sessionID uuid.
 // to S3 via PutObject. Returns a streamingSession whose Write method fans
 // data to all pipelines.
 func (m *Minio) startStreamingSession(_ context.Context, recorderID, sessionID uuid.UUID) *streamingSession {
-	// Use a background context for streaming uploads — they must survive for the
-	// entire recording duration, not just the initial SafeChunks request.
-	uploadCtx := context.Background()
+	// Use the shutdown context for streaming uploads — they must survive for the
+	// entire recording duration (not just the initial SafeChunks request), but
+	// should be cancelled when the server shuts down to avoid orphaned goroutines.
+	uploadCtx := m.shutdownCtx
 
 	var eg errgroup.Group
 	var writers []io.Writer

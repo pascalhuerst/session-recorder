@@ -1,12 +1,14 @@
 # Session Recorder State Lifecycle
 
-This document describes the state machines and data flow for recorders and sessions in the session-recorder application.
+This document describes the state machines, data flow, and concurrency model for recorders and sessions.
 
 ## Table of Contents
 
 - [Recorder Lifecycle](#recorder-lifecycle)
 - [Session Lifecycle](#session-lifecycle)
+- [Segment Lifecycle](#segment-lifecycle)
 - [Data Flow Architecture](#data-flow-architecture)
+- [Backend Internals](#backend-internals)
 - [Component Hierarchy](#component-hierarchy)
 
 ---
@@ -33,9 +35,18 @@ stateDiagram-v2
 | `NO_SIGNAL` | Recorder connected but no audio input detected |
 | `SIGNAL` | Audio input detected, recording in progress |
 
-### Recorder Status Data
+### Connection Flow
 
-The `RecorderStatus` message includes:
+```
+C++ client connects via gRPC GetCommands()
+  → Server stores send function in map (mutex-protected)
+  → OnRecorderConnectedCB fires synchronously (after mutex release)
+  → Stream blocks on context.Done()
+  → On disconnect: map entry deleted, OnRecorderDisconnectedCB fires
+  → If recording was active: session closed with 30s timeout
+```
+
+### Recorder Status Data
 
 | Field | Type | Description |
 |-------|------|-------------|
@@ -49,7 +60,7 @@ The `RecorderStatus` message includes:
 
 ## Session Lifecycle
 
-Sessions are created when a recorder starts capturing audio. Each session goes through multiple states before completion.
+Sessions are created when a recorder starts capturing audio.
 
 ### Session State Machine
 
@@ -57,45 +68,101 @@ Sessions are created when a recorder starts capturing audio. Each session goes t
 stateDiagram-v2
     [*] --> RECORDING: First audio chunk arrives
 
-    RECORDING --> PROCESSING: Session cut or new session starts
+    RECORDING --> PROCESSING: Session cut / signal loss / timeout
 
     PROCESSING --> FINISHED: Rendering complete
     PROCESSING --> ERROR: Rendering fails
+    PROCESSING --> RECORDING: Chunks arrive (resume)
+
+    ERROR --> PROCESSING: RetryRender
 
     FINISHED --> [*]: Session expires or deleted
     ERROR --> [*]: Session deleted
 
     note right of RECORDING
-        Audio chunks being
-        accumulated in storage
+        Audio chunks buffered,
+        flushed to streaming
+        encoders every ~1s
     end note
 
     note right of PROCESSING
         Generating:
-        - Waveform data
-        - PNG overview
         - FLAC audio
-        - OGG audio
+        - WAV audio
+        - Waveform data
+        (streaming or fallback)
     end note
 ```
 
-### Session State Values
+### Session States
 
 | State | Description |
 |-------|-------------|
 | `RECORDING` | Actively receiving audio chunks from recorder |
 | `PROCESSING` | Session closed, rendering audio files |
-| `FINISHED` | All files rendered, available for playback/download |
+| `FINISHED` | All files rendered, available for playback/download (terminal) |
 | `ERROR` | Rendering failed, error message available |
 
 ### State Transitions
 
-| From | To | Trigger |
-|------|-----|---------|
-| - | RECORDING | First chunk arrives for new session ID |
-| RECORDING | PROCESSING | User cuts session OR new session ID arrives |
-| PROCESSING | FINISHED | All render tasks complete successfully |
-| PROCESSING | ERROR | Any render task fails |
+| From | To | Trigger | Notes |
+|------|----|---------|-------|
+| — | RECORDING | First chunk arrives | `SafeChunks()` creates session + streaming encoders |
+| RECORDING | PROCESSING | Cut / signal loss / timeout / session switch | FSM trigger `CloseRecording` |
+| PROCESSING | FINISHED | Render completes | FSM trigger `RenderSuccess` |
+| PROCESSING | ERROR | Render fails | FSM trigger `RenderFailure`, error stored in metadata |
+| PROCESSING | RECORDING | Chunks arrive | Resume — FSM replaced, session returns to RECORDING |
+| ERROR | PROCESSING | Manual retry | FSM trigger `RetryRender`, clears error message |
+
+### Recording Flow
+
+1. **Chunk reception**: `SetChunks()` → `ChunkSinkHandler.setChunks()` → `Minio.SafeChunks()`
+2. **Buffering**: Chunks accumulated in `bytes.Buffer`, flushed to streaming encoders every ~1s
+3. **Streaming encode**: 4 parallel pipelines (raw PCM, FLAC, WAV, waveform) via `io.Pipe` + `PutObject`
+4. **Session close**: Remaining buffer flushed, encoders closed, FSM transitions to PROCESSING
+5. **Render completion**: Streaming close returns → FSM transitions to FINISHED
+
+### Session Close Triggers
+
+- **Explicit**: User cuts session via `CutSession` RPC
+- **Signal loss**: `setRecorderStatus` detects `wasRecording && !nowRecording`
+- **Session switch**: New session ID arrives in `setChunks`, previous session closed
+- **Timeout**: Session timeout checker closes sessions with no chunks for 30s (configurable)
+- **Disconnect**: `OnRecorderDisconnected` closes active session with 30s timeout
+
+---
+
+## Segment Lifecycle
+
+Segments are user-defined clips within a finished session.
+
+### Segment State Machine
+
+```mermaid
+stateDiagram-v2
+    [*] --> QUEUED: CreateSegment
+
+    QUEUED --> RENDERING: RenderSegment
+
+    RENDERING --> FINISHED: Render success
+    RENDERING --> ERROR: Render failure
+
+    FINISHED --> QUEUED: Re-render (after update)
+    ERROR --> QUEUED: Retry
+```
+
+### Segment States
+
+| State | Description |
+|-------|-------------|
+| `QUEUED` | Segment created, waiting for render |
+| `RENDERING` | Render in progress |
+| `FINISHED` | Rendered files available |
+| `ERROR` | Render failed |
+
+Transitions are validated by `validateSegmentTransition()` — no FSM object, just a transition table.
+
+On server restart, segments stuck in `RENDERING` are recovered to `ERROR` with message "interrupted by server restart".
 
 ---
 
@@ -120,8 +187,8 @@ sequenceDiagram
 
     %% Session Creation
     Recorder->>ChunkSink: First chunk (new session)
-    ChunkSink->>Storage: initSession()
-    Storage->>Handler: onSessionStateChanged(RECORDING)
+    ChunkSink->>Storage: SafeChunks()
+    Storage->>Handler: OnSessionStateChanged(RECORDING)
     Handler->>gRPC: StreamSessions
     gRPC->>UI: Session (RECORDING)
 
@@ -132,14 +199,14 @@ sequenceDiagram
 
     %% Session Processing
     Recorder->>ChunkSink: New session ID
-    ChunkSink->>Storage: closeSession()
-    Storage->>Handler: onSessionStateChanged(PROCESSING)
+    ChunkSink->>Storage: CloseRecordingSession()
+    Storage->>Handler: OnSessionStateChanged(PROCESSING)
     Handler->>gRPC: StreamSessions
     gRPC->>UI: Session (PROCESSING)
 
     %% Rendering Complete
     Storage->>Storage: renderSession()
-    Storage->>Handler: onSessionStateChanged(FINISHED)
+    Storage->>Handler: OnSessionStateChanged(FINISHED)
     Handler->>gRPC: StreamSessions
     gRPC->>UI: Session (FINISHED + file URLs)
 ```
@@ -150,10 +217,61 @@ sequenceDiagram
 |--------|------|-------------|
 | `StreamRecorders` | Server streaming | Continuous recorder status updates |
 | `StreamSessions` | Server streaming | Session state changes per recorder |
+| `StreamSessionAudio` | Server streaming | Live audio chunks during recording |
+| `StreamWaveformPeaks` | Server streaming | Live waveform peaks during recording |
 | `CutSession` | Unary | Request to stop current recording |
 | `SetKeepSession` | Unary | Prevent session from auto-expiring |
 | `DeleteSession` | Unary | Remove session immediately |
 | `SetName` | Unary | Rename a session |
+| `RetryRenderSession` | Unary | Retry failed render |
+| `CreateSegment` | Unary | Create a clip within a session |
+| `RenderSegment` | Unary | Render a segment to audio file |
+
+---
+
+## Backend Internals
+
+### Shutdown Sequence
+
+```
+Stop()
+  → close(stopTimeout)          // Stops session timeout checker
+  → renderQueue.stopAndWait()   // Waits for all in-flight render jobs
+  → shutdownCancel()            // Cancels streaming upload goroutines
+```
+
+The work queue uses `stopAndWait()` to ensure in-flight renders complete before shutdown. The work queue context is only cancelled *after* the pool drains, so in-flight S3 uploads finish before context invalidation.
+
+### Concurrency & Locking
+
+| Lock | Protects | Rules |
+|------|----------|-------|
+| `dataLock` | `system`, `chunks`, `lastChunkTime`, `deletedSessions` | Never emit events while held |
+| `machineLock` | `sessionMachines` map | Released before `sm.FireCtx()` |
+| `EventBus.mu` | Listener list | RWMutex; listeners must be fast and non-blocking |
+
+**Key invariant**: Event emission (`EmitSessionStateChanged`, `EmitSegmentStateChanged`) always happens **outside** `dataLock` to prevent deadlocks with listeners that call `GetSession`/`GetSessions`.
+
+The `onSessionTransition` callback validates that the in-memory session state matches the FSM's expected source state. This guards against stale SM references (e.g., after resume replaces the FSM).
+
+### Tombstone Cleanup
+
+Deleted sessions are tracked in `deletedSessions` with timestamps to prevent resurrection by stale render callbacks. Entries are cleaned up:
+- Amortized during `DeleteSession()` calls
+- Periodically by `sweepDeletedSessions()` in the session timeout checker
+
+Entries older than 1 minute are removed.
+
+### Broadcasting
+
+`Broadcaster[T]` fans out messages to subscribers via buffered channels (size 10 in production). Non-blocking send — messages dropped if a subscriber's buffer is full.
+
+- `Close()` closes all subscriber channels, unblocking waiting goroutines
+- Unsubscribe is idempotent and safe to call concurrently with Broadcast
+
+### Peak Accumulator
+
+Live waveform peaks are accumulated during recording and removed when the session leaves `RECORDING` state — including transitions to `PROCESSING`, `ERROR`, and `FINISHED`.
 
 ---
 
@@ -212,8 +330,8 @@ flowchart TB
 ```mermaid
 flowchart LR
     subgraph Backend
-        A[Storage Layer] -->|callback| B[Session Handler]
-        B -->|channel| C[gRPC Stream]
+        A[Storage Layer] -->|EventBus| B[Session Handler]
+        B -->|Broadcaster| C[gRPC Stream]
     end
 
     subgraph Network
@@ -231,16 +349,22 @@ flowchart LR
 
 ## File Reference
 
-### Backend Files
+### Backend
 
 | File | Purpose |
 |------|---------|
-| `go/storage/storage.go` | Session struct, state types, interfaces |
-| `go/storage/minio.go` | State transitions, callbacks, rendering |
-| `go/cmd/chunk_sink/session-source-handler.go` | gRPC handlers, state streaming |
-| `go/grpc/chunksink-server.go` | Command channel for cut session |
+| `go/storage/storage.go` | Session/Segment types, Storage interface |
+| `go/storage/statemachine.go` | Session FSM, segment transition validation |
+| `go/storage/minio.go` | State transitions, S3 persistence, streaming encode, shutdown |
+| `go/storage/workqueue.go` | Async render job scheduling |
+| `go/storage/eventbus.go` | Event emission to listeners |
+| `go/broadcast/broadcast.go` | Fan-out to gRPC stream subscribers |
+| `go/cmd/chunk_sink/chunk-sink-handler.go` | Chunk reception, session close on disconnect/signal loss |
+| `go/cmd/chunk_sink/session-source-handler.go` | gRPC stream handlers, peak accumulator, event relay |
+| `go/grpc/chunksink-server.go` | Recorder connection/disconnection, command routing |
+| `go/grpc/sessionsource-server.go` | Session streaming endpoints |
 
-### Frontend Files
+### Frontend
 
 | File | Purpose |
 |------|---------|
@@ -250,12 +374,13 @@ flowchart LR
 | `web/src/grpc/procedures/streamSessions.ts` | Session streaming |
 | `web/src/types.ts` | TypeScript type definitions |
 
-### Protocol Files
+### Protocols
 
 | File | Purpose |
 |------|---------|
 | `protocols/proto/common.proto` | SignalStatus, RecorderStatus |
-| `protocols/proto/sessionsource.proto` | SessionState, SessionInfo, gRPC service |
+| `protocols/proto/chunksink.proto` | ChunkSink service |
+| `protocols/proto/sessionsource.proto` | SessionSource service, SessionState |
 
 ---
 

@@ -12,7 +12,9 @@ export const integrateSegments = (
   recorderId: string,
   ctx: PeaksContext
 ) => {
-  ctx.eventEmitter.on('segmentAdded', async (segment) => {
+  const unbinds: Array<() => void> = [];
+
+  unbinds.push(ctx.eventEmitter.on('segmentAdded', async (segment) => {
     try {
       // Peaks.js uses seconds (float), convert to protobuf Timestamp (seconds + nanos)
       await createSegment({
@@ -36,9 +38,9 @@ export const integrateSegments = (
       console.error('Failed to create segment:', error);
       toastService.error('Failed to create segment');
     }
-  });
+  }));
 
-  ctx.eventEmitter.on('segmentUpdated', async (segmentId, _, segment) => {
+  unbinds.push(ctx.eventEmitter.on('segmentUpdated', async (segmentId, _, segment) => {
     try {
       // Peaks.js uses seconds (float), convert to protobuf Timestamp (seconds + nanos)
       await updateSegment({
@@ -62,9 +64,9 @@ export const integrateSegments = (
       console.error('Failed to update segment:', error);
       toastService.error('Failed to update segment');
     }
-  });
+  }));
 
-  ctx.eventEmitter.on('segmentRemoved', async (segmentId) => {
+  unbinds.push(ctx.eventEmitter.on('segmentRemoved', async (segmentId) => {
     try {
       await deleteSegment({
         recorderId,
@@ -75,14 +77,14 @@ export const integrateSegments = (
       console.error('Failed to delete segment:', error);
       toastService.error('Failed to delete segment');
     }
-  });
+  }));
 
-  ctx.eventEmitter.on('segmentsBulkDeleted', (count) => {
+  unbinds.push(ctx.eventEmitter.on('segmentsBulkDeleted', (count) => {
     const label = count === 1 ? 'segment' : 'segments';
     toastService.success(`${count} ${label} deleted`);
-  });
+  }));
 
-  ctx.commandEmitter.on('renderSegment', async (segmentId) => {
+  unbinds.push(ctx.commandEmitter.on('renderSegment', async (segmentId) => {
     try {
       await renderSegment({
         recorderId,
@@ -94,5 +96,7 @@ export const integrateSegments = (
       console.error('Failed to render segment:', error);
       toastService.error('Failed to render segment');
     }
-  });
+  }));
+
+  return () => unbinds.forEach((unbind) => unbind());
 };

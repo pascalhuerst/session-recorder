@@ -63,6 +63,16 @@ let clippingTimeout: ReturnType<typeof setTimeout> | null = null;
 // Track canvas width for peak trimming
 let lastCanvasWidth = 0;
 
+// Data-driven redraw: only schedule a frame when peaks change
+let needsRedraw = false;
+
+const scheduleRedraw = () => {
+  if (!needsRedraw) {
+    needsRedraw = true;
+    animationId = requestAnimationFrame(drawWaveform);
+  }
+};
+
 const onWaveformPeaks = (msg: WaveformPeakMessage) => {
   const newPairCount = msg.peaks.length / 2;
 
@@ -104,6 +114,9 @@ const onWaveformPeaks = (msg: WaveformPeakMessage) => {
     maxPeaks.value = newMaxs;
   }
 
+  // Schedule a redraw now that we have new data
+  scheduleRedraw();
+
   // Update peak level meter
   peakLevel.value = msg.peakLevel;
   emit('peakUpdate', msg.peakLevel, msg.clipping);
@@ -118,6 +131,9 @@ const onWaveformPeaks = (msg: WaveformPeakMessage) => {
 };
 
 const drawWaveform = () => {
+  needsRedraw = false;
+  animationId = null;
+
   const canvas = canvasRef.value;
   if (!canvas) return;
 
@@ -149,7 +165,6 @@ const drawWaveform = () => {
   const peaksLength = mins.length;
 
   if (peaksLength === 0) {
-    animationId = requestAnimationFrame(drawWaveform);
     return;
   }
 
@@ -182,8 +197,6 @@ const drawWaveform = () => {
 
   ctx.closePath();
   ctx.fill();
-
-  animationId = requestAnimationFrame(drawWaveform);
 };
 
 const subscribePeaks = (sessionID: string) => {
@@ -203,7 +216,7 @@ const subscribePeaks = (sessionID: string) => {
 };
 
 onMounted(() => {
-  animationId = requestAnimationFrame(drawWaveform);
+  scheduleRedraw();
   peakStream = subscribePeaks(props.session.id);
 });
 

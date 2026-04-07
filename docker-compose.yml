@@ -15,9 +15,9 @@ services:
   minio:
     image: quay.io/minio/minio:latest
     command: server /data --console-address ":9090"
-    ports:
-      - "9000:9000" # API
-      - "9090:9090" # Console
+    # No host port exposure — MinIO is only reachable within the Docker network.
+    # Clients access files via presigned URLs served through the nginx proxy.
+    # For console access in development, use docker-compose.dev.yml.
     environment:
       - MINIO_ROOT_USER=admin
       - MINIO_ROOT_PASSWORD=password123

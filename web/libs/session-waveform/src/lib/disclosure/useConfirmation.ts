@@ -10,7 +10,8 @@ export const useConfirmation = () => {
       confirmationStatus.value = undefined;
 
       return new Promise((resolve) => {
-        watch(confirmationStatus, () => {
+        const stop = watch(confirmationStatus, () => {
+          stop();
           resolve({ isConfirmed: confirmationStatus.value === 'confirmed' });
         });
       });

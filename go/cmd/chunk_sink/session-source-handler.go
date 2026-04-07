@@ -22,8 +22,9 @@ import (
 )
 
 var (
-	success   = &cmpb.Respone{Success: true}
-	noSuccess = &cmpb.Respone{Success: false}
+	success         = &cmpb.Respone{Success: true}
+	noSuccess       = &cmpb.Respone{Success: false}
+	urlUnsafeChars  = regexp.MustCompile(`[^a-zA-Z0-9_-]`)
 )
 
 type SessionSourceHandler struct {
@@ -110,7 +111,7 @@ func mapSegmentState(state storage.SegmentState) sspb.SegmentState {
 func getFileURL(ctx context.Context, h *SessionSourceHandler, session *storage.Session, filename storage.Filename, download bool) string {
 	// Create URL-friendly session name
 	urlFriendlyName := strings.ReplaceAll(session.Name, " ", "_")
-	urlFriendlyName = regexp.MustCompile(`[^a-zA-Z0-9_-]`).ReplaceAllString(urlFriendlyName, "")
+	urlFriendlyName = urlUnsafeChars.ReplaceAllString(urlFriendlyName, "")
 
 	// Format date as URL-friendly string
 	dateStr := session.StartTime.Format("2006-01-02_15-04-05")
@@ -145,7 +146,7 @@ func getFileURL(ctx context.Context, h *SessionSourceHandler, session *storage.S
 func getSegmentFileURL(ctx context.Context, h *SessionSourceHandler, session *storage.Session, segment *storage.Segment, filename storage.Filename, download bool) string {
 	// Create URL-friendly segment name
 	urlFriendlyName := strings.ReplaceAll(segment.Comment, " ", "_")
-	urlFriendlyName = regexp.MustCompile(`[^a-zA-Z0-9_-]`).ReplaceAllString(urlFriendlyName, "")
+	urlFriendlyName = urlUnsafeChars.ReplaceAllString(urlFriendlyName, "")
 	if urlFriendlyName == "" {
 		urlFriendlyName = "segment"
 	}
@@ -883,7 +884,7 @@ func (h *SessionSourceHandler) shareSession(ctx context.Context, request *sspb.S
 
 	// Generate download filename
 	urlFriendlyName := strings.ReplaceAll(sessionName, " ", "_")
-	urlFriendlyName = regexp.MustCompile(`[^a-zA-Z0-9_-]`).ReplaceAllString(urlFriendlyName, "")
+	urlFriendlyName = urlUnsafeChars.ReplaceAllString(urlFriendlyName, "")
 	dateStr := session.StartTime.Format("2006-01-02_15-04-05")
 	downloadFilename := urlFriendlyName + "_" + dateStr + ".flac"
 
@@ -1005,7 +1006,7 @@ func (h *SessionSourceHandler) shareSegment(ctx context.Context, request *sspb.S
 
 	// Generate download filename
 	urlFriendlyName := strings.ReplaceAll(segmentName, " ", "_")
-	urlFriendlyName = regexp.MustCompile(`[^a-zA-Z0-9_-]`).ReplaceAllString(urlFriendlyName, "")
+	urlFriendlyName = urlUnsafeChars.ReplaceAllString(urlFriendlyName, "")
 	dateStr := session.StartTime.Format("2006-01-02_15-04-05")
 	downloadFilename := urlFriendlyName + "_" + dateStr + ".flac"
 

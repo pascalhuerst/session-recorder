@@ -21,7 +21,7 @@ func CreateWaveformStream(ctx context.Context, raw io.Reader, zoom, width, heigh
 		"--raw-format", "s16le",
 		"--output-filename", "-",
 		"--output-format", "dat",
-		"--zoom", "256",
+		"--zoom", fmt.Sprintf("%d", zoom),
 		"-b", "8")
 
 	cmd.Stdin = raw

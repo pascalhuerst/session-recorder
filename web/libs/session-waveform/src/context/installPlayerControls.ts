@@ -5,6 +5,8 @@ export const installPlayerControls = ({
   eventEmitter,
   commandEmitter,
 }: ReturnType<typeof createPeaksModule>) => {
+  let commandUnbinds: Array<() => void> = [];
+
   eventEmitter.on('ready', (peaks) => {
     const player = peaks.player;
 
@@ -45,17 +47,21 @@ export const installPlayerControls = ({
       }));
     });
 
-    commandEmitter.on('play', () => {
+    // Clean up previous command handlers before re-registering
+    commandUnbinds.forEach((unbind) => unbind());
+    commandUnbinds = [];
+
+    commandUnbinds.push(commandEmitter.on('play', () => {
       player?.play();
-    });
+    }));
 
-    commandEmitter.on('pause', () => {
+    commandUnbinds.push(commandEmitter.on('pause', () => {
       player?.pause();
-    });
+    }));
 
-    commandEmitter.on('seek', (seconds) => {
+    commandUnbinds.push(commandEmitter.on('seek', (seconds) => {
       player?.seek(seconds);
-    });
+    }));
   });
 
   eventEmitter.on('playbackStarted', () => {

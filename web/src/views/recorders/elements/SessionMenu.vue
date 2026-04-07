@@ -29,13 +29,9 @@ const sessionName = computed(() => {
   return props.session.name || 'Untitled Recording';
 });
 
-const expiresIn = computed(() => {
-  const { expiresAt } = props.session;
-  if (!expiresAt) {
-    return null;
-  }
-  return useTimeAgo(expiresAt, { showSecond: false }).value;
-});
+const expiresAt = computed(() => props.session.expiresAt ?? new Date());
+const expiresInRaw = useTimeAgo(expiresAt, { showSecond: false });
+const expiresIn = computed(() => props.session.expiresAt ? expiresInRaw.value : null);
 
 const onKeep = () => {
   const keepAction = !props.session.keep;
@@ -122,6 +118,7 @@ const onShareClose = () => {
       Share
     </Button>
     <Button
+      v-if="session.downloadFiles"
       size="xs"
       tag-name="a"
       :href="session.downloadFiles.flac"

@@ -1,4 +1,4 @@
-import { computed, onBeforeUnmount, ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { streamSessions } from '../grpc/procedures/streamSessions';
 import { useRecordersStore } from './useRecordersStore';
 import { defineStore, storeToRefs } from 'pinia';
@@ -34,7 +34,7 @@ export const useSessionsStore = defineStore('sessions', () => {
           // Track which session IDs the server sends on this (re)connect
           // so we can prune any that no longer exist on the backend.
           const seen = new Set<string>();
-          let pruned = false;
+          let pruneTimer: ReturnType<typeof setTimeout> | null = null;
 
           return streamSessions({
             request: { recorderID },
@@ -58,20 +58,20 @@ export const useSessionsStore = defineStore('sessions', () => {
                 case 'updated': {
                   seen.add(msg.session.id);
 
-                  // After the initial snapshot burst, prune sessions the
-                  // server didn't mention (they were deleted while we were
-                  // disconnected). We do this once, on the first "updated"
-                  // message that arrives after a short gap — the server
-                  // sends the full snapshot synchronously, so a microtask
-                  // boundary marks the end of the burst.
-                  if (!pruned) {
-                    pruned = true;
-                    queueMicrotask(() => {
-                      sessions.value = sessions.value.filter((s) =>
-                        seen.has(s.id)
-                      );
-                    });
+                  // Debounced pruning: after a 100ms gap in messages, prune
+                  // sessions the server didn't mention (deleted while we were
+                  // disconnected). This is resilient to gRPC-Web transports
+                  // that yield messages across multiple microtasks due to
+                  // HTTP/2 framing or Envoy buffering.
+                  if (pruneTimer !== null) {
+                    clearTimeout(pruneTimer);
                   }
+                  pruneTimer = setTimeout(() => {
+                    pruneTimer = null;
+                    sessions.value = sessions.value.filter((s) =>
+                      seen.has(s.id)
+                    );
+                  }, 100);
 
                   const excludeUpdated = sessions.value.filter(
                     (s) => s.id !== msg.session.id
@@ -90,10 +90,6 @@ export const useSessionsStore = defineStore('sessions', () => {
       immediate: true,
     }
   );
-
-  onBeforeUnmount(() => {
-    handle?.stop();
-  });
 
   /** Force-reconnect the sessions stream to fetch fresh state */
   const reconnect = () => {

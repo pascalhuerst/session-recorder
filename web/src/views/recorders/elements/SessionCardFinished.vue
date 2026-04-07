@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, computed } from 'vue';
+import { ref, watch, computed, onBeforeUnmount } from 'vue';
 import {
   createPeaksContext,
   providePeaksContext,
@@ -71,7 +71,8 @@ const ctx = createPeaksContext({
 });
 
 providePeaksContext(ctx);
-integrateSegments(props.session, props.recorderId, ctx);
+const cleanupSegments = integrateSegments(props.session, props.recorderId, ctx);
+onBeforeUnmount(cleanupSegments);
 
 // Share segment modal state
 const showShareModal = ref(false);

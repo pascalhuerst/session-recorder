@@ -1,4 +1,4 @@
-import { computed, onBeforeUnmount, ref } from 'vue';
+import { computed, ref } from 'vue';
 import { Recorder } from '@session-recorder/protocols/ts/sessionsource';
 import { useRoute, useRouter } from 'vue-router';
 import { defineStore } from 'pinia';
@@ -32,9 +32,5 @@ export const useRecordersStore = defineStore('recorders', () => {
       }),
   });
 
-  onBeforeUnmount(() => {
-    stop();
-  });
-
-  return { recorders, selectedRecorderId };
+  return { recorders, selectedRecorderId, dispose: stop };
 });

@@ -100,10 +100,12 @@ type Minio struct {
 	sessionMachines map[uuid.UUID]*stateless.StateMachine
 	machineLock     sync.Mutex
 
-	// deletedSessions tracks session IDs that have been deleted. Checked by
-	// onSessionTransition to avoid resurrecting sessions when a stale render
-	// callback fires after deletion.
-	deletedSessions map[uuid.UUID]struct{}
+	// deletedSessions tracks session IDs that have been deleted, along with the
+	// deletion timestamp. Checked by onSessionTransition to avoid resurrecting
+	// sessions when a stale render callback fires after deletion.
+	// Entries are cleaned up when accessed (in onSessionTransition) and by
+	// periodic sweeps (in DeleteSession, amortized).
+	deletedSessions map[uuid.UUID]time.Time
 
 	// Work queue for async rendering (sessions + segments)
 	renderQueue *workQueue
@@ -155,7 +157,7 @@ func NewMinioStorage(endpoint, localEndpoint, publicEndpoint, accessKey, secretK
 		stopTimeout:     make(chan struct{}),
 		eventBus:        NewEventBus(),
 		sessionMachines: make(map[uuid.UUID]*stateless.StateMachine),
-		deletedSessions: make(map[uuid.UUID]struct{}),
+		deletedSessions: make(map[uuid.UUID]time.Time),
 		renderQueue:     newWorkQueue(DefaultMaxRenderWorkers),
 	}, nil
 }
@@ -180,7 +182,7 @@ func NewMinioStorageWithClient(client MinioClient, endpoint, localEndpoint, publ
 		stopTimeout:     make(chan struct{}),
 		eventBus:        NewEventBus(),
 		sessionMachines: make(map[uuid.UUID]*stateless.StateMachine),
-		deletedSessions: make(map[uuid.UUID]struct{}),
+		deletedSessions: make(map[uuid.UUID]time.Time),
 		renderQueue:     newWorkQueue(DefaultMaxRenderWorkers),
 	}
 }
@@ -439,7 +441,10 @@ func (m *Minio) onSessionTransition(ctx context.Context, recorderID, sessionID u
 
 	// If the session was deleted while a render was in-flight, the stale SM
 	// reference can still fire. Bail out to avoid resurrecting the session.
+	// Clean up the tombstone — the SM reference is stale and won't fire again
+	// for any meaningful work.
 	if _, deleted := m.deletedSessions[sessionID]; deleted {
+		delete(m.deletedSessions, sessionID) // Clean up tombstone
 		m.dataLock.Unlock()
 		log.Warn().
 			Stringer("session-id", sessionID).
@@ -464,6 +469,21 @@ func (m *Minio) onSessionTransition(ctx context.Context, recorderID, sessionID u
 			RecorderID: recorderID,
 			Segments:   make(map[uuid.UUID]Segment),
 		}
+	}
+
+	// Guard against stale SM references: if the session's current in-memory
+	// state doesn't match what the FSM thinks the source state is, the SM was
+	// replaced (e.g., by SafeChunks resuming a session to RECORDING). Reject
+	// the transition to avoid overwriting the new state.
+	if ok && session.State != source {
+		m.dataLock.Unlock()
+		log.Warn().
+			Stringer("session-id", sessionID).
+			Str("trigger", string(trigger)).
+			Str("expected-source", source.String()).
+			Str("actual-state", session.State.String()).
+			Msg("onSessionTransition: session state diverged from FSM source, ignoring stale transition")
+		return
 	}
 
 	previousState := session.State
@@ -598,10 +618,17 @@ func (m *Minio) RegisterOnAudioChunkCallback(cb OnAudioChunkCb) error {
 	return nil
 }
 
-// initSession creates a new session. Must be called while dataLock is held.
-// Returns deferred work (intermediate session closings) that must be executed
+// initSessionResult holds deferred work from initSession that must be executed
 // after dataLock is released.
-func (m *Minio) initSession(ctx context.Context, recorderID, sessionID uuid.UUID, timeCreated time.Time) []intermediateSessionClose {
+type initSessionResult struct {
+	closes []intermediateSessionClose
+	event  *SessionStateChangedEvent // non-nil if a new-session event should be emitted
+}
+
+// initSession creates a new session. Must be called while dataLock is held.
+// Returns deferred work (intermediate session closings and events) that must be
+// executed after dataLock is released.
+func (m *Minio) initSession(ctx context.Context, recorderID, sessionID uuid.UUID, timeCreated time.Time) initSessionResult {
 	log.Info().
 		Stringer("recorder-id", recorderID).
 		Stringer("session-id", sessionID).
@@ -638,7 +665,7 @@ func (m *Minio) initSession(ctx context.Context, recorderID, sessionID uuid.UUID
 			Stringer("recorder-id", recorderID).
 			Stringer("session-id", sessionID).
 			Msg("Cannot put session metadata")
-		return deferred
+		return initSessionResult{closes: deferred}
 	}
 
 	// Update in-memory map
@@ -647,18 +674,18 @@ func (m *Minio) initSession(ctx context.Context, recorderID, sessionID uuid.UUID
 	// Create state machine at RECORDING (already transitioned)
 	m.getOrCreateSessionMachine(recorderID, sessionID, SessionStateRecording)
 
-	// Notify about new recording session (emitted while dataLock is held by caller;
-	// listeners must not call back into storage methods that acquire dataLock)
-	m.eventBus.EmitSessionStateChanged(SessionStateChangedEvent{
+	// Return the event for the caller to emit after releasing dataLock.
+	// This prevents deadlocks when listeners call back into storage methods.
+	event := SessionStateChangedEvent{
 		RecorderID:    recorderID,
 		SessionID:     sessionID,
 		PreviousState: SessionStateUnknown,
 		NewState:      SessionStateRecording,
 		Trigger:       string(triggerStartRecording),
 		Session:       session,
-	})
+	}
 
-	return deferred
+	return initSessionResult{closes: deferred, event: &event}
 }
 
 func (m *Minio) initRecorder(ctx context.Context, recorderID uuid.UUID, recorderName string) {
@@ -692,7 +719,15 @@ func (m *Minio) DeleteSession(ctx context.Context, recorderID, sessionID uuid.UU
 	// Mark as deleted before removing the state machine so that any in-flight
 	// render callback (onSessionTransition) that fires after this point will
 	// detect the deletion and bail out instead of resurrecting the session.
-	m.deletedSessions[sessionID] = struct{}{}
+	m.deletedSessions[sessionID] = time.Now()
+
+	// Amortized cleanup: sweep tombstones older than 1 minute.
+	// Render jobs complete well within this window.
+	for id, ts := range m.deletedSessions {
+		if time.Since(ts) > time.Minute {
+			delete(m.deletedSessions, id)
+		}
+	}
 
 	m.removeSessionMachine(sessionID)
 
@@ -802,7 +837,7 @@ func (m *Minio) SafeChunks(ctx context.Context, recorderID, sessionID uuid.UUID,
 	var oldSessionID uuid.UUID
 	var lastChunk *minioChunk
 	var needsSessionSwitch bool
-	var deferredCloses []intermediateSessionClose
+	var deferredResult initSessionResult
 
 	m.dataLock.Lock()
 
@@ -864,7 +899,7 @@ func (m *Minio) SafeChunks(ctx context.Context, recorderID, sessionID uuid.UUID,
 					Msg("Resuming existing RECORDING session")
 			}
 		} else {
-			deferredCloses = m.initSession(ctx, recorderID, sessionID, timeCreated)
+			deferredResult = m.initSession(ctx, recorderID, sessionID, timeCreated)
 		}
 	}
 
@@ -877,7 +912,7 @@ func (m *Minio) SafeChunks(ctx context.Context, recorderID, sessionID uuid.UUID,
 		lastChunk = &lc
 		needsSessionSwitch = true
 
-		deferredCloses = m.initSession(ctx, recorderID, sessionID, timeCreated)
+		deferredResult = m.initSession(ctx, recorderID, sessionID, timeCreated)
 		chunk = m.chunks[recorderID]
 	}
 
@@ -911,30 +946,55 @@ func (m *Minio) SafeChunks(ctx context.Context, recorderID, sessionID uuid.UUID,
 
 	m.dataLock.Unlock()
 
+	// Emit the new-session event outside dataLock to prevent deadlocks
+	// when listeners call back into storage methods.
+	if deferredResult.event != nil {
+		m.eventBus.EmitSessionStateChanged(*deferredResult.event)
+	}
+
 	// Fire deferred FSM transitions for intermediate sessions that were in
 	// RECORDING state when a new session started. These transitions use the FSM
 	// (which acquires dataLock in its callback), so they must happen after
 	// dataLock is released.
-	for _, ic := range deferredCloses {
+	//
+	// When the session being switched away from (oldSessionID) also appears in
+	// the deferred closes, use its lastChunk for the render (it has buffered
+	// data and streaming pipelines). This avoids duplicate render submissions.
+	for _, ic := range deferredResult.closes {
 		if err := m.fireSessionTrigger(ctx, ic.sessionID, triggerCloseRecording); err != nil {
 			log.Warn().Err(err).
 				Stringer("session-id", ic.sessionID).
 				Msg("Cannot transition intermediate session to PROCESSING (may already be closed)")
 		}
-		// Submit render to work queue (non-blocking)
-		m.renderQueue.submitSessionRender(context.Background(), m, ic.recorderID, ic.sessionID, nil)
+		// If this is the session we're switching away from, use its chunk data
+		var chunk *minioChunk
+		if needsSessionSwitch && ic.sessionID == oldSessionID {
+			chunk = lastChunk
+		}
+		m.renderQueue.submitSessionRender(context.Background(), m, ic.recorderID, ic.sessionID, chunk)
 	}
 
-	// Handle session switch outside dataLock — fireSessionTrigger's callback acquires it
+	// Handle session switch outside dataLock — fireSessionTrigger's callback acquires it.
+	// Skip if the old session was already handled by closeIntermediateSessions above,
+	// to avoid double-closing and duplicate render submissions.
 	if needsSessionSwitch {
-		if err := m.fireSessionTrigger(ctx, oldSessionID, triggerCloseRecording); err != nil {
-			log.Warn().Err(err).
-				Stringer("session-id", oldSessionID).
-				Msg("Cannot transition old session to PROCESSING (may already be closed)")
+		alreadyClosed := false
+		for _, ic := range deferredResult.closes {
+			if ic.sessionID == oldSessionID {
+				alreadyClosed = true
+				break
+			}
 		}
+		if !alreadyClosed {
+			if err := m.fireSessionTrigger(ctx, oldSessionID, triggerCloseRecording); err != nil {
+				log.Warn().Err(err).
+					Stringer("session-id", oldSessionID).
+					Msg("Cannot transition old session to PROCESSING (may already be closed)")
+			}
 
-		// Submit render to work queue (non-blocking)
-		m.renderQueue.submitSessionRender(context.Background(), m, recorderID, oldSessionID, lastChunk)
+			// Submit render to work queue (non-blocking)
+			m.renderQueue.submitSessionRender(context.Background(), m, recorderID, oldSessionID, lastChunk)
+		}
 	}
 
 	return nil

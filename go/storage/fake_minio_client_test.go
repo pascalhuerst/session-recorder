@@ -46,7 +46,16 @@ type FakeMinioClient struct {
 	uploads      map[string]*fakeMultipartUpload // uploadID -> upload
 	nextUploadID int
 	lastObjects  []*fakeObject // tracks objects returned by GetObject for close assertions
+
+	// Error injection: if non-nil, the corresponding method returns this error.
+	putObjectErr  error
+	getObjectErr  error
+	statObjectErr error
 }
+
+func (f *FakeMinioClient) SetPutObjectError(err error)  { f.mu.Lock(); defer f.mu.Unlock(); f.putObjectErr = err }
+func (f *FakeMinioClient) SetGetObjectError(err error)   { f.mu.Lock(); defer f.mu.Unlock(); f.getObjectErr = err }
+func (f *FakeMinioClient) SetStatObjectError(err error)  { f.mu.Lock(); defer f.mu.Unlock(); f.statObjectErr = err }
 
 func NewFakeMinioClient() *FakeMinioClient {
 	return &FakeMinioClient{
@@ -132,6 +141,9 @@ func (f *FakeMinioClient) ListObjects(_ context.Context, bucketName string, opts
 func (f *FakeMinioClient) GetObject(_ context.Context, bucketName, objectName string, _ minio.GetObjectOptions) (ObjectHandle, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if f.getObjectErr != nil {
+		return nil, f.getObjectErr
+	}
 	data, ok := f.objects[f.key(bucketName, objectName)]
 	if !ok {
 		return nil, fmt.Errorf("object %q not found in bucket %q", objectName, bucketName)
@@ -145,6 +157,13 @@ func (f *FakeMinioClient) GetObject(_ context.Context, bucketName, objectName st
 }
 
 func (f *FakeMinioClient) PutObject(_ context.Context, bucketName, objectName string, reader io.Reader, _ int64, _ minio.PutObjectOptions) (minio.UploadInfo, error) {
+	f.mu.Lock()
+	if f.putObjectErr != nil {
+		err := f.putObjectErr
+		f.mu.Unlock()
+		return minio.UploadInfo{}, err
+	}
+	f.mu.Unlock()
 	data, err := io.ReadAll(reader)
 	if err != nil {
 		return minio.UploadInfo{}, fmt.Errorf("cannot read data: %w", err)
@@ -181,6 +200,9 @@ func (f *FakeMinioClient) RemoveObject(_ context.Context, bucketName, objectName
 func (f *FakeMinioClient) StatObject(_ context.Context, bucketName, objectName string, _ minio.StatObjectOptions) (minio.ObjectInfo, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if f.statObjectErr != nil {
+		return minio.ObjectInfo{}, f.statObjectErr
+	}
 	data, ok := f.objects[f.key(bucketName, objectName)]
 	if !ok {
 		return minio.ObjectInfo{}, fmt.Errorf("object %q not found in bucket %q", objectName, bucketName)

@@ -74,9 +74,11 @@ export const reconnectingStream = (
     const jitter = baseDelay * 0.2 * Math.random();
     const delay = baseDelay + jitter;
 
-    console.log(
-      `[${name}] Stream ended, reconnecting in ${Math.round(delay)}ms (attempt ${consecutiveFailures})`
-    );
+    if (import.meta.env.DEV) {
+      console.log(
+        `[${name}] Stream ended, reconnecting in ${Math.round(delay)}ms (attempt ${consecutiveFailures})`
+      );
+    }
 
     onReconnecting?.(consecutiveFailures);
 
@@ -98,7 +100,7 @@ export const reconnectingStream = (
       if (!receivedMessage) {
         receivedMessage = true;
         if (consecutiveFailures > 0) {
-          console.log(`[${name}] Reconnected successfully`);
+          if (import.meta.env.DEV) console.log(`[${name}] Reconnected successfully`);
           consecutiveFailures = 0;
           onReconnected?.();
         }

@@ -163,7 +163,7 @@ export const streamSessions = (args: {
   onError?: (error: Error) => void;
   onEnd?: () => void;
 }) => {
-  console.log('Starting streamSessions for recorder:', args.request.recorderID);
+  if (import.meta.env.DEV) console.log('Starting streamSessions for recorder:', args.request.recorderID);
 
   const abortController = new AbortController();
   const call = sessionSourceClient.streamSessions(args.request, {
@@ -177,10 +177,12 @@ export const streamSessions = (args: {
 
       for await (const response of call.responses) {
         sessionCount++;
-        console.log(
-          `StreamSessions received session #${sessionCount}:`,
-          response
-        );
+        if (import.meta.env.DEV) {
+          console.log(
+            `StreamSessions received session #${sessionCount}:`,
+            response
+          );
+        }
         switch (response.info.oneofKind) {
           case 'updated': {
             if ('updated' in response.info) {
@@ -215,9 +217,11 @@ export const streamSessions = (args: {
         }
       }
 
-      console.log(
-        `StreamSessions ended. Total sessions received: ${sessionCount}`
-      );
+      if (import.meta.env.DEV) {
+        console.log(
+          `StreamSessions ended. Total sessions received: ${sessionCount}`
+        );
+      }
 
       if (args.onEnd) {
         args.onEnd();

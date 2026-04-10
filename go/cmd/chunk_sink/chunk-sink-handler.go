@@ -15,6 +15,10 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// maxChunkSamples caps the number of samples accepted per gRPC chunk.
+// 48 kHz * 2 ch * 10 s = 960 000 samples — well above any legitimate payload.
+const maxChunkSamples = 960_000
+
 type ChunkSinkHandler struct {
 	recorderBroadcaster *broadcast.RecorderBroadcaster
 	sessionStorage      storage.Storage
@@ -142,6 +146,10 @@ func (h *ChunkSinkHandler) setChunks(ctx context.Context, chunks *cspb.Chunks) e
 	state.lastSession = sessionID
 	state.recording = true
 	h.lock.Unlock()
+
+	if len(chunks.Data) > maxChunkSamples {
+		return fmt.Errorf("chunk too large: %d samples exceeds limit of %d", len(chunks.Data), maxChunkSamples)
+	}
 
 	// We have s16 samples, but stored in u32
 	samples := make([]int16, len(chunks.Data))

@@ -3138,13 +3138,6 @@ func TestRenderSegmentSemaphoreLimits(t *testing.T) {
 		}
 	}
 
-	// Make RenderSegment slow to observe concurrency
-	var concurrentRenders int32
-	var maxObservedConcurrent int32
-	var renderMu sync.Mutex
-
-	origRender := store.RenderSegment
-	_ = origRender
 	// We can't easily replace the method, but we can verify via the semaphore behavior
 	// that all 4 renders eventually complete.
 
@@ -3185,9 +3178,6 @@ func TestRenderSegmentSemaphoreLimits(t *testing.T) {
 		t.Errorf("Expected 4 RenderSegment calls, got %d", renderCalls)
 	}
 
-	_ = concurrentRenders
-	_ = maxObservedConcurrent
-	_ = renderMu
 }
 
 // TestRenderSegmentInvalidUUID verifies that renderSegment rejects bad IDs.

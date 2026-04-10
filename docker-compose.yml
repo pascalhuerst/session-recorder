@@ -13,7 +13,7 @@ services:
 
   # MinIO S3-compatible storage
   minio:
-    image: quay.io/minio/minio:latest
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
     command: server /data --console-address ":9090"
     # No host port exposure — MinIO is only reachable within the Docker network.
     # Clients access files via presigned URLs served through the nginx proxy.

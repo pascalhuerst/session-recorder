@@ -3,7 +3,7 @@ version: "3.3"
 services:
   # MinIO S3-compatible storage
   minio:
-    image: quay.io/minio/minio:latest
+    image: quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z
     command: server /data --console-address ":9090"
     ports:
       - "9000:9000" # API (internal)

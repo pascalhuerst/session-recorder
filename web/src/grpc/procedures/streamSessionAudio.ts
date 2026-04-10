@@ -13,7 +13,7 @@ export const streamSessionAudio = (args: {
   onError?: (error: Error) => void;
   onEnd?: () => void;
 }) => {
-  console.log('Starting streamSessionAudio for session:', args.sessionID);
+  if (import.meta.env.DEV) console.log('Starting streamSessionAudio for session:', args.sessionID);
 
   const abortController = new AbortController();
   const request = { sessionID: args.sessionID };
@@ -51,9 +51,11 @@ export const streamSessionAudio = (args: {
         args.onChunk(chunk);
       }
 
-      console.log(
-        `StreamSessionAudio ended. Total chunks received: ${chunkCount}`
-      );
+      if (import.meta.env.DEV) {
+        console.log(
+          `StreamSessionAudio ended. Total chunks received: ${chunkCount}`
+        );
+      }
 
       if (args.onEnd) {
         args.onEnd();

@@ -31,10 +31,11 @@ RUN git clone https://github.com/bbc/audiowaveform.git && \
 # --- Stage 2: Test runner with Go + audio tools ---
 FROM golang:1.24-alpine
 
-# Runtime dependencies for sox and audiowaveform
+# Runtime dependencies for sox and audiowaveform, plus gcc/musl-dev for CGO (needed by -race)
 RUN apk --no-cache add ca-certificates sox \
     libmad libid3tag libsndfile gd libgd libpng zlib \
-    boost1.84-filesystem boost1.84-program_options
+    boost1.84-filesystem boost1.84-program_options \
+    gcc musl-dev
 
 # Copy audiowaveform binary
 COPY --from=audiowaveform-builder /usr/local/bin/audiowaveform /usr/local/bin/audiowaveform
@@ -52,5 +53,7 @@ COPY go/ .
 
 # Update dependencies
 RUN go mod tidy && go mod download
+
+ENV CGO_ENABLED=1
 
 CMD ["go", "test", "-v", "-race", "-count=1", "./..."]

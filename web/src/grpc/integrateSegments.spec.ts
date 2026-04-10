@@ -28,6 +28,8 @@ vi.mock('../services/Toaster/ToastService', () => ({
   },
 }));
 
+import type { PeaksContext } from '@session-recorder/session-waveform';
+import type { Session } from '../types';
 import { integrateSegments } from './integrateSegments';
 import { createSegment } from './procedures/createSegment';
 import { deleteSegment } from './procedures/deleteSegment';
@@ -35,19 +37,19 @@ import { renderSegment } from './procedures/renderSegment';
 import { toastService } from '../services/Toaster/ToastService';
 
 type EventEmitter = {
-  on: (event: string, cb: (...args: any[]) => void) => () => void;
-  emit: (event: string, ...args: any[]) => void;
-  events: Record<string, ((...args: any[]) => void)[]>;
+  on: (event: string, cb: (...args: unknown[]) => void) => () => void;
+  emit: (event: string, ...args: unknown[]) => void;
+  events: Record<string, ((...args: unknown[]) => void)[]>;
 };
 
 function createMockCtx() {
   const eventEmitter = createNanoEvents() as unknown as EventEmitter;
   const commandEmitter = createNanoEvents() as unknown as EventEmitter;
-  return { eventEmitter, commandEmitter } as any;
+  return { eventEmitter, commandEmitter } as unknown as PeaksContext;
 }
 
 function createMockSession() {
-  return { id: 'session-1' } as any;
+  return { id: 'session-1' } as unknown as Session;
 }
 
 describe('integrateSegments', () => {

@@ -302,15 +302,8 @@ describe('reconnectingStream', () => {
   });
 
   it('reconnect() stops current stream and reconnects immediately', () => {
-    let handlers: {
-      onEnd: () => void;
-      onError: (error: Error) => void;
-      onMessage: () => void;
-    } | null = null;
-
     const innerStop = vi.fn();
-    const connect = vi.fn((h) => {
-      handlers = h;
+    const connect = vi.fn(() => {
       return innerStop;
     });
 

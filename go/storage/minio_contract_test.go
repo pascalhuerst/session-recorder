@@ -181,6 +181,9 @@ func TestContractSafeChunks_FiresAudioCallback(t *testing.T) {
 }
 
 func TestContractSafeChunks_BuffersInMemoryThenStreams(t *testing.T) {
+	if !audioToolsAvailable() {
+		t.Skip("sox and/or audiowaveform not available, skipping streaming test")
+	}
 	m, _ := newTestStorage(t)
 	ctx := context.Background()
 

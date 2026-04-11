@@ -3,6 +3,7 @@ package storage
 import (
 	"bytes"
 	"context"
+	"os/exec"
 	"sync"
 	"testing"
 	"time"
@@ -154,6 +155,9 @@ func TestBug_SetSegmentErrorBypassesValidation(t *testing.T) {
 // =============================================================================
 
 func TestBug_SegmentRenderingEventHardcodesPreviousState(t *testing.T) {
+	if _, err := exec.LookPath("/usr/bin/sox"); err != nil {
+		t.Skip("sox not available, skipping render event test")
+	}
 	m, fake := newTestStorage(t)
 	ctx := context.Background()
 

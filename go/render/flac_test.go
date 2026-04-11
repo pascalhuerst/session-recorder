@@ -25,6 +25,9 @@ import (
  */
 
 func TestFlac_ValidInput(t *testing.T) {
+	if !soxAvailable() {
+		t.Skip("sox not available, skipping test")
+	}
 	raw := bytes.NewReader(rawTestAudio)
 
 	got, err := Flac(raw)
@@ -51,6 +54,9 @@ func TestFlac_ValidInput(t *testing.T) {
 }
 
 func TestFlac_EmptyInput(t *testing.T) {
+	if !soxAvailable() {
+		t.Skip("sox not available, skipping test")
+	}
 	raw := bytes.NewReader([]byte{})
 
 	got, err := Flac(raw)
@@ -76,6 +82,9 @@ func TestFlac_EmptyInput(t *testing.T) {
 // TestFlac_DeterministicOutput verifies the FLAC encoder produces
 // identical output for the same input across two runs.
 func TestFlac_DeterministicOutput(t *testing.T) {
+	if !soxAvailable() {
+		t.Skip("sox not available, skipping test")
+	}
 	first, err := Flac(bytes.NewReader(rawTestAudio))
 	if err != nil {
 		t.Fatalf("Flac() first run error = %v", err)
@@ -92,6 +101,9 @@ func TestFlac_DeterministicOutput(t *testing.T) {
 }
 
 func TestFlac_SmallInput(t *testing.T) {
+	if !soxAvailable() {
+		t.Skip("sox not available, skipping test")
+	}
 	// Create minimal stereo 16-bit samples (32 samples = 16 per channel)
 	samples := make([]byte, 64) // 32 samples * 2 bytes
 	for i := range samples {

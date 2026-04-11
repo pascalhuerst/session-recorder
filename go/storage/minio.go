@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"os/exec"
 	"strings"
 	"sync"
 	"time"
@@ -1045,6 +1046,18 @@ func (m *Minio) isSessionClosed(ctx context.Context, recorderID, sessionID uuid.
 // to S3 via PutObject. Returns a streamingSession whose Write method fans
 // data to all pipelines.
 func (m *Minio) startStreamingSession(_ context.Context, recorderID, sessionID uuid.UUID) *streamingSession {
+	// Streaming requires sox and audiowaveform for encoding. If they're not
+	// available (e.g., CI without Docker), fall back to the non-streaming path
+	// which renders from data.raw after the session closes.
+	if _, err := exec.LookPath("/usr/bin/sox"); err != nil {
+		log.Warn().Msg("sox not found, disabling streaming encoders")
+		return nil
+	}
+	if _, err := exec.LookPath("audiowaveform"); err != nil {
+		log.Warn().Msg("audiowaveform not found, disabling streaming encoders")
+		return nil
+	}
+
 	// Use the shutdown context for streaming uploads — they must survive for the
 	// entire recording duration (not just the initial SafeChunks request), but
 	// should be cancelled when the server shuts down to avoid orphaned goroutines.

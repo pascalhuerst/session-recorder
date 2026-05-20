@@ -87,7 +87,6 @@ public:
 
     void start();
     void stop();
-    void cutSession();
 
 private:
     std::string m_recorderID;

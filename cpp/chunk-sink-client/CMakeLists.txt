@@ -6,22 +6,22 @@ include(FindPkgConfig)
 include(CMakeFindDependencyMacro)
 
 function(addLib name)
-    pkg_check_modules(${name} REQUIRED ${name})
-    include_directories(${${name}_INCLUDE_DIRS})
-    link_directories(${${name}_LIBRARY_DIRS})
+  pkg_check_modules(${name} REQUIRED ${name})
+  include_directories(${${name}_INCLUDE_DIRS})
+  link_directories(${${name}_LIBRARY_DIRS})
 endfunction(addLib)
 
 function(linkLib name target)
-    pkg_check_modules(${name} REQUIRED ${name})
-    target_link_libraries(${target} ${${name}_LIBRARIES})
+  pkg_check_modules(${name} REQUIRED ${name})
+  target_link_libraries(${target} ${${name}_LIBRARIES})
 endfunction(linkLib)
 
 file(GLOB GRPC_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/../../protocols/cpp/*.cc")
 
 set(LIBS alsa avahi-client avahi-core)
-set(SOURCES
+set(SOURCES 
   ${GRPC_SOURCES}
-
+  
   chunk-sink-client.cpp
   AlsaAudioInput.cpp
   publishZeroConf/publishAvahi.cpp
@@ -33,12 +33,12 @@ set(SOURCES
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++20 -Wno-unused-parameter -Wall -O2")
 
 foreach(lib ${LIBS})
-    addLib(${lib})
+  addLib(${lib})
 endforeach(lib)
 
 find_package(gRPC REQUIRED)
 find_package(Threads REQUIRED)
-find_package(Boost 1.74 COMPONENTS program_options REQUIRED)
+find_package(Boost 1.81 COMPONENTS program_options REQUIRED)
 
 include_directories("${CMAKE_CURRENT_BINARY_DIR}")
 include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../../protocols/cpp")
@@ -46,7 +46,7 @@ include_directories("${CMAKE_CURRENT_SOURCE_DIR}/../../protocols/cpp")
 add_executable(${PROJECT_NAME} ${SOURCES})
 
 foreach(lib ${LIBS})
-    linkLib(${lib} ${PROJECT_NAME})
+  linkLib(${lib} ${PROJECT_NAME})
 endforeach(lib)
 
 message(STATUS "gRPC libraries: ${gRPC_LIBRARIES}")

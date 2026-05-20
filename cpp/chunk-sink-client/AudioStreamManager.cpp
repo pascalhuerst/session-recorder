@@ -66,84 +66,67 @@ AudioStreamManager::~AudioStreamManager()
 
 void sendChunks(ServiceTracker::ServiceMap &services, chunksink::Chunks &chunks)
 {
-
-    auto sendFunc = [&](const std::string &url) -> bool {
-        auto channel = grpc::CreateChannel(url, grpc::InsecureChannelCredentials());
-        auto stub_ = chunksink::ChunkSink::NewStub(channel);
-
-        grpc::ClientContext context;
-        common::Respone response;
-
-        grpc::Status status = stub_->SetChunks(&context, chunks, &response);
-
-        if (!status.ok()) {
-            std::cout << "[ERROR] SetChunks: " << url << std::endl;
-
-            return false;
-        }
-
-        if (response.success() != true) {
-            std::cout << "[ERROR] SetChunks: " << url << " -- " <<  response.errormessage() << std::endl;
-
-            return false;
-        }
-
-        std::cout << "[OK    ] SetChunks: " << url << std::endl;
-
-        return true;
-    };
-
-    // For display hack
-    sendFunc("127.0.0.1:50051");
-
     for (const auto &service : services) {
         for (const auto &se : service.second) {
             std::string url = se.second.address + ":" + std::to_string(se.second.port);
 
-            if (sendFunc(url)) {
-               return;
+            auto channel = grpc::CreateChannel(url, grpc::InsecureChannelCredentials());
+            auto stub_ = chunksink::ChunkSink::NewStub(channel);
+
+            grpc::ClientContext context;
+            common::Respone response;
+
+            grpc::Status status = stub_->SetChunks(&context, chunks, &response);
+
+            if (!status.ok()) {
+                std::cout << "[ERROR] SetChunks: " << url << std::endl;
+
+                continue;
             }
+
+            if (response.success() != true) {
+                std::cout << "[ERROR] SetChunks: " << url << " -- " <<  response.errormessage() << std::endl;
+        
+                continue;
+            }
+
+            std::cout << "[OK    ] SetChunks: " << url << std::endl;
+
+            return;
         }
     }
 }
 
 void sendDetectorStatus(ServiceTracker::ServiceMap &services, common::RecorderStatus &recorderStatus)
 {
-    auto sendFunc = [&](const std::string &url) -> bool {
-        auto channel = grpc::CreateChannel(url, grpc::InsecureChannelCredentials());
-        auto stub_ = chunksink::ChunkSink::NewStub(channel);
-
-        grpc::ClientContext context;
-        common::Respone response;
-
-        grpc::Status status = stub_->SetRecorderStatus(&context, recorderStatus, &response);
-
-        if (!status.ok()) {
-            std::cout << "[ERROR] DetectorStatus: " << url << std::endl;
-
-            return false;
-        }
-
-        if (response.success() != true) {
-            std::cout << "[ERROR] DetectorStatus: " << url << "  - " << response.errormessage() << std::endl;
-
-            return false;
-        }
-
-        std::cout << "[OK    ] DetectorStatus: " << url << std::endl;
-
-        return true;
-    };
-
-    // For display hack
-    sendFunc("127.0.0.1:50051");
-
-
     for (const auto &service : services) {
         for (const auto &se : service.second) {
-            if (sendFunc(se.second.address + ":" + std::to_string(se.second.port))) {
-                return;
+            //TODO: This is broken with IPv6
+            std::string url = se.second.address + ":" + std::to_string(se.second.port);
+
+            auto channel = grpc::CreateChannel(url, grpc::InsecureChannelCredentials());
+            auto stub_ = chunksink::ChunkSink::NewStub(channel);
+
+            grpc::ClientContext context;
+            common::Respone response;
+    
+            grpc::Status status = stub_->SetRecorderStatus(&context, recorderStatus, &response);
+
+            if (!status.ok()) {
+                std::cout << "[ERROR] DetectorStatus: " << url << std::endl;
+
+                continue;
             }
+
+            if (response.success() != true) {
+                std::cout << "[ERROR] DetectorStatus: " << url << "  - " << response.errormessage() << std::endl;
+
+                continue;
+            }
+
+            std::cout << "[OK    ] DetectorStatus: " << url << std::endl;
+
+            return;
         }
     }
 }
@@ -192,11 +175,6 @@ void AudioStreamManager::start()
             throw std::invalid_argument(strOptAudioRate + "must be set!");
         }
 
-        //std::string display_address;
-        //if (m_vmCombined.count(strOptDisplayUrl)) {
-        //    display_address = m_vmCombined[strOptDisplayUrl].as<std::string>();
-        //}
-
         //TODO; This crashed when destroyed
         m_serviceTracker.reset(new ServiceTracker("_session-recorder-chunksink._tcp"));
 
@@ -238,12 +216,12 @@ void AudioStreamManager::start()
                     // Convert samples to normalized floating point values (-1.0 to 1.0)
                     double leftNorm = static_cast<double>(buffer[i].left) / 32768.0;
                     double rightNorm = static_cast<double>(buffer[i].right) / 32768.0;
-
+                    
                     // Calculate mono sum using normalized values
                     double monoSum = (leftNorm + rightNorm) / 2.0;
                     chunkSum += (monoSum * monoSum);
 
-                    if (buffer[i].left == std::numeric_limits<Sample>::max() ||
+                    if (buffer[i].left == std::numeric_limits<Sample>::max() || 
                         buffer[i].right == std::numeric_limits<Sample>::max() ||
                         buffer[i].left == std::numeric_limits<Sample>::min() ||
                         buffer[i].right == std::numeric_limits<Sample>::min()) {
@@ -304,7 +282,7 @@ void AudioStreamManager::start()
             while (!m_terminateRequest) {
                 size_t i=0;
                 while (i<m_streamStorageChunkSize && !m_terminateRequest) {
-                    auto ret = m_storageBuffer->wait_dequeue_timed(buffer[i], std::chrono::milliseconds(500));
+                    auto ret = m_storageBuffer->wait_dequeue_timed(buffer[i], std::chrono::milliseconds(500));            
                     if (m_terminateRequest) return;
                     if (!ret)
                         continue;
@@ -326,7 +304,7 @@ void AudioStreamManager::start()
                     chunks.set_sessionid(state.sessionID);
                     chunks.set_chunkcount(state.totalChunks);
                     chunks.set_allocated_timecreated(new google::protobuf::Timestamp(state.startTime));
-
+                    
                     auto rawData = buffer.get();
                     for (size_t i=0; i<m_streamStorageChunkSize; i++) {
                         chunks.add_data(static_cast<uint32_t>(rawData[i].left));
@@ -347,7 +325,7 @@ void AudioStreamManager::start()
                 }
             }
         }));
-
+ 
         m_grpcStreamWorker.reset(new std::thread([&] {
             while (!m_terminateRequest) {
 
@@ -384,7 +362,7 @@ void AudioStreamManager::start()
                             std::cout << std::endl;
                         }
                     }
-                }
+                }    
             }
         }));
     }
@@ -428,9 +406,4 @@ bool AudioStreamManager::isValidPath(const std::string &path)
         close(fd);
 
     return ret;
-}
-
-void AudioStreamManager::cutSession()
-{
-    m_cutSession = true;
 }

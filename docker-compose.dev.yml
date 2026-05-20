@@ -23,22 +23,6 @@ services:
       retries: 3
     restart: unless-stopped
 
-  # gRPC-Web Proxy (Envoy)
-  grpc-proxy:
-    image: envoyproxy/envoy:v1.31-latest
-    container_name: session-recorder-envoy-dev
-    ports:
-      - "8081:8080" # gRPC-Web proxy (mapped to 8081 to avoid conflicts)
-      - "9901:9901" # Admin interface
-    volumes:
-      - ./grpc-web-proxy/envoy.dev.yaml:/etc/envoy/envoy.yaml:ro
-    command: /usr/local/bin/envoy -c /etc/envoy/envoy.yaml -l debug
-    networks:
-      - session-recorder-net
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    restart: unless-stopped
-
 networks:
   session-recorder-net:
     driver: bridge

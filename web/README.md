@@ -18,21 +18,24 @@ npx nx storybook --project session-waveform
 
 To run application in dev mode, go to `/web` directory:
 
-##### Run `npm install`
+##### Run `pnpm install`
 
-##### Start proxy for grpc web
+##### Make sure the Go backend is running
 
-Run envoy in docker container: (You might have to adapt the config)
+The chunk_sink binary serves gRPC-Web in-process (default port 8081) — no separate
+proxy container needed. From the repo root:
 
 ```
-cd grpc-web-proxy
-docker compose up envoy
+cd go && source sourceme.sh && go run ./cmd/chunk_sink
 ```
 
 ##### Setup .env
 
-- create `.env` using `.env.example` as a reference
+`.env.development` is already wired to `http://localhost:8081`. Use `.env.example`
+as a reference if you need to override.
 
 ##### Start the app
 
-- run npm `npm start`
+```
+pnpm start
+```

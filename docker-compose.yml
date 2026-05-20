@@ -31,15 +31,16 @@ services:
       timeout: 10s
       retries: 3
 
-  # Go Backend Services
+  # Go Backend Services (also serves gRPC-Web on 8081)
   go-backend:
     build:
       context: .
       dockerfile: ./go/Dockerfile
     hostname: session-recorder-docker
     ports:
-      - "8779:8779" # ChunkSink service
-      - "8780:8780" # SessionSource service
+      - "8779:8779" # ChunkSink gRPC
+      - "8780:8780" # SessionSource gRPC
+      - "8081:8081" # SessionSource gRPC-Web
     environment:
       - S3_ENDPOINT=minio:9000
       - S3_LOCAL_ENDPOINT=localhost:3000/minio
@@ -59,19 +60,6 @@ services:
       - protocol-data:/protocols:ro
     restart: unless-stopped
 
-  # gRPC-Web Proxy (Envoy)
-  grpc-proxy:
-    build:
-      context: ./grpc-web-proxy
-      dockerfile: Dockerfile
-    depends_on:
-      - go-backend
-    networks:
-      - session-recorder-net
-    volumes:
-      - ./grpc-web-proxy/envoy.yaml:/etc/envoy/envoy.yaml:ro
-    restart: unless-stopped
-
   # Web Interface
   web:
     build:
@@ -83,7 +71,7 @@ services:
       - "3000:80" # Web interface
     depends_on:
       - protocols
-      - grpc-proxy
+      - go-backend
       - minio
     networks:
       - session-recorder-net

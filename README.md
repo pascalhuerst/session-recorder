@@ -13,8 +13,8 @@ pnpm run dev
 ```
 
 This starts everything with hot reload:
-- Docker services (MinIO + Envoy)
-- Go backend with [air](https://github.com/air-verse/air) (auto-restarts on `.go` changes)
+- Docker services (MinIO)
+- Go backend with [air](https://github.com/air-verse/air) (auto-restarts on `.go` changes; serves gRPC-Web in-process on 8081)
 - Vite dev server (HMR)
 
 **Stop:** `Ctrl+C`, then `pnpm run dev:stop`
@@ -30,7 +30,7 @@ pnpm run dev:web       # Vite only
 |---------|-----|
 | Web Interface | http://localhost:4200 |
 | MinIO Console | http://localhost:9091 (admin/password123) |
-| Envoy gRPC-Web | http://localhost:8081 |
+| SessionSource gRPC-Web | http://localhost:8081 |
 
 ---
 
@@ -52,7 +52,7 @@ pnpm run dev:web       # Vite only
 |---------|-----|
 | Web Interface | http://localhost:3000 |
 | MinIO Console | http://localhost:9090 (admin/password123) |
-| gRPC-Web Proxy | http://localhost:8080 |
+| SessionSource gRPC-Web | http://localhost:8081 |
 
 ---
 
@@ -146,6 +146,7 @@ Set `FILE_SHARE_METHOD=s3_copy` and configure:
 |------|---------|---------|
 | `-chunk-sink-port` | `CHUNK_SINK_PORT` | 8779 |
 | `-session-source-port` | `SESSION_SOURCE_PORT` | 8780 |
+| `-grpcweb-port` | `GRPCWEB_PORT` | 8081 |
 | `-s3-endpoint` | `S3_ENDPOINT` | localhost:9000 |
 | `-s3-local-endpoint` | `S3_LOCAL_ENDPOINT` | (s3-endpoint) |
 | `-s3-public-endpoint` | `S3_PUBLIC_ENDPOINT` | (s3-local-endpoint) |
@@ -155,18 +156,17 @@ Set `FILE_SHARE_METHOD=s3_copy` and configure:
 ### Architecture
 
 ```
-┌─────────────────┐     gRPC      ┌─────────────────┐
-│  C++ Client     │ ────────────► │  Go Backend     │
-│  (ALSA capture) │               │  (ChunkSink)    │
-└─────────────────┘               └────────┬────────┘
-                                           │
-                                           ▼
-┌─────────────────┐    gRPC-Web   ┌─────────────────┐
-│  Vue.js Web UI  │ ◄───────────► │  Envoy Proxy    │
-└─────────────────┘               └─────────────────┘
-                                           │
-                                           ▼
-                                  ┌─────────────────┐
-                                  │  MinIO (S3)     │
-                                  └─────────────────┘
+┌─────────────────┐     gRPC       ┌──────────────────────────┐
+│  C++ Client     │ ─────────────► │  Go Backend              │
+│  (ALSA capture) │                │  ChunkSink (gRPC :8779)  │
+└─────────────────┘                │  SessionSource (:8780)   │
+                                   │  SessionSource gRPC-Web  │
+┌─────────────────┐    gRPC-Web    │  (HTTP :8081, embedded)  │
+│  Vue.js Web UI  │ ◄────────────► │                          │
+└─────────────────┘                └────────────┬─────────────┘
+                                                │
+                                                ▼
+                                       ┌─────────────────┐
+                                       │  MinIO (S3)     │
+                                       └─────────────────┘
 ```

@@ -1,12 +1,12 @@
 use crate::audio::channels::CaptureProducer;
-use crate::audio::generic_buffer::AudioBuffer;
-use crate::audio::utils::deinterleave_and_convert_to_float;
 use anyhow::Result;
 use core_affinity;
 use log::{error, info, warn};
 use ringbuf::traits::*;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
+
+const I16_INV_SCALE: f32 = 1.0 / 32768.0;
 
 pub fn start_callback_thread(
     num_input_channels: usize,
@@ -18,7 +18,7 @@ pub fn start_callback_thread(
     //TODO:
     let dedicated_core_id = 1;
 
-    let mut buffer = vec![0; num_input_channels * period_size];
+    let mut buffer = vec![0i16; num_input_channels * period_size];
     let audio_thread = std::thread::spawn(move || {
         if !core_affinity::set_for_current(core_affinity::CoreId {
             id: dedicated_core_id,
@@ -32,7 +32,9 @@ pub fn start_callback_thread(
         }
 
         let mut callback_thread = move || -> Result<()> {
-            let mut input_buffer = AudioBuffer::new(num_input_channels, period_size);
+            // Per-period f32 scratch buffer, kept interleaved (LRLRLR…) to
+            // match the wire format the Go ChunkSink server expects.
+            let mut float_buffer = vec![0.0f32; num_input_channels * period_size];
 
             {
                 let capture_period_size = capture_pcm.hw_params_current()?.get_period_size()?;
@@ -52,22 +54,21 @@ pub fn start_callback_thread(
                 }
 
                 match capture_pcm.wait(Some(100)) {
-                    Ok(true) => match capture_pcm.io_i32()?.readi(&mut buffer) {
+                    Ok(true) => match capture_pcm.io_i16()?.readi(&mut buffer) {
                         Ok(frames) if frames > 0 => {
                             let samples_read = frames * num_input_channels;
-                            let interleaved_input = &buffer[..samples_read];
-                            let noninterleaved_input =
-                                &mut input_buffer.get_all_mut()[..samples_read];
 
-                            deinterleave_and_convert_to_float(
-                                interleaved_input,
-                                noninterleaved_input,
-                                num_input_channels,
-                            );
+                            // Convert in-place, preserving interleaved layout.
+                            for (dst, &src) in float_buffer[..samples_read]
+                                .iter_mut()
+                                .zip(buffer[..samples_read].iter())
+                            {
+                                *dst = src as f32 * I16_INV_SCALE;
+                            }
 
                             let samples_pushed = capture
                                 .producer
-                                .push_slice(&input_buffer.get_all()[..samples_read]);
+                                .push_slice(&float_buffer[..samples_read]);
 
                             if samples_pushed != samples_read {
                                 warn!(

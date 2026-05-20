@@ -42,21 +42,14 @@ impl ServiceInfo {
         self.primary_address()
             .map(|addr| format!("http://{}:{}", addr, self.port))
     }
-
-    /// Check if this service has been seen recently
-    pub fn is_active(&self, timeout: Duration) -> bool {
-        self.last_seen.elapsed() < timeout
-    }
 }
 
-/// Events that can occur during service discovery
+/// Events that can occur during service discovery. Removal is driven solely
+/// by mdns-sd's own ServiceRemoved event — there is no local timeout.
 #[derive(Debug, Clone)]
 pub enum ServiceEvent {
-    /// A new service was discovered
     ServiceDiscovered(ServiceInfo),
-    /// A service was updated (e.g., properties changed)
     ServiceUpdated(ServiceInfo),
-    /// A service was removed or timed out
     ServiceRemoved(String), // instance_name
 }
 
@@ -65,10 +58,6 @@ pub enum ServiceEvent {
 pub struct ServiceTrackerConfig {
     /// Service type to search for
     pub service_type: String,
-    /// Timeout for considering a service as offline
-    pub service_timeout: Duration,
-    /// Interval for checking service timeouts
-    pub cleanup_interval: Duration,
     /// Maximum number of services to track
     pub max_services: usize,
 }
@@ -77,8 +66,6 @@ impl Default for ServiceTrackerConfig {
     fn default() -> Self {
         Self {
             service_type: "_session-recorder-chunksink._tcp.local.".to_string(),
-            service_timeout: Duration::from_secs(60),
-            cleanup_interval: Duration::from_secs(10),
             max_services: 100,
         }
     }
@@ -91,7 +78,6 @@ pub struct ServiceTracker {
     services: Arc<Mutex<HashMap<String, ServiceInfo>>>,
     event_sender: Option<mpsc::Sender<ServiceEvent>>,
     worker_handle: Option<thread::JoinHandle<()>>,
-    cleanup_handle: Option<thread::JoinHandle<()>>,
     is_running: Arc<Mutex<bool>>,
 }
 
@@ -106,7 +92,6 @@ impl ServiceTracker {
             services: Arc::new(Mutex::new(HashMap::new())),
             event_sender: None,
             worker_handle: None,
-            cleanup_handle: None,
             is_running: Arc::new(Mutex::new(false)),
         })
     }
@@ -148,22 +133,20 @@ impl ServiceTracker {
             // Small delay to allow the service to initialize
             thread::sleep(Duration::from_millis(50));
 
-            // Process mDNS events
+            // Process mDNS events. recv_timeout returns Err on both Timeout and
+            // Disconnected — distinguish via the receiver's own state instead of
+            // string-matching the error message.
             while *is_running.lock().unwrap() {
                 match receiver.recv_timeout(Duration::from_secs(1)) {
                     Ok(event) => {
                         Self::handle_mdns_event(event, &services, &worker_event_sender);
                     }
-                    Err(e) => {
-                        // Normal timeout or disconnection - this is expected behavior
-                        let error_msg = e.to_string();
-                        if error_msg.contains("timeout") || error_msg.contains("Timeout") {
-                            continue;
-                        } else {
-                            // Any other error (including channel closure) just means we should stop
-                            debug!("mDNS receiver finished: {}", e);
+                    Err(_) => {
+                        if receiver.is_disconnected() {
+                            warn!("mDNS browse channel disconnected, exiting worker");
                             break;
                         }
+                        // Plain timeout: keep polling
                     }
                 }
             }
@@ -172,27 +155,7 @@ impl ServiceTracker {
         });
 
         self.worker_handle = Some(worker_handle);
-
-        // Start the cleanup worker
-        let cleanup_services = Arc::clone(&self.services);
-        let cleanup_sender = event_sender;
-        let cleanup_interval = self.config.cleanup_interval;
-        let service_timeout = self.config.service_timeout;
-        let cleanup_running = Arc::clone(&self.is_running);
-
-        let cleanup_handle = thread::spawn(move || {
-            info!("Starting service cleanup worker");
-
-            while *cleanup_running.lock().unwrap() {
-                thread::sleep(cleanup_interval);
-
-                Self::cleanup_expired_services(&cleanup_services, &cleanup_sender, service_timeout);
-            }
-
-            info!("Service cleanup worker stopped");
-        });
-
-        self.cleanup_handle = Some(cleanup_handle);
+        drop(event_sender);
 
         info!("Service tracker started successfully");
         Ok(event_receiver)
@@ -209,10 +172,6 @@ impl ServiceTracker {
         thread::sleep(Duration::from_millis(50));
 
         if let Some(handle) = self.worker_handle.take() {
-            let _ = handle.join();
-        }
-
-        if let Some(handle) = self.cleanup_handle.take() {
             let _ = handle.join();
         }
 
@@ -318,32 +277,6 @@ impl ServiceTracker {
         }
     }
 
-    /// Clean up expired services
-    fn cleanup_expired_services(
-        services: &Arc<Mutex<HashMap<String, ServiceInfo>>>,
-        event_sender: &mpsc::Sender<ServiceEvent>,
-        timeout: Duration,
-    ) {
-        let mut services_lock = services.lock().unwrap();
-        let mut expired_services = Vec::new();
-
-        // Find expired services
-        for (instance_name, service_info) in services_lock.iter() {
-            if !service_info.is_active(timeout) {
-                expired_services.push(instance_name.clone());
-            }
-        }
-
-        // Remove expired services
-        for instance_name in expired_services {
-            services_lock.remove(&instance_name);
-            debug!("Removed expired service: {}", instance_name);
-
-            if let Err(e) = event_sender.send(ServiceEvent::ServiceRemoved(instance_name)) {
-                debug!("Service removed event send failed: {}", e);
-            }
-        }
-    }
 }
 
 impl Drop for ServiceTracker {
@@ -400,36 +333,12 @@ mod tests {
     }
 
     #[test]
-    fn test_service_info_is_active() {
-        let service = ServiceInfo {
-            instance_name: "test-service".to_string(),
-            hostname: "test-host".to_string(),
-            addresses: vec![Ipv4Addr::new(192, 168, 1, 100)],
-            port: 8080,
-            properties: HashMap::new(),
-            discovered_at: Instant::now(),
-            last_seen: Instant::now(),
-        };
-
-        assert!(service.is_active(Duration::from_secs(60)));
-
-        let old_service = ServiceInfo {
-            last_seen: Instant::now() - Duration::from_secs(120),
-            ..service
-        };
-
-        assert!(!old_service.is_active(Duration::from_secs(60)));
-    }
-
-    #[test]
     fn test_default_config() {
         let config = ServiceTrackerConfig::default();
         assert_eq!(
             config.service_type,
             "_session-recorder-chunksink._tcp.local."
         );
-        assert_eq!(config.service_timeout, Duration::from_secs(60));
-        assert_eq!(config.cleanup_interval, Duration::from_secs(10));
         assert_eq!(config.max_services, 100);
     }
 

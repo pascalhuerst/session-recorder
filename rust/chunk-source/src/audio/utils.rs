@@ -47,7 +47,7 @@ pub fn deinterleave<T: Copy>(input: &[T], output: &mut [T], num_channels: usize)
 
 #[inline(always)]
 pub fn deinterleave_and_convert_to_float<F: Float>(
-    input: &[i32],
+    input: &[i16],
     output: &mut [F],
     num_channels: usize,
 ) {
@@ -56,9 +56,15 @@ pub fn deinterleave_and_convert_to_float<F: Float>(
     let buffer_size = input.len() / num_channels;
     for i in (0..input.len()).step_by(num_channels) {
         for ch in 0..num_channels {
-            output[ch * buffer_size + (i / num_channels)] = int32_to_float_sample(input[i + ch]);
+            output[ch * buffer_size + (i / num_channels)] = int16_to_float_sample(input[i + ch]);
         }
     }
+}
+
+#[inline(always)]
+pub fn int16_to_float_sample<T: Float>(input: i16) -> T {
+    let inv_scale = T::from(1.0_f32 / 32768.0).unwrap();
+    T::from(input).unwrap() * inv_scale
 }
 
 #[inline(always)]

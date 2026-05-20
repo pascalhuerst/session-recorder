@@ -12,10 +12,17 @@ use chunk_source::audio::{
 };
 use chunk_source::grpc::chunk_sink_client::{
     AudioChunk, ChunkSinkClientService, ChunkSinkConfig, RecorderStatusInfo,
+    chunksink::{GetCommandRequest, chunk_sink_client::ChunkSinkClient, command::Command},
     common::SignalStatus,
 };
+use chunk_source::io::input_key::InputKey;
+use chunk_source::io::led::Led;
 use chunk_source::mdns::service_tracker::{ServiceEvent, ServiceTracker, ServiceTrackerConfig};
-use log::{error, info, warn};
+use evdev::KeyCode;
+use clap::Parser;
+use tonic::Request;
+use tonic::transport::Channel;
+use log::{debug, error, info, warn};
 use ringbuf::traits::Consumer;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -25,13 +32,107 @@ use std::time::{Duration, SystemTime};
 use tokio::time::interval;
 use uuid::Uuid;
 
-const DETECTOR_THRESHOLD_PERCENT: f64 = 5.0;
-const DETECTOR_SUCCESSION: u32 = 3;
-const CHUNK_INTERVAL: Duration = Duration::from_millis(100);
-const STATUS_INTERVAL: Duration = Duration::from_secs(5);
-const CHUNK_BUFFER_SAMPLES: usize = 1024;
+const SAMPLE_RATE: u32 = 48000;
+const NUM_CHANNELS: u32 = 2;
+// Capture ring sized for ~5 s of audio. The producer is the ALSA callback
+// thread (RT-priority); if the consumer task ever stalls on a slow gRPC send,
+// this gives it plenty of headroom before any sample is dropped.
+const CAPTURE_RING_SECONDS: usize = 5;
+const RING_DRAIN_INTERVAL: Duration = Duration::from_millis(5);
+const RING_POP_CHUNK_SAMPLES: usize = 4096;
+const RMS_FLOOR_DB: f64 = -180.0;
+const CLIPPING_THRESHOLD: f32 = 32767.0 / 32768.0;
 
-pub struct SessionRecorder {
+#[derive(Clone)]
+struct DetectorConfig {
+    sample_rate: u32,
+    num_channels: u32,
+    threshold_db: f64,
+    window_time_s: f64,
+    attack_time_s: f64,
+    release_time_s: f64,
+}
+
+#[derive(Debug, Clone, Copy)]
+#[allow(dead_code)] // produced by step 5 (input key) and step 6 (GetCommands)
+enum CutTrigger {
+    Local,
+    Remote,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum LedRecEvent {
+    State(bool),
+    NewSession,
+}
+
+const LED_BLINK_COUNT: u32 = 10;
+const LED_BLINK_HALF_MS: u64 = 80;
+const LED_UPLOAD_PULSE_MS: u64 = 50;
+
+#[derive(Parser, Debug, Clone)]
+#[command(name = "chunk-source", about = "Session Recorder audio client")]
+struct Args {
+    /// Unique ID of this recorder (UUID)
+    #[arg(long)]
+    recorder_id: Uuid,
+
+    /// Human-readable name of this recorder
+    #[arg(long)]
+    recorder_name: String,
+
+    /// ALSA capture device
+    #[arg(long, default_value = "default")]
+    device: String,
+
+    /// ALSA period size, in frames
+    #[arg(long, default_value_t = 512)]
+    period_size: u32,
+
+    /// ALSA buffer size, in frames
+    #[arg(long, default_value_t = 2048)]
+    buffer_size: u32,
+
+    /// Detector threshold in dB RMS (e.g. -45.0). Above → signal candidate.
+    #[arg(long, default_value_t = -45.0)]
+    detector_threshold_db: f64,
+
+    /// RMS analysis window, in seconds. Defaults sized so attack requires ≥2 windows.
+    #[arg(long, default_value_t = 0.25)]
+    window_time: f64,
+
+    /// Silence → signal transition time, in seconds
+    #[arg(long, default_value_t = 0.5)]
+    attack_time: f64,
+
+    /// Signal → silence transition time, in seconds
+    #[arg(long, default_value_t = 5.0)]
+    release_time: f64,
+
+    /// sysfs name of the recording-state LED (on = signal, off = silence;
+    /// blinks 10× on new session)
+    #[arg(long)]
+    led_rec_state: Option<String>,
+
+    /// sysfs name of the upload-pulse LED (brief flash per uploaded chunk)
+    #[arg(long)]
+    led_upload: Option<String>,
+
+    /// `/dev/input/eventNN` number to read a local cut-session key from
+    #[arg(long, requires = "input_keycode", requires = "input_hold_ms")]
+    input_event: Option<u32>,
+
+    /// Numeric Linux key code that triggers a local cut on release
+    #[arg(long, requires = "input_event", requires = "input_hold_ms")]
+    input_keycode: Option<u32>,
+
+    /// Minimum hold-down duration (ms) before a release triggers a cut
+    #[arg(long, requires = "input_event", requires = "input_keycode")]
+    input_hold_ms: Option<u64>,
+}
+
+struct SessionRecorder {
+    args: Args,
     service_tracker: Option<ServiceTracker>,
     service_event_receiver: Option<std::sync::mpsc::Receiver<ServiceEvent>>,
 
@@ -45,9 +146,17 @@ pub struct SessionRecorder {
 
     shutdown_signal: Arc<AtomicBool>,
 
+    cut_tx: Option<tokio::sync::mpsc::Sender<CutTrigger>>,
+    led_rec_tx: Option<tokio::sync::mpsc::Sender<LedRecEvent>>,
+    led_upload_tx: Option<tokio::sync::mpsc::Sender<()>>,
+
+    input_key: Option<InputKey>,
+
     discovery_handle: Option<tokio::task::JoinHandle<()>>,
     audio_handle: Option<tokio::task::JoinHandle<()>>,
-    status_handle: Option<tokio::task::JoinHandle<()>>,
+    drain_handle: Option<tokio::task::JoinHandle<()>>,
+    led_rec_handle: Option<tokio::task::JoinHandle<()>>,
+    led_upload_handle: Option<tokio::task::JoinHandle<()>>,
 }
 
 struct ClientInfo {
@@ -69,13 +178,13 @@ impl ClientInfo {
 }
 
 impl SessionRecorder {
-    pub fn new() -> Self {
+    fn new(args: Args) -> Self {
         let audio_settings = AudioSettings {
-            input_device: "default".to_string(),
-            num_channels: 2,
-            period_size: 512,
-            buffer_size: 2048,
-            sample_rate: 48000,
+            input_device: args.device.clone(),
+            num_channels: NUM_CHANNELS,
+            period_size: args.period_size,
+            buffer_size: args.buffer_size,
+            sample_rate: SAMPLE_RATE,
         };
 
         let initial_status = RecorderStatusInfo {
@@ -85,6 +194,7 @@ impl SessionRecorder {
         };
 
         Self {
+            args,
             service_tracker: None,
             service_event_receiver: None,
             grpc_clients: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
@@ -93,27 +203,37 @@ impl SessionRecorder {
             callback_handle: None,
             recorder_status: Arc::new(tokio::sync::Mutex::new(initial_status)),
             shutdown_signal: Arc::new(AtomicBool::new(false)),
+            cut_tx: None,
+            led_rec_tx: None,
+            led_upload_tx: None,
+            input_key: None,
             discovery_handle: None,
             audio_handle: None,
-            status_handle: None,
+            drain_handle: None,
+            led_rec_handle: None,
+            led_upload_handle: None,
         }
     }
 
-    pub async fn start(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        info!("Starting Session Recorder");
+    async fn start(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        info!(
+            "Starting Session Recorder (id={}, name={:?})",
+            self.args.recorder_id, self.args.recorder_name
+        );
 
         self.setup_service_discovery().await?;
         self.setup_audio_processing().await?;
 
-        self.start_discovery_task().await;
+        self.start_led_tasks();
         self.start_audio_processing_task().await;
-        self.start_status_update_task().await;
+        self.start_discovery_task().await;
+        self.setup_input_key()?;
 
         info!("Session Recorder started successfully");
         Ok(())
     }
 
-    pub async fn stop(&mut self) {
+    async fn stop(&mut self) {
         info!("Stopping Session Recorder");
 
         self.shutdown_signal.store(true, Ordering::Relaxed);
@@ -128,7 +248,18 @@ impl SessionRecorder {
         if let Some(handle) = self.audio_handle.take() {
             let _ = handle.await;
         }
-        if let Some(handle) = self.status_handle.take() {
+        if let Some(handle) = self.drain_handle.take() {
+            let _ = handle.await;
+        }
+        // Dropping the InputKey stops its worker thread (see InputKey::Drop)
+        self.input_key.take();
+        // Drop LED senders so the LED tasks finish, then await them.
+        self.led_rec_tx.take();
+        self.led_upload_tx.take();
+        if let Some(handle) = self.led_rec_handle.take() {
+            let _ = handle.await;
+        }
+        if let Some(handle) = self.led_upload_handle.take() {
             let _ = handle.await;
         }
         if let Some(handle) = self.callback_handle.take() {
@@ -147,8 +278,6 @@ impl SessionRecorder {
     async fn setup_service_discovery(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let tracker_config = ServiceTrackerConfig {
             service_type: "_session-recorder-chunksink._tcp.local.".to_string(),
-            service_timeout: Duration::from_secs(30),
-            cleanup_interval: Duration::from_secs(3),
             max_services: 50,
         };
 
@@ -165,8 +294,15 @@ impl SessionRecorder {
     async fn setup_audio_processing(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         let capture_pcm = configure_input_device(&self.audio_settings)?;
 
-        let (capture_producer, capture_consumer) =
-            new_capture_ring(self.audio_settings.buffer_size as usize * 4);
+        let ring_capacity = CAPTURE_RING_SECONDS
+            * self.audio_settings.sample_rate as usize
+            * self.audio_settings.num_channels as usize;
+        info!(
+            "Capture ring: {} samples (~{} s of audio)",
+            ring_capacity, CAPTURE_RING_SECONDS
+        );
+
+        let (capture_producer, capture_consumer) = new_capture_ring(ring_capacity);
 
         let callback_handle = start_callback_thread(
             self.audio_settings.num_channels as usize,
@@ -187,12 +323,151 @@ impl SessionRecorder {
         let event_receiver = self.service_event_receiver.take().unwrap();
         let clients = Arc::clone(&self.grpc_clients);
         let shutdown = self.shutdown_signal.clone();
+        let recorder_id = self.args.recorder_id;
+        let recorder_name = self.args.recorder_name.clone();
+        let cut_tx = self.cut_tx.clone();
 
         let handle = tokio::spawn(async move {
-            Self::discovery_task(event_receiver, clients, shutdown).await;
+            Self::discovery_task(
+                event_receiver,
+                clients,
+                shutdown,
+                recorder_id,
+                recorder_name,
+                cut_tx,
+            )
+            .await;
         });
 
         self.discovery_handle = Some(handle);
+    }
+
+    fn setup_input_key(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        let (Some(event_nr), Some(keycode), Some(hold_ms)) = (
+            self.args.input_event,
+            self.args.input_keycode,
+            self.args.input_hold_ms,
+        ) else {
+            return Ok(());
+        };
+
+        let Some(cut_tx) = self.cut_tx.clone() else {
+            warn!("input-key configured but no cut channel available — skipping");
+            return Ok(());
+        };
+
+        let mut input_key = match InputKey::new(event_nr) {
+            Ok(ik) => ik,
+            Err(e) => {
+                warn!("Cannot open /dev/input/event{}: {}", event_nr, e);
+                return Ok(());
+            }
+        };
+
+        let hold_threshold = Duration::from_millis(hold_ms);
+        let key = KeyCode::new(keycode as u16);
+
+        input_key.register_key(
+            key,
+            || {}, // press: no-op; we act on release
+            move |held| {
+                if held >= hold_threshold {
+                    info!("Input cut triggered (held {:?})", held);
+                    let _ = cut_tx.try_send(CutTrigger::Local);
+                } else {
+                    info!("Input cut ignored (held {:?} < {:?})", held, hold_threshold);
+                }
+            },
+        );
+
+        if let Err(e) = input_key.start() {
+            warn!("Failed to start InputKey worker: {}", e);
+            return Ok(());
+        }
+
+        info!(
+            "Listening for cut events on /dev/input/event{} keycode {} (hold ≥ {} ms)",
+            event_nr, keycode, hold_ms
+        );
+        self.input_key = Some(input_key);
+        Ok(())
+    }
+
+    fn start_led_tasks(&mut self) {
+        if let Some(name) = self.args.led_rec_state.as_deref() {
+            match Led::new(name) {
+                Ok(led) => {
+                    let (tx, rx) = tokio::sync::mpsc::channel::<LedRecEvent>(32);
+                    let shutdown = self.shutdown_signal.clone();
+                    self.led_rec_tx = Some(tx);
+                    self.led_rec_handle =
+                        Some(tokio::spawn(Self::led_rec_task(led, rx, shutdown)));
+                }
+                Err(e) => warn!("Cannot open led-rec-state LED '{}': {}", name, e),
+            }
+        }
+        if let Some(name) = self.args.led_upload.as_deref() {
+            match Led::new(name) {
+                Ok(led) => {
+                    let (tx, rx) = tokio::sync::mpsc::channel::<()>(32);
+                    let shutdown = self.shutdown_signal.clone();
+                    self.led_upload_tx = Some(tx);
+                    self.led_upload_handle =
+                        Some(tokio::spawn(Self::led_upload_task(led, rx, shutdown)));
+                }
+                Err(e) => warn!("Cannot open led-upload LED '{}': {}", name, e),
+            }
+        }
+    }
+
+    async fn led_rec_task(
+        led: Led,
+        mut rx: tokio::sync::mpsc::Receiver<LedRecEvent>,
+        shutdown: Arc<AtomicBool>,
+    ) {
+        let _ = led.off();
+        let mut current_state = false;
+        while !shutdown.load(Ordering::Relaxed) {
+            let Some(event) = rx.recv().await else { break };
+            match event {
+                LedRecEvent::State(on) => {
+                    current_state = on;
+                    let _ = if on { led.on() } else { led.off() };
+                }
+                LedRecEvent::NewSession => {
+                    for _ in 0..LED_BLINK_COUNT {
+                        if shutdown.load(Ordering::Relaxed) {
+                            return;
+                        }
+                        let _ = led.on();
+                        tokio::time::sleep(Duration::from_millis(LED_BLINK_HALF_MS)).await;
+                        let _ = led.off();
+                        tokio::time::sleep(Duration::from_millis(LED_BLINK_HALF_MS)).await;
+                    }
+                    let _ = if current_state { led.on() } else { led.off() };
+                }
+            }
+        }
+        let _ = led.off();
+    }
+
+    async fn led_upload_task(
+        led: Led,
+        mut rx: tokio::sync::mpsc::Receiver<()>,
+        shutdown: Arc<AtomicBool>,
+    ) {
+        let _ = led.off();
+        while !shutdown.load(Ordering::Relaxed) {
+            if rx.recv().await.is_none() {
+                break;
+            }
+            // Coalesce queued pulses so we don't flicker forever after a burst
+            while rx.try_recv().is_ok() {}
+            let _ = led.on();
+            tokio::time::sleep(Duration::from_millis(LED_UPLOAD_PULSE_MS)).await;
+            let _ = led.off();
+        }
+        let _ = led.off();
     }
 
     async fn start_audio_processing_task(&mut self) {
@@ -200,30 +475,85 @@ impl SessionRecorder {
         let clients = Arc::clone(&self.grpc_clients);
         let shutdown = self.shutdown_signal.clone();
         let status = Arc::clone(&self.recorder_status);
+        let detector = DetectorConfig {
+            sample_rate: SAMPLE_RATE,
+            num_channels: NUM_CHANNELS,
+            threshold_db: self.args.detector_threshold_db,
+            window_time_s: self.args.window_time,
+            attack_time_s: self.args.attack_time,
+            release_time_s: self.args.release_time,
+        };
+
+        let (cut_tx, cut_rx) = tokio::sync::mpsc::channel::<CutTrigger>(8);
+        self.cut_tx = Some(cut_tx);
+
+        // Dedicated drain task: pulls samples from the lock-free ring into a
+        // tokio channel as fast as it can, so a slow gRPC send in the
+        // processing task can never starve the ALSA producer.
+        let (samples_tx, samples_rx) = tokio::sync::mpsc::channel::<Vec<f32>>(128);
+        let drain_shutdown = self.shutdown_signal.clone();
+        let drain_handle = tokio::spawn(async move {
+            Self::ring_drain_task(capture_consumer, samples_tx, drain_shutdown).await;
+        });
+        self.drain_handle = Some(drain_handle);
+
+        let led_rec_tx = self.led_rec_tx.clone();
+        let led_upload_tx = self.led_upload_tx.clone();
 
         let handle = tokio::spawn(async move {
-            Self::audio_processing_task(capture_consumer, clients, shutdown, status).await;
+            Self::audio_processing_task(
+                samples_rx,
+                clients,
+                shutdown,
+                status,
+                detector,
+                cut_rx,
+                led_rec_tx,
+                led_upload_tx,
+            )
+            .await;
         });
 
         self.audio_handle = Some(handle);
     }
 
-    async fn start_status_update_task(&mut self) {
-        let clients = Arc::clone(&self.grpc_clients);
-        let shutdown = self.shutdown_signal.clone();
-        let status = Arc::clone(&self.recorder_status);
+    async fn ring_drain_task(
+        mut consumer: CaptureConsumer,
+        samples_tx: tokio::sync::mpsc::Sender<Vec<f32>>,
+        shutdown: Arc<AtomicBool>,
+    ) {
+        info!("Ring drain task started");
+        let mut buf = vec![0.0f32; RING_POP_CHUNK_SAMPLES];
+        let mut tick = interval(RING_DRAIN_INTERVAL);
 
-        let handle = tokio::spawn(async move {
-            Self::status_update_task(clients, shutdown, status).await;
-        });
+        while !shutdown.load(Ordering::Relaxed) {
+            tick.tick().await;
 
-        self.status_handle = Some(handle);
+            loop {
+                let n = consumer.consumer.pop_slice(&mut buf);
+                if n == 0 {
+                    break;
+                }
+                let chunk = buf[..n].to_vec();
+                if samples_tx.send(chunk).await.is_err() {
+                    info!("Ring drain task: downstream closed, exiting");
+                    return;
+                }
+                if n < buf.len() {
+                    break;
+                }
+            }
+        }
+        info!("Ring drain task stopped");
     }
 
     async fn discovery_task(
         event_receiver: std::sync::mpsc::Receiver<ServiceEvent>,
         clients: Arc<tokio::sync::Mutex<HashMap<String, ClientInfo>>>,
         shutdown: Arc<AtomicBool>,
+        recorder_id: Uuid,
+        recorder_name: String,
+        cut_tx: Option<tokio::sync::mpsc::Sender<CutTrigger>>,
     ) {
         info!("Service discovery task started");
 
@@ -235,11 +565,8 @@ impl SessionRecorder {
                     if let Some(url) = service_info.connection_url() {
                         let config = ChunkSinkConfig {
                             server_address: url.clone(),
-                            recorder_id: format!(
-                                "recorder-{}",
-                                gethostname::gethostname().to_string_lossy()
-                            ),
-                            recorder_name: "Session Recorder".to_string(),
+                            recorder_id: recorder_id.to_string(),
+                            recorder_name: recorder_name.clone(),
                             connect_timeout: Duration::from_secs(10),
                             request_timeout: Duration::from_secs(5),
                         };
@@ -256,6 +583,23 @@ impl SessionRecorder {
                                     .lock()
                                     .await
                                     .insert(service_info.instance_name.clone(), client_info);
+
+                                if let Some(cut_tx) = cut_tx.clone() {
+                                    let listener_url = url.clone();
+                                    let listener_recorder = recorder_id.to_string();
+                                    let listener_shutdown = shutdown.clone();
+                                    let listener_name = service_info.instance_name.clone();
+                                    tokio::spawn(async move {
+                                        command_listener_task(
+                                            listener_name,
+                                            listener_url,
+                                            listener_recorder,
+                                            cut_tx,
+                                            listener_shutdown,
+                                        )
+                                        .await;
+                                    });
+                                }
                             }
                             Err(e) => {
                                 error!(
@@ -286,188 +630,321 @@ impl SessionRecorder {
         info!("Service discovery task stopped");
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn audio_processing_task(
-        mut capture_consumer: CaptureConsumer,
+        mut samples_rx: tokio::sync::mpsc::Receiver<Vec<f32>>,
         clients: Arc<tokio::sync::Mutex<HashMap<String, ClientInfo>>>,
         shutdown: Arc<AtomicBool>,
         status: Arc<tokio::sync::Mutex<RecorderStatusInfo>>,
+        detector: DetectorConfig,
+        mut cut_rx: tokio::sync::mpsc::Receiver<CutTrigger>,
+        led_rec_tx: Option<tokio::sync::mpsc::Sender<LedRecEvent>>,
+        led_upload_tx: Option<tokio::sync::mpsc::Sender<()>>,
     ) {
-        info!("Audio processing task started");
+        info!(
+            "Audio processing task started (threshold={} dB, window={}s, attack={}s, release={}s)",
+            detector.threshold_db,
+            detector.window_time_s,
+            detector.attack_time_s,
+            detector.release_time_s
+        );
 
-        let mut audio_buffer = vec![0.0f32; CHUNK_BUFFER_SAMPLES];
-        let mut chunk_counter = 0u32;
-        let mut tick = interval(CHUNK_INTERVAL);
+        let window_samples = ((detector.sample_rate as f64 * detector.window_time_s) as usize)
+            * detector.num_channels as usize;
+        let attack_windows =
+            ((detector.attack_time_s / detector.window_time_s).ceil() as u32).max(1);
+        let release_windows =
+            ((detector.release_time_s / detector.window_time_s).ceil() as u32).max(1);
 
-        // Recording-state detector
+        let mut window_buf: Vec<f32> = Vec::with_capacity(window_samples * 2);
+
         let mut above_count: u32 = 0;
         let mut below_count: u32 = 0;
         let mut recording = false;
         let mut session_id: Option<String> = None;
+        let mut chunk_counter = 0u32;
 
         while !shutdown.load(Ordering::Relaxed) {
-            tick.tick().await;
-
-            let samples_read = capture_consumer.consumer.pop_slice(&mut audio_buffer);
-
-            if samples_read == 0 {
-                let mut status_guard = status.lock().await;
-                status_guard.signal_status = SignalStatus::NoSignal;
-                status_guard.rms_percent = 0.0;
-                status_guard.clipping = false;
-                continue;
+            tokio::select! {
+                maybe_chunk = samples_rx.recv() => {
+                    let Some(chunk) = maybe_chunk else { break; };
+                    window_buf.extend_from_slice(&chunk);
+                }
+                cut = cut_rx.recv() => {
+                    let Some(trigger) = cut else { break; };
+                    if recording {
+                        let new_id = Uuid::new_v4().to_string();
+                        info!("Cut ({:?}): ending current session, starting {}", trigger, new_id);
+                        session_id = Some(new_id);
+                        chunk_counter = 0;
+                        if let Some(tx) = &led_rec_tx {
+                            let _ = tx.try_send(LedRecEvent::NewSession);
+                            debug!("LED rec-state: NewSession (cut)");
+                        }
+                    } else {
+                        info!("Cut ({:?}) ignored: not currently recording", trigger);
+                    }
+                    continue;
+                }
             }
 
-            let samples = &audio_buffer[..samples_read];
+            // Process every full window currently buffered
+            while window_buf.len() >= window_samples {
+                let window: Vec<f32> = window_buf.drain(..window_samples).collect();
 
-            let mean_square: f32 =
-                samples.iter().map(|&x| x * x).sum::<f32>() / samples_read as f32;
-            let rms_percent = (mean_square.sqrt() * 100.0).min(100.0) as f64;
-            let clipping = samples.iter().any(|&x| x.abs() > 0.95);
-
-            {
-                let mut status_guard = status.lock().await;
-                status_guard.signal_status = if rms_percent >= DETECTOR_THRESHOLD_PERCENT {
-                    SignalStatus::Signal
+                let mean_square: f32 =
+                    window.iter().map(|&x| x * x).sum::<f32>() / window.len() as f32;
+                let rms = mean_square.sqrt();
+                let rms_db = if rms < 1e-9 {
+                    RMS_FLOOR_DB
                 } else {
-                    SignalStatus::NoSignal
+                    20.0 * (rms as f64).log10()
                 };
-                status_guard.rms_percent = rms_percent;
-                status_guard.clipping = clipping;
-            }
+                let clipping = window.iter().any(|&x| x.abs() >= CLIPPING_THRESHOLD);
 
-            // State transitions
-            if rms_percent >= DETECTOR_THRESHOLD_PERCENT {
-                above_count = above_count.saturating_add(1);
-                below_count = 0;
-                if !recording && above_count >= DETECTOR_SUCCESSION {
-                    recording = true;
-                    let new_id = Uuid::new_v4().to_string();
-                    info!("Recording started, session: {}", new_id);
-                    session_id = Some(new_id);
-                }
-            } else {
-                below_count = below_count.saturating_add(1);
-                above_count = 0;
-                if recording && below_count >= DETECTOR_SUCCESSION {
-                    recording = false;
-                    info!("Recording stopped");
-                    session_id = None;
-                }
-            }
+                let signal_above = rms_db >= detector.threshold_db;
 
-            if !recording {
-                continue;
-            }
+                debug!(
+                    "window: rms={:.2} dB, signal_above={}, above={}/{}, below={}/{}, recording={}, clipping={}",
+                    rms_db,
+                    signal_above,
+                    above_count,
+                    attack_windows,
+                    below_count,
+                    release_windows,
+                    recording,
+                    clipping
+                );
 
-            let Some(current_session) = session_id.as_ref() else {
-                continue;
-            };
-
-            // Pre-encode chunk data once
-            let data: Vec<u32> = samples
-                .iter()
-                .map(|&sample| {
-                    let scaled = (sample + 1.0) / 2.0;
-                    (scaled.clamp(0.0, 1.0) * u32::MAX as f32) as u32
-                })
-                .collect();
-
-            let mut clients_guard = clients.lock().await;
-            let mut failed_clients = Vec::new();
-
-            for (name, client_info) in clients_guard.iter_mut() {
-                let chunk = AudioChunk {
-                    session_id: current_session.clone(),
-                    chunk_count: chunk_counter,
-                    data: data.clone(),
-                    timestamp: SystemTime::now(),
-                };
-
-                match client_info.client.set_chunks(chunk).await {
-                    Ok(_) => client_info.mark_successful_send(),
-                    Err(e) => {
-                        warn!("Failed to send chunk to {}: {}", name, e);
-                        failed_clients.push(name.clone());
+                if signal_above {
+                    above_count = above_count.saturating_add(1);
+                    below_count = 0;
+                    if !recording && above_count >= attack_windows {
+                        recording = true;
+                        let new_id = Uuid::new_v4().to_string();
+                        info!(
+                            "Recording started (RMS {:.1} dB), session: {}",
+                            rms_db, new_id
+                        );
+                        session_id = Some(new_id);
+                        chunk_counter = 0;
+                        if let Some(tx) = &led_rec_tx {
+                            let _ = tx.try_send(LedRecEvent::State(true));
+                            let _ = tx.try_send(LedRecEvent::NewSession);
+                            debug!("LED rec-state: State(true) + NewSession");
+                        }
+                    }
+                } else {
+                    below_count = below_count.saturating_add(1);
+                    above_count = 0;
+                    if recording && below_count >= release_windows {
+                        recording = false;
+                        info!("Recording stopped (RMS {:.1} dB)", rms_db);
+                        session_id = None;
+                        if let Some(tx) = &led_rec_tx {
+                            let _ = tx.try_send(LedRecEvent::State(false));
+                            debug!("LED rec-state: State(false)");
+                        }
                     }
                 }
-            }
 
-            for name in failed_clients {
-                if let Some(mut client_info) = clients_guard.remove(&name) {
-                    client_info.client.disconnect().await;
-                    warn!("Removed failed client: {}", name);
+                // The signal_status in the wire message must reflect the smoothed
+                // (recording) state, not the raw per-window comparison — otherwise
+                // a quiet window mid-recording reports NoSignal to the server, which
+                // closes the session while we keep streaming chunks for it.
+                let status_info = RecorderStatusInfo {
+                    signal_status: if recording {
+                        SignalStatus::Signal
+                    } else {
+                        SignalStatus::NoSignal
+                    },
+                    rms_percent: (rms as f64) * 100.0,
+                    clipping,
+                };
+                {
+                    *status.lock().await = status_info.clone();
+                }
+
+                // Fan out RecorderStatus to every connected client this window
+                {
+                    let mut g = clients.lock().await;
+                    let n_clients = g.len();
+                    let mut failed = Vec::new();
+                    for (name, ci) in g.iter_mut() {
+                        if let Err(e) = ci.client.set_recorder_status(status_info.clone()).await {
+                            warn!("Failed to send status to {}: {}", name, e);
+                            failed.push(name.clone());
+                        }
+                    }
+                    for n in failed {
+                        if let Some(mut ci) = g.remove(&n) {
+                            ci.client.disconnect().await;
+                            warn!("Removed failed client during status update: {}", n);
+                        }
+                    }
+                    debug!(
+                        "status sent to {} client(s): signal={:?} rms={:.2}% clip={}",
+                        n_clients,
+                        status_info.signal_status,
+                        status_info.rms_percent,
+                        status_info.clipping
+                    );
+                }
+
+                // If recording, ship the window's samples as a chunk
+                if recording {
+                    let Some(current_session) = session_id.as_ref() else {
+                        continue;
+                    };
+
+                    let data: Vec<u32> = window
+                        .iter()
+                        .map(|&s| {
+                            let i = (s.clamp(-1.0, 1.0) * 32767.0) as i16;
+                            i as i32 as u32
+                        })
+                        .collect();
+
+                    let mut g = clients.lock().await;
+                    let n_clients = g.len();
+                    let mut failed = Vec::new();
+                    let mut ok_count = 0usize;
+                    for (name, ci) in g.iter_mut() {
+                        let chunk = AudioChunk {
+                            session_id: current_session.clone(),
+                            chunk_count: chunk_counter,
+                            data: data.clone(),
+                            timestamp: SystemTime::now(),
+                        };
+                        match ci.client.set_chunks(chunk).await {
+                            Ok(_) => {
+                                ci.mark_successful_send();
+                                ok_count += 1;
+                                if let Some(tx) = &led_upload_tx {
+                                    let _ = tx.try_send(());
+                                }
+                            }
+                            Err(e) => {
+                                warn!("Failed to send chunk to {}: {}", name, e);
+                                failed.push(name.clone());
+                            }
+                        }
+                    }
+                    for n in failed {
+                        if let Some(mut ci) = g.remove(&n) {
+                            ci.client.disconnect().await;
+                            warn!("Removed failed client: {}", n);
+                        }
+                    }
+                    debug!(
+                        "chunk #{} sent to {}/{} client(s), session={}, samples={}",
+                        chunk_counter,
+                        ok_count,
+                        n_clients,
+                        current_session,
+                        data.len()
+                    );
+                    chunk_counter = chunk_counter.wrapping_add(1);
                 }
             }
-
-            chunk_counter = chunk_counter.wrapping_add(1);
         }
 
         info!("Audio processing task stopped");
     }
 
-    async fn status_update_task(
-        clients: Arc<tokio::sync::Mutex<HashMap<String, ClientInfo>>>,
-        shutdown: Arc<AtomicBool>,
-        status: Arc<tokio::sync::Mutex<RecorderStatusInfo>>,
-    ) {
-        info!("Status update task started");
-
-        let mut tick = interval(STATUS_INTERVAL);
-
-        while !shutdown.load(Ordering::Relaxed) {
-            tick.tick().await;
-
-            let current_status = status.lock().await.clone();
-
-            let mut clients_guard = clients.lock().await;
-            let mut failed_clients = Vec::new();
-
-            for (name, client_info) in clients_guard.iter_mut() {
-                if let Err(e) = client_info
-                    .client
-                    .set_recorder_status(current_status.clone())
-                    .await
-                {
-                    warn!("Failed to send status to {}: {}", name, e);
-                    failed_clients.push(name.clone());
-                }
-            }
-
-            for name in failed_clients {
-                if let Some(mut client_info) = clients_guard.remove(&name) {
-                    client_info.client.disconnect().await;
-                    warn!("Removed failed client during status update: {}", name);
-                }
-            }
-
-            if !clients_guard.is_empty() {
-                info!("Status update sent to {} client(s)", clients_guard.len());
-            }
-        }
-
-        info!("Status update task stopped");
-    }
-
-    pub fn is_running(&self) -> bool {
+    fn is_running(&self) -> bool {
         !self.shutdown_signal.load(Ordering::Relaxed)
     }
 
-    pub async fn get_status(&self) -> RecorderStatusInfo {
+    async fn get_status(&self) -> RecorderStatusInfo {
         self.recorder_status.lock().await.clone()
     }
 
-    pub async fn get_client_count(&self) -> usize {
+    async fn get_client_count(&self) -> usize {
         self.grpc_clients.lock().await.len()
     }
 }
 
+/// Subscribe to the ChunkSink server's command stream and forward `CmdCutSession`
+/// to the cut channel. Exits when the stream ends or shutdown is signalled.
+async fn command_listener_task(
+    service_name: String,
+    url: String,
+    recorder_id: String,
+    cut_tx: tokio::sync::mpsc::Sender<CutTrigger>,
+    shutdown: Arc<AtomicBool>,
+) {
+    let channel = match Channel::from_shared(url.clone()) {
+        Ok(b) => match b.connect().await {
+            Ok(c) => c,
+            Err(e) => {
+                warn!("Command listener: cannot connect to {}: {}", url, e);
+                return;
+            }
+        },
+        Err(e) => {
+            warn!("Command listener: invalid URL {}: {}", url, e);
+            return;
+        }
+    };
+
+    let mut client = ChunkSinkClient::new(channel);
+    let request = Request::new(GetCommandRequest { recorder_id });
+    let mut stream = match client.get_commands(request).await {
+        Ok(r) => r.into_inner(),
+        Err(e) => {
+            warn!("Command listener: GetCommands failed for {}: {}", service_name, e);
+            return;
+        }
+    };
+
+    info!("Command listener attached to {}", service_name);
+
+    while !shutdown.load(Ordering::Relaxed) {
+        match tokio::time::timeout(Duration::from_secs(1), stream.message()).await {
+            Ok(Ok(Some(cmd))) => match cmd.command {
+                Some(Command::CmdCutSession(_)) => {
+                    info!("Received CutSession from {}", service_name);
+                    let _ = cut_tx.try_send(CutTrigger::Remote);
+                }
+                Some(Command::Reboot(_)) => {
+                    info!("Received Reboot from {} (no-op)", service_name);
+                }
+                None => {
+                    warn!("Empty command from {}", service_name);
+                }
+            },
+            Ok(Ok(None)) => {
+                info!("Command stream from {} closed by server", service_name);
+                break;
+            }
+            Ok(Err(e)) => {
+                warn!("Command stream from {} errored: {}", service_name, e);
+                break;
+            }
+            Err(_) => {
+                // 1s timeout — loop back and check shutdown
+            }
+        }
+    }
+
+    info!("Command listener for {} stopped", service_name);
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    env_logger::init();
+    // Default: info everywhere, but silence the chatty mdns_sd crate.
+    // Override with e.g. RUST_LOG=chunk_source=debug,mdns_sd=warn
+    env_logger::Builder::from_env(
+        env_logger::Env::default().default_filter_or("info,mdns_sd=off"),
+    )
+    .init();
+
+    let args = Args::parse();
 
     info!("Starting Session Recorder");
 
-    let mut recorder = SessionRecorder::new();
+    let mut recorder = SessionRecorder::new(args);
     recorder.start().await?;
 
     let shutdown_signal = recorder.shutdown_signal.clone();

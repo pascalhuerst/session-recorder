@@ -29,8 +29,9 @@ session-recorder/
 │       └── session-waveform/  # Waveform visualization library
 ├── go/                        # Go backend services
 │   ├── cmd/
-│   │   ├── chunk_sink/        # Audio chunk receiver
-│   │   └── session_source/    # Session management
+│   │   ├── chunk_sink/             # Backend (hosts ChunkSink + SessionSource gRPC services)
+│   │   ├── chunk_sink_client/      # Test client for ChunkSink
+│   │   └── session_source_client/  # Test client for SessionSource
 │   ├── grpc/                  # gRPC server implementations
 │   ├── storage/               # MinIO/S3 storage layer
 │   └── render/                # Audio rendering (waveforms)
@@ -79,11 +80,12 @@ make clean                     # Clean generated files
 
 ### Go (from `go/`)
 ```bash
-go run ./cmd/chunk_sink        # Run chunk sink service
-go run ./cmd/session_source    # Run session source service
-go test ./...                  # Run all tests
-go build ./...                 # Build all
-go vet ./...                   # Vet
+go run ./cmd/chunk_sink             # Run backend (ChunkSink + SessionSource gRPC)
+go run ./cmd/chunk_sink_client      # Run ChunkSink test client
+go run ./cmd/session_source_client  # Run SessionSource test client
+go test ./...                       # Run all tests
+go build ./...                      # Build all
+go vet ./...                        # Vet
 ```
 
 ## Service Ports

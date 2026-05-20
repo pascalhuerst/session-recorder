@@ -156,11 +156,11 @@ func main() {
 	if smtpHost != "" {
 		emailConfig := email.Config{
 			Host:     smtpHost,
-			Port:     utils.GetEnvOrDefault("SMTP_PORT", "587"),
+			Port:     utils.GetWithDefault("SMTP_PORT", "587"),
 			Username: os.Getenv("SMTP_USERNAME"),
 			Password: os.Getenv("SMTP_PASSWORD"),
-			From:     utils.GetEnvOrDefault("SMTP_FROM", "noreply@session-recorder.local"),
-			FromName: utils.GetEnvOrDefault("SMTP_FROM_NAME", "Session Recorder"),
+			From:     utils.GetWithDefault("SMTP_FROM", "noreply@session-recorder.local"),
+			FromName: utils.GetWithDefault("SMTP_FROM_NAME", "Session Recorder"),
 		}
 		emailSender = email.NewSender(emailConfig)
 		log.Info().Str("host", smtpHost).Msg("Email sharing enabled")

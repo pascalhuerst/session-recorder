@@ -5,8 +5,6 @@ go 1.24.0
 toolchain go1.24.3
 
 require (
-	github.com/bogem/id3v2 v1.2.0
-	github.com/fsnotify/fsnotify v1.4.9
 	github.com/godbus/dbus/v5 v5.1.0
 	github.com/golang/protobuf v1.5.4
 	github.com/google/uuid v1.6.0

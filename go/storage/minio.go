@@ -27,48 +27,6 @@ const (
 	minChunkSize = 5 * 1024 * 1024 // As per s3 documentation
 )
 
-const publicAccessFormula = `
-{
-	"Version": "2012-10-17",
-	"Statement": [
-	  {
-		"Effect": "Allow",
-		"Principal": {
-		  "AWS": [
-			"*"
-		  ]
-		},
-		"Action": [
-		  "s3:GetBucketLocation",
-		  "s3:ListBucket",
-		  "s3:ListBucketMultipartUploads"
-		],
-		"Resource": [
-		  "arn:aws:s3:::%s"
-		]
-	  },
-	  {
-		"Effect": "Allow",
-		"Principal": {
-		  "AWS": [
-			"*"
-		  ]
-		},
-		"Action": [
-		  "s3:AbortMultipartUpload",
-		  "s3:DeleteObject",
-		  "s3:GetObject",
-		  "s3:ListMultipartUploadParts",
-		  "s3:PutObject"
-		],
-		"Resource": [
-		  "arn:aws:s3:::%s/*"
-		]
-	  }
-	]
-  }
-`
-
 type minioChunk struct {
 	number    int
 	sessionID uuid.UUID

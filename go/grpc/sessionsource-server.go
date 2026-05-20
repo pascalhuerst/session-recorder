@@ -3,7 +3,6 @@ package grpc
 import (
 	"context"
 	"fmt"
-	"sync"
 
 	"github.com/pascalhuerst/session-recorder/protocols/go/common"
 	cmpb "github.com/pascalhuerst/session-recorder/protocols/go/common"
@@ -51,7 +50,6 @@ type SessionSourceServerConfig struct {
 }
 
 type SessionSourceServer struct {
-	mutex  sync.Mutex
 	config *SessionSourceServerConfig
 }
 

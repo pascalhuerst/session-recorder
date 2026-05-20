@@ -190,10 +190,3 @@ func (h *ChunkSinkHandler) OnRecorderDisconnected(recorderID uuid.UUID) {
 	}
 }
 
-func (h *ChunkSinkHandler) IsRecorderConnected(recorderID uuid.UUID) bool {
-	h.lock.Lock()
-	defer h.lock.Unlock()
-
-	_, ok := h.connectedRecorders[recorderID]
-	return ok
-}

@@ -5,24 +5,9 @@ import (
 	"os"
 	"strconv"
 	"strings"
-
-	"github.com/rs/zerolog/log"
 )
 
 var ErrVarNotSet = errors.New("environment variable not set")
-
-func MustGet(name string) string {
-	var (
-		err error
-		v   string
-	)
-
-	if v, err = Get(name); err != nil {
-		log.Fatal().Str("variable", name).Err(err).Msg("variable must be set")
-	}
-
-	return v
-}
 
 func Get(name string) (string, error) {
 	s := ""
@@ -40,11 +25,6 @@ func GetWithDefault(name, defaultValue string) string {
 		return v
 	}
 	return defaultValue
-}
-
-// GetEnvOrDefault is an alias for GetWithDefault for backwards compatibility
-func GetEnvOrDefault(name string, defaultValue string) string {
-	return GetWithDefault(name, defaultValue)
 }
 
 func GetInt(name string) (int, error) {

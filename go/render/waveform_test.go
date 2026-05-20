@@ -3,7 +3,6 @@ package render
 import (
 	"bytes"
 	"context"
-	"crypto/md5"
 	_ "embed"
 	"io"
 	"os/exec"
@@ -20,20 +19,8 @@ import (
  *   And the output matches the expected reference image (hash comparison)
  */
 
-func mkHash(r io.Reader) ([]byte, error) {
-	hash := md5.New()
-	if _, err := io.Copy(hash, r); err != nil {
-		return nil, err
-	}
-
-	return hash.Sum(nil), nil
-}
-
 //go:embed test_data/sweep_30_20000_s16le_2ch_48000k.raw
 var rawTestAudio []byte
-
-//go:embed test_data/sweep_30_20000_s16le_2ch_48000k.png
-var resultWaveform []byte
 
 func TestCreateOverview(t *testing.T) {
 	// Skip test if audiowaveform is not installed

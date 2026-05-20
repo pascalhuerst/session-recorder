@@ -11,10 +11,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-const (
-	sampleRate = 48000
-	channels   = 2
-)
+const sampleRate = 48000
 
 // SamplePositionToDuration converts a sample position to a time.Duration.
 // Sample position is the frame index (not byte offset).

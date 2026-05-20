@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	cspb "github.com/pascalhuerst/session-recorder/protocols/go/chunksink"
 	cmpb "github.com/pascalhuerst/session-recorder/protocols/go/common"
+	"github.com/rs/zerolog/log"
 	"google.golang.org/grpc"
 )
 
@@ -90,26 +91,41 @@ func (s *ChunkSinkServer) SetChunks(ctx context.Context, in *cspb.Chunks) (*cmpb
 func (s *ChunkSinkServer) GetCommands(request *cspb.GetCommandRequest, server cspb.ChunkSink_GetCommandsServer) error {
 	recorderID, err := uuid.Parse(request.GetRecorderID())
 	if err != nil {
+		log.Warn().Str("recorder-id", request.GetRecorderID()).Err(err).Msg("GetCommands: invalid recorder id")
 		return fmt.Errorf("invalid recorder id %q: %w", request.GetRecorderID(), err)
 	}
 
 	s.mu.Lock()
 	s.sendCommandFunc[recorderID] = server.Send
+	mapSize := len(s.sendCommandFunc)
 	if s.config.OnRecorderConnectedCB != nil {
 		go s.config.OnRecorderConnectedCB(recorderID)
 	}
 	s.mu.Unlock()
 
+	log.Info().
+		Stringer("recorder-id", recorderID).
+		Int("connected-recorders", mapSize).
+		Msg("GetCommands: stream opened")
+
 	<-server.Context().Done()
+	ctxErr := server.Context().Err()
 
 	s.mu.Lock()
 	delete(s.sendCommandFunc, recorderID)
+	mapSize = len(s.sendCommandFunc)
 	if s.config.OnRecorderDisconnectedCB != nil {
 		go s.config.OnRecorderDisconnectedCB(recorderID)
 	}
 	s.mu.Unlock()
 
-	return server.Context().Err()
+	log.Info().
+		Stringer("recorder-id", recorderID).
+		Int("connected-recorders", mapSize).
+		AnErr("ctx-err", ctxErr).
+		Msg("GetCommands: stream closed")
+
+	return ctxErr
 }
 
 // CutSession forwards a cut command to the recorder if a command stream exists.
@@ -126,13 +142,4 @@ func (s *ChunkSinkServer) CutSession(recorderID uuid.UUID) error {
 	}
 
 	return fmt.Errorf("no connection to recorder %s", recorderID)
-}
-
-// IsRecorderConnected reports whether the recorder currently has an active command stream.
-func (s *ChunkSinkServer) IsRecorderConnected(recorderID uuid.UUID) bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
-	_, ok := s.sendCommandFunc[recorderID]
-	return ok
 }

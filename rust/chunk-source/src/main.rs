@@ -134,7 +134,7 @@ struct Args {
 struct SessionRecorder {
     args: Args,
     service_tracker: Option<ServiceTracker>,
-    service_event_receiver: Option<std::sync::mpsc::Receiver<ServiceEvent>>,
+    service_event_receiver: Option<tokio::sync::mpsc::UnboundedReceiver<ServiceEvent>>,
 
     grpc_clients: Arc<tokio::sync::Mutex<HashMap<String, ClientInfo>>>,
 
@@ -548,7 +548,7 @@ impl SessionRecorder {
     }
 
     async fn discovery_task(
-        event_receiver: std::sync::mpsc::Receiver<ServiceEvent>,
+        mut event_receiver: tokio::sync::mpsc::UnboundedReceiver<ServiceEvent>,
         clients: Arc<tokio::sync::Mutex<HashMap<String, ClientInfo>>>,
         shutdown: Arc<AtomicBool>,
         recorder_id: Uuid,
@@ -558,59 +558,66 @@ impl SessionRecorder {
         info!("Service discovery task started");
 
         while !shutdown.load(Ordering::Relaxed) {
-            match event_receiver.recv_timeout(Duration::from_secs(1)) {
-                Ok(ServiceEvent::ServiceDiscovered(service_info)) => {
+            // 1 s wakeup so we re-check the shutdown flag even when the
+            // tracker channel is idle.
+            let event = match tokio::time::timeout(
+                Duration::from_secs(1),
+                event_receiver.recv(),
+            )
+            .await
+            {
+                Ok(Some(event)) => event,
+                Ok(None) => {
+                    // Channel closed (tracker exited): nothing more will come.
+                    info!("Service tracker channel closed, discovery task exiting");
+                    break;
+                }
+                Err(_) => continue, // timeout — loop back, check shutdown
+            };
+
+            match event {
+                ServiceEvent::ServiceDiscovered(service_info) => {
                     info!("Discovered service: {}", service_info.instance_name);
-
-                    if let Some(url) = service_info.connection_url() {
-                        let config = ChunkSinkConfig {
-                            server_address: url.clone(),
-                            recorder_id: recorder_id.to_string(),
-                            recorder_name: recorder_name.clone(),
-                            connect_timeout: Duration::from_secs(10),
-                            request_timeout: Duration::from_secs(5),
-                        };
-
-                        let mut client = ChunkSinkClientService::new(config);
-
-                        match client.connect().await {
-                            Ok(_) => {
-                                info!("Connected to service: {}", service_info.instance_name);
-
-                                let client_info = ClientInfo::new(client);
-
-                                clients
-                                    .lock()
-                                    .await
-                                    .insert(service_info.instance_name.clone(), client_info);
-
-                                if let Some(cut_tx) = cut_tx.clone() {
-                                    let listener_url = url.clone();
-                                    let listener_recorder = recorder_id.to_string();
-                                    let listener_shutdown = shutdown.clone();
-                                    let listener_name = service_info.instance_name.clone();
-                                    tokio::spawn(async move {
-                                        command_listener_task(
-                                            listener_name,
-                                            listener_url,
-                                            listener_recorder,
-                                            cut_tx,
-                                            listener_shutdown,
-                                        )
-                                        .await;
-                                    });
-                                }
-                            }
-                            Err(e) => {
-                                error!(
-                                    "Failed to connect to {}: {}",
-                                    service_info.instance_name, e
-                                );
-                            }
-                        }
+                    Self::try_attach_service(
+                        &service_info,
+                        &clients,
+                        &shutdown,
+                        recorder_id,
+                        &recorder_name,
+                        cut_tx.as_ref(),
+                    )
+                    .await;
+                }
+                ServiceEvent::ServiceUpdated(service_info) => {
+                    // mdns-sd often emits the initial ServiceResolved without
+                    // IPv4 addresses populated; the addresses arrive in a
+                    // subsequent re-resolve that we see as an Updated event.
+                    // Treat Updated as a chance to (re-)attach if we are not
+                    // already connected.
+                    let already_connected =
+                        clients.lock().await.contains_key(&service_info.instance_name);
+                    if already_connected {
+                        debug!(
+                            "Service updated (already connected): {}",
+                            service_info.instance_name
+                        );
+                    } else {
+                        info!(
+                            "Service updated (not yet connected, attempting): {}",
+                            service_info.instance_name
+                        );
+                        Self::try_attach_service(
+                            &service_info,
+                            &clients,
+                            &shutdown,
+                            recorder_id,
+                            &recorder_name,
+                            cut_tx.as_ref(),
+                        )
+                        .await;
                     }
                 }
-                Ok(ServiceEvent::ServiceRemoved(instance_name)) => {
+                ServiceEvent::ServiceRemoved(instance_name) => {
                     info!("Service removed: {}", instance_name);
 
                     if let Some(mut client_info) = clients.lock().await.remove(&instance_name) {
@@ -618,16 +625,92 @@ impl SessionRecorder {
                         info!("Disconnected from service: {}", instance_name);
                     }
                 }
-                Ok(ServiceEvent::ServiceUpdated(service_info)) => {
-                    info!("Service updated: {}", service_info.instance_name);
-                }
-                Err(_) => {
-                    // Timeout - normal behavior
-                }
             }
         }
 
         info!("Service discovery task stopped");
+    }
+
+    /// Attempt to register a ChunkSinkClient + command listener for a service.
+    /// No-op if the service has no IPv4 address yet or if we're already
+    /// connected to that instance name.
+    async fn try_attach_service(
+        service_info: &chunk_source::mdns::service_tracker::ServiceInfo,
+        clients: &Arc<tokio::sync::Mutex<HashMap<String, ClientInfo>>>,
+        shutdown: &Arc<AtomicBool>,
+        recorder_id: Uuid,
+        recorder_name: &str,
+        cut_tx: Option<&tokio::sync::mpsc::Sender<CutTrigger>>,
+    ) {
+        let Some(url) = service_info.connection_url() else {
+            debug!(
+                "Service {} has no IPv4 address yet, skipping",
+                service_info.instance_name
+            );
+            return;
+        };
+
+        // Re-check under lock to avoid racing duplicate attaches.
+        if clients.lock().await.contains_key(&service_info.instance_name) {
+            return;
+        }
+
+        let config = ChunkSinkConfig {
+            server_address: url.clone(),
+            recorder_id: recorder_id.to_string(),
+            recorder_name: recorder_name.to_string(),
+            connect_timeout: Duration::from_secs(10),
+            request_timeout: Duration::from_secs(5),
+        };
+
+        let mut client = ChunkSinkClientService::new(config);
+
+        match client.connect().await {
+            Ok(_) => {
+                info!(
+                    "Connected to service: {} (recorder_id={})",
+                    service_info.instance_name, recorder_id
+                );
+
+                clients
+                    .lock()
+                    .await
+                    .insert(service_info.instance_name.clone(), ClientInfo::new(client));
+
+                if let Some(cut_tx) = cut_tx {
+                    let listener_url = url.clone();
+                    let listener_recorder = recorder_id.to_string();
+                    let listener_shutdown = shutdown.clone();
+                    let listener_name = service_info.instance_name.clone();
+                    let cut_tx = cut_tx.clone();
+                    info!(
+                        "Spawning command listener for {} → {}",
+                        listener_name, listener_url
+                    );
+                    tokio::spawn(async move {
+                        command_listener_task(
+                            listener_name,
+                            listener_url,
+                            listener_recorder,
+                            cut_tx,
+                            listener_shutdown,
+                        )
+                        .await;
+                    });
+                } else {
+                    warn!(
+                        "No cut channel available — command listener for {} not spawned",
+                        service_info.instance_name
+                    );
+                }
+            }
+            Err(e) => {
+                error!(
+                    "Failed to connect to {}: {}",
+                    service_info.instance_name, e
+                );
+            }
+        }
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -874,31 +957,45 @@ async fn command_listener_task(
     cut_tx: tokio::sync::mpsc::Sender<CutTrigger>,
     shutdown: Arc<AtomicBool>,
 ) {
-    let channel = match Channel::from_shared(url.clone()) {
-        Ok(b) => match b.connect().await {
-            Ok(c) => c,
-            Err(e) => {
-                warn!("Command listener: cannot connect to {}: {}", url, e);
-                return;
-            }
-        },
+    info!("Command listener: connecting to {} at {}", service_name, url);
+    let endpoint = match Channel::from_shared(url.clone()) {
+        Ok(b) => b.connect_timeout(Duration::from_secs(5)),
         Err(e) => {
             warn!("Command listener: invalid URL {}: {}", url, e);
             return;
         }
     };
-
-    let mut client = ChunkSinkClient::new(channel);
-    let request = Request::new(GetCommandRequest { recorder_id });
-    let mut stream = match client.get_commands(request).await {
-        Ok(r) => r.into_inner(),
+    let channel = match endpoint.connect().await {
+        Ok(c) => c,
         Err(e) => {
-            warn!("Command listener: GetCommands failed for {}: {}", service_name, e);
+            warn!("Command listener: cannot connect to {}: {}", url, e);
             return;
         }
     };
 
-    info!("Command listener attached to {}", service_name);
+    let mut client = ChunkSinkClient::new(channel);
+    info!(
+        "Command listener: opening GetCommands stream for recorder {}",
+        recorder_id
+    );
+    let request = Request::new(GetCommandRequest {
+        recorder_id: recorder_id.clone(),
+    });
+    let mut stream = match client.get_commands(request).await {
+        Ok(r) => r.into_inner(),
+        Err(e) => {
+            warn!(
+                "Command listener: GetCommands failed for {} (recorder {}): {}",
+                service_name, recorder_id, e
+            );
+            return;
+        }
+    };
+
+    info!(
+        "Command listener attached to {} as recorder {}",
+        service_name, recorder_id
+    );
 
     while !shutdown.load(Ordering::Relaxed) {
         match tokio::time::timeout(Duration::from_secs(1), stream.message()).await {

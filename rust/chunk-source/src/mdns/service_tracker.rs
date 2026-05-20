@@ -7,10 +7,10 @@ use log::{debug, info, warn};
 use mdns_sd::{ServiceDaemon, ServiceEvent as MdnsServiceEvent};
 use std::collections::HashMap;
 use std::net::Ipv4Addr;
-use std::sync::mpsc;
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
+use tokio::sync::mpsc;
 
 /// Information about a discovered chunk-sink server
 #[derive(Debug, Clone)]
@@ -76,7 +76,7 @@ pub struct ServiceTracker {
     config: ServiceTrackerConfig,
     daemon: Option<ServiceDaemon>,
     services: Arc<Mutex<HashMap<String, ServiceInfo>>>,
-    event_sender: Option<mpsc::Sender<ServiceEvent>>,
+    event_sender: Option<mpsc::UnboundedSender<ServiceEvent>>,
     worker_handle: Option<thread::JoinHandle<()>>,
     is_running: Arc<Mutex<bool>>,
 }
@@ -96,13 +96,18 @@ impl ServiceTracker {
         })
     }
 
-    /// Start discovering services
-    pub fn start(&mut self) -> Result<mpsc::Receiver<ServiceEvent>, Box<dyn std::error::Error>> {
+    /// Start discovering services. Returns an unbounded receiver of service
+    /// events; the sender lives in the mdns worker thread and uses
+    /// `UnboundedSender::send` (synchronous, non-blocking) since it runs on a
+    /// plain `std::thread`, not a tokio task.
+    pub fn start(
+        &mut self,
+    ) -> Result<mpsc::UnboundedReceiver<ServiceEvent>, Box<dyn std::error::Error>> {
         if *self.is_running.lock().unwrap() {
             return Err("Service tracker is already running".into());
         }
 
-        let (event_sender, event_receiver) = mpsc::channel();
+        let (event_sender, event_receiver) = mpsc::unbounded_channel();
         self.event_sender = Some(event_sender.clone());
 
         let daemon = self.daemon.take().ok_or("Daemon not available")?;
@@ -206,7 +211,7 @@ impl ServiceTracker {
     fn handle_mdns_event(
         event: MdnsServiceEvent,
         services: &Arc<Mutex<HashMap<String, ServiceInfo>>>,
-        event_sender: &mpsc::Sender<ServiceEvent>,
+        event_sender: &mpsc::UnboundedSender<ServiceEvent>,
     ) {
         match event {
             MdnsServiceEvent::ServiceResolved(info) => {

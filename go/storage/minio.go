@@ -58,7 +58,6 @@ type Minio struct {
 	sessionTimeout time.Duration
 	stopTimeout    chan struct{}
 
-	onSessionClosedCb       OnSessionClosedCb
 	onSessionStateChangedCb OnSessionStateChangedCb
 	onAudioChunkCb          OnAudioChunkCb
 	cbLock                  sync.Mutex
@@ -193,31 +192,6 @@ func (m *Minio) Start(ctx context.Context) error {
 				continue
 			}
 
-			// Migration: Convert legacy IsClosed to State
-			if sessionMetadata.State == SessionStateUnknown {
-				if sessionMetadata.IsClosed {
-					sessionMetadata.State = SessionStateFinished
-				} else if m.isSessionClosed(ctx, recorderID, sessionID) {
-					// No chunks folder means it was already rendered
-					sessionMetadata.State = SessionStateFinished
-				} else {
-					// Has chunks folder, still recording
-					sessionMetadata.State = SessionStateRecording
-				}
-				// Save migrated state
-				if err := m.putSessionMetadata(ctx, recorderID, sessionID, sessionMetadata); err != nil {
-					log.Warn().
-						Err(err).
-						Stringer("session-id", sessionID).
-						Msg("Cannot save migrated session metadata")
-				} else {
-					log.Info().
-						Stringer("session-id", sessionID).
-						Str("state", sessionMetadata.State.String()).
-						Msg("Migrated legacy session state")
-				}
-			}
-
 			m.system.Recorders[recorderID].Sessions[sessionID] = *sessionMetadata
 		}
 
@@ -339,15 +313,6 @@ func (m *Minio) checkAndCloseStaleSession(ctx context.Context) {
 	}
 }
 
-func (m *Minio) RegisterOnSessionClosedCallback(cb OnSessionClosedCb) error {
-	m.cbLock.Lock()
-	defer m.cbLock.Unlock()
-
-	m.onSessionClosedCb = cb
-
-	return nil
-}
-
 func (m *Minio) RegisterOnSessionStateChangedCallback(cb OnSessionStateChangedCb) error {
 	m.cbLock.Lock()
 	defer m.cbLock.Unlock()
@@ -397,7 +362,6 @@ func (m *Minio) initSession(ctx context.Context, recorderID, sessionID uuid.UUID
 		EndTime:    time.Time{},
 		Duration:   0,
 		State:      SessionStateRecording,
-		IsClosed:   false,
 		Keep:       false,
 		Segments:   make(map[uuid.UUID]Segment),
 	}
@@ -878,7 +842,6 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 
 	// Rendering succeeded - set state to FINISHED
 	sm.State = SessionStateFinished
-	sm.IsClosed = true
 	m.dataLock.Lock()
 	if err := m.putSessionMetadata(ctx, recorderID, sessionID, sm); err != nil {
 		log.Err(err).Msg("Cannot put session metadata")
@@ -891,13 +854,6 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 
 	// Notify state change to FINISHED
 	m.notifyStateChange(sm, previousState)
-
-	// Legacy callback for backward compatibility
-	if m.onSessionClosedCb != nil {
-		m.cbLock.Lock()
-		m.onSessionClosedCb(sm)
-		m.cbLock.Unlock()
-	}
 
 	log.Debug().Stringer("recorder-id", recorderID).Stringer("session-id", sessionID).Msg("Done rendering session")
 

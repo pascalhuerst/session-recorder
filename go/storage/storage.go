@@ -61,9 +61,6 @@ func (s SegmentState) String() string {
 	}
 }
 
-// OnSessionClosedCb is called when a session finishes rendering (legacy callback)
-type OnSessionClosedCb func(session *Session)
-
 // OnSessionStateChangedCb is called when a session's state changes
 type OnSessionStateChangedCb func(session *Session, previousState SessionState)
 
@@ -129,10 +126,7 @@ type Storage interface {
 
 	CloseRecordingSession(ctx context.Context, recorderID, sessionID uuid.UUID) error
 	isSessionClosed(ctx context.Context, recorderID, sessionID uuid.UUID) bool
-	//CloseSession(ctx context.Context, RecorderID, SessionID uuid.UUID) error
-	//CloseOpenSessions(ctx context.Context, RecorderID uuid.UUID) error
 
-	RegisterOnSessionClosedCallback(cb OnSessionClosedCb) error
 	RegisterOnSessionStateChangedCallback(cb OnSessionStateChangedCb) error
 	RegisterOnAudioChunkCallback(cb OnAudioChunkCb) error
 
@@ -199,13 +193,9 @@ type Session struct {
 	EndTime   time.Time     `json:"end_time"`
 	Duration  time.Duration `json:"duration"`
 
-	// State replaces IsClosed - tracks full lifecycle state
 	State        SessionState `json:"state"`
 	ErrorMessage string       `json:"error_message,omitempty"`
 	Keep         bool         `json:"keep"`
-
-	// IsClosed is deprecated, kept for backward compatibility with existing metadata
-	IsClosed bool `json:"is_closed,omitempty"`
 
 	// key: segment id
 	Segments map[uuid.UUID]Segment `json:"segments"`

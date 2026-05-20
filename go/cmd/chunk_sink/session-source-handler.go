@@ -67,13 +67,6 @@ func NewSessionSourceHandler(
 		},
 	)
 
-	// Keep legacy callback for backwards compatibility
-	sessionStorage.RegisterOnSessionClosedCallback(
-		func(session *storage.Session) {
-			h.onSessionClosed(session)
-		},
-	)
-
 	// Register callback for audio chunk streaming
 	sessionStorage.RegisterOnAudioChunkCallback(
 		func(recorderID, sessionID uuid.UUID, samples []int16, chunkNumber int, timestamp time.Time) {
@@ -269,19 +262,6 @@ func (h *SessionSourceHandler) onSessionStateChanged(session *storage.Session, p
 		Str("new-state", session.State.String()).
 		Msg("Session state changed")
 
-	h.sessionBroadcaster.Broadcast(&sspb.Session{
-		ID: session.ID.String(),
-		Info: &sspb.Session_Updated{
-			Updated: newSessionInfo(context.Background(), h, session),
-		},
-	})
-}
-
-// Called after a session has been closed and rendered by storage. Setup above in the constructor
-func (h *SessionSourceHandler) onSessionClosed(session *storage.Session) {
-	log.Debug().Interface("session", session).Msg("Session closed")
-
-	// This is now handled by onSessionStateChanged, but kept for backwards compatibility
 	h.sessionBroadcaster.Broadcast(&sspb.Session{
 		ID: session.ID.String(),
 		Info: &sspb.Session_Updated{

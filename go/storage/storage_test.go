@@ -44,7 +44,7 @@ func TestSession_Serialization(t *testing.T) {
 		StartTime:  time.Date(2024, 1, 15, 10, 0, 0, 0, time.UTC),
 		EndTime:    time.Date(2024, 1, 15, 11, 0, 0, 0, time.UTC),
 		Duration:   time.Hour,
-		IsClosed:   true,
+		State:      SessionStateFinished,
 		Keep:       true,
 		Segments: map[uuid.UUID]Segment{
 			segmentID: {
@@ -81,8 +81,8 @@ func TestSession_Serialization(t *testing.T) {
 	if decoded.Name != original.Name {
 		t.Errorf("Session.Name = %v, want %v", decoded.Name, original.Name)
 	}
-	if decoded.IsClosed != original.IsClosed {
-		t.Errorf("Session.IsClosed = %v, want %v", decoded.IsClosed, original.IsClosed)
+	if decoded.State != original.State {
+		t.Errorf("Session.State = %v, want %v", decoded.State, original.State)
 	}
 	if decoded.Keep != original.Keep {
 		t.Errorf("Session.Keep = %v, want %v", decoded.Keep, original.Keep)
@@ -262,7 +262,7 @@ func TestSystem_String(t *testing.T) {
 					sessionID: {
 						ID:       sessionID,
 						Name:     "Session 1",
-						IsClosed: true,
+						State:    SessionStateFinished,
 						Keep:     true,
 						Duration: time.Hour,
 					},
@@ -287,7 +287,7 @@ func TestSession_String(t *testing.T) {
 	session := Session{
 		ID:       uuid.New(),
 		Name:     "Test Session",
-		IsClosed: true,
+		State:    SessionStateFinished,
 		Keep:     true,
 		Duration: time.Hour,
 	}

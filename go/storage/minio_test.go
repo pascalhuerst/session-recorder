@@ -152,7 +152,7 @@ func TestMinio_GetSessions_WithData(t *testing.T) {
 							RecorderID: recorderID,
 							Name:       "Test Session",
 							StartTime:  time.Now(),
-							IsClosed:   true,
+							State:      SessionStateFinished,
 						},
 					},
 				},
@@ -180,7 +180,7 @@ func TestMinio_GetSession_Success(t *testing.T) {
 		RecorderID: recorderID,
 		Name:       "Test Session",
 		StartTime:  time.Now(),
-		IsClosed:   true,
+		State:      SessionStateFinished,
 		Keep:       true,
 	}
 
@@ -255,24 +255,6 @@ func TestMinio_GetSession_SessionNotFound(t *testing.T) {
 	}
 }
 
-func TestMinio_RegisterOnSessionClosedCallback(t *testing.T) {
-	m := &Minio{
-		chunks: make(map[uuid.UUID]*minioChunk),
-	}
-
-	callback := func(session *Session) {
-		// Callback implementation
-	}
-
-	err := m.RegisterOnSessionClosedCallback(callback)
-	if err != nil {
-		t.Errorf("RegisterOnSessionClosedCallback() error = %v", err)
-	}
-
-	if m.onSessionClosedCb == nil {
-		t.Error("RegisterOnSessionClosedCallback() did not set callback")
-	}
-}
 
 func TestFilenameConstants(t *testing.T) {
 	tests := []struct {

@@ -31,6 +31,10 @@ type minioChunk struct {
 	number    int
 	sessionID uuid.UUID
 	buffer    *bytes.Buffer
+	// pushedToMinio is true once at least one buffer has been uploaded as a
+	// chunks/<n> object. Until then, no audio for this session exists on minio
+	// — the in-memory buffer is the only copy.
+	pushedToMinio bool
 }
 
 // Default session timeout - if no chunks arrive for this duration, the session is automatically closed
@@ -346,8 +350,10 @@ func (m *Minio) initSession(ctx context.Context, recorderID, sessionID uuid.UUID
 		Stringer("session-id", sessionID).
 		Msg("Creating new session")
 
-	// Before creating a new session, ensure all previous sessions are closed
-	m.closeIntermediateSessions(ctx, recorderID)
+	// Note: stale-session cleanup is handled at startup by Start()'s
+	// closeSessions, and during rotation by the explicit closeSessionAsync
+	// spawned in SafeChunks. Calling closeIntermediateSessions from here would
+	// race with that explicit close on the just-transitioned previous session.
 
 	m.chunks[recorderID] = &minioChunk{
 		number:    0,
@@ -591,6 +597,7 @@ func (m *Minio) SafeChunks(ctx context.Context, recorderID, sessionID uuid.UUID,
 		if err != nil {
 			return fmt.Errorf("cannot put object: %w", err)
 		}
+		chunk.pushedToMinio = true
 	}
 
 	return nil
@@ -632,65 +639,146 @@ func (m *Minio) flushChunks(ctx context.Context, recorderID, sessionID uuid.UUID
 	return nil
 }
 
+// renderSession is the "compose-from-uploaded-chunks" rendering path. It
+// concatenates every chunks/<n> object into data.raw, then runs the shared
+// derived-file rendering. Use this when at least one chunk has been pushed to
+// minio (chunk.pushedToMinio == true, or any chunks/<n> objects exist).
 func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UUID) error {
-	log.Debug().Stringer("recorder-id", recorderID).Stringer("session-id", sessionID).Msg("Rendering session")
+	log.Debug().Stringer("recorder-id", recorderID).Stringer("session-id", sessionID).Msg("Rendering session (compose path)")
 
+	if err := m.composeChunksIntoRaw(ctx, recorderID, sessionID); err != nil {
+		return err
+	}
+	return m.renderDerivedFiles(ctx, recorderID, sessionID, true)
+}
+
+// renderInMemorySession is the "buffer-only" rendering path. The recorder went
+// silent (or got cut) before the in-memory buffer ever reached minChunkSize,
+// so nothing was uploaded as a chunks/<n>. The bytes are right here in
+// memory — feed them straight into the renderers and upload data.raw in
+// parallel. No compose, no round-trip through minio, no zero-padding.
+func (m *Minio) renderInMemorySession(ctx context.Context, recorderID, sessionID uuid.UUID, buffer *bytes.Buffer) error {
+	rawBytes := buffer.Bytes()
+	log.Info().
+		Stringer("recorder-id", recorderID).
+		Stringer("session-id", sessionID).
+		Int("bytes", len(rawBytes)).
+		Msg("Rendering session from in-memory buffer (nothing pushed to minio yet)")
+
+	// raw samples: 48000 Hz, 2 channels, int16 LE
+	const bytesPerSecond float64 = 48000.0 * 2.0 * 2.0
+	durationSeconds := float64(len(rawBytes)) / bytesPerSecond
+
+	sm, err := m.getSessionMetadata(ctx, recorderID, sessionID)
+	if err != nil {
+		return fmt.Errorf("cannot get session metadata: %w", err)
+	}
+	previousState := sm.State
+	sm.Duration = time.Duration(durationSeconds) * time.Second
+	sm.EndTime = sm.StartTime.Add(sm.Duration)
+
+	rawDataObjectName := fmt.Sprintf("%s/sessions/%s/data.raw", recorderID, sessionID)
+	waveformObject := fmt.Sprintf("%s/sessions/%s/waveform.dat", recorderID, sessionID)
+	overviewObject := fmt.Sprintf("%s/sessions/%s/overview.png", recorderID, sessionID)
+	flacObject := fmt.Sprintf("%s/sessions/%s/data.flac", recorderID, sessionID)
+	oggObject := fmt.Sprintf("%s/sessions/%s/data.ogg", recorderID, sessionID)
+
+	// Each renderer reads from its own bytes.Reader over the same underlying
+	// slice — cheap (cursor only) and independent. data.raw is uploaded as a
+	// fifth parallel task so it's available for later segment rendering.
+	eg, egCtx := errgroup.WithContext(ctx)
+
+	eg.Go(func() error {
+		_, err := m.client.PutObject(egCtx, bucketName, rawDataObjectName, bytes.NewReader(rawBytes), int64(len(rawBytes)), minio.PutObjectOptions{})
+		if err != nil {
+			log.Err(err).Str("object", rawDataObjectName).Msg("Cannot upload data.raw")
+			return fmt.Errorf("cannot upload data.raw: %w", err)
+		}
+		return nil
+	})
+
+	eg.Go(func() error {
+		waveformData, werr := render.CreateWaveform(egCtx, bytes.NewReader(rawBytes), 300, 10000, 200)
+		if werr != nil {
+			return fmt.Errorf("cannot create waveform: %w", werr)
+		}
+		if _, err := m.client.PutObject(egCtx, bucketName, waveformObject, waveformData, int64(waveformData.Len()), minio.PutObjectOptions{}); err != nil {
+			return fmt.Errorf("cannot upload waveform: %w", err)
+		}
+		return nil
+	})
+
+	eg.Go(func() error {
+		overviewData, oerr := render.CreateOverview(egCtx, bytes.NewReader(rawBytes), 300, 1000, 200)
+		if oerr != nil {
+			return fmt.Errorf("cannot create overview: %w", oerr)
+		}
+		if _, err := m.client.PutObject(egCtx, bucketName, overviewObject, overviewData, int64(overviewData.Len()), minio.PutObjectOptions{}); err != nil {
+			return fmt.Errorf("cannot upload overview: %w", err)
+		}
+		return nil
+	})
+
+	eg.Go(func() error {
+		flacBuffer, ferr := render.Flac(bytes.NewReader(rawBytes))
+		if ferr != nil {
+			return fmt.Errorf("cannot create flac: %w", ferr)
+		}
+		if _, err := m.client.PutObject(egCtx, bucketName, flacObject, flacBuffer, int64(flacBuffer.Len()), minio.PutObjectOptions{}); err != nil {
+			return fmt.Errorf("cannot upload flac: %w", err)
+		}
+		return nil
+	})
+
+	eg.Go(func() error {
+		oggBuffer, oerr := render.CreateAudioFile(bytes.NewReader(rawBytes), "ogg")
+		if oerr != nil {
+			return fmt.Errorf("cannot create ogg: %w", oerr)
+		}
+		if _, err := m.client.PutObject(egCtx, bucketName, oggObject, oggBuffer, int64(oggBuffer.Len()), minio.PutObjectOptions{}); err != nil {
+			return fmt.Errorf("cannot upload ogg: %w", err)
+		}
+		return nil
+	})
+
+	if err := eg.Wait(); err != nil {
+		sm.State = SessionStateError
+		sm.ErrorMessage = err.Error()
+		m.dataLock.Lock()
+		if putErr := m.putSessionMetadata(ctx, recorderID, sessionID, sm); putErr != nil {
+			log.Err(putErr).Msg("Cannot update session state to ERROR")
+		}
+		m.dataLock.Unlock()
+		m.notifyStateChange(sm, previousState)
+		return err
+	}
+
+	sm.State = SessionStateFinished
+	m.dataLock.Lock()
+	if err := m.putSessionMetadata(ctx, recorderID, sessionID, sm); err != nil {
+		log.Err(err).Msg("Cannot put session metadata")
+	}
+	m.dataLock.Unlock()
+
+	m.notifyStateChange(sm, previousState)
+	log.Debug().Stringer("recorder-id", recorderID).Stringer("session-id", sessionID).Msg("Done rendering in-memory session")
+	return nil
+}
+
+// composeChunksIntoRaw concatenates every chunks/<n> object for this session
+// into a single data.raw, via S3 server-side composition.
+func (m *Minio) composeChunksIntoRaw(ctx context.Context, recorderID, sessionID uuid.UUID) error {
 	chunksPrefix := fmt.Sprintf("%s/sessions/%s/chunks", recorderID, sessionID)
 	rawDataObjectName := fmt.Sprintf("%s/sessions/%s/data.raw", recorderID, sessionID)
-
-	// I need to double check this, but this dance does not seem to be necessary...
-	//rawPreRenderedObjectName := fmt.Sprintf("%s/sessions/%s/pre_rendered_data.raw", RecorderID, sessionID)
-	//
-	//havePreRenderedData := false
-	//
-	//// There is an edge case. If the chunk-sink-server crashed, the current session is closed on m.Start()
-	//// If the chunk-source still sends data for the same session, we just create a chunks folder again and drop
-	//// the data. We can however check, if there is a chunks folder AND a data.raw. If that's the case, we can just append
-	//// the data and regenerate the ogg and the flac file
-	//_, err := m.client.StatObject(ctx, bucketName, rawDataObjectName, minio.StatObjectOptions{})
-	//if minio.ToErrorResponse(err).Code != "NoSuchKey" {
-	//	havePreRenderedData = true
-	//
-	//	log.Info().
-	//		Stringer("recorder-id", RecorderID).
-	//		Stringer("session-id", sessionID).
-	//		Msg("Session already rendered, but more chunks found. Will re-render.")
-	//
-	//	dst := minio.CopyDestOptions{
-	//		Bucket: bucketName,
-	//		Object: rawPreRenderedObjectName,
-	//	}
-	//
-	//	src := minio.CopySrcOptions{
-	//		Bucket: bucketName,
-	//		Object: rawDataObjectName,
-	//	}
-	//
-	//	_, err = m.client.CopyObject(ctx, dst, src)
-	//	if err != nil {
-	//		log.Err(err).Msg("Could not extend pre-rendered data")
-	//	}
-	//}
 
 	objectCh := m.client.ListObjects(ctx, bucketName, minio.ListObjectsOptions{Prefix: chunksPrefix, Recursive: true})
 	srcs := make([]minio.CopySrcOptions, 0)
 
-	// Just add the pre-rendered data to the list of sources first
-	// that way, the new chunks should be appended
-	//if havePreRenderedData {
-	//	srcs = append(srcs, minio.CopySrcOptions{
-	//		Bucket: bucketName,
-	//		Object: rawPreRenderedObjectName,
-	//	})
-	//}
-
 	for objectInfo := range objectCh {
 		if objectInfo.Err != nil {
 			log.Err(objectInfo.Err).Msg("Cannot list objects")
-
 			return objectInfo.Err
 		}
-
 		srcs = append(srcs, minio.CopySrcOptions{
 			Bucket: bucketName,
 			Object: objectInfo.Key,
@@ -702,17 +790,37 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 		Object: rawDataObjectName,
 	}
 
-	ui, err := m.client.ComposeObject(ctx, dst, srcs...)
-	if err != nil {
+	if _, err := m.client.ComposeObject(ctx, dst, srcs...); err != nil {
 		log.Err(err).Msg("Cannot compose object, too small. Will delete session.")
-
 		return m.deleteSession(ctx, recorderID, sessionID)
 	}
 
-	// We need to make this generic and nicer, hack for now to get teh exact end time for the session
-	// raw samples for 48000hz, 2 Bytes (16bit), 2 channels
+	return nil
+}
+
+// renderDerivedFiles assumes <session>/data.raw exists, then renders waveform,
+// overview, flac and ogg files. If removeChunks is true, the chunks/ folder is
+// purged on success (used by the compose path; the in-memory path has nothing
+// to clean up there).
+func (m *Minio) renderDerivedFiles(ctx context.Context, recorderID, sessionID uuid.UUID, removeChunks bool) error {
+	chunksPrefix := fmt.Sprintf("%s/sessions/%s/chunks", recorderID, sessionID)
+	rawDataObjectName := fmt.Sprintf("%s/sessions/%s/data.raw", recorderID, sessionID)
+
+	rawData, err := m.client.GetObject(ctx, bucketName, rawDataObjectName, minio.GetObjectOptions{})
+	if err != nil {
+		log.Err(err).Str("object", rawDataObjectName).Msg("Cannot get object")
+		return err
+	}
+
+	rawInfo, err := rawData.Stat()
+	if err != nil {
+		rawData.Close()
+		return fmt.Errorf("cannot stat data.raw: %w", err)
+	}
+
+	// raw samples: 48000 Hz, 2 channels, int16 LE
 	const bytesPerSecond float64 = 48000.0 * 2.0 * 2.0
-	durationSeconds := float64(ui.Size) / bytesPerSecond
+	durationSeconds := float64(rawInfo.Size) / bytesPerSecond
 
 	sm, err := m.getSessionMetadata(ctx, recorderID, sessionID)
 	if err != nil {
@@ -725,27 +833,17 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 	sm.EndTime = sm.StartTime.Add(sm.Duration)
 	// Don't set to FINISHED yet - wait for rendering to complete
 
-	var rawData *minio.Object
-	if rawData, err = m.client.GetObject(ctx, bucketName, dst.Object, minio.GetObjectOptions{}); err != nil {
-		log.Err(err).Str("object", dst.Object).Msg("Cannot get object")
-
-		return err
-	}
-
 	readers, writer, closer := makeReaders(4)
 	eg, egCtx := errgroup.WithContext(ctx)
 
-	// Setup some io for the rendering of waveform, overview, flac and ogg files
+	// Pipe data.raw to the four render workers.
 	eg.Go(func() error {
 		defer closer.Close()
-
 		_, err := io.Copy(writer, rawData)
 		if err != nil {
 			log.Err(err).Msg("Cannot setup multiple readers")
-
 			return err
 		}
-
 		return nil
 	})
 
@@ -754,17 +852,13 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 		waveformData, err := render.CreateWaveform(egCtx, readers[0], 300, 10000, 200)
 		if err != nil {
 			log.Err(err).Msg("Cannot create waveform")
-
 			return fmt.Errorf("cannot create waveform: %w", err)
 		}
-
 		waveformObject := fmt.Sprintf("%s/sessions/%s/waveform.dat", recorderID, sessionID)
 		if _, err := m.client.PutObject(ctx, bucketName, waveformObject, waveformData, int64(waveformData.Len()), minio.PutObjectOptions{}); err != nil {
 			log.Err(err).Str("object", waveformObject).Msg("Cannot put object")
-
 			return err
 		}
-
 		return nil
 	})
 
@@ -773,62 +867,47 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 		overviewData, err := render.CreateOverview(egCtx, readers[1], 300, 1000, 200)
 		if err != nil {
 			log.Err(err).Msg("Cannot create waveform overview")
-
 			return fmt.Errorf("cannot create waveform overview: %w", err)
 		}
-
 		overviewObject := fmt.Sprintf("%s/sessions/%s/overview.png", recorderID, sessionID)
 		if _, err := m.client.PutObject(ctx, bucketName, overviewObject, overviewData, int64(overviewData.Len()), minio.PutObjectOptions{}); err != nil {
 			log.Err(err).Str("object", overviewObject).Msg("Cannot put object")
-
 			return err
 		}
-
 		return nil
 	})
 
 	// Create flac file.
 	eg.Go(func() error {
-		var flacBuffer *bytes.Buffer
-		if flacBuffer, err = render.Flac(readers[2]); err != nil {
-			log.Err(err).Msg("Cannot convert to flac")
-
-			return err
+		flacBuffer, ferr := render.Flac(readers[2])
+		if ferr != nil {
+			log.Err(ferr).Msg("Cannot convert to flac")
+			return ferr
 		}
-
 		flacObject := fmt.Sprintf("%s/sessions/%s/data.flac", recorderID, sessionID)
 		if _, err := m.client.PutObject(ctx, bucketName, flacObject, flacBuffer, int64(flacBuffer.Len()), minio.PutObjectOptions{}); err != nil {
 			log.Err(err).Str("object", flacObject).Msg("Cannot put object")
-
 			return err
 		}
-
 		return nil
 	})
 
 	// Create ogg file.
 	eg.Go(func() error {
-		ext := "ogg"
-
-		var buffer *bytes.Buffer
-		if buffer, err = render.CreateAudioFile(readers[3], ext); err != nil {
-			log.Err(err).Msg("Cannot convert to ogg")
-
-			return err
+		oggBuffer, oerr := render.CreateAudioFile(readers[3], "ogg")
+		if oerr != nil {
+			log.Err(oerr).Msg("Cannot convert to ogg")
+			return oerr
 		}
-
-		object := fmt.Sprintf("%s/sessions/%s/data.%s", recorderID, sessionID, ext)
-		if _, err := m.client.PutObject(ctx, bucketName, object, buffer, int64(buffer.Len()), minio.PutObjectOptions{}); err != nil {
+		object := fmt.Sprintf("%s/sessions/%s/data.ogg", recorderID, sessionID)
+		if _, err := m.client.PutObject(ctx, bucketName, object, oggBuffer, int64(oggBuffer.Len()), minio.PutObjectOptions{}); err != nil {
 			log.Err(err).Str("object", object).Msg("Cannot put object")
-
 			return err
 		}
-
 		return nil
 	})
 
 	if err := eg.Wait(); err != nil {
-		// Set state to ERROR on rendering failure
 		sm.State = SessionStateError
 		sm.ErrorMessage = err.Error()
 		m.dataLock.Lock()
@@ -840,7 +919,6 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 		return err
 	}
 
-	// Rendering succeeded - set state to FINISHED
 	sm.State = SessionStateFinished
 	m.dataLock.Lock()
 	if err := m.putSessionMetadata(ctx, recorderID, sessionID, sm); err != nil {
@@ -848,15 +926,14 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 	}
 	m.dataLock.Unlock()
 
-	if err := m.client.RemoveObject(ctx, bucketName, chunksPrefix, minio.RemoveObjectOptions{ForceDelete: true}); err != nil {
-		log.Err(err).Str("object", chunksPrefix).Msg("Cannot remove object")
+	if removeChunks {
+		if err := m.client.RemoveObject(ctx, bucketName, chunksPrefix, minio.RemoveObjectOptions{ForceDelete: true}); err != nil {
+			log.Err(err).Str("object", chunksPrefix).Msg("Cannot remove object")
+		}
 	}
 
-	// Notify state change to FINISHED
 	m.notifyStateChange(sm, previousState)
-
 	log.Debug().Stringer("recorder-id", recorderID).Stringer("session-id", sessionID).Msg("Done rendering session")
-
 	return nil
 }
 
@@ -1148,64 +1225,24 @@ func (m *Minio) closeSessions(ctx context.Context, recorderID uuid.UUID) error {
 	return nil
 }
 
-// closeIntermediateSessions finds all sessions in RECORDING or PROCESSING state for a recorder
-// and transitions them to be processed. This is called when a new session starts to ensure
-// no sessions are left in an intermediate state.
-func (m *Minio) closeIntermediateSessions(ctx context.Context, recorderID uuid.UUID) {
-	recorder, ok := m.system.Recorders[recorderID]
-	if !ok {
-		return
-	}
-
-	for sessionID, session := range recorder.Sessions {
-		if session.State == SessionStateRecording || session.State == SessionStateProcessing {
-			log.Info().
-				Stringer("recorder-id", recorderID).
-				Stringer("session-id", sessionID).
-				Str("state", session.State.String()).
-				Msg("Found session in intermediate state, closing")
-
-			// Transition to PROCESSING if still RECORDING
-			if session.State == SessionStateRecording {
-				previousState := session.State
-				session.State = SessionStateProcessing
-				if err := m.putSessionMetadata(ctx, recorderID, sessionID, &session); err != nil {
-					log.Err(err).Msg("Cannot update session state to PROCESSING")
-					continue
-				}
-				m.system.Recorders[recorderID].Sessions[sessionID] = session
-				go m.notifyStateChange(&session, previousState)
-			}
-
-			// Kick off async rendering
-			go func(recorderID, sessionID uuid.UUID) {
-				if err := m.closeSessionAsync(context.Background(), recorderID, sessionID, nil); err != nil {
-					log.Err(err).
-						Stringer("recorder-id", recorderID).
-						Stringer("session-id", sessionID).
-						Msg("Cannot close intermediate session")
-					return
-				}
-				log.Info().
-					Stringer("recorder-id", recorderID).
-					Stringer("session-id", sessionID).
-					Msg("Intermediate session closed")
-			}(recorderID, sessionID)
-		}
-	}
-}
-
 // closeSession handles full session closing including state transition.
 // Used at startup when processing sessions that may still be in RECORDING state.
+// The startup path never has an in-memory chunk (the process just restarted),
+// so the only thing to check is whether there are any chunks/<n> on disk.
 func (m *Minio) closeSession(ctx context.Context, recorderID, sessionID uuid.UUID, chunk *minioChunk) error {
-	if m.isSessionClosed(ctx, recorderID, sessionID) {
-		return nil
-	}
+	hasOnDisk := !m.isSessionClosed(ctx, recorderID, sessionID)
+	hasInMemory := chunk != nil && chunk.buffer != nil && chunk.buffer.Len() > 0
 
-	if chunk != nil {
-		if err := m.flushChunks(ctx, recorderID, sessionID, chunk); err != nil {
-			return fmt.Errorf("cannot flush session: %w", err)
-		}
+	if !hasOnDisk && !hasInMemory {
+		// Genuinely empty session — orphan metadata only. Clean it up so it
+		// doesn't sit in PROCESSING forever.
+		log.Info().
+			Stringer("recorder-id", recorderID).
+			Stringer("session-id", sessionID).
+			Msg("Closing empty session (no chunks on disk, no in-memory buffer)")
+		m.dataLock.Lock()
+		defer m.dataLock.Unlock()
+		return m.deleteSession(ctx, recorderID, sessionID)
 	}
 
 	// Update state to PROCESSING before rendering
@@ -1221,7 +1258,7 @@ func (m *Minio) closeSession(ctx context.Context, recorderID, sessionID uuid.UUI
 		m.notifyStateChange(sm, previousState)
 	}
 
-	if err := m.renderSession(ctx, recorderID, sessionID); err != nil {
+	if err := m.dispatchRender(ctx, recorderID, sessionID, chunk, hasOnDisk, hasInMemory); err != nil {
 		return fmt.Errorf("cannot render session: %w", err)
 	}
 
@@ -1233,25 +1270,64 @@ func (m *Minio) closeSession(ctx context.Context, recorderID, sessionID uuid.UUI
 // closeSessionAsync handles session closing when state was already transitioned to PROCESSING.
 // Used when a new session starts and we need to finish processing the previous session.
 func (m *Minio) closeSessionAsync(ctx context.Context, recorderID, sessionID uuid.UUID, chunk *minioChunk) error {
-	if m.isSessionClosed(ctx, recorderID, sessionID) {
-		return nil
-	}
+	hasOnDisk := !m.isSessionClosed(ctx, recorderID, sessionID)
+	hasInMemory := chunk != nil && chunk.buffer != nil && chunk.buffer.Len() > 0
 
-	if chunk != nil {
-		if err := m.flushChunks(ctx, recorderID, sessionID, chunk); err != nil {
-			return fmt.Errorf("cannot flush session: %w", err)
-		}
+	if !hasOnDisk && !hasInMemory {
+		log.Info().
+			Stringer("recorder-id", recorderID).
+			Stringer("session-id", sessionID).
+			Msg("Closing empty session (no chunks on disk, no in-memory buffer)")
+		m.dataLock.Lock()
+		defer m.dataLock.Unlock()
+		return m.deleteSession(ctx, recorderID, sessionID)
 	}
 
 	// State transition to PROCESSING was already done synchronously in SafeChunks
 	// Proceed directly to rendering
-	if err := m.renderSession(ctx, recorderID, sessionID); err != nil {
+	if err := m.dispatchRender(ctx, recorderID, sessionID, chunk, hasOnDisk, hasInMemory); err != nil {
 		return fmt.Errorf("cannot render session: %w", err)
 	}
 
 	log.Debug().Stringer("recorder-id", recorderID).Stringer("session-id", sessionID).Msg("Session closed")
 
 	return nil
+}
+
+// dispatchRender picks the right rendering path based on what data exists:
+//
+//   - on-disk chunks AND a non-empty in-memory buffer: flush the remaining
+//     buffer to a final chunks/<n>, then compose all chunks/<n> into data.raw
+//     and render derived files. The buffer is appended (padded to minChunkSize
+//     so multipart copy accepts it).
+//   - on-disk chunks only: skip flush, just compose and render.
+//   - in-memory only (recorder went silent before the buffer ever reached
+//     minChunkSize): upload the buffer directly as data.raw, no padding,
+//     no compose. This is the case that used to silently drop data.
+//
+// Caller has already verified at least one of hasOnDisk / hasInMemory is true.
+func (m *Minio) dispatchRender(
+	ctx context.Context,
+	recorderID, sessionID uuid.UUID,
+	chunk *minioChunk,
+	hasOnDisk, hasInMemory bool,
+) error {
+	switch {
+	case hasOnDisk && hasInMemory:
+		if err := m.flushChunks(ctx, recorderID, sessionID, chunk); err != nil {
+			return fmt.Errorf("cannot flush session: %w", err)
+		}
+		return m.renderSession(ctx, recorderID, sessionID)
+
+	case hasOnDisk:
+		return m.renderSession(ctx, recorderID, sessionID)
+
+	case hasInMemory:
+		return m.renderInMemorySession(ctx, recorderID, sessionID, chunk.buffer)
+
+	default:
+		return nil
+	}
 }
 
 func (m *Minio) CloseRecordingSession(ctx context.Context, recorderID, sessionID uuid.UUID) error {

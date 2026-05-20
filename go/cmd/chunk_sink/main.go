@@ -25,6 +25,7 @@ const (
 	chunkSinkService         = "_session-recorder-chunksink._tcp"
 	defaultSessionSourcePort = 8780
 	sessionSourceService     = "_session-recorder-sessionsource._tcp"
+	defaultGrpcWebPort       = 8081
 	defaultLifetime          = 4 * 24 * time.Hour
 )
 
@@ -61,6 +62,7 @@ func main() {
 	// CLI flags with env var fallback
 	chunkSinkPort := flag.Int("chunk-sink-port", utils.GetIntWithDefault("CHUNK_SINK_PORT", defaultChunkSinkPort), "Port for ChunkSink gRPC service (env: CHUNK_SINK_PORT)")
 	sessionSourcePort := flag.Int("session-source-port", utils.GetIntWithDefault("SESSION_SOURCE_PORT", defaultSessionSourcePort), "Port for SessionSource gRPC service (env: SESSION_SOURCE_PORT)")
+	grpcWebPort := flag.Int("grpcweb-port", utils.GetIntWithDefault("GRPCWEB_PORT", defaultGrpcWebPort), "Port for gRPC-Web HTTP listener wrapping SessionSource (env: GRPCWEB_PORT)")
 
 	// S3/MinIO configuration
 	s3Endpoint := flag.String("s3-endpoint", utils.GetWithDefault("S3_ENDPOINT", "localhost:9000"), "S3/MinIO internal endpoint host:port (env: S3_ENDPOINT)")
@@ -195,7 +197,7 @@ func main() {
 		ShareSegmentCB:       sessionSourceHandler.shareSegment,
 	})
 
-	port, err := grpc.StartProtocolServer(sessionSourceServer, mdnsServer, sessionSourceService, uint16(*sessionSourcePort))
+	sessionSourceGrpcServer, port, err := grpc.StartProtocolServer(sessionSourceServer, mdnsServer, sessionSourceService, uint16(*sessionSourcePort))
 	if err != nil {
 		log.Err(err).Msg("Cannot start session source server")
 
@@ -203,7 +205,13 @@ func main() {
 	}
 	log.Info().Msgf("Session source server is now being served on port %d", port)
 
-	port, err = grpc.StartProtocolServer(chunkSinkServer, mdnsServer, chunkSinkService, uint16(*chunkSinkPort))
+	if err := grpc.StartGrpcWebServer(sessionSourceGrpcServer, uint16(*grpcWebPort)); err != nil {
+		log.Err(err).Msg("Cannot start gRPC-Web server")
+
+		return
+	}
+
+	_, port, err = grpc.StartProtocolServer(chunkSinkServer, mdnsServer, chunkSinkService, uint16(*chunkSinkPort))
 	if err != nil {
 		log.Err(err).Msg("Cannot start chunk sink server")
 

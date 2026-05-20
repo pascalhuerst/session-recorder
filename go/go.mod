@@ -23,9 +23,12 @@ require (
 )
 
 require (
+	github.com/cenkalti/backoff/v4 v4.1.1 // indirect
+	github.com/desertbit/timer v0.0.0-20180107155436-c41aec40b27f // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/hashicorp/errwrap v1.0.0 // indirect
 	github.com/icza/bitio v1.1.0 // indirect
+	github.com/improbable-eng/grpc-web v0.15.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/compress v1.17.4 // indirect
 	github.com/klauspost/cpuid/v2 v2.2.6 // indirect
@@ -34,6 +37,7 @@ require (
 	github.com/minio/sha256-simd v1.0.1 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
 	github.com/modern-go/reflect2 v1.0.2 // indirect
+	github.com/rs/cors v1.7.0 // indirect
 	github.com/rs/xid v1.5.0 // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/stretchr/testify v1.11.1 // indirect
@@ -43,6 +47,7 @@ require (
 	golang.org/x/text v0.32.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20251213004720-97cd9d5aeac2 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
+	nhooyr.io/websocket v1.8.6 // indirect
 )
 
 replace github.com/pascalhuerst/session-recorder/protocols/go => ../protocols/go

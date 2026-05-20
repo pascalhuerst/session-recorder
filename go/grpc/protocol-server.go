@@ -17,11 +17,11 @@ type ProtocolServer interface {
 	announcement() [][]byte
 }
 
-func StartProtocolServer(server ProtocolServer, mdnsServer *mdns.Server, mdnsName string, port uint16) (uint16, error) {
+func StartProtocolServer(server ProtocolServer, mdnsServer *mdns.Server, mdnsName string, port uint16) (*grpc.Server, uint16, error) {
 	host := fmt.Sprintf(":%d", port)
 	listener, err := net.Listen("tcp4", host)
 	if err != nil {
-		return 0, fmt.Errorf("cannot listen on %s: %v", host, err)
+		return nil, 0, fmt.Errorf("cannot listen on %s: %v", host, err)
 	}
 
 	port = uint16(listener.Addr().(*net.TCPAddr).Port)
@@ -40,11 +40,11 @@ func StartProtocolServer(server ProtocolServer, mdnsServer *mdns.Server, mdnsNam
 	if mdnsServer != nil {
 		_, err = mdnsServer.PublishRecord(mdnsServer.Hostname(), mdnsName, "", port, server.announcement())
 		if err != nil {
-			return 0, fmt.Errorf("unable to publish mDNS record %s: %v", mdnsName, err)
+			return nil, 0, fmt.Errorf("unable to publish mDNS record %s: %v", mdnsName, err)
 		}
 	}
 
 	log.Info().Msgf("Protocol %s is now being served on port %d", mdnsName, port)
 
-	return port, nil
+	return grpcServer, port, nil
 }

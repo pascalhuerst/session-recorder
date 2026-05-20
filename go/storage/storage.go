@@ -70,6 +70,7 @@ type OnAudioChunkCb func(recorderID, sessionID uuid.UUID, samples []int16, chunk
 type Filename string
 
 const (
+	FILENAME_RAW      = Filename("data.raw")
 	FILENAME_OGG      = Filename("data.ogg")
 	FILENAME_FLAC     = Filename("data.flac")
 	FILENAME_WAVEFORM = Filename("waveform.dat")

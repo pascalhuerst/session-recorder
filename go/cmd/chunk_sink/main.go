@@ -64,7 +64,23 @@ func main() {
 	sessionSourcePort := flag.Int("session-source-port", utils.GetIntWithDefault("SESSION_SOURCE_PORT", defaultSessionSourcePort), "Port for SessionSource gRPC service (env: SESSION_SOURCE_PORT)")
 	grpcWebPort := flag.Int("grpcweb-port", utils.GetIntWithDefault("GRPCWEB_PORT", defaultGrpcWebPort), "Port for gRPC-Web HTTP listener wrapping SessionSource (env: GRPCWEB_PORT)")
 
-	// S3/MinIO configuration
+	// Storage backend selection.
+	storageFsRoot := flag.String("storage-fs-root", utils.GetWithDefault("STORAGE_FS_ROOT", ""),
+		"Path to use as the root of a local filesystem storage backend (env: STORAGE_FS_ROOT).\n"+
+			"When set, all audio is read from / written to this directory and the MinIO\n"+
+			"backend is not used (so all --s3-* flags are ignored).\n"+
+			"When unset (the default), audio is stored in MinIO/S3 using the --s3-* flags.\n"+
+			"\n"+
+			"Filesystem backend trade-offs:\n"+
+			"  + No MinIO container required, no S3 credentials needed.\n"+
+			"  + Short sessions render correctly (no MinIO 5 MB-part zero-padding).\n"+
+			"  - Web UI playback does not work: it fetches audio via presigned URLs\n"+
+			"    the fs backend cannot produce. The session_source_client CLI and\n"+
+			"    external file-sharing (Dropbox / s3_copy / direct) still work.\n"+
+			"  - The on-disk layout mirrors the MinIO bucket layout, so a snapshot\n"+
+			"    of one backend can be loaded by the other by copying files.")
+
+	// S3/MinIO configuration (only used when --storage-fs-root is empty)
 	s3Endpoint := flag.String("s3-endpoint", utils.GetWithDefault("S3_ENDPOINT", "localhost:9000"), "S3/MinIO internal endpoint host:port (env: S3_ENDPOINT)")
 	s3AccessKey := flag.String("s3-access-key", utils.GetWithDefault("S3_ACCESS_KEY", ""), "S3 access key (env: S3_ACCESS_KEY)")
 	s3SecretKey := flag.String("s3-secret-key", utils.GetWithDefault("S3_SECRET_KEY", ""), "S3 secret key (env: S3_SECRET_KEY)")
@@ -93,24 +109,32 @@ func main() {
 		s3PublicEndpoint = buildEndpoint(*s3PublicHost, *s3PublicPort, s3LocalEndpoint)
 	}
 
-	// Validate required fields
-	if *s3AccessKey == "" || *s3SecretKey == "" {
-		log.Fatal().Msg("S3_ACCESS_KEY and S3_SECRET_KEY are required (via flags or env vars)")
-	}
-
 	ctx := context.Background()
 
 	logger.Setup()
 
 	log.Info().Msg("Setting up storage server")
 
-	minio, err := storage.NewMinioStorage(*s3Endpoint, s3LocalEndpoint, s3PublicEndpoint, *s3AccessKey, *s3SecretKey)
-	if err != nil {
-		log.Fatal().Err(err).Msg("Cannot create storage. Giving up")
-
-		return
+	var sessionStorage storage.Storage
+	if *storageFsRoot != "" {
+		log.Info().Str("root", *storageFsRoot).Msg("Using filesystem storage backend")
+		fs, err := storage.NewFsStorage(*storageFsRoot)
+		if err != nil {
+			log.Fatal().Err(err).Msg("Cannot create filesystem storage. Giving up")
+			return
+		}
+		sessionStorage = fs
+	} else {
+		if *s3AccessKey == "" || *s3SecretKey == "" {
+			log.Fatal().Msg("S3_ACCESS_KEY and S3_SECRET_KEY are required for the MinIO backend (set them or pass --storage-fs-root to use the filesystem backend)")
+		}
+		minio, err := storage.NewMinioStorage(*s3Endpoint, s3LocalEndpoint, s3PublicEndpoint, *s3AccessKey, *s3SecretKey)
+		if err != nil {
+			log.Fatal().Err(err).Msg("Cannot create storage. Giving up")
+			return
+		}
+		sessionStorage = minio
 	}
-	var sessionStorage storage.Storage = minio
 
 	if err := sessionStorage.Start(ctx); err != nil {
 		log.Fatal().Err(err).Msg("Cannot start storage. Giving up")

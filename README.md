@@ -1,10 +1,11 @@
 # Session Recorder
 
-A distributed audio recording system with C++ audio capture clients, Go backend, and Vue.js web interface.
+A distributed audio recording system with native audio-capture clients (Rust or C++),
+a Go backend, and a Vue.js web interface.
 
 ## I want to... develop locally
 
-**Prerequisites:** [pnpm](https://pnpm.io/), [Go](https://golang.org/) 1.19+, [Docker](https://www.docker.com/)
+**Prerequisites:** [pnpm](https://pnpm.io/), [Go](https://golang.org/) 1.24+, [Docker](https://www.docker.com/)
 
 ```bash
 cd web
@@ -32,6 +33,10 @@ pnpm run dev:web       # Vite only
 | MinIO Console | http://localhost:9091 (admin/password123) |
 | SessionSource gRPC-Web | http://localhost:8081 |
 
+If you'd rather run MinIO natively too, the backend can also use a local
+directory instead of MinIO — see the `--storage-fs-root` flag in
+[`go/README.md`](go/README.md).
+
 ---
 
 ## I want to... deploy with Docker
@@ -58,7 +63,41 @@ pnpm run dev:web       # Vite only
 
 ## I want to... connect a recording device
 
-### 1. Install dependencies (Fedora)
+Two client implementations exist. **Rust is the recommended one** — it has the
+full feature set (LED bindings, button-driven cut, server-command stream, dB-based
+detector). The C++ client is older and kept for now.
+
+### Rust client (recommended)
+
+#### 1. Build
+
+```bash
+cd rust/chunk-source
+cargo build --release
+```
+
+#### 2. Run
+
+```bash
+./target/release/chunk-source \
+  --recorder-id $(uuidgen) \
+  --recorder-name "Living Room" \
+  --device default
+```
+
+Useful optional flags (see `chunk-source --help` for the full list):
+
+| Flag | Purpose |
+|---|---|
+| `--detector-threshold-db -45` | dB-FS RMS above which signal is considered "present" |
+| `--attack-time 0.5` / `--release-time 5.0` | seconds for silence→signal / signal→silence transitions |
+| `--led-rec-state <sysfs-name>` | LED on while recording, blinks 10× on new session |
+| `--led-upload <sysfs-name>` | LED pulses on each successful chunk upload |
+| `--input-event 3 --input-keycode 28 --input-hold-ms 800` | Local "cut session" button on `/dev/input/eventNN` |
+
+### C++ client (legacy)
+
+#### 1. Install dependencies (Fedora)
 
 ```bash
 dnf install cmake make gcc-c++ alsa-lib-devel avahi-devel \
@@ -66,22 +105,18 @@ dnf install cmake make gcc-c++ alsa-lib-devel avahi-devel \
     protobuf-devel boost-devel
 ```
 
-### 2. Generate protocols
+#### 2. Generate protocols
 
-```bash
-cd protocols
-pnpm install
-make all
-```
+See [`protocols/README.md`](protocols/README.md).
 
-### 3. Build C++ client
+#### 3. Build
 
 ```bash
 cd cpp/chunk-sink-client
 cmake --build .
 ```
 
-### 4. Run
+#### 4. Run
 
 ```bash
 ./cpp/chunk-sink-client/chunk-sink-client \
@@ -90,11 +125,14 @@ cmake --build .
   --device default
 ```
 
+Both clients discover the backend automatically via mDNS
+(`_session-recorder-chunksink._tcp`) and start streaming once it appears.
+
 ---
 
 ## I want to... enable email sharing
 
-Set these environment variables:
+Set these environment variables on the backend:
 
 | Variable | Required | Description |
 |----------|----------|-------------|
@@ -138,27 +176,12 @@ Set `FILE_SHARE_METHOD=s3_copy` and configure:
 
 ---
 
-## Reference
-
-### Backend CLI flags
-
-| Flag | Env Var | Default |
-|------|---------|---------|
-| `-chunk-sink-port` | `CHUNK_SINK_PORT` | 8779 |
-| `-session-source-port` | `SESSION_SOURCE_PORT` | 8780 |
-| `-grpcweb-port` | `GRPCWEB_PORT` | 8081 |
-| `-s3-endpoint` | `S3_ENDPOINT` | localhost:9000 |
-| `-s3-local-endpoint` | `S3_LOCAL_ENDPOINT` | (s3-endpoint) |
-| `-s3-public-endpoint` | `S3_PUBLIC_ENDPOINT` | (s3-local-endpoint) |
-| `-s3-access-key` | `S3_ACCESS_KEY` | (required) |
-| `-s3-secret-key` | `S3_SECRET_KEY` | (required) |
-
-### Architecture
+## Architecture
 
 ```
 ┌─────────────────┐     gRPC       ┌──────────────────────────┐
-│  C++ Client     │ ─────────────► │  Go Backend              │
-│  (ALSA capture) │                │  ChunkSink (gRPC :8779)  │
+│  Rust or C++    │ ─────────────► │  Go Backend              │
+│  Client (ALSA)  │                │  ChunkSink (gRPC :8779)  │
 └─────────────────┘                │  SessionSource (:8780)   │
                                    │  SessionSource gRPC-Web  │
 ┌─────────────────┐    gRPC-Web    │  (HTTP :8081, embedded)  │
@@ -167,6 +190,21 @@ Set `FILE_SHARE_METHOD=s3_copy` and configure:
                                                 │
                                                 ▼
                                        ┌─────────────────┐
-                                       │  MinIO (S3)     │
+                                       │ MinIO (S3) OR   │
+                                       │ local directory │
                                        └─────────────────┘
 ```
+
+mDNS-driven discovery: clients find the backend; the backend finds nothing
+(it advertises and waits).
+
+---
+
+## Per-component documentation
+
+- [`go/README.md`](go/README.md) — backend binary, CLI flags, storage backends, test clients
+- [`web/README.md`](web/README.md) — dev mode, environment, storybook
+- [`protocols/README.md`](protocols/README.md) — proto regeneration, codegen deps
+- [`rust/chunk-source/README.md`](rust/chunk-source/README.md) — Rust recorder client
+- [`cpp/chunk-sink-client/README.md`](cpp/chunk-sink-client/README.md) — C++ recorder client
+- [`readme_deployment.md`](readme_deployment.md) — production deployment notes

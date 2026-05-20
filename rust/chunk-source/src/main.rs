@@ -18,10 +18,8 @@ use chunk_source::grpc::chunk_sink_client::{
 use chunk_source::io::input_key::InputKey;
 use chunk_source::io::led::Led;
 use chunk_source::mdns::service_tracker::{ServiceEvent, ServiceTracker, ServiceTrackerConfig};
-use evdev::KeyCode;
 use clap::Parser;
-use tonic::Request;
-use tonic::transport::Channel;
+use evdev::KeyCode;
 use log::{debug, error, info, warn};
 use ringbuf::traits::Consumer;
 use std::collections::HashMap;
@@ -30,6 +28,8 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
 use std::time::{Duration, SystemTime};
 use tokio::time::interval;
+use tonic::Request;
+use tonic::transport::Channel;
 use uuid::Uuid;
 
 const SAMPLE_RATE: u32 = 48000;
@@ -102,7 +102,7 @@ struct Args {
     window_time: f64,
 
     /// Silence → signal transition time, in seconds
-    #[arg(long, default_value_t = 0.5)]
+    #[arg(long, default_value_t = 30.0)]
     attack_time: f64,
 
     /// Signal → silence transition time, in seconds
@@ -400,8 +400,7 @@ impl SessionRecorder {
                     let (tx, rx) = tokio::sync::mpsc::channel::<LedRecEvent>(32);
                     let shutdown = self.shutdown_signal.clone();
                     self.led_rec_tx = Some(tx);
-                    self.led_rec_handle =
-                        Some(tokio::spawn(Self::led_rec_task(led, rx, shutdown)));
+                    self.led_rec_handle = Some(tokio::spawn(Self::led_rec_task(led, rx, shutdown)));
                 }
                 Err(e) => warn!("Cannot open led-rec-state LED '{}': {}", name, e),
             }
@@ -560,20 +559,16 @@ impl SessionRecorder {
         while !shutdown.load(Ordering::Relaxed) {
             // 1 s wakeup so we re-check the shutdown flag even when the
             // tracker channel is idle.
-            let event = match tokio::time::timeout(
-                Duration::from_secs(1),
-                event_receiver.recv(),
-            )
-            .await
-            {
-                Ok(Some(event)) => event,
-                Ok(None) => {
-                    // Channel closed (tracker exited): nothing more will come.
-                    info!("Service tracker channel closed, discovery task exiting");
-                    break;
-                }
-                Err(_) => continue, // timeout — loop back, check shutdown
-            };
+            let event =
+                match tokio::time::timeout(Duration::from_secs(1), event_receiver.recv()).await {
+                    Ok(Some(event)) => event,
+                    Ok(None) => {
+                        // Channel closed (tracker exited): nothing more will come.
+                        info!("Service tracker channel closed, discovery task exiting");
+                        break;
+                    }
+                    Err(_) => continue, // timeout — loop back, check shutdown
+                };
 
             match event {
                 ServiceEvent::ServiceDiscovered(service_info) => {
@@ -594,8 +589,10 @@ impl SessionRecorder {
                     // subsequent re-resolve that we see as an Updated event.
                     // Treat Updated as a chance to (re-)attach if we are not
                     // already connected.
-                    let already_connected =
-                        clients.lock().await.contains_key(&service_info.instance_name);
+                    let already_connected = clients
+                        .lock()
+                        .await
+                        .contains_key(&service_info.instance_name);
                     if already_connected {
                         debug!(
                             "Service updated (already connected): {}",
@@ -651,7 +648,11 @@ impl SessionRecorder {
         };
 
         // Re-check under lock to avoid racing duplicate attaches.
-        if clients.lock().await.contains_key(&service_info.instance_name) {
+        if clients
+            .lock()
+            .await
+            .contains_key(&service_info.instance_name)
+        {
             return;
         }
 
@@ -705,10 +706,7 @@ impl SessionRecorder {
                 }
             }
             Err(e) => {
-                error!(
-                    "Failed to connect to {}: {}",
-                    service_info.instance_name, e
-                );
+                error!("Failed to connect to {}: {}", service_info.instance_name, e);
             }
         }
     }
@@ -957,7 +955,10 @@ async fn command_listener_task(
     cut_tx: tokio::sync::mpsc::Sender<CutTrigger>,
     shutdown: Arc<AtomicBool>,
 ) {
-    info!("Command listener: connecting to {} at {}", service_name, url);
+    info!(
+        "Command listener: connecting to {} at {}",
+        service_name, url
+    );
     let endpoint = match Channel::from_shared(url.clone()) {
         Ok(b) => b.connect_timeout(Duration::from_secs(5)),
         Err(e) => {
@@ -1032,10 +1033,8 @@ async fn command_listener_task(
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Default: info everywhere, but silence the chatty mdns_sd crate.
     // Override with e.g. RUST_LOG=chunk_source=debug,mdns_sd=warn
-    env_logger::Builder::from_env(
-        env_logger::Env::default().default_filter_or("info,mdns_sd=off"),
-    )
-    .init();
+    env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info,mdns_sd=off"))
+        .init();
 
     let args = Args::parse();
 

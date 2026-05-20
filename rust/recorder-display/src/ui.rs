@@ -277,7 +277,7 @@ impl eframe::App for RecorderDisplayApp {
         ctx.set_pixels_per_point(1.25);
 
         // Configure for embedded/kiosk mode
-        //ctx.send_viewport_cmd(egui::ViewportCommand::Fullscreen(true));
+        ctx.send_viewport_cmd(egui::ViewportCommand::Fullscreen(true));
 
         egui::CentralPanel::default().show(ctx, |ui| {
             // Compact header
@@ -528,11 +528,11 @@ pub fn run_gui(recorder_statuses: RecorderStatusMap) -> eframe::Result<()> {
             .with_inner_size([800.0, 480.0]) // Perfect for 7" touch LCD
             .with_min_inner_size([800.0, 480.0])
             .with_max_inner_size([800.0, 480.0])
-            .with_resizable(true)
-            .with_decorations(true) // No window decorations for embedded display
-            .with_fullscreen(false) // Fullscreen for embedded use
+            .with_resizable(false)
+            .with_decorations(false) // No window decorations for embedded display
+            .with_fullscreen(true) // Fullscreen for embedded use
             .with_always_on_top()
-            .with_maximized(false),
+            .with_maximized(true),
         hardware_acceleration: eframe::HardwareAcceleration::Required,
         ..Default::default()
     };

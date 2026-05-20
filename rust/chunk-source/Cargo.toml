@@ -18,10 +18,9 @@ tokio = { version = "1.0", features = ["full"] }
 tonic = "0.12"
 prost = "0.13"
 prost-types = "0.13"
-futures-util = "0.3"
-zeroconf-tokio = "0.3"
+mdns-sd = "0.10"
 gethostname = "0.5"
-uuid = { version = "1.19.0", features = ["v4"] }
+uuid = { version = "1", features = ["v4"] }
 
 [build-dependencies]
 tonic-build = "0.12"

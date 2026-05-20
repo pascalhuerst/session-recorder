@@ -34,7 +34,7 @@ pub fn configure_pcm(
     let hwp = HwParams::any(pcm)?;
     hwp.set_channels(num_channels)?;
     hwp.set_rate(sample_rate, alsa::ValueOr::Nearest)?;
-    hwp.set_format(Format::S16LE)?;
+    hwp.set_format(Format::S32LE)?;
     hwp.set_access(Access::RWInterleaved)?;
 
     hwp.set_buffer_size_near(buffer_size as i64)?;

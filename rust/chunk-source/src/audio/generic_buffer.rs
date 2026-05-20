@@ -1,7 +1,5 @@
 use num_traits::{NumCast, Zero};
 
-use crate::channels::Sample;
-
 #[derive(Clone, Debug)]
 pub struct GenericBuffer<T>
 where
@@ -86,5 +84,5 @@ pub fn zero_slice(buffer: &mut [f32]) {
     }
 }
 
-//pub type IntBuffer = GenericBuffer<Sample>;
-pub type AudioBuffer = GenericBuffer<Sample>;
+pub type IntBuffer = GenericBuffer<i32>;
+pub type AudioBuffer = GenericBuffer<f32>;

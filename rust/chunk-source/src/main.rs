@@ -22,7 +22,7 @@ use clap::Parser;
 use evdev::KeyCode;
 use log::{debug, error, info, warn};
 use ringbuf::traits::Consumer;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
@@ -42,6 +42,10 @@ const RING_DRAIN_INTERVAL: Duration = Duration::from_millis(5);
 const RING_POP_CHUNK_SAMPLES: usize = 4096;
 const RMS_FLOOR_DB: f64 = -180.0;
 const CLIPPING_THRESHOLD: f32 = 32767.0 / 32768.0;
+// How often the discovery task re-checks that every known mDNS service still
+// has a live gRPC client. Catches reconnects after backend restarts when no
+// fresh mDNS event would otherwise wake us up.
+const RECONCILE_INTERVAL: Duration = Duration::from_secs(5);
 
 #[derive(Clone)]
 struct DetectorConfig {
@@ -102,11 +106,11 @@ struct Args {
     window_time: f64,
 
     /// Silence → signal transition time, in seconds
-    #[arg(long, default_value_t = 30.0)]
+    #[arg(long, default_value_t = 5.0)]
     attack_time: f64,
 
     /// Signal → silence transition time, in seconds
-    #[arg(long, default_value_t = 5.0)]
+    #[arg(long, default_value_t = 30.0)]
     release_time: f64,
 
     /// sysfs name of the recording-state LED (on = signal, off = silence;
@@ -556,55 +560,101 @@ impl SessionRecorder {
     ) {
         info!("Service discovery task started");
 
+        // Local view of every service mdns-sd has told us about (Discovered or
+        // Updated, until Removed). Used by the reconciler to re-attach when a
+        // client got dropped (e.g. the backend restarted under us) without a
+        // fresh mDNS event firing.
+        let mut known_services: HashMap<String, chunk_source::mdns::service_tracker::ServiceInfo> =
+            HashMap::new();
+        let mut reconcile_tick = tokio::time::interval(RECONCILE_INTERVAL);
+        // First tick fires immediately; skip it so we don't reconcile-before-we-discover.
+        reconcile_tick.tick().await;
+
         while !shutdown.load(Ordering::Relaxed) {
-            // 1 s wakeup so we re-check the shutdown flag even when the
-            // tracker channel is idle.
-            let event =
-                match tokio::time::timeout(Duration::from_secs(1), event_receiver.recv()).await {
-                    Ok(Some(event)) => event,
-                    Ok(None) => {
-                        // Channel closed (tracker exited): nothing more will come.
+            tokio::select! {
+                maybe_event = event_receiver.recv() => {
+                    let Some(event) = maybe_event else {
                         info!("Service tracker channel closed, discovery task exiting");
                         break;
-                    }
-                    Err(_) => continue, // timeout — loop back, check shutdown
-                };
+                    };
 
-            match event {
-                ServiceEvent::ServiceDiscovered(service_info) => {
-                    info!("Discovered service: {}", service_info.instance_name);
-                    Self::try_attach_service(
-                        &service_info,
-                        &clients,
-                        &shutdown,
-                        recorder_id,
-                        &recorder_name,
-                        cut_tx.as_ref(),
-                    )
-                    .await;
+                    match event {
+                        ServiceEvent::ServiceDiscovered(service_info) => {
+                            info!("Discovered service: {}", service_info.instance_name);
+                            known_services.insert(service_info.instance_name.clone(), service_info.clone());
+                            Self::try_attach_service(
+                                &service_info,
+                                &clients,
+                                &shutdown,
+                                recorder_id,
+                                &recorder_name,
+                                cut_tx.as_ref(),
+                            )
+                            .await;
+                        }
+                        ServiceEvent::ServiceUpdated(service_info) => {
+                            known_services.insert(service_info.instance_name.clone(), service_info.clone());
+
+                            let already_connected = clients
+                                .lock()
+                                .await
+                                .contains_key(&service_info.instance_name);
+                            if already_connected {
+                                debug!(
+                                    "Service updated (already connected): {}",
+                                    service_info.instance_name
+                                );
+                            } else {
+                                info!(
+                                    "Service updated (not yet connected, attempting): {}",
+                                    service_info.instance_name
+                                );
+                                Self::try_attach_service(
+                                    &service_info,
+                                    &clients,
+                                    &shutdown,
+                                    recorder_id,
+                                    &recorder_name,
+                                    cut_tx.as_ref(),
+                                )
+                                .await;
+                            }
+                        }
+                        ServiceEvent::ServiceRemoved(instance_name) => {
+                            info!("Service removed: {}", instance_name);
+                            known_services.remove(&instance_name);
+
+                            if let Some(mut client_info) = clients.lock().await.remove(&instance_name) {
+                                client_info.client.disconnect().await;
+                                info!("Disconnected from service: {}", instance_name);
+                            }
+                        }
+                    }
                 }
-                ServiceEvent::ServiceUpdated(service_info) => {
-                    // mdns-sd often emits the initial ServiceResolved without
-                    // IPv4 addresses populated; the addresses arrive in a
-                    // subsequent re-resolve that we see as an Updated event.
-                    // Treat Updated as a chance to (re-)attach if we are not
-                    // already connected.
-                    let already_connected = clients
+
+                _ = reconcile_tick.tick() => {
+                    // Detect services we know about (per mDNS) that lost their
+                    // client mid-flight — typically because the backend was
+                    // restarted within the daemon's TTL window, so no mDNS
+                    // event re-fires, but our previous client failed a send
+                    // and got dropped from the clients map.
+                    let connected: HashSet<String> = clients
                         .lock()
                         .await
-                        .contains_key(&service_info.instance_name);
-                    if already_connected {
-                        debug!(
-                            "Service updated (already connected): {}",
-                            service_info.instance_name
-                        );
-                    } else {
+                        .keys()
+                        .cloned()
+                        .collect();
+
+                    for (name, info) in &known_services {
+                        if connected.contains(name) {
+                            continue;
+                        }
                         info!(
-                            "Service updated (not yet connected, attempting): {}",
-                            service_info.instance_name
+                            "Reconciler: {} has no live client, attempting to (re-)attach",
+                            name
                         );
                         Self::try_attach_service(
-                            &service_info,
+                            info,
                             &clients,
                             &shutdown,
                             recorder_id,
@@ -612,14 +662,6 @@ impl SessionRecorder {
                             cut_tx.as_ref(),
                         )
                         .await;
-                    }
-                }
-                ServiceEvent::ServiceRemoved(instance_name) => {
-                    info!("Service removed: {}", instance_name);
-
-                    if let Some(mut client_info) = clients.lock().await.remove(&instance_name) {
-                        client_info.client.disconnect().await;
-                        info!("Disconnected from service: {}", instance_name);
                     }
                 }
             }

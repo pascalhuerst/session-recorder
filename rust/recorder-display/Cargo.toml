@@ -1,0 +1,20 @@
+[package]
+name = "recorder-display"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+tokio = { version = "1.0", features = ["full"] }
+tokio-stream = { version = "0.1", features = ["sync"] }
+tonic = "0.10"
+prost = "0.12"
+prost-types = "0.12"
+clap = { version = "4.0", features = ["derive"] }
+zeroconf = "0.15"
+gethostname = "0.4"
+eframe = "0.27"
+egui = "0.27"
+
+
+[build-dependencies]
+tonic-build = "0.10"

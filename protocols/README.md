@@ -17,6 +17,13 @@ cargo install grpc-compiler
 cargo install protobuf-codegen
 ```
 
+## For rust
+
+```
+cargo install grpc-compiler
+cargo install protobuf-codegen
+```
+
 ## For go and cpp
 
 ```

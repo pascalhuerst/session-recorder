@@ -28,6 +28,7 @@ dist/
 build/
 out/
 tmp/
+target/
 
 # Go
 bin/

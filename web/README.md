@@ -29,7 +29,7 @@ web/
 1. Make sure the Go backend is running. From the repo root:
 
    ```bash
-   cd go && source sourceme.sh && go run ./cmd/chunk_sink
+   cd go && source sourceme.sh && go run ./cmd/session_recorder_server
    ```
 
    The backend serves gRPC-Web on port `8081` by default, which is what

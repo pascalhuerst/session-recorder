@@ -23,7 +23,7 @@ COPY go/ .
 RUN go mod tidy && go mod download
 
 # Build the application
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o chunk_sink ./cmd/chunk_sink
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o session_recorder_server ./cmd/session_recorder_server
 
 # Audiowaveform builder stage
 FROM alpine:latest AS audiowaveform-builder
@@ -64,7 +64,7 @@ RUN apk --no-cache add ca-certificates dbus sox \
 WORKDIR /root/
 
 # Copy the binary from builder stage
-COPY --from=builder /app/chunk_sink .
+COPY --from=builder /app/session_recorder_server .
 
 # Copy audiowaveform binary from audiowaveform-builder stage
 COPY --from=audiowaveform-builder /usr/local/bin/audiowaveform /usr/local/bin/audiowaveform
@@ -73,4 +73,4 @@ COPY --from=audiowaveform-builder /usr/local/bin/audiowaveform /usr/local/bin/au
 EXPOSE 8779 8780
 
 # Command to run
-CMD ["./chunk_sink"]
+CMD ["./session_recorder_server"]

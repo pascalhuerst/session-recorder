@@ -3,14 +3,14 @@ GO ?= go
 GOBUILDFLAGS ?= -v
 
 BINARIES = \
-  chunk_sink \
+  session_recorder_server \
 
 PACKAGES = \
   mdns
 
 all: $(BINARIES)
 
-chunk_sink:
+session_recorder_server:
 	${GO} build -o bin/$@ $(GOBUILDFLAGS) -ldflags "-X main.version=$(VERSION)" ./cmd/$@
 
 clean:

@@ -5,15 +5,15 @@ root = "."
 tmp_dir = "tmp"
 
 [build]
-  bin = "./tmp/chunk_sink"
-  cmd = "go build -o ./tmp/chunk_sink ./cmd/chunk_sink"
+  bin = "./tmp/session_recorder_server"
+  cmd = "go build -o ./tmp/session_recorder_server ./cmd/session_recorder_server"
   delay = 1000
   exclude_dir = ["tmp", "vendor", "node_modules"]
   exclude_file = []
   exclude_regex = ["_test.go"]
   exclude_unchanged = false
   follow_symlink = false
-  full_bin = "S3_ENDPOINT=localhost:9000 S3_PUBLIC_ENDPOINT=localhost:9000 S3_ACCESS_KEY=admin S3_SECRET_KEY=password123 S3_USE_SSL=false ./tmp/chunk_sink"
+  full_bin = "S3_ENDPOINT=localhost:9000 S3_PUBLIC_ENDPOINT=localhost:9000 S3_ACCESS_KEY=admin S3_SECRET_KEY=password123 S3_USE_SSL=false ./tmp/session_recorder_server"
   include_dir = []
   include_ext = ["go", "tpl", "tmpl", "html"]
   include_file = []

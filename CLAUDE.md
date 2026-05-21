@@ -29,7 +29,7 @@ session-recorder/
 │       └── session-waveform/  # Waveform visualization library
 ├── go/                        # Go backend services
 │   ├── cmd/
-│   │   ├── chunk_sink/             # Backend (hosts ChunkSink + SessionSource gRPC services)
+│   │   ├── session_recorder_server/  # Backend (hosts ChunkSink + SessionSource gRPC services)
 │   │   ├── chunk_sink_client/      # Test client for ChunkSink
 │   │   └── session_source_client/  # Test client for SessionSource
 │   ├── grpc/                  # gRPC server implementations
@@ -65,7 +65,7 @@ generated stubs — everywhere else the device client is called the **recorder**
 docker compose -f docker-compose.dev.yml up    # MinIO only
 docker compose -f docker-compose.dev.yml down
 ```
-Then run the Go backend natively (`cd go && source sourceme.sh && go run ./cmd/chunk_sink`) and the web with `cd web && pnpm start`.
+Then run the Go backend natively (`cd go && source sourceme.sh && go run ./cmd/session_recorder_server`) and the web with `cd web && pnpm start`.
 
 ### Web (from `web/`)
 ```bash
@@ -87,7 +87,7 @@ make clean                     # Clean generated files
 
 ### Go (from `go/`)
 ```bash
-go run ./cmd/chunk_sink             # Run backend (ChunkSink + SessionSource gRPC)
+go run ./cmd/session_recorder_server  # Run backend (ChunkSink + SessionSource gRPC)
 go run ./cmd/chunk_sink_client      # Run ChunkSink test client
 go run ./cmd/session_source_client  # Run SessionSource test client
 go test ./...                       # Run all tests
@@ -100,7 +100,7 @@ go vet ./...                        # Vet
 | Service | Port | Protocol |
 |---------|------|----------|
 | Web Interface | 3000 | HTTP |
-| SessionSource gRPC-Web (chunk_sink HTTP listener) | 8081 | HTTP |
+| SessionSource gRPC-Web (session_recorder_server HTTP listener) | 8081 | HTTP |
 | ChunkSink gRPC | 8779 | gRPC |
 | SessionSource gRPC | 8780 | gRPC |
 | MinIO API | 9000 | HTTP |
@@ -126,7 +126,7 @@ VITE_GRPC_SERVER_URL=http://localhost:8081
 
 - **gRPC + Protocol Buffers** for type-safe streaming between components
 - **MinIO** for S3-compatible self-hosted audio storage
-- **In-process gRPC-Web** wrapper inside `chunk_sink` (no envoy/proxy container)
+- **In-process gRPC-Web** wrapper inside `session_recorder_server` (no envoy/proxy container)
 - **Monorepo** with optimal language per component
 
 ## Patterns & Conventions

@@ -237,7 +237,7 @@ flowchart LR
 |------|---------|
 | `go/storage/storage.go` | Session struct, state types, interfaces |
 | `go/storage/minio.go` | State transitions, callbacks, rendering |
-| `go/cmd/chunk_sink/session-source-handler.go` | gRPC handlers, state streaming |
+| `go/cmd/session_recorder_server/session-source-handler.go` | gRPC handlers, state streaming |
 | `go/grpc/chunksink-server.go` | Command channel for cut session |
 
 ### Frontend Files

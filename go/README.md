@@ -1,11 +1,11 @@
 # Go Backend
 
-Hosts the `chunk_sink` binary (the backend) and two CLI test clients.
+Hosts the `session_recorder_server` binary (the backend) and two CLI test clients.
 
 ```
 go/
 ├── cmd/
-│   ├── chunk_sink/             # Backend (ChunkSink + SessionSource gRPC + embedded gRPC-Web)
+│   ├── session_recorder_server/ # Backend (ChunkSink + SessionSource gRPC + embedded gRPC-Web)
 │   ├── chunk_sink_client/      # Test client that pushes test audio chunks
 │   └── session_source_client/  # Test client to list/watch recorders, list sessions, etc.
 ├── broadcast/                  # In-memory fan-out for streaming RPCs
@@ -28,14 +28,14 @@ go vet ./...
 
 # Run the backend (needs MinIO if you don't use --storage-fs-root)
 source sourceme.sh           # or export S3_ACCESS_KEY / S3_SECRET_KEY yourself
-go run ./cmd/chunk_sink
+go run ./cmd/session_recorder_server
 ```
 
 Hot reload via [air](https://github.com/air-verse/air): `air` (config in `.air.toml`).
 
 ## CLI flags
 
-Run `go run ./cmd/chunk_sink -h` for the authoritative help (incl. the
+Run `go run ./cmd/session_recorder_server -h` for the authoritative help (incl. the
 multi-line explanation of `--storage-fs-root`).
 
 | Flag | Env Var | Default | Purpose |
@@ -54,7 +54,7 @@ multi-line explanation of `--storage-fs-root`).
 
 ## Storage backends
 
-`chunk_sink` ships with two storage backends behind the `storage.Storage`
+`session_recorder_server` ships with two storage backends behind the `storage.Storage`
 interface. The on-disk layout is identical so a snapshot of one can be loaded
 by the other by copying files.
 

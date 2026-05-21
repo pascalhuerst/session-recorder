@@ -41,3 +41,15 @@ func GetIntWithDefault(name string, defaultValue int) int {
 	}
 	return defaultValue
 }
+
+func GetBoolWithDefault(name string, defaultValue bool) bool {
+	v, err := Get(name)
+	if err != nil {
+		return defaultValue
+	}
+	b, err := strconv.ParseBool(strings.TrimSpace(v))
+	if err != nil {
+		return defaultValue
+	}
+	return b
+}

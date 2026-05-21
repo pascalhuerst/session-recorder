@@ -68,9 +68,23 @@ type Minio struct {
 }
 
 func NewMinioStorage(endpoint, localEndpoint, publicEndpoint, accessKey, secretKey string) (*Minio, error) {
+	// Composing a long session into data.raw is a single server-side
+	// CompleteMultipartUpload that the MinIO server can take well over a
+	// minute to assemble (a 2 h recording is ~1.4 GB / hundreds of parts).
+	// minio-go's default transport caps ResponseHeaderTimeout at 1 minute,
+	// which aborts large composes with "timeout awaiting response headers".
+	// Disable that per-request cap (0 = wait for the server) so long
+	// recordings can finalize; connection-level timeouts still apply.
+	transport, err := minio.DefaultTransport(false)
+	if err != nil {
+		return nil, fmt.Errorf("cannot create minio transport: %w", err)
+	}
+	transport.ResponseHeaderTimeout = 0
+
 	c, err := minio.New(endpoint, &minio.Options{
-		Creds:  credentials.NewStaticV4(accessKey, secretKey, ""),
-		Secure: false,
+		Creds:     credentials.NewStaticV4(accessKey, secretKey, ""),
+		Secure:    false,
+		Transport: transport,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("cannot create minio client: %w", err)
@@ -830,9 +844,36 @@ func (m *Minio) renderSession(ctx context.Context, recorderID, sessionID uuid.UU
 	log.Debug().Stringer("recorder-id", recorderID).Stringer("session-id", sessionID).Msg("Rendering session (compose path)")
 
 	if err := m.composeChunksIntoRaw(ctx, recorderID, sessionID); err != nil {
+		// Compose failed but the chunks are still on disk. Mark the session
+		// ERROR (visible in the UI, recoverable) rather than leaving it stuck
+		// in PROCESSING or deleting it.
+		m.markSessionError(ctx, recorderID, sessionID, fmt.Sprintf("compose failed: %v", err))
 		return err
 	}
 	return m.renderDerivedFiles(ctx, recorderID, sessionID, true)
+}
+
+// markSessionError transitions a session to ERROR and records the message,
+// without touching its stored chunks/objects. Best-effort: logs and moves on
+// if metadata can't be read/written.
+func (m *Minio) markSessionError(ctx context.Context, recorderID, sessionID uuid.UUID, msg string) {
+	sm, err := m.getSessionMetadata(ctx, recorderID, sessionID)
+	if err != nil {
+		log.Err(err).
+			Stringer("recorder-id", recorderID).
+			Stringer("session-id", sessionID).
+			Msg("Cannot read session metadata to mark ERROR")
+		return
+	}
+	previousState := sm.State
+	sm.State = SessionStateError
+	sm.ErrorMessage = msg
+	m.dataLock.Lock()
+	if putErr := m.putSessionMetadata(ctx, recorderID, sessionID, sm); putErr != nil {
+		log.Err(putErr).Msg("Cannot update session state to ERROR")
+	}
+	m.dataLock.Unlock()
+	m.notifyStateChange(sm, previousState)
 }
 
 // renderInMemorySession is the "buffer-only" rendering path. The recorder went
@@ -974,8 +1015,17 @@ func (m *Minio) composeChunksIntoRaw(ctx context.Context, recorderID, sessionID 
 	}
 
 	if _, err := m.client.ComposeObject(ctx, dst, srcs...); err != nil {
-		log.Err(err).Msg("Cannot compose object, too small. Will delete session.")
-		return m.deleteSession(ctx, recorderID, sessionID)
+		// Do NOT delete the session here. A compose failure can be a transient
+		// timeout, a slow server-side assembly, or a genuine "part too small"
+		// — none of which justify destroying recorded audio. Return the error
+		// so the caller marks the session ERROR and the chunks/<n> objects are
+		// preserved for retry/recovery.
+		log.Err(err).
+			Stringer("recorder-id", recorderID).
+			Stringer("session-id", sessionID).
+			Int("chunk-parts", len(srcs)).
+			Msg("Cannot compose chunks into data.raw; preserving chunks")
+		return fmt.Errorf("cannot compose chunks into data.raw: %w", err)
 	}
 
 	return nil

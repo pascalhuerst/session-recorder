@@ -193,6 +193,11 @@ impl Outbox {
     fn len(&self) -> usize {
         self.deque.len()
     }
+
+    /// (queued chunks, buffered samples, capacity in samples)
+    fn stats(&self) -> (usize, usize, usize) {
+        (self.deque.len(), self.total_samples, self.capacity_samples)
+    }
 }
 
 struct SessionRecorder {
@@ -1109,6 +1114,13 @@ impl SessionRecorder {
     async fn get_client_count(&self) -> usize {
         self.grpc_clients.lock().await.len()
     }
+
+    /// (queued chunks, buffered seconds, capacity seconds) of the send outbox.
+    async fn outbox_stats(&self) -> (usize, f64, f64) {
+        let (chunks, samples, capacity) = self.outbox.lock().await.stats();
+        let per_sec = (SAMPLE_RATE * NUM_CHANNELS) as f64;
+        (chunks, samples as f64 / per_sec, capacity as f64 / per_sec)
+    }
 }
 
 /// Subscribe to the ChunkSink server's command stream and forward `CmdCutSession`
@@ -1216,18 +1228,42 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!("Session Recorder running. Press Ctrl+C to stop.");
 
+    // Wake every second to notice shutdown promptly, but only emit a status
+    // line every STATUS_LOG_SECS.
+    const STATUS_LOG_SECS: u64 = 10;
+    let mut secs: u64 = 0;
+
     while recorder.is_running() {
         tokio::time::sleep(Duration::from_secs(1)).await;
+        secs += 1;
+        if !secs.is_multiple_of(STATUS_LOG_SECS) {
+            continue;
+        }
 
         let status = recorder.get_status().await;
-        let client_count = recorder.get_client_count().await;
+        let servers = recorder.get_client_count().await;
+        let (queued, buffered_s, capacity_s) = recorder.outbox_stats().await;
 
-        if client_count > 0 {
-            info!(
-                "Connected to {} server(s), RMS: {:.1}%, Signal: {:?}",
-                client_count, status.rms_percent, status.signal_status
-            );
-        }
+        // Linear RMS percent → dBFS (more meaningful for level judgement).
+        let rms = status.rms_percent / 100.0;
+        let rms_db = if rms < 1e-9 {
+            f64::NEG_INFINITY
+        } else {
+            20.0 * rms.log10()
+        };
+        let recording = matches!(status.signal_status, SignalStatus::Signal);
+
+        info!(
+            "status: servers={} recording={} rms={:.1}dBFS ({:.1}%) clipping={} outbox={} chunks ({:.1}s / {:.0}s)",
+            servers,
+            if recording { "yes" } else { "no" },
+            rms_db,
+            status.rms_percent,
+            if status.clipping { "YES" } else { "no" },
+            queued,
+            buffered_s,
+            capacity_s,
+        );
     }
 
     recorder.stop().await;

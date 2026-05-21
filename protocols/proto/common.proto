@@ -1,5 +1,4 @@
 syntax = "proto3";
-// Test change to trigger CI
 
 package common;
 

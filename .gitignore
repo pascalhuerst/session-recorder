@@ -55,7 +55,6 @@ Makefile
 chunk-sink-client
 
 # Protocol Buffers (generated files)
-protocols/cpp/
 protocols/ts/
 protocols/go/
 

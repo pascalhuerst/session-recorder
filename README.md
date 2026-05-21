@@ -95,41 +95,6 @@ Useful optional flags (see `chunk-source --help` for the full list):
 | `--led-upload <sysfs-name>` | LED pulses on each successful chunk upload |
 | `--input-event 3 --input-keycode 28 --input-hold-ms 800` | Local "cut session" button on `/dev/input/eventNN` |
 
-### C++ client (legacy)
-
-#### 1. Install dependencies (Fedora)
-
-```bash
-dnf install cmake make gcc-c++ alsa-lib-devel avahi-devel \
-    grpc-data grpc grpc-cpp grpc-plugins grpc-devel \
-    protobuf-devel boost-devel
-```
-
-#### 2. Generate protocols
-
-See [`protocols/README.md`](protocols/README.md).
-
-#### 3. Build
-
-```bash
-cd cpp/chunk-sink-client
-cmake --build .
-```
-
-#### 4. Run
-
-```bash
-./cpp/chunk-sink-client/chunk-sink-client \
-  --recorder-id $(uuidgen) \
-  --recorder-name "Living Room" \
-  --device default
-```
-
-Both clients discover the backend automatically via mDNS
-(`_session-recorder-chunksink._tcp`) and start streaming once it appears.
-
----
-
 ## I want to... enable email sharing
 
 Set these environment variables on the backend:
@@ -206,5 +171,4 @@ mDNS-driven discovery: clients find the backend; the backend finds nothing
 - [`web/README.md`](web/README.md) — dev mode, environment, storybook
 - [`protocols/README.md`](protocols/README.md) — proto regeneration, codegen deps
 - [`rust/chunk-source/README.md`](rust/chunk-source/README.md) — Rust recorder client
-- [`cpp/chunk-sink-client/README.md`](cpp/chunk-sink-client/README.md) — C++ recorder client
 - [`readme_deployment.md`](readme_deployment.md) — production deployment notes

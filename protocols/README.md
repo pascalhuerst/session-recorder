@@ -11,7 +11,6 @@ protocols/
 │   └── sessionsource.proto    # SessionSource service (web UI ↔ backend)
 ├── go/                        # generated Go stubs (committed)
 ├── ts/                        # generated TypeScript stubs (committed)
-├── cpp/                       # generated C++ stubs (committed)
 ├── Makefile                   # regen targets
 └── Dockerfile                 # used by docker-compose to regenerate stubs in CI
 ```
@@ -20,14 +19,13 @@ protocols/
 
 ```bash
 cd protocols
-make all                       # cpp + ts + go (+ gomod)
+make all                       # ts + go (+ gomod)
 make ts                        # just TypeScript
 make go                        # just Go
-make cpp                       # just C++
 make clean                     # remove all generated dirs
 ```
 
-The default `make all` writes to `cpp/`, `ts/`, `go/` next to the
+The default `make all` writes to `ts/` and `go/` next to the
 `Makefile`. The generated Go subpackage gets its own `go.mod` copied in
 (via the `gomod` target) so it can be consumed as a Go module by the
 backend and the test clients.

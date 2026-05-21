@@ -8,7 +8,6 @@ Distributed audio recording system — captures audio from ALSA devices via gRPC
 |-----------|-----------|-------|
 | Web Interface | `web/` | Vue 3.4, TypeScript 5.8, Vite 5, Nx 17, npm |
 | Go Backend | `go/` | Go 1.24, gRPC, MinIO (S3), zerolog, avahi |
-| C++ Client | `cpp/` | C++, CMake, ALSA, gRPC |
 | Protocols | `protocols/` | Protocol Buffers → Go, TypeScript, C++ stubs |
 
 ## Project Structure
@@ -35,10 +34,8 @@ session-recorder/
 │   ├── grpc/                  # gRPC server implementations
 │   ├── storage/               # MinIO/S3 storage layer
 │   └── render/                # Audio rendering (waveforms)
-├── cpp/
-│   └── chunk-sink-client/     # ALSA audio streamer
 ├── protocols/                 # Protocol Buffer definitions
-│   └── proto/                 # .proto files (generates go/, ts/, cpp/)
+│   └── proto/                 # .proto files (generates go/, ts/)
 ├── docker-compose.yml         # Production setup
 └── docker-compose.dev.yml     # Development setup (MinIO only)
 ```

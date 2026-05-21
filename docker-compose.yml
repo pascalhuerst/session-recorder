@@ -5,7 +5,6 @@ services:
       context: ./protocols
       dockerfile: Dockerfile
     volumes:
-      - protocol-data:/app/cpp
       - protocol-data:/app/ts
       - protocol-data:/app/go
     networks:

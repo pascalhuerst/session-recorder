@@ -69,8 +69,7 @@ pub fn int16_to_float_sample<T: Float>(input: i16) -> T {
 
 #[inline(always)]
 pub fn int32_to_float_sample<T: Float>(input: i32) -> T {
-    let output = T::from(input).unwrap() * T::from(INV_BITS_32_SCALE).unwrap();
-    output
+    T::from(input).unwrap() * T::from(INV_BITS_32_SCALE).unwrap()
 }
 
 #[inline(always)]
@@ -82,8 +81,7 @@ pub fn float_to_i32_sample<T: Float>(input: T) -> i32 {
     )
     .unwrap();
 
-    let output = (clamped * BITS_32_SCALE) as i32;
-    output
+    (clamped * BITS_32_SCALE) as i32
 }
 
 #[inline(always)]

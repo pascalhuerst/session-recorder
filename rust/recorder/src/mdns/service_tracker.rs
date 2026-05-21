@@ -281,7 +281,6 @@ impl ServiceTracker {
             }
         }
     }
-
 }
 
 impl Drop for ServiceTracker {
@@ -312,7 +311,6 @@ pub fn create_tracker_for_service(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::time::Duration;
 
     #[test]
     fn test_service_tracker_creation() {

@@ -175,7 +175,7 @@ impl Led {
     /// # Returns
     /// * `Result<(), LedError>` - Success or error
     pub fn set_brightness_percent(&self, percentage: f32) -> Result<(), LedError> {
-        if percentage < 0.0 || percentage > 1.0 {
+        if !(0.0..=1.0).contains(&percentage) {
             return Err(LedError::InvalidBrightness((percentage * 100.0) as u32));
         }
 
@@ -294,10 +294,10 @@ impl Led {
 
         for entry in std::fs::read_dir(base_path)? {
             let entry = entry?;
-            if entry.file_type()?.is_dir() {
-                if let Some(name) = entry.file_name().to_str() {
-                    leds.push(name.to_string());
-                }
+            if entry.file_type()?.is_dir()
+                && let Some(name) = entry.file_name().to_str()
+            {
+                leds.push(name.to_string());
             }
         }
 

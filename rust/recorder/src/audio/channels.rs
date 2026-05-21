@@ -17,8 +17,5 @@ pub struct CaptureConsumer {
 pub fn new_capture_ring(buffer_size: usize) -> (CaptureProducer, CaptureConsumer) {
     let rb = HeapRb::<f32>::new(buffer_size);
     let (producer, consumer) = rb.split();
-    (
-        CaptureProducer { producer },
-        CaptureConsumer { consumer },
-    )
+    (CaptureProducer { producer }, CaptureConsumer { consumer })
 }

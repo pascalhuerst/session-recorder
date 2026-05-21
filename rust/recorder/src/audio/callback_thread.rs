@@ -19,7 +19,8 @@ pub fn start_callback_thread(
     let dedicated_core_id = 1;
 
     let mut buffer = vec![0i16; num_input_channels * period_size];
-    let audio_thread = std::thread::spawn(move || {
+
+    std::thread::spawn(move || {
         if !core_affinity::set_for_current(core_affinity::CoreId {
             id: dedicated_core_id,
         }) {
@@ -66,9 +67,8 @@ pub fn start_callback_thread(
                                 *dst = src as f32 * I16_INV_SCALE;
                             }
 
-                            let samples_pushed = capture
-                                .producer
-                                .push_slice(&float_buffer[..samples_read]);
+                            let samples_pushed =
+                                capture.producer.push_slice(&float_buffer[..samples_read]);
 
                             if samples_pushed != samples_read {
                                 warn!(
@@ -90,10 +90,7 @@ pub fn start_callback_thread(
                                         continue;
                                     }
                                     Err(recovery_err) => {
-                                        error!(
-                                            "Failed to recover capture PCM: {}",
-                                            recovery_err
-                                        );
+                                        error!("Failed to recover capture PCM: {}", recovery_err);
                                         capture_pcm.drain()?;
                                         capture_pcm.prepare()?;
                                         capture_pcm.start()?;
@@ -119,6 +116,5 @@ pub fn start_callback_thread(
         if let Err(e) = callback_thread() {
             error!("Audio processing thread error: {}", e);
         }
-    });
-    audio_thread
+    })
 }

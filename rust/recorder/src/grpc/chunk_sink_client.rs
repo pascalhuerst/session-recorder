@@ -18,8 +18,8 @@ pub mod common {
     tonic::include_proto!("common");
 }
 
-use chunksink::chunk_sink_client::ChunkSinkClient;
 use chunksink::Chunks;
+use chunksink::chunk_sink_client::ChunkSinkClient;
 use common::{RecorderStatus, SignalStatus};
 
 /// Error types for ChunkSink client operations

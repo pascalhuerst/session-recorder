@@ -5,6 +5,9 @@
 //! 3. Capture audio, detect signal level, transmit chunks only while recording
 //! 4. Status updates to all connected clients
 
+use clap::Parser;
+use evdev::KeyCode;
+use log::{debug, error, info, warn};
 use recorder::audio::{
     alsa::{AudioSettings, configure_input_device},
     callback_thread::start_callback_thread,
@@ -18,9 +21,6 @@ use recorder::grpc::chunk_sink_client::{
 use recorder::io::input_key::InputKey;
 use recorder::io::led::Led;
 use recorder::mdns::service_tracker::{ServiceEvent, ServiceTracker, ServiceTrackerConfig};
-use clap::Parser;
-use evdev::KeyCode;
-use log::{debug, error, info, warn};
 use ringbuf::traits::Consumer;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;

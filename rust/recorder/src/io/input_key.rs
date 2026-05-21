@@ -135,10 +135,10 @@ impl InputKey {
         info!("Stopping input key monitoring...");
         self.terminate_request.store(true, Ordering::Relaxed);
 
-        if let Some(handle) = self.worker_handle.take() {
-            if let Err(e) = handle.join() {
-                error!("Error joining worker thread: {:?}", e);
-            }
+        if let Some(handle) = self.worker_handle.take()
+            && let Err(e) = handle.join()
+        {
+            error!("Error joining worker thread: {:?}", e);
         }
 
         self.is_running.store(false, Ordering::Relaxed);

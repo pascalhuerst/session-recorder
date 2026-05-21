@@ -8,7 +8,8 @@ Distributed audio recording system — captures audio from ALSA devices via gRPC
 |-----------|-----------|-------|
 | Web Interface | `web/` | Vue 3.4, TypeScript 5.8, Vite 5, Nx 17, npm |
 | Go Backend | `go/` | Go 1.24, gRPC, MinIO (S3), zerolog, avahi |
-| Protocols | `protocols/` | Protocol Buffers → Go, TypeScript, C++ stubs |
+| Recorder (device client) | `rust/recorder/` | Rust, ALSA, tonic (gRPC), mdns-sd |
+| Protocols | `protocols/` | Protocol Buffers → Go, TypeScript stubs |
 
 ## Project Structure
 
@@ -34,11 +35,20 @@ session-recorder/
 │   ├── grpc/                  # gRPC server implementations
 │   ├── storage/               # MinIO/S3 storage layer
 │   └── render/                # Audio rendering (waveforms)
+├── rust/
+│   ├── recorder/              # Device client: ALSA capture → chunksink protocol client
+│   └── recorder-display/      # On-device status display (SessionSource client)
 ├── protocols/                 # Protocol Buffer definitions
 │   └── proto/                 # .proto files (generates go/, ts/)
 ├── docker-compose.yml         # Production setup
 └── docker-compose.dev.yml     # Development setup (MinIO only)
 ```
+
+Protocol naming is written from the backend's perspective: the backend hosts the
+**ChunkSink** service (the sink that receives audio chunks); the recorder is the
+client of that protocol. The terms "chunk source" / "chunk sink client" are
+equivalent to the recorder but are used **only** in the protocol definitions and
+generated stubs — everywhere else the device client is called the **recorder**.
 
 ## Commands
 
@@ -69,7 +79,7 @@ npx nx storybook               # Storybook
 
 ### Protocols (from `protocols/`)
 ```bash
-make all                       # Generate all (Go, TS, C++)
+make all                       # Generate all (Go, TS)
 make ts                        # TypeScript only
 make go                        # Go only
 make clean                     # Clean generated files

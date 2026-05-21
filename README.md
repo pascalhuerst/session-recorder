@@ -1,7 +1,7 @@
 # Session Recorder
 
-A distributed audio recording system with native audio-capture clients (Rust or C++),
-a Go backend, and a Vue.js web interface.
+A distributed audio recording system with a native audio-capture client (the
+**recorder**, in Rust), a Go backend, and a Vue.js web interface.
 
 ## I want to... develop locally
 
@@ -63,29 +63,28 @@ directory instead of MinIO — see the `--storage-fs-root` flag in
 
 ## I want to... connect a recording device
 
-Two client implementations exist. **Rust is the recommended one** — it has the
-full feature set (LED bindings, button-driven cut, server-command stream, dB-based
-detector). The C++ client is older and kept for now.
-
-### Rust client (recommended)
+The **recorder** is the device-side client. It reads audio from a soundcard,
+detects when a signal is present, and streams the captured audio to the backend.
+It implements a client for the chunksink protocol — see
+[`rust/recorder/README.md`](rust/recorder/README.md) for details.
 
 #### 1. Build
 
 ```bash
-cd rust/chunk-source
+cd rust/recorder
 cargo build --release
 ```
 
 #### 2. Run
 
 ```bash
-./target/release/chunk-source \
+./target/release/recorder \
   --recorder-id $(uuidgen) \
   --recorder-name "Living Room" \
   --device default
 ```
 
-Useful optional flags (see `chunk-source --help` for the full list):
+Useful optional flags (see `recorder --help` for the full list):
 
 | Flag | Purpose |
 |---|---|
@@ -145,8 +144,8 @@ Set `FILE_SHARE_METHOD=s3_copy` and configure:
 
 ```
 ┌─────────────────┐     gRPC       ┌──────────────────────────┐
-│  Rust or C++    │ ─────────────► │  Go Backend              │
-│  Client (ALSA)  │                │  ChunkSink (gRPC :8779)  │
+│  recorder       │ ─────────────► │  Go Backend              │
+│  (Rust, ALSA)   │                │  ChunkSink (gRPC :8779)  │
 └─────────────────┘                │  SessionSource (:8780)   │
                                    │  SessionSource gRPC-Web  │
 ┌─────────────────┐    gRPC-Web    │  (HTTP :8081, embedded)  │
@@ -160,8 +159,10 @@ Set `FILE_SHARE_METHOD=s3_copy` and configure:
                                        └─────────────────┘
 ```
 
-mDNS-driven discovery: clients find the backend; the backend finds nothing
-(it advertises and waits).
+Protocol names are written from the backend's perspective: the backend hosts the
+**ChunkSink** service (it is the sink that receives chunks); the recorder is the
+client of that protocol. mDNS-driven discovery: the recorder finds the backend;
+the backend finds nothing (it advertises and waits).
 
 ---
 
@@ -170,5 +171,5 @@ mDNS-driven discovery: clients find the backend; the backend finds nothing
 - [`go/README.md`](go/README.md) — backend binary, CLI flags, storage backends, test clients
 - [`web/README.md`](web/README.md) — dev mode, environment, storybook
 - [`protocols/README.md`](protocols/README.md) — proto regeneration, codegen deps
-- [`rust/chunk-source/README.md`](rust/chunk-source/README.md) — Rust recorder client
+- [`rust/recorder/README.md`](rust/recorder/README.md) — the recorder (Rust chunksink-protocol client)
 - [`readme_deployment.md`](readme_deployment.md) — production deployment notes

@@ -290,31 +290,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 
 [[package]]
-name = "chunk-source"
-version = "0.1.0"
-dependencies = [
- "alsa",
- "anyhow",
- "clap",
- "core_affinity",
- "ctrlc",
- "env_logger",
- "evdev",
- "gethostname",
- "libc",
- "log",
- "mdns-sd",
- "num-traits",
- "prost",
- "prost-types",
- "ringbuf",
- "tokio",
- "tonic",
- "tonic-build",
- "uuid",
-]
-
-[[package]]
 name = "clap"
 version = "4.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1242,6 +1217,31 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
 dependencies = [
  "getrandom 0.2.16",
+]
+
+[[package]]
+name = "recorder"
+version = "0.1.0"
+dependencies = [
+ "alsa",
+ "anyhow",
+ "clap",
+ "core_affinity",
+ "ctrlc",
+ "env_logger",
+ "evdev",
+ "gethostname",
+ "libc",
+ "log",
+ "mdns-sd",
+ "num-traits",
+ "prost",
+ "prost-types",
+ "ringbuf",
+ "tokio",
+ "tonic",
+ "tonic-build",
+ "uuid",
 ]
 
 [[package]]

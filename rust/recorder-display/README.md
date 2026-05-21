@@ -157,7 +157,7 @@ Provides a streaming interface for sending commands to recorders. Currently retu
 
 ## Integration
 
-This application is designed to work with the C++ chunk-sink-client and other session-recorder components.
+This application is designed to work with the recorder and other session-recorder components.
 
 ### Service Discovery
 

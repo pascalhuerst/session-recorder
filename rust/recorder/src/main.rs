@@ -5,19 +5,19 @@
 //! 3. Capture audio, detect signal level, transmit chunks only while recording
 //! 4. Status updates to all connected clients
 
-use chunk_source::audio::{
+use recorder::audio::{
     alsa::{AudioSettings, configure_input_device},
     callback_thread::start_callback_thread,
     channels::{CaptureConsumer, new_capture_ring},
 };
-use chunk_source::grpc::chunk_sink_client::{
+use recorder::grpc::chunk_sink_client::{
     AudioChunk, ChunkSinkClientService, ChunkSinkConfig, RecorderStatusInfo,
     chunksink::{GetCommandRequest, chunk_sink_client::ChunkSinkClient, command::Command},
     common::SignalStatus,
 };
-use chunk_source::io::input_key::InputKey;
-use chunk_source::io::led::Led;
-use chunk_source::mdns::service_tracker::{ServiceEvent, ServiceTracker, ServiceTrackerConfig};
+use recorder::io::input_key::InputKey;
+use recorder::io::led::Led;
+use recorder::mdns::service_tracker::{ServiceEvent, ServiceTracker, ServiceTrackerConfig};
 use clap::Parser;
 use evdev::KeyCode;
 use log::{debug, error, info, warn};
@@ -75,7 +75,7 @@ const LED_BLINK_HALF_MS: u64 = 80;
 const LED_UPLOAD_PULSE_MS: u64 = 50;
 
 #[derive(Parser, Debug, Clone)]
-#[command(name = "chunk-source", about = "Session Recorder audio client")]
+#[command(name = "recorder", about = "Session Recorder audio client")]
 struct Args {
     /// Unique ID of this recorder (UUID)
     #[arg(long)]
@@ -710,7 +710,7 @@ impl SessionRecorder {
         // Updated, until Removed). Used by the reconciler to re-attach when a
         // client got dropped (e.g. the backend restarted under us) without a
         // fresh mDNS event firing.
-        let mut known_services: HashMap<String, chunk_source::mdns::service_tracker::ServiceInfo> =
+        let mut known_services: HashMap<String, recorder::mdns::service_tracker::ServiceInfo> =
             HashMap::new();
         let mut reconcile_tick = tokio::time::interval(RECONCILE_INTERVAL);
         // First tick fires immediately; skip it so we don't reconcile-before-we-discover.
@@ -820,7 +820,7 @@ impl SessionRecorder {
     /// No-op if the service has no IPv4 address yet or if we're already
     /// connected to that instance name.
     async fn try_attach_service(
-        service_info: &chunk_source::mdns::service_tracker::ServiceInfo,
+        service_info: &recorder::mdns::service_tracker::ServiceInfo,
         clients: &Arc<tokio::sync::Mutex<HashMap<String, ClientInfo>>>,
         shutdown: &Arc<AtomicBool>,
         recorder_id: Uuid,
@@ -1197,7 +1197,7 @@ async fn command_listener_task(
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Default: info everywhere, but silence the chatty mdns_sd crate.
-    // Override with e.g. RUST_LOG=chunk_source=debug,mdns_sd=warn
+    // Override with e.g. RUST_LOG=recorder=debug,mdns_sd=warn
     env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info,mdns_sd=off"))
         .init();
 

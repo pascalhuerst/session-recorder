@@ -62,10 +62,9 @@ make all
 
 ## Rust stubs
 
-There is no Rust target in the Makefile (yet). The Rust recorder client in
-`rust/chunk-source/` generates its own stubs at build time via
-`tonic-build` in its `build.rs`. The check-in copies under
-`rust/grpc_test/src/` are stale demo files (referenced by `TODO.md`).
+There is no Rust target in the Makefile (yet). The recorder in
+`rust/recorder/` generates its own stubs at build time via
+`tonic-build` in its `build.rs`.
 
 ## Known issues
 

@@ -40,7 +40,7 @@ func NewChunkSinkHandler(sessionStorage storage.Storage, recorderBroadcaster *br
 	}
 }
 
-// Called when a chunk-source sends status updates
+// Called when a recorder sends status updates
 func (h *ChunkSinkHandler) setRecorderStatus(ctx context.Context, status *cmpb.RecorderStatus) error {
 	recorderID, err := uuid.Parse(status.RecorderID)
 	if err != nil {
@@ -110,7 +110,7 @@ func (h *ChunkSinkHandler) closeRecorderSession(ctx context.Context, recorderID,
 	return true, nil
 }
 
-// Called when a chunk-source sends chunks
+// Called when a recorder sends chunks
 func (h *ChunkSinkHandler) setChunks(ctx context.Context, chunks *cspb.Chunks) error {
 	chunkID := fmt.Sprintf("%016d", chunks.ChunkCount)
 	sessionID, err := uuid.Parse(chunks.SessionID)

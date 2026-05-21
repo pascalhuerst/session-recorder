@@ -41,19 +41,6 @@ bin/
 *.out
 go.work
 
-# C++
-CMakeFiles/
-CMakeCache.txt
-cmake_install.cmake
-*.cmake
-!CMakeLists.txt
-Makefile
-*.o
-*.so
-*.a
-*.out
-chunk-sink-client
-
 # Protocol Buffers (generated files)
 protocols/ts/
 protocols/go/

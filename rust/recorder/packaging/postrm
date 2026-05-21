@@ -1,0 +1,16 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+  remove|purge)
+    if [ -d /run/systemd/system ]; then
+      systemctl daemon-reload || true
+    fi
+    ;;
+esac
+
+# On purge the dedicated user is intentionally left in place to avoid orphaning
+# files it may own. Remove manually if desired:
+#   deluser --system session-recorder-alsa-reader
+
+exit 0

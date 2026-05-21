@@ -1,0 +1,29 @@
+# Configuration for session-recorder-server.
+# Installed to /etc/default/session-recorder-server and sourced by systemd
+# (EnvironmentFile). Every setting is an environment variable read by the
+# backend. Uncomment and edit what you need.
+
+# --- Storage: MinIO / S3 (default backend) ---
+#S3_ENDPOINT=localhost:9000
+#S3_ACCESS_KEY=admin
+#S3_SECRET_KEY=changeme
+#S3_USE_SSL=false
+#S3_PUBLIC_ENDPOINT=localhost:9000
+
+# --- Storage: local filesystem (alternative; when set, all S3_* are ignored) ---
+# Point it at the systemd StateDirectory so the service can write there:
+#STORAGE_FS_ROOT=/var/lib/session-recorder-server
+
+# --- Ports (optional; defaults shown) ---
+#CHUNK_SINK_PORT=8779
+#SESSION_SOURCE_PORT=8780
+#GRPCWEB_PORT=8081
+
+# --- Optional email sharing ---
+#SMTP_HOST=
+#SMTP_PORT=587
+#SMTP_USERNAME=
+#SMTP_PASSWORD=
+
+# --- Extra raw CLI flags (optional) ---
+#SESSION_RECORDER_SERVER_OPTS=

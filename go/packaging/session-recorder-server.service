@@ -1,0 +1,32 @@
+[Unit]
+Description=Session Recorder backend (ChunkSink + SessionSource gRPC, embedded gRPC-Web)
+Documentation=https://github.com/pascalhuerst/session-recorder
+Wants=network-online.target avahi-daemon.service
+After=network-online.target avahi-daemon.service
+
+[Service]
+Type=simple
+# Optional config. The leading '-' makes the file non-fatal if absent.
+# All backend configuration is read from environment variables; see the file.
+EnvironmentFile=-/etc/default/session-recorder-server
+# $SESSION_RECORDER_SERVER_OPTS lets you pass extra raw CLI flags if needed.
+ExecStart=/usr/bin/session-recorder-server $SESSION_RECORDER_SERVER_OPTS
+Restart=on-failure
+RestartSec=5
+
+# Dedicated unprivileged user (created by the .deb postinst).
+User=session-recorder
+Group=session-recorder
+
+# Managed writable dir at /var/lib/session-recorder-server. If you use the
+# filesystem storage backend, set STORAGE_FS_ROOT to this path in the env file.
+StateDirectory=session-recorder-server
+
+# Hardening (relax if it gets in your way).
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

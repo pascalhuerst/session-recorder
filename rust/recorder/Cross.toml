@@ -1,0 +1,19 @@
+# cross (https://github.com/cross-rs/cross) config for building the recorder
+# for arm64. The default cross image has the aarch64 toolchain but not protoc
+# (needed by build.rs / tonic-build) nor the target's ALSA headers (needed to
+# link the `alsa` crate), so install both into the build container.
+[build.env]
+# cross mounts only the crate dir, so the protos must be staged inside it and
+# located via PROTO_DIR (see build.rs and the release workflow). PROTOC points
+# build.rs/prost at the modern protoc we install below (the cross image's apt
+# protobuf-compiler is too old — proto2 only).
+passthrough = ["PROTO_DIR", "PROTOC"]
+
+[target.aarch64-unknown-linux-gnu]
+pre-build = [
+    "dpkg --add-architecture arm64",
+    "apt-get update && apt-get install --assume-yes curl unzip libasound2-dev:arm64",
+    "curl -fsSL -o /tmp/protoc.zip https://github.com/protocolbuffers/protobuf/releases/download/v27.2/protoc-27.2-linux-x86_64.zip",
+    "unzip -o /tmp/protoc.zip -d /usr/local bin/protoc 'include/*'",
+    "chmod +x /usr/local/bin/protoc",
+]

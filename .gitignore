@@ -30,6 +30,9 @@ out/
 tmp/
 target/
 
+# Protos staged into rust/recorder for cross-compilation (see release workflow)
+rust/recorder/proto/
+
 # Go
 bin/
 *.exe

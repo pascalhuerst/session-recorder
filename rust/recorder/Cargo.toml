@@ -2,6 +2,9 @@
 name = "recorder"
 version = "0.1.0"
 edition = "2024"
+description = "Session Recorder ALSA reader — captures audio and streams it to the backend (ChunkSink protocol client)."
+license = "MIT"
+homepage = "https://github.com/pascalhuerst/session-recorder"
 
 [dependencies]
 alsa = "0.9"
@@ -25,3 +28,23 @@ clap = { version = "4.6.1", features = ["derive"] }
 
 [build-dependencies]
 tonic-build = "0.12"
+
+# Debian packaging (cargo-deb). The installed artifact is named
+# session-recorder-alsa-reader; the cargo crate/binary stays `recorder`.
+# Build for arm64:
+#   cross build --release --target aarch64-unknown-linux-gnu
+#   cargo deb --no-build --no-strip --target aarch64-unknown-linux-gnu
+[package.metadata.deb]
+name = "session-recorder-alsa-reader"
+section = "sound"
+priority = "optional"
+# libasound2 was renamed libasound2t64 in the time64 transition (trixie+);
+# accept either. adduser is needed by the postinst.
+depends = "libasound2 | libasound2t64, adduser"
+maintainer-scripts = "packaging"
+conf-files = ["/etc/default/session-recorder-alsa-reader"]
+assets = [
+    ["target/release/recorder", "usr/bin/session-recorder-alsa-reader", "755"],
+    ["packaging/session-recorder-alsa-reader.service", "lib/systemd/system/session-recorder-alsa-reader.service", "644"],
+    ["packaging/session-recorder-alsa-reader.default", "etc/default/session-recorder-alsa-reader", "644"],
+]

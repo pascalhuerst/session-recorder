@@ -1,0 +1,42 @@
+# nfpm config for the Session Recorder backend .deb.
+# Run from the REPO ROOT (all paths below are repo-root-relative):
+#   GOOS=linux GOARCH=arm64 CGO_ENABLED=0 \
+#     go build -C go -o dist/session-recorder-server ./cmd/session_recorder_server
+#   VERSION=1.2.3 nfpm package --packager deb --config go/packaging/nfpm.yaml \
+#     --target dist/session-recorder-server_1.2.3_arm64.deb
+#
+# ${VERSION} is supplied via env (e.g. the git tag without the leading 'v').
+name: session-recorder-server
+arch: arm64
+platform: linux
+version: ${VERSION}
+section: sound
+priority: optional
+maintainer: Pascal Huerst <pascal.huerst@gmail.com>
+description: |
+  Session Recorder backend.
+  Hosts the ChunkSink and SessionSource gRPC services and an embedded
+  gRPC-Web listener for the web UI.
+homepage: https://github.com/pascalhuerst/session-recorder
+license: MIT
+
+depends:
+  - adduser
+
+contents:
+  - src: go/dist/session-recorder-server
+    dst: /usr/bin/session-recorder-server
+    file_info:
+      mode: 0755
+
+  - src: go/packaging/session-recorder-server.service
+    dst: /lib/systemd/system/session-recorder-server.service
+
+  - src: go/packaging/session-recorder-server.default
+    dst: /etc/default/session-recorder-server
+    type: config|noreplace
+
+scripts:
+  postinstall: go/packaging/postinst.sh
+  preremove: go/packaging/prerm.sh
+  postremove: go/packaging/postrm.sh

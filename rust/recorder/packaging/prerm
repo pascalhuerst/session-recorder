@@ -1,0 +1,13 @@
+#!/bin/sh
+set -e
+
+case "$1" in
+  remove|deconfigure)
+    if [ -d /run/systemd/system ]; then
+      systemctl stop session-recorder-alsa-reader.service || true
+      systemctl disable session-recorder-alsa-reader.service || true
+    fi
+    ;;
+esac
+
+exit 0

@@ -1,0 +1,12 @@
+# Configuration for the session-recorder-alsa-reader service.
+# Installed to /etc/default/session-recorder-alsa-reader and sourced by systemd
+# (EnvironmentFile). RECORDER_ARGS is appended verbatim to the command line.
+# Run `session-recorder-alsa-reader --help` for the full flag list.
+#
+# NOTE: keep RECORDER_ARGS on a single line (systemd EnvironmentFile parsing).
+
+# Minimum required: a stable UUID and a name.
+RECORDER_ARGS="--recorder-id 00000000-0000-0000-0000-000000000000 --recorder-name alsa-reader --device default"
+
+# Fuller example (detector tuning, LEDs, cut button, send buffer):
+#RECORDER_ARGS="--recorder-id <uuid> --recorder-name 'Studio 1' --device hw:0 --detector-threshold-db -45 --attack-time 5 --release-time 30 --led-rec-state led0 --led-upload led1 --input-event 3 --input-keycode 28 --input-hold-ms 800 --send-buffer-secs 120"

@@ -1,0 +1,28 @@
+[Unit]
+Description=Session Recorder ALSA reader (captures audio, ChunkSink protocol client)
+Documentation=https://github.com/pascalhuerst/session-recorder
+Wants=network-online.target avahi-daemon.service sound.target
+After=network-online.target avahi-daemon.service sound.target
+
+[Service]
+Type=simple
+# RECORDER_ARGS (set in the env file) is appended to the command line and must
+# at least provide --recorder-id and --recorder-name.
+EnvironmentFile=/etc/default/session-recorder-alsa-reader
+ExecStart=/usr/bin/session-recorder-alsa-reader $RECORDER_ARGS
+Restart=on-failure
+RestartSec=5
+
+# Dedicated user (created by the .deb postinst). It needs the soundcard
+# (audio group) and, for the optional cut button, input devices (input group).
+User=session-recorder-alsa-reader
+Group=session-recorder-alsa-reader
+SupplementaryGroups=audio input
+
+# NOTE on LEDs: writing /sys/class/leds/<led>/brightness needs either root or a
+# udev rule granting the group write access. If you use --led-*, either drop
+# User=/Group= above to run as root, or install such a udev rule.
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target

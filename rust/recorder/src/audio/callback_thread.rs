@@ -8,6 +8,21 @@ use std::sync::atomic::AtomicBool;
 
 const I16_INV_SCALE: f32 = 1.0 / 32768.0;
 
+// wait() poll timeout. At 48 kHz / 512-frame periods a period is ready roughly
+// every ~10 ms, so a 100 ms timeout already means the stream produced nothing.
+const WAIT_TIMEOUT_MS: u32 = 100;
+// If the stream is RUNNING but produces no data for this many consecutive
+// timeouts (~2 s), treat it as wedged and reinitialize.
+const STALL_TIMEOUTS: u32 = 20;
+
+// Bring the capture PCM back to a started state from XRUN / SETUP / SUSPENDED /
+// PREPARED. Safe to call whenever the stream is not actively RUNNING.
+fn reinit_capture(pcm: &alsa::pcm::PCM) -> Result<()> {
+    pcm.prepare()?;
+    pcm.start()?;
+    Ok(())
+}
+
 pub fn start_callback_thread(
     num_input_channels: usize,
     period_size: usize,
@@ -49,64 +64,103 @@ pub fn start_callback_thread(
             capture_pcm.start()?;
 
             info!("Starting audio processing loop");
+            // Counts consecutive wait() timeouts while the stream claims to be
+            // RUNNING; a sustained run means the stream is wedged.
+            let mut stall_timeouts: u32 = 0;
+
             'main: loop {
                 if shutdown_signal.load(std::sync::atomic::Ordering::Relaxed) {
                     break 'main;
                 }
 
-                match capture_pcm.wait(Some(100)) {
-                    Ok(true) => match capture_pcm.io_i16()?.readi(&mut buffer) {
-                        Ok(frames) if frames > 0 => {
-                            let samples_read = frames * num_input_channels;
+                match capture_pcm.wait(Some(WAIT_TIMEOUT_MS)) {
+                    Ok(true) => {
+                        stall_timeouts = 0;
 
-                            // Convert in-place, preserving interleaved layout.
-                            for (dst, &src) in float_buffer[..samples_read]
-                                .iter_mut()
-                                .zip(buffer[..samples_read].iter())
-                            {
-                                *dst = src as f32 * I16_INV_SCALE;
+                        let io = match capture_pcm.io_i16() {
+                            Ok(io) => io,
+                            Err(e) => {
+                                warn!("Cannot obtain capture IO handle: {}; reinitializing", e);
+                                if let Err(re) = reinit_capture(&capture_pcm) {
+                                    error!("Capture reinit failed: {}", re);
+                                }
+                                continue;
                             }
+                        };
 
-                            let samples_pushed =
-                                capture.producer.push_slice(&float_buffer[..samples_read]);
+                        match io.readi(&mut buffer) {
+                            Ok(frames) if frames > 0 => {
+                                let samples_read = frames * num_input_channels;
 
-                            if samples_pushed != samples_read {
-                                warn!(
-                                    "Could not push all samples to capture ring: {} of {}",
-                                    samples_pushed, samples_read
-                                );
-                            }
-                        }
-                        Ok(_) => {
-                            // No frames read, continue
-                        }
-                        Err(e) => {
-                            error!("Capture error: {}", e);
-                            if e.errno() == libc::EPIPE {
-                                info!("Capture overrun detected, attempting recovery...");
-                                match capture_pcm.try_recover(e, true) {
-                                    Ok(_) => {
-                                        info!("Capture PCM recovered successfully");
-                                        continue;
-                                    }
-                                    Err(recovery_err) => {
-                                        error!("Failed to recover capture PCM: {}", recovery_err);
-                                        capture_pcm.drain()?;
-                                        capture_pcm.prepare()?;
-                                        capture_pcm.start()?;
-                                        continue;
-                                    }
+                                // Convert in-place, preserving interleaved layout.
+                                for (dst, &src) in float_buffer[..samples_read]
+                                    .iter_mut()
+                                    .zip(buffer[..samples_read].iter())
+                                {
+                                    *dst = src as f32 * I16_INV_SCALE;
+                                }
+
+                                let samples_pushed =
+                                    capture.producer.push_slice(&float_buffer[..samples_read]);
+
+                                if samples_pushed != samples_read {
+                                    warn!(
+                                        "Could not push all samples to capture ring: {} of {}",
+                                        samples_pushed, samples_read
+                                    );
                                 }
                             }
-                            return Err(anyhow::anyhow!("Capture error: {}", e));
+                            Ok(_) => {
+                                // No frames read, continue
+                            }
+                            Err(e) => {
+                                // try_recover handles EPIPE (overrun) and
+                                // ESTRPIPE (suspend). For anything else, fall
+                                // back to a full prepare/start. Never return —
+                                // a dead capture thread silently freezes the
+                                // whole recorder.
+                                warn!("Capture read error: {} (errno {})", e, e.errno());
+                                if capture_pcm.try_recover(e, true).is_err()
+                                    && let Err(re) = reinit_capture(&capture_pcm)
+                                {
+                                    error!("Capture reinit failed: {}", re);
+                                }
+                            }
                         }
-                    },
+                    }
                     Ok(false) => {
-                        // Timeout, continue loop
+                        // Timeout: no data within WAIT_TIMEOUT_MS. If the stream
+                        // is no longer RUNNING it has fallen over without a read
+                        // error ever surfacing (the classic silent stall) —
+                        // reinitialize immediately. If it still claims RUNNING,
+                        // tolerate a brief run before forcing a reinit.
+                        let state = capture_pcm.state();
+                        if state == alsa::pcm::State::Running {
+                            stall_timeouts += 1;
+                            if stall_timeouts >= STALL_TIMEOUTS {
+                                warn!(
+                                    "Capture produced no data for ~{} ms while RUNNING; reinitializing",
+                                    STALL_TIMEOUTS * WAIT_TIMEOUT_MS
+                                );
+                                if let Err(re) = reinit_capture(&capture_pcm) {
+                                    error!("Capture reinit failed: {}", re);
+                                }
+                                stall_timeouts = 0;
+                            }
+                        } else {
+                            warn!("Capture stalled (state={:?}); reinitializing", state);
+                            if let Err(re) = reinit_capture(&capture_pcm) {
+                                error!("Capture reinit failed: {}", re);
+                            }
+                            stall_timeouts = 0;
+                        }
                     }
                     Err(e) => {
-                        error!("Wait error: {}", e);
-                        return Err(anyhow::anyhow!("Wait error: {}", e));
+                        warn!("Capture wait error: {}; reinitializing", e);
+                        if let Err(re) = reinit_capture(&capture_pcm) {
+                            error!("Capture reinit failed: {}", re);
+                        }
+                        stall_timeouts = 0;
                     }
                 }
             }

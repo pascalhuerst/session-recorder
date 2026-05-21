@@ -5,7 +5,9 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/google/uuid"
@@ -109,7 +111,8 @@ func main() {
 		s3PublicEndpoint = buildEndpoint(*s3PublicHost, *s3PublicPort, s3LocalEndpoint)
 	}
 
-	ctx := context.Background()
+	ctx, stopSignals := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stopSignals()
 
 	logger.Setup()
 
@@ -221,7 +224,7 @@ func main() {
 		ShareSegmentCB:       sessionSourceHandler.shareSegment,
 	})
 
-	sessionSourceGrpcServer, port, err := grpc.StartProtocolServer(sessionSourceServer, mdnsServer, sessionSourceService, uint16(*sessionSourcePort))
+	sessionSourceGrpcServer, sessionSourceMdns, port, err := grpc.StartProtocolServer(sessionSourceServer, mdnsServer, sessionSourceService, uint16(*sessionSourcePort))
 	if err != nil {
 		log.Err(err).Msg("Cannot start session source server")
 
@@ -229,13 +232,14 @@ func main() {
 	}
 	log.Info().Msgf("Session source server is now being served on port %d", port)
 
-	if err := grpc.StartGrpcWebServer(sessionSourceGrpcServer, uint16(*grpcWebPort)); err != nil {
+	grpcWebHttpServer, err := grpc.StartGrpcWebServer(sessionSourceGrpcServer, uint16(*grpcWebPort))
+	if err != nil {
 		log.Err(err).Msg("Cannot start gRPC-Web server")
 
 		return
 	}
 
-	_, port, err = grpc.StartProtocolServer(chunkSinkServer, mdnsServer, chunkSinkService, uint16(*chunkSinkPort))
+	chunkSinkGrpcServer, chunkSinkMdns, port, err := grpc.StartProtocolServer(chunkSinkServer, mdnsServer, chunkSinkService, uint16(*chunkSinkPort))
 	if err != nil {
 		log.Err(err).Msg("Cannot start chunk sink server")
 
@@ -296,4 +300,46 @@ func main() {
 	log.Info().Msg("chunk sink server setup successfully")
 
 	<-ctx.Done()
+	stopSignals()
+	log.Info().Msg("Shutdown signal received, draining...")
+
+	// 1. Unannounce mDNS so new recorders/UIs don't discover us mid-shutdown.
+	if chunkSinkMdns != nil {
+		chunkSinkMdns.Close()
+	}
+	if sessionSourceMdns != nil {
+		sessionSourceMdns.Close()
+	}
+
+	// 2. Stop the gRPC-Web HTTP listener. Long-lived gRPC-Web streams (the
+	//    UI's StreamRecorders / StreamSessions / StreamSessionAudio) keep the
+	//    HTTP connection open, so Shutdown will hang on the deadline. Force
+	//    Close() afterwards to free the port and unblock the wrapped streams.
+	shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), 3*time.Second)
+	if err := grpcWebHttpServer.Shutdown(shutdownCtx); err != nil {
+		log.Warn().Err(err).Msg("gRPC-Web graceful shutdown timed out, force-closing")
+		_ = grpcWebHttpServer.Close()
+	}
+	cancelShutdown()
+
+	// 3. Gracefully stop the gRPC servers, but bounded — both have long-lived
+	//    server-streaming RPCs (chunk-sink: GetCommands blocks on
+	//    server.Context().Done(); session-source: the UI Stream* handlers).
+	//    GracefulStop won't cancel those handler contexts on its own, so we
+	//    fall back to Stop() after the deadline to force them out.
+	grpc.ShutdownServer(chunkSinkGrpcServer, "chunk-sink", 3*time.Second)
+	grpc.ShutdownServer(sessionSourceGrpcServer, "session-source", 3*time.Second)
+
+	// 4. Flush in-flight chunk buffers as resumable partial state so a restart
+	//    can pick up exactly where we left off (no audio gap).
+	shutdownCtx, cancelShutdown = context.WithTimeout(context.Background(), 30*time.Second)
+	if err := sessionStorage.Shutdown(shutdownCtx); err != nil {
+		log.Err(err).Msg("Storage shutdown error")
+	}
+	cancelShutdown()
+
+	// 5. Close the mDNS server itself.
+	mdnsServer.Close()
+
+	log.Info().Msg("Shutdown complete")
 }

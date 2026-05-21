@@ -22,7 +22,7 @@ use clap::Parser;
 use evdev::KeyCode;
 use log::{debug, error, info, warn};
 use ringbuf::traits::Consumer;
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
@@ -133,6 +133,66 @@ struct Args {
     /// Minimum hold-down duration (ms) before a release triggers a cut
     #[arg(long, requires = "input_event", requires = "input_keycode")]
     input_hold_ms: Option<u64>,
+
+    /// Seconds of ready-to-send chunks to buffer when no backend is reachable.
+    /// When the buffer fills, the oldest chunks are dropped.
+    #[arg(long, default_value_t = 120.0)]
+    send_buffer_secs: f64,
+}
+
+/// Bounded outbox of ready-to-send chunks. Drops the oldest entry when the
+/// total buffered audio (counted in u32 samples) would exceed capacity.
+/// Drained by the chunk sender task whenever ≥1 client is connected.
+struct Outbox {
+    deque: VecDeque<AudioChunk>,
+    total_samples: usize,
+    capacity_samples: usize,
+}
+
+impl Outbox {
+    fn new(capacity_samples: usize) -> Self {
+        Self {
+            deque: VecDeque::new(),
+            total_samples: 0,
+            capacity_samples: capacity_samples.max(1),
+        }
+    }
+
+    fn push(&mut self, chunk: AudioChunk) {
+        self.total_samples += chunk.data.len();
+        self.deque.push_back(chunk);
+        while self.total_samples > self.capacity_samples {
+            let Some(dropped) = self.deque.pop_front() else {
+                break;
+            };
+            self.total_samples = self.total_samples.saturating_sub(dropped.data.len());
+            warn!(
+                "Outbox full ({}/{} samples), dropping oldest chunk ({} samples, session={})",
+                self.total_samples,
+                self.capacity_samples,
+                dropped.data.len(),
+                dropped.session_id,
+            );
+        }
+    }
+
+    fn pop_front(&mut self) -> Option<AudioChunk> {
+        let chunk = self.deque.pop_front()?;
+        self.total_samples = self.total_samples.saturating_sub(chunk.data.len());
+        Some(chunk)
+    }
+
+    /// Restore a chunk that was popped but failed to send. Re-prepends without
+    /// triggering drop-oldest (the sample count was already accounted for at
+    /// original push time and zeroed at pop time).
+    fn push_front_in_flight(&mut self, chunk: AudioChunk) {
+        self.total_samples += chunk.data.len();
+        self.deque.push_front(chunk);
+    }
+
+    fn len(&self) -> usize {
+        self.deque.len()
+    }
 }
 
 struct SessionRecorder {
@@ -150,6 +210,8 @@ struct SessionRecorder {
 
     shutdown_signal: Arc<AtomicBool>,
 
+    outbox: Arc<tokio::sync::Mutex<Outbox>>,
+
     cut_tx: Option<tokio::sync::mpsc::Sender<CutTrigger>>,
     led_rec_tx: Option<tokio::sync::mpsc::Sender<LedRecEvent>>,
     led_upload_tx: Option<tokio::sync::mpsc::Sender<()>>,
@@ -159,6 +221,7 @@ struct SessionRecorder {
     discovery_handle: Option<tokio::task::JoinHandle<()>>,
     audio_handle: Option<tokio::task::JoinHandle<()>>,
     drain_handle: Option<tokio::task::JoinHandle<()>>,
+    sender_handle: Option<tokio::task::JoinHandle<()>>,
     led_rec_handle: Option<tokio::task::JoinHandle<()>>,
     led_upload_handle: Option<tokio::task::JoinHandle<()>>,
 }
@@ -197,6 +260,15 @@ impl SessionRecorder {
             clipping: false,
         };
 
+        let capacity_samples = (audio_settings.sample_rate as f64
+            * audio_settings.num_channels as f64
+            * args.send_buffer_secs) as usize;
+        info!(
+            "Send-buffer outbox: {} samples (~{:.1} s of audio)",
+            capacity_samples, args.send_buffer_secs
+        );
+        let outbox = Arc::new(tokio::sync::Mutex::new(Outbox::new(capacity_samples)));
+
         Self {
             args,
             service_tracker: None,
@@ -207,6 +279,7 @@ impl SessionRecorder {
             callback_handle: None,
             recorder_status: Arc::new(tokio::sync::Mutex::new(initial_status)),
             shutdown_signal: Arc::new(AtomicBool::new(false)),
+            outbox,
             cut_tx: None,
             led_rec_tx: None,
             led_upload_tx: None,
@@ -214,6 +287,7 @@ impl SessionRecorder {
             discovery_handle: None,
             audio_handle: None,
             drain_handle: None,
+            sender_handle: None,
             led_rec_handle: None,
             led_upload_handle: None,
         }
@@ -230,6 +304,7 @@ impl SessionRecorder {
 
         self.start_led_tasks();
         self.start_audio_processing_task().await;
+        self.start_chunk_sender_task();
         self.start_discovery_task().await;
         self.setup_input_key()?;
 
@@ -253,6 +328,9 @@ impl SessionRecorder {
             let _ = handle.await;
         }
         if let Some(handle) = self.drain_handle.take() {
+            let _ = handle.await;
+        }
+        if let Some(handle) = self.sender_handle.take() {
             let _ = handle.await;
         }
         // Dropping the InputKey stops its worker thread (see InputKey::Drop)
@@ -478,6 +556,7 @@ impl SessionRecorder {
         let clients = Arc::clone(&self.grpc_clients);
         let shutdown = self.shutdown_signal.clone();
         let status = Arc::clone(&self.recorder_status);
+        let outbox = Arc::clone(&self.outbox);
         let detector = DetectorConfig {
             sample_rate: SAMPLE_RATE,
             num_channels: NUM_CHANNELS,
@@ -501,23 +580,90 @@ impl SessionRecorder {
         self.drain_handle = Some(drain_handle);
 
         let led_rec_tx = self.led_rec_tx.clone();
-        let led_upload_tx = self.led_upload_tx.clone();
 
         let handle = tokio::spawn(async move {
             Self::audio_processing_task(
-                samples_rx,
-                clients,
-                shutdown,
-                status,
-                detector,
-                cut_rx,
-                led_rec_tx,
-                led_upload_tx,
+                samples_rx, clients, shutdown, status, detector, cut_rx, led_rec_tx, outbox,
             )
             .await;
         });
 
         self.audio_handle = Some(handle);
+    }
+
+    fn start_chunk_sender_task(&mut self) {
+        let outbox = Arc::clone(&self.outbox);
+        let clients = Arc::clone(&self.grpc_clients);
+        let shutdown = self.shutdown_signal.clone();
+        let led_upload_tx = self.led_upload_tx.clone();
+
+        let handle = tokio::spawn(async move {
+            Self::chunk_sender_task(outbox, clients, shutdown, led_upload_tx).await;
+        });
+
+        self.sender_handle = Some(handle);
+    }
+
+    /// Drain the outbox to all currently connected clients. When zero clients
+    /// are connected, idle without dropping chunks (the producer enforces the
+    /// time-based capacity via drop-oldest). On full failure, restore the
+    /// chunk at the front and back off.
+    async fn chunk_sender_task(
+        outbox: Arc<tokio::sync::Mutex<Outbox>>,
+        clients: Arc<tokio::sync::Mutex<HashMap<String, ClientInfo>>>,
+        shutdown: Arc<AtomicBool>,
+        led_upload_tx: Option<tokio::sync::mpsc::Sender<()>>,
+    ) {
+        info!("Chunk sender task started");
+        let idle_sleep = Duration::from_millis(20);
+        let wait_sleep = Duration::from_millis(200);
+
+        while !shutdown.load(Ordering::Relaxed) {
+            let Some(chunk) = outbox.lock().await.pop_front() else {
+                tokio::time::sleep(idle_sleep).await;
+                continue;
+            };
+
+            if clients.lock().await.is_empty() {
+                outbox.lock().await.push_front_in_flight(chunk);
+                tokio::time::sleep(wait_sleep).await;
+                continue;
+            }
+
+            let mut sent_to_any = false;
+            {
+                let mut g = clients.lock().await;
+                let mut failed = Vec::new();
+                for (name, ci) in g.iter_mut() {
+                    match ci.client.set_chunks(chunk.clone()).await {
+                        Ok(_) => {
+                            sent_to_any = true;
+                            ci.mark_successful_send();
+                        }
+                        Err(e) => {
+                            warn!("Chunk send to {} failed: {}", name, e);
+                            failed.push(name.clone());
+                        }
+                    }
+                }
+                for n in failed {
+                    if let Some(mut ci) = g.remove(&n) {
+                        ci.client.disconnect().await;
+                        warn!("Removed failed client during chunk send: {}", n);
+                    }
+                }
+            }
+
+            if sent_to_any {
+                if let Some(tx) = &led_upload_tx {
+                    let _ = tx.try_send(());
+                }
+            } else {
+                outbox.lock().await.push_front_in_flight(chunk);
+                tokio::time::sleep(wait_sleep).await;
+            }
+        }
+        info!("Chunk sender task stopped");
     }
 
     async fn ring_drain_task(
@@ -762,7 +908,7 @@ impl SessionRecorder {
         detector: DetectorConfig,
         mut cut_rx: tokio::sync::mpsc::Receiver<CutTrigger>,
         led_rec_tx: Option<tokio::sync::mpsc::Sender<LedRecEvent>>,
-        led_upload_tx: Option<tokio::sync::mpsc::Sender<()>>,
+        outbox: Arc<tokio::sync::Mutex<Outbox>>,
     ) {
         info!(
             "Audio processing task started (threshold={} dB, window={}s, attack={}s, release={}s)",
@@ -914,7 +1060,7 @@ impl SessionRecorder {
                     );
                 }
 
-                // If recording, ship the window's samples as a chunk
+                // If recording, enqueue the window's samples for the sender task.
                 if recording {
                     let Some(current_session) = session_id.as_ref() else {
                         continue;
@@ -928,44 +1074,21 @@ impl SessionRecorder {
                         })
                         .collect();
 
-                    let mut g = clients.lock().await;
-                    let n_clients = g.len();
-                    let mut failed = Vec::new();
-                    let mut ok_count = 0usize;
-                    for (name, ci) in g.iter_mut() {
-                        let chunk = AudioChunk {
-                            session_id: current_session.clone(),
-                            chunk_count: chunk_counter,
-                            data: data.clone(),
-                            timestamp: SystemTime::now(),
-                        };
-                        match ci.client.set_chunks(chunk).await {
-                            Ok(_) => {
-                                ci.mark_successful_send();
-                                ok_count += 1;
-                                if let Some(tx) = &led_upload_tx {
-                                    let _ = tx.try_send(());
-                                }
-                            }
-                            Err(e) => {
-                                warn!("Failed to send chunk to {}: {}", name, e);
-                                failed.push(name.clone());
-                            }
-                        }
-                    }
-                    for n in failed {
-                        if let Some(mut ci) = g.remove(&n) {
-                            ci.client.disconnect().await;
-                            warn!("Removed failed client: {}", n);
-                        }
-                    }
+                    let chunk = AudioChunk {
+                        session_id: current_session.clone(),
+                        chunk_count: chunk_counter,
+                        data,
+                        timestamp: SystemTime::now(),
+                    };
+
+                    let queue_len = {
+                        let mut g = outbox.lock().await;
+                        g.push(chunk);
+                        g.len()
+                    };
                     debug!(
-                        "chunk #{} sent to {}/{} client(s), session={}, samples={}",
-                        chunk_counter,
-                        ok_count,
-                        n_clients,
-                        current_session,
-                        data.len()
+                        "chunk #{} enqueued (outbox depth={}, session={})",
+                        chunk_counter, queue_len, current_session
                     );
                     chunk_counter = chunk_counter.wrapping_add(1);
                 }

@@ -217,6 +217,89 @@ func (m *Minio) Stop() {
 	close(m.stopTimeout)
 }
 
+// Shutdown flushes every active recorder's in-flight buffer to a partial
+// chunks/<n> object and marks the session metadata with the chunk number so
+// the next Start can resume from where we left off.
+//
+// Padding is intentionally omitted: the partial is a small chunks/<n>
+// which is always the highest-numbered chunk on disk. On resume we load it
+// back into memory and delete it before any new chunks/<n+1> is uploaded,
+// so it never ends up in the middle of a ComposeObject part-list.
+func (m *Minio) Shutdown(ctx context.Context) error {
+	m.dataLock.Lock()
+
+	type pending struct {
+		recorderID uuid.UUID
+		sessionID  uuid.UUID
+		chunk      minioChunk
+	}
+	var toFlush []pending
+	for recorderID, chunk := range m.chunks {
+		if chunk == nil || chunk.buffer == nil || chunk.buffer.Len() == 0 {
+			continue
+		}
+		toFlush = append(toFlush, pending{
+			recorderID: recorderID,
+			sessionID:  chunk.sessionID,
+			chunk:      *chunk,
+		})
+	}
+	// Clear the maps; we own these buffers now and won't accept further writes.
+	m.chunks = make(map[uuid.UUID]*minioChunk)
+	m.lastChunkTime = make(map[uuid.UUID]time.Time)
+	m.dataLock.Unlock()
+
+	close(m.stopTimeout)
+
+	for _, p := range toFlush {
+		log.Info().
+			Stringer("recorder-id", p.recorderID).
+			Stringer("session-id", p.sessionID).
+			Int("bytes", p.chunk.buffer.Len()).
+			Int("chunk-number", p.chunk.number).
+			Msg("Shutdown: flushing partial chunk")
+
+		objectName := fmt.Sprintf("%s/sessions/%s/chunks/%s",
+			p.recorderID, p.sessionID, fmt.Sprintf("%016d", p.chunk.number))
+
+		if _, err := m.client.PutObject(
+			ctx, bucketName, objectName,
+			p.chunk.buffer, int64(p.chunk.buffer.Len()),
+			minio.PutObjectOptions{},
+		); err != nil {
+			log.Err(err).
+				Stringer("recorder-id", p.recorderID).
+				Stringer("session-id", p.sessionID).
+				Msg("Shutdown: cannot flush partial chunk")
+			continue
+		}
+
+		// Persist the marker so the next Start knows this chunks/<n> is partial.
+		sm, err := m.getSessionMetadata(ctx, p.recorderID, p.sessionID)
+		if err != nil {
+			log.Err(err).
+				Stringer("recorder-id", p.recorderID).
+				Stringer("session-id", p.sessionID).
+				Msg("Shutdown: cannot read session metadata for partial-chunk marker")
+			continue
+		}
+		n := p.chunk.number
+		sm.PartialChunkNumber = &n
+		m.dataLock.Lock()
+		err = m.putSessionMetadata(ctx, p.recorderID, p.sessionID, sm)
+		m.dataLock.Unlock()
+		if err != nil {
+			log.Err(err).
+				Stringer("recorder-id", p.recorderID).
+				Stringer("session-id", p.sessionID).
+				Msg("Shutdown: cannot persist partial-chunk marker")
+		}
+	}
+
+	log.Info().Int("flushed", len(toFlush)).Msg("Shutdown complete")
+	return nil
+}
+
 // runSessionTimeoutChecker periodically checks for stale sessions and closes them
 func (m *Minio) runSessionTimeoutChecker(ctx context.Context) {
 	ticker := time.NewTicker(sessionTimeoutCheckInterval)
@@ -384,6 +467,85 @@ func (m *Minio) initSession(ctx context.Context, recorderID, sessionID uuid.UUID
 	m.notifyStateChange(&session, SessionStateUnknown)
 }
 
+// resumeSession rehydrates the in-memory chunk state for a session that was
+// left in RECORDING by a previous backend process. If the metadata names a
+// PartialChunkNumber, the corresponding chunks/<n> object is loaded back into
+// the in-memory buffer and removed from disk so subsequent uploads can replace
+// it with a full-size chunk. If there's no partial marker, chunk.number is
+// advanced past whatever full chunks already exist on disk.
+func (m *Minio) resumeSession(ctx context.Context, recorderID, sessionID uuid.UUID, sm *Session) error {
+	log.Info().
+		Stringer("recorder-id", recorderID).
+		Stringer("session-id", sessionID).
+		Msg("Resuming session")
+
+	buffer := new(bytes.Buffer)
+	var nextNumber int
+
+	if sm.PartialChunkNumber != nil {
+		partialNumber := *sm.PartialChunkNumber
+		partialKey := fmt.Sprintf("%s/sessions/%s/chunks/%s",
+			recorderID, sessionID, fmt.Sprintf("%016d", partialNumber))
+
+		obj, err := m.client.GetObject(ctx, bucketName, partialKey, minio.GetObjectOptions{})
+		if err != nil {
+			return fmt.Errorf("cannot read partial chunk %s: %w", partialKey, err)
+		}
+		if _, err := buffer.ReadFrom(obj); err != nil {
+			obj.Close()
+			return fmt.Errorf("cannot drain partial chunk %s: %w", partialKey, err)
+		}
+		obj.Close()
+
+		if err := m.client.RemoveObject(ctx, bucketName, partialKey, minio.RemoveObjectOptions{}); err != nil {
+			log.Warn().Err(err).Str("object", partialKey).Msg("Cannot remove loaded partial chunk")
+		}
+
+		nextNumber = partialNumber
+
+		log.Info().
+			Stringer("recorder-id", recorderID).
+			Stringer("session-id", sessionID).
+			Int("chunk-number", partialNumber).
+			Int("bytes", buffer.Len()).
+			Msg("Loaded partial chunk back into memory")
+
+		// Clear the marker on disk.
+		sm.PartialChunkNumber = nil
+	} else {
+		nextNumber = m.countExistingChunks(ctx, recorderID, sessionID)
+	}
+
+	if err := m.putSessionMetadata(ctx, recorderID, sessionID, sm); err != nil {
+		return fmt.Errorf("cannot persist resumed session metadata: %w", err)
+	}
+
+	m.chunks[recorderID] = &minioChunk{
+		number:        nextNumber,
+		sessionID:     sessionID,
+		buffer:        buffer,
+		pushedToMinio: nextNumber > 0,
+	}
+	m.lastChunkTime[recorderID] = time.Now()
+
+	return nil
+}
+
+// countExistingChunks returns the count (i.e. the next free chunk number) of
+// chunks/<n> objects on disk for a session.
+func (m *Minio) countExistingChunks(ctx context.Context, recorderID, sessionID uuid.UUID) int {
+	prefix := fmt.Sprintf("%s/sessions/%s/chunks/", recorderID, sessionID)
+	objectCh := m.client.ListObjects(ctx, bucketName, minio.ListObjectsOptions{Prefix: prefix, Recursive: false})
+	n := 0
+	for o := range objectCh {
+		if o.Err != nil {
+			continue
+		}
+		n++
+	}
+	return n
+}
+
 func (m *Minio) initRecorder(ctx context.Context, recorderID uuid.UUID, recorderName string) {
 	log.Info().
 		Stringer("recorder-id", recorderID).
@@ -527,7 +689,25 @@ func (m *Minio) SafeChunks(ctx context.Context, recorderID, sessionID uuid.UUID,
 	}
 
 	if _, ok := m.chunks[recorderID]; !ok {
-		m.initSession(ctx, recorderID, sessionID, timeCreated)
+		// First chunk after process start: see if there is a resumable
+		// session on disk for this (recorder, session) pair.
+		if sm, err := m.getSessionMetadata(ctx, recorderID, sessionID); err == nil &&
+			sm.State == SessionStateRecording {
+			if err := m.resumeSession(ctx, recorderID, sessionID, sm); err != nil {
+				log.Err(err).
+					Stringer("recorder-id", recorderID).
+					Stringer("session-id", sessionID).
+					Msg("Cannot resume session, starting fresh")
+				m.initSession(ctx, recorderID, sessionID, timeCreated)
+			}
+		} else {
+			m.initSession(ctx, recorderID, sessionID, timeCreated)
+		}
+		// The recorder has committed to this session id. Any other session
+		// for this recorder still marked RECORDING (typically a session
+		// preserved across a backend restart that the recorder did NOT pick
+		// back up) will never see another sample — render and close it.
+		m.closeOrphanRecordingSessions(ctx, recorderID, sessionID)
 	}
 
 	chunk := m.chunks[recorderID]
@@ -569,6 +749,9 @@ func (m *Minio) SafeChunks(ctx context.Context, recorderID, sessionID uuid.UUID,
 
 		m.initSession(ctx, recorderID, sessionID, timeCreated)
 		chunk = m.chunks[recorderID]
+		// Same reasoning as the first-chunk branch: catch any other RECORDING
+		// sessions that aren't the just-rotated one (already PROCESSING).
+		m.closeOrphanRecordingSessions(ctx, recorderID, sessionID)
 	}
 
 	binary.Write(chunk.buffer, binary.LittleEndian, samples)
@@ -1206,8 +1389,13 @@ func (m *Minio) EnsureRecorderExists(ctx context.Context, recorderID uuid.UUID, 
 	}
 }
 
+// closeSessions is the startup cleanup pass. It closes PROCESSING sessions
+// (those interrupted mid-render) but LEAVES RECORDING sessions alone so the
+// recorder can resume them on its next SafeChunks call. If the recorder
+// never reconnects, the RECORDING session simply stays on disk; the user
+// can delete it via the UI / session_source_client.
 func (m *Minio) closeSessions(ctx context.Context, recorderID uuid.UUID) error {
-	log.Debug().Stringer("recorder-id", recorderID).Msg("Closing all sessions for recorder")
+	log.Debug().Stringer("recorder-id", recorderID).Msg("Startup cleanup for recorder")
 
 	sessionIDs, err := m.readSessionIDs(ctx, recorderID)
 	if err != nil {
@@ -1215,14 +1403,85 @@ func (m *Minio) closeSessions(ctx context.Context, recorderID uuid.UUID) error {
 	}
 
 	for _, sessionID := range sessionIDs {
+		sm, err := m.getSessionMetadata(ctx, recorderID, sessionID)
+		if err != nil {
+			log.Warn().Err(err).
+				Stringer("recorder-id", recorderID).
+				Stringer("session-id", sessionID).
+				Msg("Cannot read session metadata, skipping")
+			continue
+		}
+
+		switch sm.State {
+		case SessionStateRecording:
+			log.Info().
+				Stringer("recorder-id", recorderID).
+				Stringer("session-id", sessionID).
+				Bool("has-partial-chunk", sm.PartialChunkNumber != nil).
+				Msg("Leaving RECORDING session on disk for resume")
+			continue
+		case SessionStateFinished, SessionStateError:
+			// Terminal states — already rendered (or failed and recorded as such).
+			// closeSession would see no chunks/<n> on disk (they were composed
+			// away during render) and incorrectly treat the session as empty.
+			continue
+		}
+
+		// PROCESSING / UNKNOWN: interrupted mid-render, finish the job.
 		if err := m.closeSession(ctx, recorderID, sessionID, nil); err != nil {
-			return fmt.Errorf("cannot close session: %w", err)
+			log.Err(err).
+				Stringer("recorder-id", recorderID).
+				Stringer("session-id", sessionID).
+				Msg("Cannot close session on startup")
+			continue
 		}
 	}
 
-	log.Debug().Stringer("recorder-id", recorderID).Msg("Closed all sessions for recorder")
-
+	log.Debug().Stringer("recorder-id", recorderID).Msg("Startup cleanup done")
 	return nil
+}
+
+// closeOrphanRecordingSessions sweeps for sessions that are still in
+// RECORDING state for this recorder but no longer match the live session id.
+// The recorder has committed to a new session, so any prior RECORDING entry
+// (typically one preserved across a backend restart that the recorder did
+// not pick back up) will never see another sample. Caller must hold
+// m.dataLock.
+func (m *Minio) closeOrphanRecordingSessions(ctx context.Context, recorderID, exceptSessionID uuid.UUID) {
+	recorder, ok := m.system.Recorders[recorderID]
+	if !ok {
+		return
+	}
+	for sessionID, session := range recorder.Sessions {
+		if sessionID == exceptSessionID || session.State != SessionStateRecording {
+			continue
+		}
+
+		log.Info().
+			Stringer("recorder-id", recorderID).
+			Stringer("session-id", sessionID).
+			Stringer("new-session-id", exceptSessionID).
+			Msg("Orphan RECORDING session detected, closing")
+
+		previousState := session.State
+		session.State = SessionStateProcessing
+		if err := m.putSessionMetadata(ctx, recorderID, sessionID, &session); err != nil {
+			log.Err(err).Msg("Cannot update orphan session state to PROCESSING")
+			continue
+		}
+		sessionCopy := session
+		go m.notifyStateChange(&sessionCopy, previousState)
+
+		sid := sessionID
+		go func() {
+			if err := m.closeSessionAsync(context.Background(), recorderID, sid, nil); err != nil {
+				log.Err(err).
+					Stringer("recorder-id", recorderID).
+					Stringer("session-id", sid).
+					Msg("Cannot close orphan session")
+			}
+		}()
+	}
 }
 
 // closeSession handles full session closing including state transition.
@@ -1234,8 +1493,20 @@ func (m *Minio) closeSession(ctx context.Context, recorderID, sessionID uuid.UUI
 	hasInMemory := chunk != nil && chunk.buffer != nil && chunk.buffer.Len() > 0
 
 	if !hasOnDisk && !hasInMemory {
-		// Genuinely empty session — orphan metadata only. Clean it up so it
-		// doesn't sit in PROCESSING forever.
+		// No raw chunks anywhere — either a genuinely empty session (orphan
+		// metadata from a crash before any audio landed) or a session that has
+		// already been rendered (chunks/<n> composed away into data.raw +
+		// data.flac/data.ogg). Only the former should be deleted; never wipe
+		// rendered output.
+		sm, err := m.getSessionMetadata(ctx, recorderID, sessionID)
+		if err == nil && (sm.State == SessionStateFinished || sm.State == SessionStateError) {
+			log.Debug().
+				Stringer("recorder-id", recorderID).
+				Stringer("session-id", sessionID).
+				Str("state", sm.State.String()).
+				Msg("Skipping empty-session cleanup (already rendered)")
+			return nil
+		}
 		log.Info().
 			Stringer("recorder-id", recorderID).
 			Stringer("session-id", sessionID).
@@ -1274,6 +1545,15 @@ func (m *Minio) closeSessionAsync(ctx context.Context, recorderID, sessionID uui
 	hasInMemory := chunk != nil && chunk.buffer != nil && chunk.buffer.Len() > 0
 
 	if !hasOnDisk && !hasInMemory {
+		sm, err := m.getSessionMetadata(ctx, recorderID, sessionID)
+		if err == nil && (sm.State == SessionStateFinished || sm.State == SessionStateError) {
+			log.Debug().
+				Stringer("recorder-id", recorderID).
+				Stringer("session-id", sessionID).
+				Str("state", sm.State.String()).
+				Msg("Skipping empty-session cleanup (already rendered)")
+			return nil
+		}
 		log.Info().
 			Stringer("recorder-id", recorderID).
 			Stringer("session-id", sessionID).

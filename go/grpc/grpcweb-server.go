@@ -11,8 +11,9 @@ import (
 )
 
 // StartGrpcWebServer exposes an existing *grpc.Server as gRPC-Web on the given
-// HTTP port. The HTTP listener runs in its own goroutine.
-func StartGrpcWebServer(grpcServer *grpc.Server, port uint16) error {
+// HTTP port. The HTTP listener runs in its own goroutine. The returned
+// *http.Server can be Shutdown by the caller for a graceful exit.
+func StartGrpcWebServer(grpcServer *grpc.Server, port uint16) (*http.Server, error) {
 	wrapped := grpcweb.WrapServer(
 		grpcServer,
 		grpcweb.WithOriginFunc(func(string) bool { return true }),
@@ -41,5 +42,5 @@ func StartGrpcWebServer(grpcServer *grpc.Server, port uint16) error {
 		}
 	}()
 
-	return nil
+	return httpServer, nil
 }

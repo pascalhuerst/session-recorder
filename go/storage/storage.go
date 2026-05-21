@@ -117,6 +117,11 @@ type Storage interface {
 	GetSession(recorderID, sessionID uuid.UUID) (Session, error)
 
 	Start(ctx context.Context) error
+	// Shutdown is called on graceful exit. The backend should flush any
+	// in-flight per-recorder state (e.g. the in-memory chunk buffer) and mark
+	// active sessions as resumable so they can be picked up on the next Start.
+	// Implementations should be safe to call concurrently with no active RPCs.
+	Shutdown(ctx context.Context) error
 
 	SafeChunks(ctx context.Context, recorderID, sessionID uuid.UUID, chunkID string, timeCreated time.Time, samples []int16) error
 	EnsureRecorderExists(ctx context.Context, recorderID uuid.UUID, recorderName string)
@@ -197,6 +202,12 @@ type Session struct {
 	State        SessionState `json:"state"`
 	ErrorMessage string       `json:"error_message,omitempty"`
 	Keep         bool         `json:"keep"`
+
+	// PartialChunkNumber, if non-nil, names a chunks/<n> object that holds an
+	// in-flight buffer flushed on graceful shutdown. The session is resumable:
+	// on the next Start, the named chunk is loaded back into memory and
+	// deleted from disk. Always nil during normal operation.
+	PartialChunkNumber *int `json:"partial_chunk_number,omitempty"`
 
 	// key: segment id
 	Segments map[uuid.UUID]Segment `json:"segments"`

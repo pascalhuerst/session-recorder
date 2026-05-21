@@ -37,8 +37,11 @@ pub fn configure_pcm(
     hwp.set_format(Format::S16LE)?;
     hwp.set_access(Access::RWInterleaved)?;
 
-    hwp.set_buffer_size_near(buffer_size as i64)?;
-    hwp.set_period_size_near(period_size as i64, alsa::ValueOr::Nearest)?;
+    // alsa::pcm::Frames is the C `snd_pcm_sframes_t` (a `long`): i64 on 64-bit
+    // targets, i32 on 32-bit ones. Cast to Frames, not a fixed-width int, so
+    // this compiles on both.
+    hwp.set_buffer_size_near(buffer_size as alsa::pcm::Frames)?;
+    hwp.set_period_size_near(period_size as alsa::pcm::Frames, alsa::ValueOr::Nearest)?;
 
     pcm.hw_params(&hwp)?;
 

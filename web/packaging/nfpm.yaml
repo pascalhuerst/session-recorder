@@ -1,0 +1,36 @@
+# nfpm config for the Session Recorder web UI .deb (architecture-independent).
+# Run from the REPO ROOT (paths below are repo-root-relative):
+#   cd web && VITE_GRPC_SERVER_URL=/grpc pnpm nx build && cd ..
+#   VERSION=1.2.3 nfpm package --packager deb --config web/packaging/nfpm.yaml \
+#     --target dist/session-recorder-web_1.2.3_all.deb
+#
+# ${VERSION} is supplied via env (the git tag without the leading 'v').
+name: session-recorder-web
+arch: all
+platform: linux
+version: ${VERSION}
+section: web
+priority: optional
+maintainer: Pascal Huerst <pascal.huerst@gmail.com>
+description: |
+  Session Recorder web interface (static files + nginx site).
+  Serves the Vue UI and reverse-proxies /grpc to the backend and /minio for
+  audio playback.
+homepage: https://github.com/pascalhuerst/session-recorder
+license: MIT
+
+depends:
+  - nginx
+
+contents:
+  - src: web/dist/web
+    dst: /usr/share/session-recorder-web
+    type: tree
+
+  - src: web/packaging/session-recorder-web.nginx
+    dst: /etc/nginx/sites-available/session-recorder-web
+    type: config|noreplace
+
+scripts:
+  postinstall: web/packaging/postinst.sh
+  preremove: web/packaging/prerm.sh

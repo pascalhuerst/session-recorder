@@ -1,0 +1,81 @@
+# Session Recorder web UI — nginx site.
+#
+# Installed to /etc/nginx/sites-available/session-recorder-web (a conffile, so
+# edits survive package upgrades). The package ENABLES this site on install
+# (symlinks it into sites-enabled, disables the stock nginx default site so
+# this one owns the port, and reloads nginx).
+#
+# Configure below: the `listen` port and the two backend upstreams, then:
+#   sudo nginx -t && sudo systemctl reload nginx
+
+server {
+    # UI port. Change to taste (e.g. 8088) if :80 conflicts with another site.
+    # default_server makes this the site served for any unmatched host.
+    listen 80 default_server;
+    listen [::]:80 default_server;
+    server_name _;
+
+    root /usr/share/session-recorder-web;
+    index index.html;
+
+    access_log /var/log/nginx/session-recorder-web.access.log;
+    error_log  /var/log/nginx/session-recorder-web.error.log warn;
+
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css application/javascript application/json application/wasm font/woff2;
+
+    client_max_body_size 1G;
+
+    # --- Backend gRPC-Web (session-recorder-server, default 127.0.0.1:8081) ---
+    # Point this at your backend host:port if it is not on this machine.
+    location /grpc/ {
+        rewrite ^/grpc/(.*)$ /$1 break;
+        proxy_pass http://127.0.0.1:8081;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Accept-Encoding "";
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+        add_header 'Access-Control-Allow-Origin' '*' always;
+        add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS' always;
+        add_header 'Access-Control-Allow-Headers' 'Content-Type,grpc-timeout,x-grpc-web,x-user-agent' always;
+        add_header 'Access-Control-Expose-Headers' 'grpc-status,grpc-message' always;
+    }
+
+    # --- MinIO for audio playback (default 127.0.0.1:9000) ---
+    # The web UI fetches audio via presigned URLs. For these to validate, the
+    # backend's S3_LOCAL_ENDPOINT must match how the browser reaches MinIO
+    # (e.g. http://<this-host>/minio). Adjust the upstream if MinIO is remote.
+    location /minio/ {
+        rewrite ^/minio/(.*)$ /$1 break;
+        proxy_pass http://127.0.0.1:9000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 60s;
+    }
+
+    # SPA client-side routing.
+    location / {
+        try_files $uri $uri/ /index.html;
+    }
+
+    # Long-cache fingerprinted assets.
+    location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot|wasm)$ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+
+    add_header X-Frame-Options SAMEORIGIN always;
+    add_header X-Content-Type-Options nosniff always;
+}

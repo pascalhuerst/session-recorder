@@ -93,10 +93,64 @@ jobs:
           path: rust/recorder/target/aarch64-unknown-linux-gnu/debian/*.deb
           if-no-files-found: error
 
+  web-deb:
+    name: Web UI .deb (all)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: 'pnpm'
+          cache-dependency-path: web/pnpm-lock.yaml
+
+      - name: Setup Go (for nfpm)
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          cache-dependency-path: go/go.sum
+
+      - name: Derive version from tag
+        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> "$GITHUB_ENV"
+
+      - name: Install dependencies
+        working-directory: web
+        run: pnpm install --frozen-lockfile
+
+      - name: Build web UI (same-origin /grpc)
+        working-directory: web
+        env:
+          VITE_GRPC_SERVER_URL: /grpc
+        run: pnpm nx build
+
+      - name: Install nfpm
+        run: go install github.com/goreleaser/nfpm/v2/cmd/nfpm@latest
+
+      - name: Build .deb
+        run: |
+          mkdir -p dist
+          nfpm package --packager deb --config web/packaging/nfpm.yaml \
+            --target "dist/session-recorder-web_${VERSION}_all.deb"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-deb
+          path: dist/*.deb
+          if-no-files-found: error
+
   release:
     name: Publish GitHub Release
     runs-on: ubuntu-latest
-    needs: [backend-deb, reader-deb]
+    needs: [backend-deb, reader-deb, web-deb]
     steps:
       - name: Download artifacts
         uses: actions/download-artifact@v4

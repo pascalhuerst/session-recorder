@@ -59,6 +59,12 @@ impl InputKey {
     pub fn from_path<P: AsRef<Path>>(device_path: P) -> Result<Self, Box<dyn std::error::Error>> {
         let device = Device::open(device_path)?;
 
+        // Open non-blocking so the worker's fetch_events() returns WouldBlock
+        // when idle instead of parking on a read. Without this, the device
+        // blocks until the next key event, so shutdown hangs in stop() until a
+        // button is pressed.
+        device.set_nonblocking(true)?;
+
         info!(
             "Opened input device: {}",
             device.name().unwrap_or("unknown")

@@ -116,6 +116,12 @@ type Storage interface {
 	GetSessions(recorderID uuid.UUID) map[uuid.UUID]Session
 	GetSession(recorderID, sessionID uuid.UUID) (Session, error)
 
+	// SnapshotSessions returns a copy of every session across all recorders,
+	// built under the backend's data lock. The returned slice is safe to iterate
+	// without holding any lock and without racing concurrent chunk reception or
+	// deletion (used by the retention sweeper).
+	SnapshotSessions() []SessionRef
+
 	Start(ctx context.Context) error
 	// Shutdown is called on graceful exit. The backend should flush any
 	// in-flight per-recorder state (e.g. the in-memory chunk buffer) and mark
@@ -188,6 +194,14 @@ func (r Recorder) String() string {
 	}
 
 	return ret
+}
+
+// SessionRef pairs a session snapshot with the IDs needed to address it,
+// independent of whether the embedded Session has its own ID fields populated.
+type SessionRef struct {
+	RecorderID uuid.UUID
+	SessionID  uuid.UUID
+	Session    Session
 }
 
 type Session struct {

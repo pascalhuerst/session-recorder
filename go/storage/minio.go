@@ -1213,6 +1213,19 @@ func (m *Minio) GetSessions(recorderID uuid.UUID) map[uuid.UUID]Session {
 	return m.system.Recorders[recorderID].Sessions
 }
 
+func (m *Minio) SnapshotSessions() []SessionRef {
+	m.dataLock.Lock()
+	defer m.dataLock.Unlock()
+
+	var out []SessionRef
+	for recorderID, recorder := range m.system.Recorders {
+		for sessionID, session := range recorder.Sessions {
+			out = append(out, SessionRef{RecorderID: recorderID, SessionID: sessionID, Session: session})
+		}
+	}
+	return out
+}
+
 func (m *Minio) GetSession(recorderID, sessionID uuid.UUID) (Session, error) {
 	m.dataLock.Lock()
 	defer m.dataLock.Unlock()

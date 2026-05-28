@@ -900,6 +900,19 @@ func (f *Fs) GetSessions(recorderID uuid.UUID) map[uuid.UUID]Session {
 	return f.system.Recorders[recorderID].Sessions
 }
 
+func (f *Fs) SnapshotSessions() []SessionRef {
+	f.dataLock.Lock()
+	defer f.dataLock.Unlock()
+
+	var out []SessionRef
+	for recorderID, recorder := range f.system.Recorders {
+		for sessionID, session := range recorder.Sessions {
+			out = append(out, SessionRef{RecorderID: recorderID, SessionID: sessionID, Session: session})
+		}
+	}
+	return out
+}
+
 func (f *Fs) GetSession(recorderID, sessionID uuid.UUID) (Session, error) {
 	f.dataLock.Lock()
 	defer f.dataLock.Unlock()

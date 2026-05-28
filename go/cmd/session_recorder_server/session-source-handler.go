@@ -187,7 +187,7 @@ func getSegmentFileURL(ctx context.Context, h *SessionSourceHandler, session *st
 func newSessionInfo(ctx context.Context, h *SessionSourceHandler, session *storage.Session) *sspb.SessionInfo {
 	info := &sspb.SessionInfo{
 		TimeCreated:  timestamppb.New(session.StartTime),
-		Lifetime:     durationpb.New(defaultLifetime), //TODO: This info needs to be stored in the session
+		Lifetime:     durationpb.New(sessionLifetime),
 		Name:         session.Name,
 		Keep:         session.Keep,
 		State:        mapSessionState(session.State),
@@ -470,10 +470,21 @@ func (h *SessionSourceHandler) deleteSession(ctx context.Context, request *sspb.
 		return noSuccess, err
 	}
 
-	if err := h.sessionStorage.DeleteSession(ctx, recorderID, sessionID); err != nil {
+	if err := h.removeSession(ctx, recorderID, sessionID); err != nil {
 		log.Err(err).Str("session-id", request.SessionID).Msg("Cannot delete session")
 
 		return noSuccess, err
+	}
+
+	return success, nil
+}
+
+// removeSession deletes a session from storage and notifies UI subscribers so
+// the card disappears live. Shared by the manual delete RPC and the retention
+// sweeper.
+func (h *SessionSourceHandler) removeSession(ctx context.Context, recorderID, sessionID uuid.UUID) error {
+	if err := h.sessionStorage.DeleteSession(ctx, recorderID, sessionID); err != nil {
+		return err
 	}
 
 	h.sessionBroadcaster.Broadcast(&sspb.Session{
@@ -481,7 +492,68 @@ func (h *SessionSourceHandler) deleteSession(ctx context.Context, request *sspb.
 		Info: &sspb.Session_Removed{Removed: &sspb.SessionRemoved{}},
 	})
 
-	return success, nil
+	return nil
+}
+
+// runRetentionSweeper periodically deletes finished sessions older than
+// retentionPeriod that are not marked Keep. It sweeps once immediately (so a
+// restart catches up on anything that expired while the server was down) and
+// then every interval, until ctx is cancelled. It runs in its own goroutine;
+// chunk reception and all other RPCs continue concurrently, since storage
+// access is serialized by the backend's data lock.
+func (h *SessionSourceHandler) runRetentionSweeper(ctx context.Context, retentionPeriod, interval time.Duration) {
+	log.Info().
+		Dur("retention-period", retentionPeriod).
+		Dur("interval", interval).
+		Msg("Retention sweeper started")
+
+	h.sweepExpiredSessions(ctx, retentionPeriod)
+
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			log.Info().Msg("Retention sweeper stopped")
+			return
+		case <-ticker.C:
+			h.sweepExpiredSessions(ctx, retentionPeriod)
+		}
+	}
+}
+
+// sweepExpiredSessions deletes every FINISHED, non-Keep session whose age since
+// EndTime exceeds retentionPeriod. ERROR / RECORDING / PROCESSING sessions are
+// left untouched. Targets are snapshotted before any deletion so the live
+// session maps are never mutated mid-iteration.
+func (h *SessionSourceHandler) sweepExpiredSessions(ctx context.Context, retentionPeriod time.Duration) {
+	now := time.Now()
+
+	var expired []storage.SessionRef
+	for _, ref := range h.sessionStorage.SnapshotSessions() {
+		s := ref.Session
+		if s.State != storage.SessionStateFinished || s.Keep || s.EndTime.IsZero() {
+			continue
+		}
+		if now.Sub(s.EndTime) > retentionPeriod {
+			expired = append(expired, ref)
+		}
+	}
+
+	for _, ref := range expired {
+		log.Info().
+			Stringer("recorder-id", ref.RecorderID).
+			Stringer("session-id", ref.SessionID).
+			Dur("age", now.Sub(ref.Session.EndTime)).
+			Msg("Deleting expired session (retention)")
+		if err := h.removeSession(ctx, ref.RecorderID, ref.SessionID); err != nil {
+			log.Err(err).
+				Stringer("recorder-id", ref.RecorderID).
+				Stringer("session-id", ref.SessionID).
+				Msg("Cannot delete expired session")
+		}
+	}
 }
 
 func (h *SessionSourceHandler) setKeepSession(ctx context.Context, request *sspb.SetKeepSessionRequest) (*cmpb.Respone, error) {

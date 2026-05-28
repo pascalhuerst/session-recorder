@@ -29,10 +29,17 @@ const (
 	sessionSourceService     = "_session-recorder-sessionsource._tcp"
 	defaultGrpcWebPort       = 8081
 	defaultLifetime          = 4 * 24 * time.Hour
+	defaultRetentionInterval = 30 * time.Minute
 )
 
 var (
 	version string
+
+	// sessionLifetime is how long a finished, non-kept session is retained before
+	// the retention sweeper deletes it. Set from the --retention-period flag in
+	// main; also reported to the UI as each session's lifetime so the displayed
+	// expiry countdown stays in lockstep with actual deletion.
+	sessionLifetime = defaultLifetime
 )
 
 // buildEndpoint constructs an endpoint string from host and port.
@@ -65,6 +72,11 @@ func main() {
 	chunkSinkPort := flag.Int("chunk-sink-port", utils.GetIntWithDefault("CHUNK_SINK_PORT", defaultChunkSinkPort), "Port for ChunkSink gRPC service (env: CHUNK_SINK_PORT)")
 	sessionSourcePort := flag.Int("session-source-port", utils.GetIntWithDefault("SESSION_SOURCE_PORT", defaultSessionSourcePort), "Port for SessionSource gRPC service (env: SESSION_SOURCE_PORT)")
 	grpcWebPort := flag.Int("grpcweb-port", utils.GetIntWithDefault("GRPCWEB_PORT", defaultGrpcWebPort), "Port for gRPC-Web HTTP listener wrapping SessionSource (env: GRPCWEB_PORT)")
+
+	// Retention: finished sessions not marked "keep" are deleted once older than
+	// the retention period. The sweeper runs on startup and then on the interval.
+	retentionPeriod := flag.Duration("retention-period", utils.GetDurationWithDefault("RETENTION_PERIOD", defaultLifetime), "How long finished, non-kept sessions are retained before deletion (env: RETENTION_PERIOD)")
+	retentionInterval := flag.Duration("retention-interval", utils.GetDurationWithDefault("RETENTION_INTERVAL", defaultRetentionInterval), "How often the retention sweeper runs (env: RETENTION_INTERVAL)")
 
 	// Storage backend selection.
 	storageFsRoot := flag.String("storage-fs-root", utils.GetWithDefault("STORAGE_FS_ROOT", ""),
@@ -100,6 +112,9 @@ func main() {
 	s3PublicPort := flag.Int("s3-public-port", utils.GetIntWithDefault("S3_PUBLIC_PORT", 0), "S3 port for email sharing URLs (env: S3_PUBLIC_PORT, default: s3-local-port)")
 
 	flag.Parse()
+
+	// Keep the UI-reported lifetime in lockstep with actual deletion timing.
+	sessionLifetime = *retentionPeriod
 
 	// Build endpoint strings: direct endpoint takes precedence over host:port
 	s3LocalEndpoint := *s3LocalEndpointDirect
@@ -206,6 +221,11 @@ func main() {
 
 	sessionSourceHandler := NewSessionSourceHandler(sessionStorage, chunkSinkServer, recorderBroadcaster, sessionBroadcaster, audioBroadcaster, emailSender, fileSharer)
 
+	// Periodically delete finished, non-kept sessions older than the retention
+	// period (runs once now, then on the interval). Runs alongside chunk
+	// reception; stops when ctx is cancelled on shutdown.
+	go sessionSourceHandler.runRetentionSweeper(ctx, *retentionPeriod, *retentionInterval)
+
 	sessionSourceServer := grpc.NewSessionSourceServer(&grpc.SessionSourceServerConfig{
 		Name:                 hostname,
 		Version:              version,
@@ -246,56 +266,6 @@ func main() {
 		return
 	}
 	log.Info().Msgf("Chunk sink server is now being served on port %d", port)
-
-	/*
-		go func() {
-			time.Sleep(10 * time.Second)
-
-			recorders, err := sessionStorage.GetRecorderIDs(ctx)
-			if err != nil {
-				log.Err(err).Msg("Cannot get recorders")
-			}
-
-			fmt.Printf("Recorders:\n")
-
-			for _, recorderID := range recorders {
-				fmt.Printf("  %s\n", recorderID)
-
-				sessions, err := sessionStorage.GetSessionIDs(ctx, recorderID)
-				if err != nil {
-					log.Err(err).Msg("Cannot get sessions")
-				}
-
-				for _, sessionID := range sessions {
-					meta, err := sessionStorage.GetSessionMetadata(ctx, recorderID, sessionID)
-					if err != nil {
-						log.Err(err).Msg("Cannot get session metadata")
-
-						continue
-					}
-
-					sessionUpdateCh <- &sspb.Session{
-						ID: sessionID.String(),
-						Info: &sspb.Session_Updated{
-							Updated: &sspb.SessionInfo{
-								TimeCreated:      timestamppb.New(meta.StartTime),
-								TimeFinished:     timestamppb.New(meta.EndTime),
-								Lifetime:         durationpb.New(defaultLifetime),
-								Name:             meta.GenericMetadata.Name,
-								AudioFileName:    "data.ogg",
-								WaveformDataFile: "waveform.dat",
-								Keep:             false,
-								State:            sspb.SessionState_SESSION_STATE_UNKNOWN,
-							},
-						},
-					}
-
-					fmt.Printf("    %s\n", sessionID)
-				}
-			}
-
-		}()
-	*/
 
 	log.Info().Msg("chunk sink server setup successfully")
 

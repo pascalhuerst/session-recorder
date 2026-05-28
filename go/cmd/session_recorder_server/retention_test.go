@@ -51,8 +51,21 @@ func TestSweepExpiredSessions(t *testing.T) {
 	processing := ref(storage.SessionStateProcessing, false, time.Time{})
 	errored := ref(storage.SessionStateError, false, old) // ERROR is never reaped
 
+	// Expired + non-kept, but has a rendered segment -> the whole session is
+	// retained (rendered segments are recordings we keep for now).
+	withRendered := ref(storage.SessionStateFinished, false, old)
+	withRendered.Session.Segments = map[uuid.UUID]storage.Segment{
+		uuid.New(): {State: storage.SegmentStateFinished},
+	}
+
+	// Expired + non-kept with only a non-rendered segment -> still deleted.
+	withQueuedSeg := ref(storage.SessionStateFinished, false, old)
+	withQueuedSeg.Session.Segments = map[uuid.UUID]storage.Segment{
+		uuid.New(): {State: storage.SegmentStateQueued},
+	}
+
 	fake := &fakeRetentionStorage{sessions: []storage.SessionRef{
-		expired, kept, young, recording, processing, errored,
+		expired, kept, young, recording, processing, errored, withRendered, withQueuedSeg,
 	}}
 
 	bc := broadcast.NewSessionBroadcaster(10)
@@ -63,23 +76,45 @@ func TestSweepExpiredSessions(t *testing.T) {
 
 	h.sweepExpiredSessions(context.Background(), retention)
 
-	if len(fake.deleted) != 1 {
-		t.Fatalf("expected exactly 1 deletion, got %d: %v", len(fake.deleted), fake.deleted)
+	// Both the plain expired session and the one whose only segment is not
+	// rendered are deleted; the session with a rendered segment is retained.
+	wantDeleted := map[uuid.UUID]bool{
+		expired.SessionID:       true,
+		withQueuedSeg.SessionID: true,
 	}
-	if fake.deleted[0] != expired.SessionID {
-		t.Fatalf("deleted wrong session: got %s, want %s", fake.deleted[0], expired.SessionID)
+	gotDeleted := map[uuid.UUID]bool{}
+	for _, id := range fake.deleted {
+		gotDeleted[id] = true
+	}
+	if len(fake.deleted) != len(wantDeleted) {
+		t.Fatalf("expected %d deletions, got %d: %v", len(wantDeleted), len(fake.deleted), fake.deleted)
+	}
+	for id := range wantDeleted {
+		if !gotDeleted[id] {
+			t.Fatalf("expected session %s to be deleted, deleted set was %v", id, fake.deleted)
+		}
+	}
+	if gotDeleted[withRendered.SessionID] {
+		t.Fatal("session with a rendered segment must be retained")
 	}
 
-	// The deletion must be broadcast as a removal so the UI drops the card.
-	select {
-	case msg := <-updates:
-		if msg.ID != expired.SessionID.String() {
-			t.Fatalf("removal broadcast for wrong session: got %s, want %s", msg.ID, expired.SessionID)
+	// Each deletion must be broadcast as a removal so the UI drops the card.
+	removed := map[string]bool{}
+	for {
+		select {
+		case msg := <-updates:
+			if msg.GetRemoved() == nil {
+				t.Fatalf("expected Session_Removed, got %T", msg.Info)
+			}
+			removed[msg.ID] = true
+			continue
+		default:
 		}
-		if msg.GetRemoved() == nil {
-			t.Fatalf("expected Session_Removed, got %T", msg.Info)
+		break
+	}
+	for id := range wantDeleted {
+		if !removed[id.String()] {
+			t.Fatalf("expected a removal broadcast for %s, got %v", id, removed)
 		}
-	default:
-		t.Fatal("expected a removal broadcast, got none")
 	}
 }

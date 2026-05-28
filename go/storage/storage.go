@@ -204,6 +204,20 @@ type SessionRef struct {
 	Session    Session
 }
 
+// copySessionForSnapshot returns a copy of session with its Segments map cloned,
+// so the result can be read (including ranging Segments) without holding the
+// data lock and without racing concurrent segment create/delete.
+func copySessionForSnapshot(session Session) Session {
+	if session.Segments != nil {
+		segments := make(map[uuid.UUID]Segment, len(session.Segments))
+		for id, seg := range session.Segments {
+			segments[id] = seg
+		}
+		session.Segments = segments
+	}
+	return session
+}
+
 type Session struct {
 	ID         uuid.UUID `json:"id"`
 	RecorderID uuid.UUID `json:"recorder_id"`

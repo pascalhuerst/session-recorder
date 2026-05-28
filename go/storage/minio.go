@@ -1220,7 +1220,7 @@ func (m *Minio) SnapshotSessions() []SessionRef {
 	var out []SessionRef
 	for recorderID, recorder := range m.system.Recorders {
 		for sessionID, session := range recorder.Sessions {
-			out = append(out, SessionRef{RecorderID: recorderID, SessionID: sessionID, Session: session})
+			out = append(out, SessionRef{RecorderID: recorderID, SessionID: sessionID, Session: copySessionForSnapshot(session)})
 		}
 	}
 	return out

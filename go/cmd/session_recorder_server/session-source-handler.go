@@ -523,6 +523,17 @@ func (h *SessionSourceHandler) runRetentionSweeper(ctx context.Context, retentio
 	}
 }
 
+// hasRenderedSegment reports whether the session has at least one successfully
+// rendered (FINISHED) segment.
+func hasRenderedSegment(s storage.Session) bool {
+	for _, seg := range s.Segments {
+		if seg.State == storage.SegmentStateFinished {
+			return true
+		}
+	}
+	return false
+}
+
 // sweepExpiredSessions deletes every FINISHED, non-Keep session whose age since
 // EndTime exceeds retentionPeriod. ERROR / RECORDING / PROCESSING sessions are
 // left untouched. Targets are snapshotted before any deletion so the live
@@ -534,6 +545,15 @@ func (h *SessionSourceHandler) sweepExpiredSessions(ctx context.Context, retenti
 	for _, ref := range h.sessionStorage.SnapshotSessions() {
 		s := ref.Session
 		if s.State != storage.SessionStateFinished || s.Keep || s.EndTime.IsZero() {
+			continue
+		}
+		// Keep the entire session (not just its segments) for now if it has any
+		// rendered segment. Rendered segments are considered "recordings": soon
+		// we'll move them into a separate, keep-forever folder that becomes the
+		// permanent recordings library, and the sharing feature will move to a
+		// dedicated page that only shows those recordings. Until that exists,
+		// retaining the whole session is the safe way to never lose a recording.
+		if hasRenderedSegment(s) {
 			continue
 		}
 		if now.Sub(s.EndTime) > retentionPeriod {

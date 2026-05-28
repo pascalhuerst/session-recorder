@@ -66,12 +66,6 @@ func main() {
 	sessionSourcePort := flag.Int("session-source-port", utils.GetIntWithDefault("SESSION_SOURCE_PORT", defaultSessionSourcePort), "Port for SessionSource gRPC service (env: SESSION_SOURCE_PORT)")
 	grpcWebPort := flag.Int("grpcweb-port", utils.GetIntWithDefault("GRPCWEB_PORT", defaultGrpcWebPort), "Port for gRPC-Web HTTP listener wrapping SessionSource (env: GRPCWEB_PORT)")
 
-	generateWaveform := flag.Bool("generate-waveform", utils.GetBoolWithDefault("GENERATE_WAVEFORM", false),
-		"Generate waveform.dat and overview.png on session close (env: GENERATE_WAVEFORM).\n"+
-			"Disabled by default: it requires the external `audiowaveform` binary (awkward\n"+
-			"to provide on ARM) and the current web UI does not use these files. data.flac\n"+
-			"and data.ogg are always rendered regardless.")
-
 	// Storage backend selection.
 	storageFsRoot := flag.String("storage-fs-root", utils.GetWithDefault("STORAGE_FS_ROOT", ""),
 		"Path to use as the root of a local filesystem storage backend (env: STORAGE_FS_ROOT).\n"+
@@ -132,7 +126,6 @@ func main() {
 			log.Fatal().Err(err).Msg("Cannot create filesystem storage. Giving up")
 			return
 		}
-		fs.SetGenerateWaveform(*generateWaveform)
 		sessionStorage = fs
 	} else {
 		if *s3AccessKey == "" || *s3SecretKey == "" {
@@ -143,7 +136,6 @@ func main() {
 			log.Fatal().Err(err).Msg("Cannot create storage. Giving up")
 			return
 		}
-		minio.SetGenerateWaveform(*generateWaveform)
 		sessionStorage = minio
 	}
 

@@ -25,10 +25,9 @@ depends:
   # sox is invoked at /usr/bin/sox to encode data.flac and data.ogg on close.
   # libsox-fmt-all provides the flac/ogg-vorbis format handlers (the base sox
   # package does not include them, so encoding would otherwise fail at runtime).
+  # (waveform.dat is generated in-process in Go — no audiowaveform dependency.)
   - sox
   - libsox-fmt-all
-# audiowaveform (for --generate-waveform) is NOT in the Debian/Raspbian repos,
-# so it can't be a dependency. Install it manually if you enable that flag.
 
 contents:
   - src: go/dist/session-recorder-server

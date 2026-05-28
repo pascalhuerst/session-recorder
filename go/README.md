@@ -43,7 +43,6 @@ multi-line explanation of `--storage-fs-root`).
 | `--chunk-sink-port` | `CHUNK_SINK_PORT` | `8779` | ChunkSink gRPC port |
 | `--session-source-port` | `SESSION_SOURCE_PORT` | `8780` | SessionSource gRPC port |
 | `--grpcweb-port` | `GRPCWEB_PORT` | `8081` | HTTP port for the embedded gRPC-Web wrapper of SessionSource (replaces the old envoy proxy) |
-| `--generate-waveform` | `GENERATE_WAVEFORM` | `false` | Generate `waveform.dat` + `overview.png` on close (needs the `audiowaveform` binary). `data.flac`/`data.ogg` are always rendered. |
 | `--storage-fs-root` | `STORAGE_FS_ROOT` | _(unset)_ | If set: store everything under this directory and ignore all `--s3-*` flags. If unset: use MinIO. |
 | `--s3-endpoint` | `S3_ENDPOINT` | `localhost:9000` | Internal MinIO endpoint |
 | `--s3-access-key` | `S3_ACCESS_KEY` | _(required for MinIO)_ | |

@@ -46,19 +46,9 @@ type Fs struct {
 	sessionTimeout time.Duration
 	stopTimeout    chan struct{}
 
-	// When false (default), waveform.dat / overview.png are not generated on
-	// close (they need the external `audiowaveform` binary and aren't used by
-	// the current UI). Enable with SetGenerateWaveform.
-	generateWaveform bool
-
 	onSessionStateChangedCb OnSessionStateChangedCb
 	onAudioChunkCb          OnAudioChunkCb
 	cbLock                  sync.Mutex
-}
-
-// SetGenerateWaveform toggles waveform.dat / overview.png generation on close.
-func (f *Fs) SetGenerateWaveform(enabled bool) {
-	f.generateWaveform = enabled
 }
 
 // NewFsStorage creates an Fs storage backend rooted at the given directory.
@@ -548,15 +538,11 @@ func (f *Fs) renderSession(ctx context.Context, recorderID, sessionID uuid.UUID)
 	}
 	defer rawData.Close()
 
-	// flac + ogg always; waveform + overview only when enabled. The reader
-	// count must equal the number of consumers or the MultiWriter blocks on an
-	// undrained pipe.
-	readerCount := 2
-	if f.generateWaveform {
-		readerCount = 4
-	}
-	readers, writer, closer := makeReaders(readerCount)
-	eg, egCtx := errgroup.WithContext(ctx)
+	// Three parallel consumers of data.raw: waveform.dat, data.flac, data.ogg.
+	// The reader count must equal the number of consumers or the MultiWriter
+	// blocks on an undrained pipe.
+	readers, writer, closer := makeReaders(3)
+	eg, _ := errgroup.WithContext(ctx)
 
 	eg.Go(func() error {
 		defer closer.Close()
@@ -568,34 +554,17 @@ func (f *Fs) renderSession(ctx context.Context, recorderID, sessionID uuid.UUID)
 		return nil
 	})
 
-	idx := 0
+	waveformReader := readers[0]
+	flacReader := readers[1]
+	oggReader := readers[2]
 
-	if f.generateWaveform {
-		waveformReader := readers[idx]
-		idx++
-		overviewReader := readers[idx]
-		idx++
-
-		eg.Go(func() error {
-			waveformData, err := render.CreateWaveform(egCtx, waveformReader, 300, 10000, 200)
-			if err != nil {
-				return fmt.Errorf("cannot create waveform: %w", err)
-			}
-			return f.writeFile(f.sessionFilePath(recorderID, sessionID, FILENAME_WAVEFORM), waveformData.Bytes())
-		})
-
-		eg.Go(func() error {
-			overviewData, err := render.CreateOverview(egCtx, overviewReader, 300, 1000, 200)
-			if err != nil {
-				return fmt.Errorf("cannot create waveform overview: %w", err)
-			}
-			return f.writeFile(filepath.Join(f.sessionDir(recorderID, sessionID), "overview.png"), overviewData.Bytes())
-		})
-	}
-
-	flacReader := readers[idx]
-	idx++
-	oggReader := readers[idx]
+	eg.Go(func() error {
+		waveformData, err := render.CreateWaveform(waveformReader)
+		if err != nil {
+			return fmt.Errorf("cannot create waveform: %w", err)
+		}
+		return f.writeFile(f.sessionFilePath(recorderID, sessionID, FILENAME_WAVEFORM), waveformData.Bytes())
+	})
 
 	eg.Go(func() error {
 		flacBuffer, err := render.Flac(flacReader)

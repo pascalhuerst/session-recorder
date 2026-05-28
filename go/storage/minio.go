@@ -62,19 +62,9 @@ type Minio struct {
 	sessionTimeout time.Duration
 	stopTimeout    chan struct{}
 
-	// When false (default), waveform.dat / overview.png are not generated on
-	// close (they need the external `audiowaveform` binary and aren't used by
-	// the current UI). Enable with SetGenerateWaveform.
-	generateWaveform bool
-
 	onSessionStateChangedCb OnSessionStateChangedCb
 	onAudioChunkCb          OnAudioChunkCb
 	cbLock                  sync.Mutex
-}
-
-// SetGenerateWaveform toggles waveform.dat / overview.png generation on close.
-func (m *Minio) SetGenerateWaveform(enabled bool) {
-	m.generateWaveform = enabled
 }
 
 func NewMinioStorage(endpoint, localEndpoint, publicEndpoint, accessKey, secretKey string) (*Minio, error) {
@@ -913,13 +903,12 @@ func (m *Minio) renderInMemorySession(ctx context.Context, recorderID, sessionID
 
 	rawDataObjectName := fmt.Sprintf("%s/sessions/%s/data.raw", recorderID, sessionID)
 	waveformObject := fmt.Sprintf("%s/sessions/%s/waveform.dat", recorderID, sessionID)
-	overviewObject := fmt.Sprintf("%s/sessions/%s/overview.png", recorderID, sessionID)
 	flacObject := fmt.Sprintf("%s/sessions/%s/data.flac", recorderID, sessionID)
 	oggObject := fmt.Sprintf("%s/sessions/%s/data.ogg", recorderID, sessionID)
 
 	// Each renderer reads from its own bytes.Reader over the same underlying
-	// slice — cheap (cursor only) and independent. data.raw is uploaded as a
-	// fifth parallel task so it's available for later segment rendering.
+	// slice — cheap (cursor only) and independent. data.raw is uploaded in
+	// parallel so it's available for later segment rendering.
 	eg, egCtx := errgroup.WithContext(ctx)
 
 	eg.Go(func() error {
@@ -931,29 +920,16 @@ func (m *Minio) renderInMemorySession(ctx context.Context, recorderID, sessionID
 		return nil
 	})
 
-	if m.generateWaveform {
-		eg.Go(func() error {
-			waveformData, werr := render.CreateWaveform(egCtx, bytes.NewReader(rawBytes), 300, 10000, 200)
-			if werr != nil {
-				return fmt.Errorf("cannot create waveform: %w", werr)
-			}
-			if _, err := m.client.PutObject(egCtx, bucketName, waveformObject, waveformData, int64(waveformData.Len()), minio.PutObjectOptions{}); err != nil {
-				return fmt.Errorf("cannot upload waveform: %w", err)
-			}
-			return nil
-		})
-
-		eg.Go(func() error {
-			overviewData, oerr := render.CreateOverview(egCtx, bytes.NewReader(rawBytes), 300, 1000, 200)
-			if oerr != nil {
-				return fmt.Errorf("cannot create overview: %w", oerr)
-			}
-			if _, err := m.client.PutObject(egCtx, bucketName, overviewObject, overviewData, int64(overviewData.Len()), minio.PutObjectOptions{}); err != nil {
-				return fmt.Errorf("cannot upload overview: %w", err)
-			}
-			return nil
-		})
-	}
+	eg.Go(func() error {
+		waveformData, werr := render.CreateWaveform(bytes.NewReader(rawBytes))
+		if werr != nil {
+			return fmt.Errorf("cannot create waveform: %w", werr)
+		}
+		if _, err := m.client.PutObject(egCtx, bucketName, waveformObject, waveformData, int64(waveformData.Len()), minio.PutObjectOptions{}); err != nil {
+			return fmt.Errorf("cannot upload waveform: %w", err)
+		}
+		return nil
+	})
 
 	eg.Go(func() error {
 		flacBuffer, ferr := render.Flac(bytes.NewReader(rawBytes))
@@ -1078,15 +1054,11 @@ func (m *Minio) renderDerivedFiles(ctx context.Context, recorderID, sessionID uu
 	sm.EndTime = sm.StartTime.Add(sm.Duration)
 	// Don't set to FINISHED yet - wait for rendering to complete
 
-	// flac + ogg always; waveform + overview only when enabled. The reader
-	// count must equal the number of consumers or the MultiWriter blocks on an
-	// undrained pipe.
-	readerCount := 2
-	if m.generateWaveform {
-		readerCount = 4
-	}
-	readers, writer, closer := makeReaders(readerCount)
-	eg, egCtx := errgroup.WithContext(ctx)
+	// Three parallel consumers of data.raw: waveform.dat, data.flac, data.ogg.
+	// The reader count must equal the number of consumers or the MultiWriter
+	// blocks on an undrained pipe.
+	readers, writer, closer := makeReaders(3)
+	eg, _ := errgroup.WithContext(ctx)
 
 	// Pipe data.raw to the render workers.
 	eg.Go(func() error {
@@ -1099,48 +1071,24 @@ func (m *Minio) renderDerivedFiles(ctx context.Context, recorderID, sessionID uu
 		return nil
 	})
 
-	idx := 0
+	waveformReader := readers[0]
+	flacReader := readers[1]
+	oggReader := readers[2]
 
-	if m.generateWaveform {
-		waveformReader := readers[idx]
-		idx++
-		overviewReader := readers[idx]
-		idx++
-
-		// Create waveform dat file.
-		eg.Go(func() error {
-			waveformData, err := render.CreateWaveform(egCtx, waveformReader, 300, 10000, 200)
-			if err != nil {
-				log.Err(err).Msg("Cannot create waveform")
-				return fmt.Errorf("cannot create waveform: %w", err)
-			}
-			waveformObject := fmt.Sprintf("%s/sessions/%s/waveform.dat", recorderID, sessionID)
-			if _, err := m.client.PutObject(ctx, bucketName, waveformObject, waveformData, int64(waveformData.Len()), minio.PutObjectOptions{}); err != nil {
-				log.Err(err).Str("object", waveformObject).Msg("Cannot put object")
-				return err
-			}
-			return nil
-		})
-
-		// Create waveform png overview file.
-		eg.Go(func() error {
-			overviewData, err := render.CreateOverview(egCtx, overviewReader, 300, 1000, 200)
-			if err != nil {
-				log.Err(err).Msg("Cannot create waveform overview")
-				return fmt.Errorf("cannot create waveform overview: %w", err)
-			}
-			overviewObject := fmt.Sprintf("%s/sessions/%s/overview.png", recorderID, sessionID)
-			if _, err := m.client.PutObject(ctx, bucketName, overviewObject, overviewData, int64(overviewData.Len()), minio.PutObjectOptions{}); err != nil {
-				log.Err(err).Str("object", overviewObject).Msg("Cannot put object")
-				return err
-			}
-			return nil
-		})
-	}
-
-	flacReader := readers[idx]
-	idx++
-	oggReader := readers[idx]
+	// Create waveform dat file.
+	eg.Go(func() error {
+		waveformData, err := render.CreateWaveform(waveformReader)
+		if err != nil {
+			log.Err(err).Msg("Cannot create waveform")
+			return fmt.Errorf("cannot create waveform: %w", err)
+		}
+		waveformObject := fmt.Sprintf("%s/sessions/%s/waveform.dat", recorderID, sessionID)
+		if _, err := m.client.PutObject(ctx, bucketName, waveformObject, waveformData, int64(waveformData.Len()), minio.PutObjectOptions{}); err != nil {
+			log.Err(err).Str("object", waveformObject).Msg("Cannot put object")
+			return err
+		}
+		return nil
+	})
 
 	// Create flac file.
 	eg.Go(func() error {

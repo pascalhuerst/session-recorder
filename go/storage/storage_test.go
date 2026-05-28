@@ -220,7 +220,7 @@ func TestSegment_WithErrorMessage(t *testing.T) {
 		StartPoint:   100,
 		EndPoint:     500,
 		State:        SegmentStateError,
-		ErrorMessage: "sox encoding failed",
+		ErrorMessage: "encoding failed",
 	}
 
 	// Marshal to JSON

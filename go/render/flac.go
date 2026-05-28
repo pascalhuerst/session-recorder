@@ -1,7 +1,7 @@
 package render
 
 import (
-	"bytes"
+	"bufio"
 	"encoding/binary"
 	"io"
 
@@ -11,101 +11,95 @@ import (
 	"github.com/pkg/errors"
 )
 
-func Flac(raw io.Reader) (*bytes.Buffer, error) {
-	var (
-		sampleRate uint32        = 48000
-		nChannels  int           = 2
-		bps        uint8         = 16
-		ret        *bytes.Buffer = new(bytes.Buffer)
+// Flac encodes raw PCM (s16le, 2ch, 48kHz) read from src into a FLAC stream
+// written incrementally to dst. Frames are emitted one block at a time, so
+// memory use is bounded regardless of stream length (safe for multi-hour
+// sessions).
+func Flac(dst io.Writer, src io.Reader) error {
+	const (
+		sr  uint32 = 48000
+		bps uint8  = 16
+		// Number of inter-channel samples per block.
+		nsamplesPerChannel = 16
 	)
 
+	// The encoder only back-patches BlockSizeMin/Max in Close() when the writer
+	// is an io.WriteSeeker; we stream to a pipe/file, so they must be set up
+	// front or the header carries an invalid block size of 0. Frames use a fixed
+	// block size of nsamplesPerChannel (a short final block may be smaller).
 	info := &meta.StreamInfo{
-		//		BlockSizeMin:  16,    // adjusted by encoder.
-		//		BlockSizeMax:  65535, // adjusted by encoder.
-		SampleRate:    sampleRate,
-		NChannels:     uint8(nChannels),
+		BlockSizeMin:  nsamplesPerChannel,
+		BlockSizeMax:  nsamplesPerChannel,
+		SampleRate:    sr,
+		NChannels:     numChannels,
 		BitsPerSample: bps,
 	}
 
-	enc, err := flac.NewEncoder(ret, info)
+	enc, err := flac.NewEncoder(dst, info)
 	if err != nil {
-		return nil, errors.WithStack(err)
+		return errors.WithStack(err)
 	}
 	defer enc.Close()
 
-	// Number of samples per channel and block.
-	const nsamplesPerChannel = 16
-	nsamplesPerBlock := nChannels * nsamplesPerChannel
-
-	subframes := make([]*frame.Subframe, nChannels)
+	subframes := make([]*frame.Subframe, numChannels)
 	for i := range subframes {
-		subframe := &frame.Subframe{
-			Samples: make([]int32, nsamplesPerChannel),
-		}
-
-		subframes[i] = subframe
+		subframes[i] = &frame.Subframe{Samples: make([]int32, nsamplesPerChannel)}
 	}
 
-	for frameNum := 0; ; frameNum++ {
-		buf := make([]int16, nsamplesPerBlock)
+	br := bufio.NewReaderSize(src, 64*1024)
+	rbuf := make([]byte, nsamplesPerChannel*numChannels*2)
 
-		err := binary.Read(raw, binary.LittleEndian, buf)
-		if err == io.EOF {
-			break
-		}
-
-		if err != nil {
-			return nil, errors.WithStack(err)
-		}
-
-		for _, subframe := range subframes {
-			subHdr := frame.SubHeader{
-				Pred:   frame.PredVerbatim,
-				Order:  0,
-				Wasted: 0,
+	for {
+		n, rerr := io.ReadFull(br, rbuf)
+		if n == 0 {
+			if rerr == io.EOF || rerr == io.ErrUnexpectedEOF {
+				break
 			}
-			subframe.SubHeader = subHdr
-			subframe.NSamples = len(buf) / nChannels
-			subframe.Samples = subframe.Samples[:subframe.NSamples]
+			return errors.WithStack(rerr)
 		}
 
-		for i, sample := range buf {
-			subframe := subframes[i%nChannels]
-			subframe.Samples[i/nChannels] = int32(sample)
-		}
+		// Whole frames only (the raw stream is frame-aligned: n%bytesPerFrame==0).
+		nFrames := n / bytesPerFrame
 
-		for _, subframe := range subframes {
-			sample := subframe.Samples[0]
+		for ch, subframe := range subframes {
+			subframe.SubHeader = frame.SubHeader{Pred: frame.PredVerbatim}
+			subframe.NSamples = nFrames
+			subframe.Samples = subframe.Samples[:nFrames]
+			for i := 0; i < nFrames; i++ {
+				s := int16(binary.LittleEndian.Uint16(rbuf[(i*numChannels+ch)*2:]))
+				subframe.Samples[i] = int32(s)
+			}
+
 			constant := true
-
 			for _, s := range subframe.Samples[1:] {
-				if sample != s {
+				if s != subframe.Samples[0] {
 					constant = false
+					break
 				}
 			}
-
 			if constant {
 				subframe.SubHeader.Pred = frame.PredConstant
 			}
 		}
 
-		hdr := frame.Header{
-			HasFixedBlockSize: false,
-			BlockSize:         uint16(nsamplesPerChannel),
-			SampleRate:        uint32(sampleRate),
-			Channels:          frame.ChannelsLR,
-			BitsPerSample:     uint8(bps),
-		}
-
 		f := &frame.Frame{
-			Header:    hdr,
+			Header: frame.Header{
+				HasFixedBlockSize: false,
+				BlockSize:         uint16(nFrames),
+				SampleRate:        sr,
+				Channels:          frame.ChannelsLR,
+				BitsPerSample:     bps,
+			},
 			Subframes: subframes,
 		}
-
 		if err := enc.WriteFrame(f); err != nil {
-			return nil, errors.WithStack(err)
+			return errors.WithStack(err)
+		}
+
+		if rerr == io.EOF || rerr == io.ErrUnexpectedEOF {
+			break
 		}
 	}
 
-	return ret, nil
+	return nil
 }

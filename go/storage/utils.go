@@ -1,10 +1,25 @@
 package storage
 
 import (
+	"errors"
 	"io"
 
 	multierror "github.com/hashicorp/go-multierror"
 )
+
+// closeReader closes r if it implements io.Closer. Used to unblock a fan-out
+// MultiWriter when a consumer stops reading early (e.g. on encode error).
+func closeReader(r io.Reader) {
+	if c, ok := r.(io.Closer); ok {
+		_ = c.Close()
+	}
+}
+
+// isPipeClosed reports whether err is the result of a closed io.Pipe — expected
+// when a consumer finishes/aborts before the fan-out copy has drained the rest.
+func isPipeClosed(err error) bool {
+	return errors.Is(err, io.ErrClosedPipe)
+}
 
 type MultiCloser struct {
 	closers []io.Closer

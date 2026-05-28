@@ -28,9 +28,9 @@ RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o session_recorder_
 # Final stage
 FROM alpine:latest
 
-# Install runtime dependencies. sox encodes data.flac / data.ogg; waveform.dat
-# is generated in-process (pure Go), so audiowaveform is no longer needed.
-RUN apk --no-cache add ca-certificates dbus sox libsndfile
+# Install runtime dependencies. data.flac, data.ogg (Ogg/Opus) and waveform.dat
+# are all generated in-process (pure Go) — no sox or audiowaveform needed.
+RUN apk --no-cache add ca-certificates dbus
 
 WORKDIR /root/
 

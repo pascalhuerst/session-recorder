@@ -22,12 +22,8 @@ license: MIT
 
 depends:
   - adduser
-  # sox is invoked at /usr/bin/sox to encode data.flac and data.ogg on close.
-  # libsox-fmt-all provides the flac/ogg-vorbis format handlers (the base sox
-  # package does not include them, so encoding would otherwise fail at runtime).
-  # (waveform.dat is generated in-process in Go — no audiowaveform dependency.)
-  - sox
-  - libsox-fmt-all
+  # data.flac, data.ogg (Ogg/Opus) and waveform.dat are all generated in-process
+  # in pure Go — no sox or audiowaveform runtime dependency.
 
 contents:
   - src: go/dist/session-recorder-server

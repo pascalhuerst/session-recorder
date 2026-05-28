@@ -380,7 +380,7 @@ export const ErrorState: Story = {
       const errorSegment = {
         ...baseSegment,
         state: 'error' as const,
-        errorMessage: 'sox encoding failed',
+        errorMessage: 'encoding failed',
         renders: [],
       };
       const context = createPeaksContext(createMockContext(errorSegment));

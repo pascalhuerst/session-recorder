@@ -932,23 +932,15 @@ func (m *Minio) renderInMemorySession(ctx context.Context, recorderID, sessionID
 	})
 
 	eg.Go(func() error {
-		flacBuffer, ferr := render.Flac(bytes.NewReader(rawBytes))
-		if ferr != nil {
-			return fmt.Errorf("cannot create flac: %w", ferr)
-		}
-		if _, err := m.client.PutObject(egCtx, bucketName, flacObject, flacBuffer, int64(flacBuffer.Len()), minio.PutObjectOptions{}); err != nil {
-			return fmt.Errorf("cannot upload flac: %w", err)
+		if err := m.streamEncode(egCtx, flacObject, "audio/flac", bytes.NewReader(rawBytes), render.Flac); err != nil {
+			return fmt.Errorf("cannot create flac: %w", err)
 		}
 		return nil
 	})
 
 	eg.Go(func() error {
-		oggBuffer, oerr := render.CreateAudioFile(bytes.NewReader(rawBytes), "ogg")
-		if oerr != nil {
-			return fmt.Errorf("cannot create ogg: %w", oerr)
-		}
-		if _, err := m.client.PutObject(egCtx, bucketName, oggObject, oggBuffer, int64(oggBuffer.Len()), minio.PutObjectOptions{}); err != nil {
-			return fmt.Errorf("cannot upload ogg: %w", err)
+		if err := m.streamEncode(egCtx, oggObject, "audio/ogg", bytes.NewReader(rawBytes), render.Opus); err != nil {
+			return fmt.Errorf("cannot create ogg: %w", err)
 		}
 		return nil
 	})
@@ -1019,6 +1011,33 @@ func (m *Minio) composeChunksIntoRaw(ctx context.Context, recorderID, sessionID 
 	return nil
 }
 
+// uploadPartSize bounds the multipart buffer used when streaming an object of
+// unknown length to MinIO. Encoded output is never fully held in memory; at
+// most one part per in-flight upload is buffered — important on embedded hosts
+// (e.g. a Raspberry Pi rendering a 12h session).
+const uploadPartSize = 16 * 1024 * 1024
+
+// streamEncode runs encode(dst, src) and uploads its output to object via a
+// streaming multipart PutObject. The encoder writes into a pipe that PutObject
+// drains, so neither the raw input nor the encoded output is ever fully
+// buffered in memory, regardless of session length.
+func (m *Minio) streamEncode(ctx context.Context, object, contentType string, src io.Reader, encode func(dst io.Writer, src io.Reader) error) error {
+	pr, pw := io.Pipe()
+	go func() {
+		pw.CloseWithError(encode(pw, src))
+	}()
+	_, err := m.client.PutObject(ctx, bucketName, object, pr, -1, minio.PutObjectOptions{
+		ContentType: contentType,
+		PartSize:    uploadPartSize,
+	})
+	if err != nil {
+		// Unblock the encoder goroutine if it is still writing.
+		pr.CloseWithError(err)
+		return err
+	}
+	return nil
+}
+
 // renderDerivedFiles assumes <session>/data.raw exists, then renders waveform,
 // overview, flac and ogg files. If removeChunks is true, the chunks/ folder is
 // purged on success (used by the compose path; the in-memory path has nothing
@@ -1060,11 +1079,12 @@ func (m *Minio) renderDerivedFiles(ctx context.Context, recorderID, sessionID uu
 	readers, writer, closer := makeReaders(3)
 	eg, _ := errgroup.WithContext(ctx)
 
-	// Pipe data.raw to the render workers.
+	// Pipe data.raw to the render workers. A consumer that errors closes its
+	// reader, which surfaces here as a closed-pipe error — expected, not fatal.
 	eg.Go(func() error {
 		defer closer.Close()
 		_, err := io.Copy(writer, rawData)
-		if err != nil {
+		if err != nil && !isPipeClosed(err) {
 			log.Err(err).Msg("Cannot setup multiple readers")
 			return err
 		}
@@ -1075,8 +1095,10 @@ func (m *Minio) renderDerivedFiles(ctx context.Context, recorderID, sessionID uu
 	flacReader := readers[1]
 	oggReader := readers[2]
 
-	// Create waveform dat file.
+	// Create waveform dat file. Its output is bounded (downsampled overview), so
+	// it is the one consumer that may stay buffered.
 	eg.Go(func() error {
+		defer closeReader(waveformReader)
 		waveformData, err := render.CreateWaveform(waveformReader)
 		if err != nil {
 			log.Err(err).Msg("Cannot create waveform")
@@ -1090,31 +1112,23 @@ func (m *Minio) renderDerivedFiles(ctx context.Context, recorderID, sessionID uu
 		return nil
 	})
 
-	// Create flac file.
+	// Create flac file (streamed: never fully buffered in memory).
 	eg.Go(func() error {
-		flacBuffer, ferr := render.Flac(flacReader)
-		if ferr != nil {
-			log.Err(ferr).Msg("Cannot convert to flac")
-			return ferr
-		}
+		defer closeReader(flacReader)
 		flacObject := fmt.Sprintf("%s/sessions/%s/data.flac", recorderID, sessionID)
-		if _, err := m.client.PutObject(ctx, bucketName, flacObject, flacBuffer, int64(flacBuffer.Len()), minio.PutObjectOptions{}); err != nil {
-			log.Err(err).Str("object", flacObject).Msg("Cannot put object")
+		if err := m.streamEncode(ctx, flacObject, "audio/flac", flacReader, render.Flac); err != nil {
+			log.Err(err).Str("object", flacObject).Msg("Cannot convert to flac")
 			return err
 		}
 		return nil
 	})
 
-	// Create ogg file.
+	// Create ogg file (streamed: never fully buffered in memory).
 	eg.Go(func() error {
-		oggBuffer, oerr := render.CreateAudioFile(oggReader, "ogg")
-		if oerr != nil {
-			log.Err(oerr).Msg("Cannot convert to ogg")
-			return oerr
-		}
-		object := fmt.Sprintf("%s/sessions/%s/data.ogg", recorderID, sessionID)
-		if _, err := m.client.PutObject(ctx, bucketName, object, oggBuffer, int64(oggBuffer.Len()), minio.PutObjectOptions{}); err != nil {
-			log.Err(err).Str("object", object).Msg("Cannot put object")
+		defer closeReader(oggReader)
+		oggObject := fmt.Sprintf("%s/sessions/%s/data.ogg", recorderID, sessionID)
+		if err := m.streamEncode(ctx, oggObject, "audio/ogg", oggReader, render.Opus); err != nil {
+			log.Err(err).Str("object", oggObject).Msg("Cannot convert to ogg")
 			return err
 		}
 		return nil
@@ -2007,90 +2021,70 @@ func (m *Minio) RenderSegment(ctx context.Context, recorderID, sessionID, segmen
 		return fmt.Errorf("%s", errMsg)
 	}
 
-	// Get the raw audio file
+	// Fetch only the segment's byte range so we never download a whole
+	// multi-hour data.raw to extract a short clip. Raw is s16le/2ch => 4 bytes
+	// per frame; StartPoint/EndPoint are frame indices.
+	const rawBytesPerFrame = 2 * 2
+	startByte := segment.StartPoint * rawBytesPerFrame
+	endByte := segment.EndPoint * rawBytesPerFrame
+
 	rawDataObjectName := fmt.Sprintf("%s/sessions/%s/data.raw", recorderID, sessionID)
-	log.Info().Stringer("segment-id", segmentID).Str("object", rawDataObjectName).Msg("Fetching raw audio for segment")
-	rawData, err := m.client.GetObject(ctx, bucketName, rawDataObjectName, minio.GetObjectOptions{})
+	getOpts := minio.GetObjectOptions{}
+	if err := getOpts.SetRange(startByte, endByte-1); err != nil {
+		m.setSegmentError(ctx, recorderID, sessionID, segmentID, fmt.Sprintf("cannot set range: %v", err))
+		return fmt.Errorf("cannot set range: %w", err)
+	}
+	log.Info().
+		Stringer("segment-id", segmentID).
+		Str("object", rawDataObjectName).
+		Int64("startByte", startByte).
+		Int64("endByte", endByte).
+		Msg("Fetching raw audio range for segment")
+	rawData, err := m.client.GetObject(ctx, bucketName, rawDataObjectName, getOpts)
 	if err != nil {
 		m.setSegmentError(ctx, recorderID, sessionID, segmentID, fmt.Sprintf("cannot get raw audio: %v", err))
 		return fmt.Errorf("cannot get raw audio: %w", err)
 	}
-	log.Info().Stringer("segment-id", segmentID).Msg("Got raw audio handle, starting encoding")
+	defer rawData.Close()
 
-	// Setup readers for parallel encoding
+	// The ranged reader already yields exactly the segment, so the encoders can
+	// consume it directly. Fan it out to the OGG and FLAC encoders, each of which
+	// streams its output straight to MinIO (never fully buffered in memory).
 	readers, writer, closer := makeReaders(2)
 	eg, egCtx := errgroup.WithContext(ctx)
 
-	// Copy raw data to multiple readers
 	eg.Go(func() error {
 		defer closer.Close()
-		log.Info().Stringer("segment-id", segmentID).Msg("Starting raw audio copy to encoders")
 		n, err := io.Copy(writer, rawData)
-		log.Info().Stringer("segment-id", segmentID).Int64("bytes", n).Err(err).Msg("Raw audio copy complete")
-		// Ignore closed pipe errors - this is expected when sox finishes early
-		// (sox only reads what it needs for the trim, then closes the pipe)
-		if err != nil && (strings.Contains(err.Error(), "closed pipe") || strings.Contains(err.Error(), "broken pipe")) {
-			log.Debug().Stringer("segment-id", segmentID).Msg("Pipe closed by encoder (expected)")
-			return nil
+		log.Info().Stringer("segment-id", segmentID).Int64("bytes", n).Err(err).Msg("Raw audio range copy complete")
+		if err != nil && !isPipeClosed(err) {
+			return err
 		}
-		return err
-	})
-
-	// Encode to OGG
-	eg.Go(func() error {
-		log.Info().Stringer("segment-id", segmentID).Msg("Starting OGG encoding")
-		oggBuffer, err := render.ClipAndEncodeOgg(readers[0], segment.StartPoint, segment.EndPoint)
-		// Close the pipe reader to unblock the copy goroutine
-		// (sox only reads what it needs, leaving the rest unread)
-		if rc, ok := readers[0].(io.Closer); ok {
-			rc.Close()
-		}
-		if err != nil {
-			log.Error().Stringer("segment-id", segmentID).Err(err).Msg("OGG encoding failed")
-			return fmt.Errorf("cannot encode segment to OGG: %w", err)
-		}
-		log.Info().Stringer("segment-id", segmentID).Int("size", oggBuffer.Len()).Msg("OGG encoding complete")
-
-		oggObject := fmt.Sprintf("%s/sessions/%s/segments/%s/%s", recorderID, sessionID, segmentID, SEGMENT_FILENAME_OGG)
-		if _, err := m.client.PutObject(egCtx, bucketName, oggObject, oggBuffer, int64(oggBuffer.Len()), minio.PutObjectOptions{}); err != nil {
-			log.Error().Stringer("segment-id", segmentID).Err(err).Msg("OGG upload failed")
-			return fmt.Errorf("cannot upload OGG: %w", err)
-		}
-
-		log.Info().
-			Stringer("segment-id", segmentID).
-			Int("size", oggBuffer.Len()).
-			Msg("Segment OGG uploaded")
-
 		return nil
 	})
 
-	// Encode to FLAC
+	oggReader := readers[0]
+	flacReader := readers[1]
+
 	eg.Go(func() error {
-		log.Info().Stringer("segment-id", segmentID).Msg("Starting FLAC encoding")
-		flacBuffer, err := render.ClipAndEncodeFlac(readers[1], segment.StartPoint, segment.EndPoint)
-		// Close the pipe reader to unblock the copy goroutine
-		// (sox only reads what it needs, leaving the rest unread)
-		if rc, ok := readers[1].(io.Closer); ok {
-			rc.Close()
+		defer closeReader(oggReader)
+		oggObject := fmt.Sprintf("%s/sessions/%s/segments/%s/%s", recorderID, sessionID, segmentID, SEGMENT_FILENAME_OGG)
+		if err := m.streamEncode(egCtx, oggObject, "audio/ogg", oggReader, render.Opus); err != nil {
+			log.Error().Stringer("segment-id", segmentID).Err(err).Msg("OGG encoding failed")
+			return fmt.Errorf("cannot encode segment to OGG: %w", err)
 		}
-		if err != nil {
+		log.Info().Stringer("segment-id", segmentID).Msg("Segment OGG uploaded")
+		return nil
+	})
+
+	eg.Go(func() error {
+		defer closeReader(flacReader)
+		flacObject := fmt.Sprintf("%s/sessions/%s/segments/%s/%s", recorderID, sessionID, segmentID, SEGMENT_FILENAME_FLAC)
+		if err := m.streamEncode(egCtx, flacObject, "audio/flac", flacReader, render.Flac); err != nil {
 			log.Error().Stringer("segment-id", segmentID).Err(err).Msg("FLAC encoding failed")
 			return fmt.Errorf("cannot encode segment to FLAC: %w", err)
 		}
-		log.Info().Stringer("segment-id", segmentID).Int("size", flacBuffer.Len()).Msg("FLAC encoding complete")
-
-		flacObject := fmt.Sprintf("%s/sessions/%s/segments/%s/%s", recorderID, sessionID, segmentID, SEGMENT_FILENAME_FLAC)
-		if _, err := m.client.PutObject(egCtx, bucketName, flacObject, flacBuffer, int64(flacBuffer.Len()), minio.PutObjectOptions{}); err != nil {
-			log.Error().Stringer("segment-id", segmentID).Err(err).Msg("FLAC upload failed")
-			return fmt.Errorf("cannot upload FLAC: %w", err)
-		}
-
-		log.Info().
-			Stringer("segment-id", segmentID).
-			Int("size", flacBuffer.Len()).
-			Msg("Segment FLAC uploaded")
-
+		log.Info().Stringer("segment-id", segmentID).Msg("Segment FLAC uploaded")
 		return nil
 	})
 

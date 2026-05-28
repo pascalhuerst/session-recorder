@@ -11,6 +11,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/holoplot/go-avahi v1.0.1
 	github.com/improbable-eng/grpc-web v0.15.0
+	github.com/kazzmir/opus-go v1.3.0
 	github.com/mattn/go-colorable v0.1.13
 	github.com/mattn/go-isatty v0.0.20
 	github.com/mewkiz/flac v1.0.10

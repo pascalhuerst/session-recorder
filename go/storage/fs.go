@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"bufio"
 	"bytes"
 	"context"
 	"encoding/binary"
@@ -10,7 +11,6 @@ import (
 	"io"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 
@@ -547,7 +547,7 @@ func (f *Fs) renderSession(ctx context.Context, recorderID, sessionID uuid.UUID)
 	eg.Go(func() error {
 		defer closer.Close()
 		_, err := io.Copy(writer, rawData)
-		if err != nil {
+		if err != nil && !isPipeClosed(err) {
 			log.Err(err).Msg("Cannot setup multiple readers")
 			return err
 		}
@@ -559,6 +559,7 @@ func (f *Fs) renderSession(ctx context.Context, recorderID, sessionID uuid.UUID)
 	oggReader := readers[2]
 
 	eg.Go(func() error {
+		defer closeReader(waveformReader)
 		waveformData, err := render.CreateWaveform(waveformReader)
 		if err != nil {
 			return fmt.Errorf("cannot create waveform: %w", err)
@@ -567,19 +568,17 @@ func (f *Fs) renderSession(ctx context.Context, recorderID, sessionID uuid.UUID)
 	})
 
 	eg.Go(func() error {
-		flacBuffer, err := render.Flac(flacReader)
-		if err != nil {
-			return err
-		}
-		return f.writeFile(f.sessionFilePath(recorderID, sessionID, FILENAME_FLAC), flacBuffer.Bytes())
+		defer closeReader(flacReader)
+		return f.writeFileStream(f.sessionFilePath(recorderID, sessionID, FILENAME_FLAC), func(w io.Writer) error {
+			return render.Flac(w, flacReader)
+		})
 	})
 
 	eg.Go(func() error {
-		oggBuffer, err := render.CreateAudioFile(oggReader, "ogg")
-		if err != nil {
-			return err
-		}
-		return f.writeFile(f.sessionFilePath(recorderID, sessionID, FILENAME_OGG), oggBuffer.Bytes())
+		defer closeReader(oggReader)
+		return f.writeFileStream(f.sessionFilePath(recorderID, sessionID, FILENAME_OGG), func(w io.Writer) error {
+			return render.Opus(w, oggReader)
+		})
 	})
 
 	if err := eg.Wait(); err != nil {
@@ -617,6 +616,41 @@ func (f *Fs) writeFile(path string, data []byte) error {
 		return fmt.Errorf("cannot write %s: %w", path, err)
 	}
 	if err := os.Rename(tmp, path); err != nil {
+		return fmt.Errorf("cannot rename %s: %w", path, err)
+	}
+	return nil
+}
+
+// writeFileStream writes a file atomically (temp file + rename) by streaming:
+// write is called with the destination file as an io.Writer, so the content is
+// never fully buffered in memory — safe for multi-hour encodes on a Pi.
+func (f *Fs) writeFileStream(path string, write func(io.Writer) error) (err error) {
+	if mkErr := os.MkdirAll(filepath.Dir(path), 0o755); mkErr != nil {
+		return fmt.Errorf("cannot create parent directory: %w", mkErr)
+	}
+	tmp := path + ".tmp"
+	file, err := os.OpenFile(tmp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o644)
+	if err != nil {
+		return fmt.Errorf("cannot create %s: %w", tmp, err)
+	}
+	defer func() {
+		if err != nil {
+			file.Close()
+			os.Remove(tmp)
+		}
+	}()
+
+	bw := bufio.NewWriterSize(file, 1<<20)
+	if err = write(bw); err != nil {
+		return err
+	}
+	if err = bw.Flush(); err != nil {
+		return fmt.Errorf("cannot flush %s: %w", tmp, err)
+	}
+	if err = file.Close(); err != nil {
+		return fmt.Errorf("cannot close %s: %w", tmp, err)
+	}
+	if err = os.Rename(tmp, path); err != nil {
 		return fmt.Errorf("cannot rename %s: %w", path, err)
 	}
 	return nil
@@ -1094,38 +1128,45 @@ func (f *Fs) RenderSegment(ctx context.Context, recorderID, sessionID, segmentID
 	}
 	defer rawData.Close()
 
+	// Seek to the segment start and bound the window so we never read the whole
+	// file to extract a short clip. Raw is s16le/2ch => 4 bytes per frame;
+	// StartPoint/EndPoint are frame indices.
+	const rawBytesPerFrame = 2 * 2
+	startByte := segment.StartPoint * rawBytesPerFrame
+	want := (segment.EndPoint - segment.StartPoint) * rawBytesPerFrame
+	if _, err := rawData.Seek(startByte, io.SeekStart); err != nil {
+		f.setSegmentError(ctx, recorderID, sessionID, segmentID, fmt.Sprintf("cannot seek raw audio: %v", err))
+		return fmt.Errorf("cannot seek raw audio: %w", err)
+	}
+	segmentRaw := io.LimitReader(rawData, want)
+
 	readers, writer, closer := makeReaders(2)
 	eg, _ := errgroup.WithContext(ctx)
 
 	eg.Go(func() error {
 		defer closer.Close()
-		_, err := io.Copy(writer, rawData)
-		if err != nil && (strings.Contains(err.Error(), "closed pipe") || strings.Contains(err.Error(), "broken pipe")) {
-			return nil
+		_, err := io.Copy(writer, segmentRaw)
+		if err != nil && !isPipeClosed(err) {
+			return err
 		}
-		return err
+		return nil
+	})
+
+	oggReader := readers[0]
+	flacReader := readers[1]
+
+	eg.Go(func() error {
+		defer closeReader(oggReader)
+		return f.writeFileStream(f.segmentFilePath(recorderID, sessionID, segmentID, SEGMENT_FILENAME_OGG), func(w io.Writer) error {
+			return render.Opus(w, oggReader)
+		})
 	})
 
 	eg.Go(func() error {
-		oggBuffer, err := render.ClipAndEncodeOgg(readers[0], segment.StartPoint, segment.EndPoint)
-		if rc, ok := readers[0].(io.Closer); ok {
-			rc.Close()
-		}
-		if err != nil {
-			return fmt.Errorf("cannot encode segment to OGG: %w", err)
-		}
-		return f.writeFile(f.segmentFilePath(recorderID, sessionID, segmentID, SEGMENT_FILENAME_OGG), oggBuffer.Bytes())
-	})
-
-	eg.Go(func() error {
-		flacBuffer, err := render.ClipAndEncodeFlac(readers[1], segment.StartPoint, segment.EndPoint)
-		if rc, ok := readers[1].(io.Closer); ok {
-			rc.Close()
-		}
-		if err != nil {
-			return fmt.Errorf("cannot encode segment to FLAC: %w", err)
-		}
-		return f.writeFile(f.segmentFilePath(recorderID, sessionID, segmentID, SEGMENT_FILENAME_FLAC), flacBuffer.Bytes())
+		defer closeReader(flacReader)
+		return f.writeFileStream(f.segmentFilePath(recorderID, sessionID, segmentID, SEGMENT_FILENAME_FLAC), func(w io.Writer) error {
+			return render.Flac(w, flacReader)
+		})
 	})
 
 	if err := eg.Wait(); err != nil {

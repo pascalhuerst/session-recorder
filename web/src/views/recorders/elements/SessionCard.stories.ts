@@ -460,7 +460,7 @@ export const WithSegmentStates: Story = {
           timeStart: new Date(30000),
           timeEnd: new Date(60000),
           state: 'error' as const,
-          errorMessage: 'sox encoding failed',
+          errorMessage: 'encoding failed',
           downloadFiles: null,
         },
         {

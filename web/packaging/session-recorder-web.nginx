@@ -1,9 +1,11 @@
 # Session Recorder web UI — nginx site.
 #
-# Installed to /etc/nginx/sites-available/session-recorder-web (a conffile, so
-# edits survive package upgrades). The package ENABLES this site on install
-# (symlinks it into sites-enabled, disables the stock nginx default site so
-# this one owns the port, and reloads nginx).
+# Installed as a conffile (edits survive upgrades):
+#   Debian: /etc/nginx/sites-available/session-recorder-web — the package
+#           symlinks it into sites-enabled and disables the stock default site.
+#   Fedora: /etc/nginx/conf.d/session-recorder-web.conf — auto-included; you may
+#           need to drop `default_server` from the stock server block in
+#           /etc/nginx/nginx.conf so :80 isn't claimed twice.
 #
 # Configure below: the `listen` port and the two backend upstreams, then:
 #   sudo nginx -t && sudo systemctl reload nginx

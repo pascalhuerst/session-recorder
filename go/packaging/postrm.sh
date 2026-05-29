@@ -1,16 +1,17 @@
 #!/bin/sh
 set -e
 
-case "$1" in
-  remove|purge)
-    if [ -d /run/systemd/system ]; then
-      systemctl daemon-reload || true
-    fi
-    ;;
-esac
+# deb postrm: arg "remove"/"purge"; rpm %postun: numeric arg, 0 on final
+# removal. Reload systemd after the unit file is gone.
 
-# On purge the dedicated user is intentionally left in place to avoid orphaning
-# files it may own. Remove manually if desired:
-#   deluser --system session-recorder
+if [ "$1" = "remove" ] || [ "$1" = "purge" ] || [ "$1" = "0" ]; then
+  if [ -d /run/systemd/system ]; then
+    systemctl daemon-reload || true
+  fi
+fi
+
+# The dedicated user is intentionally left in place to avoid orphaning files it
+# may own. Remove manually if desired:
+#   userdel session-recorder
 
 exit 0

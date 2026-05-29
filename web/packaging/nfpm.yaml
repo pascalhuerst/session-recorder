@@ -1,8 +1,16 @@
-# nfpm config for the Session Recorder web UI .deb (architecture-independent).
-# Run from the REPO ROOT (paths below are repo-root-relative):
+# nfpm config for the Session Recorder web UI (.deb and .rpm,
+# architecture-independent). Run from the REPO ROOT (paths are repo-relative):
 #   cd web && VITE_GRPC_SERVER_URL=/grpc pnpm nx build && cd ..
 #   VERSION=1.2.3 nfpm package --packager deb --config web/packaging/nfpm.yaml \
 #     --target dist/session-recorder-web_1.2.3_all.deb
+#   VERSION=1.2.3 nfpm package --packager rpm --config web/packaging/nfpm.yaml \
+#     --target dist/session-recorder-web-1.2.3.noarch.rpm
+#
+# Debian and Fedora lay out nginx differently, so the nginx site install path
+# and maintainer scripts are overridden per packager (see `overrides` below):
+#   deb -> /etc/nginx/sites-available + a sites-enabled symlink (managed by the
+#          scripts, which also disable the stock default site)
+#   rpm -> /etc/nginx/conf.d/*.conf (auto-included by the stock nginx.conf)
 #
 # ${VERSION} is supplied via env (the git tag without the leading 'v').
 name: session-recorder-web
@@ -22,15 +30,34 @@ license: MIT
 depends:
   - nginx
 
-contents:
-  - src: web/dist/web
-    dst: /usr/share/session-recorder-web
-    type: tree
+# Static assets are identical for both packagers; only the nginx site path and
+# maintainer scripts differ, so contents+scripts are specified per packager.
+# (nfpm replaces `contents` per packager but *merges* `scripts` key-by-key, so
+# keeping scripts only inside the overrides avoids the deb scripts leaking into
+# the rpm.)
+overrides:
+  deb:
+    contents:
+      - src: web/dist/web
+        dst: /usr/share/session-recorder-web
+        type: tree
 
-  - src: web/packaging/session-recorder-web.nginx
-    dst: /etc/nginx/sites-available/session-recorder-web
-    type: config|noreplace
+      - src: web/packaging/session-recorder-web.nginx
+        dst: /etc/nginx/sites-available/session-recorder-web
+        type: config|noreplace
+    scripts:
+      postinstall: web/packaging/postinst.sh
+      preremove: web/packaging/prerm.sh
 
-scripts:
-  postinstall: web/packaging/postinst.sh
-  preremove: web/packaging/prerm.sh
+  rpm:
+    contents:
+      - src: web/dist/web
+        dst: /usr/share/session-recorder-web
+        type: tree
+
+      - src: web/packaging/session-recorder-web.nginx
+        dst: /etc/nginx/conf.d/session-recorder-web.conf
+        type: config|noreplace
+    scripts:
+      postinstall: web/packaging/postinst.rpm.sh
+      postremove: web/packaging/postrm.rpm.sh

@@ -1,9 +1,11 @@
-# nfpm config for the Session Recorder backend .deb.
+# nfpm config for the Session Recorder backend (.deb and .rpm).
 # Run from the REPO ROOT (all paths below are repo-root-relative):
 #   GOOS=linux GOARCH=arm64 CGO_ENABLED=0 \
 #     go build -C go -o dist/session-recorder-server ./cmd/session_recorder_server
 #   VERSION=1.2.3 nfpm package --packager deb --config go/packaging/nfpm.yaml \
 #     --target dist/session-recorder-server_1.2.3_arm64.deb
+#   VERSION=1.2.3 nfpm package --packager rpm --config go/packaging/nfpm.yaml \
+#     --target dist/session-recorder-server-1.2.3.aarch64.rpm
 #
 # ${VERSION} is supplied via env (e.g. the git tag without the leading 'v').
 name: session-recorder-server
@@ -20,10 +22,13 @@ description: |
 homepage: https://github.com/pascalhuerst/session-recorder
 license: MIT
 
-depends:
-  - adduser
-  # data.flac, data.ogg (Ogg/Opus) and waveform.dat are all generated in-process
-  # in pure Go — no sox or audiowaveform runtime dependency.
+# data.flac, data.ogg (Ogg/Opus) and waveform.dat are all generated in-process
+# in pure Go — no sox/audiowaveform runtime dependency. User creation uses
+# useradd/groupadd, present on both Debian (passwd, essential) and Fedora.
+overrides:
+  rpm:
+    depends:
+      - shadow-utils # provides useradd/groupadd on Fedora
 
 contents:
   - src: go/dist/session-recorder-server

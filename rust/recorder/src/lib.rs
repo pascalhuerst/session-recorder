@@ -9,6 +9,7 @@ pub mod audio {
 pub mod io {
     pub mod input_key;
     pub mod led;
+    pub mod ws2812;
 }
 
 pub mod grpc {

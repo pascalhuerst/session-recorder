@@ -23,7 +23,7 @@
 #define LED_PIN2 7      // channel 1 (e.g. right) WS2812 DIN
 #endif
 #ifndef NUM_LEDS
-#define NUM_LEDS 12
+#define NUM_LEDS 15
 #endif
 #ifndef I2C_ADDRESS
 #define I2C_ADDRESS 0x20
@@ -211,11 +211,11 @@ static uint16_t frameInterval(uint8_t ch) {
 
 // Initialise one channel's register block with sensible defaults.
 static void initChannelDefaults(uint8_t ch) {
-    regs[regAddr(ch, REG_MODE)]        = MODE_CYLON;
+    regs[regAddr(ch, REG_MODE)]        = MODE_OFF;
     regs[regAddr(ch, REG_BRIGHTNESS)]  = 64;
-    regs[regAddr(ch, REG_COLOR_R)]     = 0;
-    regs[regAddr(ch, REG_COLOR_G)]     = 128;
-    regs[regAddr(ch, REG_COLOR_B)]     = 255;
+    regs[regAddr(ch, REG_COLOR_R)]     = 32;
+    regs[regAddr(ch, REG_COLOR_G)]     = 32;
+    regs[regAddr(ch, REG_COLOR_B)]     = 32;
     regs[regAddr(ch, REG_SPEED)]       = 160;
     regs[regAddr(ch, REG_LENGTH)]      = NUM_LEDS / 3 > 0 ? NUM_LEDS / 3 : 1;
     regs[regAddr(ch, REG_DIRECTION)]   = 0;

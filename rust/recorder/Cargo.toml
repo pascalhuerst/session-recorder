@@ -24,7 +24,12 @@ prost-types = "0.13"
 mdns-sd = "0.10"
 gethostname = "0.5"
 uuid = { version = "1", features = ["v4"] }
-clap = { version = "4.6.1", features = ["derive"] }
+clap = { version = "4.6.1", features = ["derive", "env"] }
+# D-Bus client for the Avahi discovery backend. zbus is pure Rust (no libdbus /
+# C dependency), so it cross-compiles to arm64 with the rest of the recorder.
+zbus = { version = "5", default-features = false, features = ["tokio"] }
+async-trait = "0.1"
+futures-util = "0.3"
 
 [build-dependencies]
 tonic-build = "0.12"
@@ -41,6 +46,9 @@ priority = "optional"
 # libasound2 was renamed libasound2t64 in the time64 transition (trixie+);
 # accept either. adduser is needed by the postinst.
 depends = "libasound2 | libasound2t64, adduser"
+# The default discovery backend talks to the system avahi-daemon over D-Bus.
+# Recommended (not required) since --discovery mdns works without them.
+recommends = "avahi-daemon, dbus"
 maintainer-scripts = "packaging"
 conf-files = ["/etc/default/session-recorder-alsa-reader"]
 assets = [

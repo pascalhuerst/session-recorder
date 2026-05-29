@@ -20,7 +20,9 @@ use recorder::grpc::chunk_sink_client::{
 };
 use recorder::io::input_key::InputKey;
 use recorder::io::led::Led;
-use recorder::mdns::service_tracker::{ServiceEvent, ServiceTracker, ServiceTrackerConfig};
+use recorder::discovery::{
+    self, DiscoveryConfig, DiscoveryMethod, ServiceDiscovery, ServiceEvent, ServiceInfo,
+};
 use ringbuf::traits::Consumer;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
@@ -158,6 +160,11 @@ struct Args {
     /// gRPC limit (4 MiB by default).
     #[arg(long, default_value_t = DEFAULT_CHUNK_FRAMES)]
     chunk_frames: usize,
+
+    /// Service discovery backend: `avahi` (talk to the system avahi-daemon over
+    /// D-Bus) or `mdns` (in-process mDNS).
+    #[arg(long, value_enum, env = "DISCOVERY_METHOD", default_value_t = DiscoveryMethod::Avahi)]
+    discovery: DiscoveryMethod,
 }
 
 /// Bounded outbox of ready-to-send chunks. Drops the oldest entry when the
@@ -222,7 +229,7 @@ impl Outbox {
 
 struct SessionRecorder {
     args: Args,
-    service_tracker: Option<ServiceTracker>,
+    discovery: Option<Box<dyn ServiceDiscovery>>,
     service_event_receiver: Option<tokio::sync::mpsc::UnboundedReceiver<ServiceEvent>>,
 
     grpc_clients: Arc<tokio::sync::Mutex<HashMap<String, ClientInfo>>>,
@@ -314,7 +321,7 @@ impl SessionRecorder {
 
         Self {
             args,
-            service_tracker: None,
+            discovery: None,
             service_event_receiver: None,
             grpc_clients: Arc::new(tokio::sync::Mutex::new(HashMap::new())),
             audio_settings,
@@ -360,8 +367,8 @@ impl SessionRecorder {
 
         self.shutdown_signal.store(true, Ordering::Relaxed);
 
-        if let Some(mut tracker) = self.service_tracker.take() {
-            tracker.stop();
+        if let Some(mut discovery) = self.discovery.take() {
+            discovery.stop().await;
         }
 
         if let Some(handle) = self.discovery_handle.take() {
@@ -401,18 +408,25 @@ impl SessionRecorder {
     }
 
     async fn setup_service_discovery(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        let tracker_config = ServiceTrackerConfig {
+        let config = DiscoveryConfig {
             service_type: "_session-recorder-chunksink._tcp.local.".to_string(),
             max_services: 50,
         };
 
-        let mut tracker = ServiceTracker::new(tracker_config)?;
-        let event_receiver = tracker.start()?;
+        let mut discovery = discovery::create(self.args.discovery, config)
+            .map_err(|e| format!("cannot create discovery backend: {e:#}"))?;
+        let event_receiver = discovery
+            .start()
+            .await
+            .map_err(|e| format!("cannot start discovery: {e:#}"))?;
 
-        self.service_tracker = Some(tracker);
+        self.discovery = Some(discovery);
         self.service_event_receiver = Some(event_receiver);
 
-        info!("mDNS service discovery initialized");
+        info!(
+            "Service discovery initialized (method: {:?})",
+            self.args.discovery
+        );
         Ok(())
     }
 
@@ -755,8 +769,7 @@ impl SessionRecorder {
         // Updated, until Removed). Used by the reconciler to re-attach when a
         // client got dropped (e.g. the backend restarted under us) without a
         // fresh mDNS event firing.
-        let mut known_services: HashMap<String, recorder::mdns::service_tracker::ServiceInfo> =
-            HashMap::new();
+        let mut known_services: HashMap<String, ServiceInfo> = HashMap::new();
         let mut reconcile_tick = tokio::time::interval(RECONCILE_INTERVAL);
         // First tick fires immediately; skip it so we don't reconcile-before-we-discover.
         reconcile_tick.tick().await;
@@ -865,7 +878,7 @@ impl SessionRecorder {
     /// No-op if the service has no IPv4 address yet or if we're already
     /// connected to that instance name.
     async fn try_attach_service(
-        service_info: &recorder::mdns::service_tracker::ServiceInfo,
+        service_info: &ServiceInfo,
         clients: &Arc<tokio::sync::Mutex<HashMap<String, ClientInfo>>>,
         shutdown: &Arc<AtomicBool>,
         recorder_id: Uuid,

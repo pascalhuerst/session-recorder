@@ -138,6 +138,16 @@ func (f *Fs) Start(ctx context.Context) error {
 		return nil
 	}
 
+	// Interrupted sessions to re-render, collected during the lock-free
+	// population loop below and rendered in the background only after it
+	// completes (rendering takes dataLock and would otherwise race the map
+	// writes here).
+	type interruptedSession struct {
+		recorderID uuid.UUID
+		sessionID  uuid.UUID
+	}
+	var pendingRenders []interruptedSession
+
 	for _, recorderID := range recorderIDs {
 		recorderMetadata, err := f.getRecorderMetadata(recorderID)
 		if err != nil {
@@ -163,10 +173,29 @@ func (f *Fs) Start(ctx context.Context) error {
 			f.system.Recorders[recorderID].Sessions[sessionID] = *sessionMetadata
 		}
 
-		if err := f.closeSessions(ctx, recorderID); err != nil {
+		toRender, err := f.closeSessions(ctx, recorderID)
+		if err != nil {
 			log.Err(err).Msg("Cannot close sessions")
 			continue
 		}
+		for _, sessionID := range toRender {
+			pendingRenders = append(pendingRenders, interruptedSession{recorderID, sessionID})
+		}
+	}
+
+	// Re-render interrupted sessions in the background, sequentially, so startup
+	// is never blocked. Spawned only after the maps are fully populated above.
+	if len(pendingRenders) > 0 {
+		go func(items []interruptedSession) {
+			for _, it := range items {
+				if err := f.closeSession(context.Background(), it.recorderID, it.sessionID); err != nil {
+					log.Err(err).
+						Stringer("recorder-id", it.recorderID).
+						Stringer("session-id", it.sessionID).
+						Msg("Cannot close interrupted session on startup")
+				}
+			}
+		}(pendingRenders)
 	}
 
 	go f.runSessionTimeoutChecker(ctx)
@@ -707,14 +736,19 @@ func (f *Fs) closeOrphanRecordingSessions(ctx context.Context, recorderID, excep
 // recorder can resume them on its next SafeChunks call. If the recorder
 // never reconnects, the RECORDING session simply stays on disk; the user
 // can delete it via the UI.
-func (f *Fs) closeSessions(ctx context.Context, recorderID uuid.UUID) error {
+// closeSessions scans a recorder's sessions, leaves RECORDING ones for resume,
+// and returns the IDs of sessions interrupted mid-render (PROCESSING / UNKNOWN)
+// that need re-rendering. It does NOT render them — the caller renders in the
+// background after startup so boot is never blocked by a long re-encode.
+func (f *Fs) closeSessions(ctx context.Context, recorderID uuid.UUID) ([]uuid.UUID, error) {
 	log.Debug().Stringer("recorder-id", recorderID).Msg("Startup cleanup for recorder")
 
 	sessionIDs, err := f.readSessionIDs(recorderID)
 	if err != nil {
-		return fmt.Errorf("cannot read session IDs: %w", err)
+		return nil, fmt.Errorf("cannot read session IDs: %w", err)
 	}
 
+	var toRender []uuid.UUID
 	for _, sessionID := range sessionIDs {
 		sm, err := f.getSessionMetadata(recorderID, sessionID)
 		if err != nil {
@@ -737,17 +771,16 @@ func (f *Fs) closeSessions(ctx context.Context, recorderID uuid.UUID) error {
 			continue
 		}
 
-		if err := f.closeSession(ctx, recorderID, sessionID); err != nil {
-			log.Err(err).
-				Stringer("recorder-id", recorderID).
-				Stringer("session-id", sessionID).
-				Msg("Cannot close session on startup")
-			continue
-		}
+		// PROCESSING / UNKNOWN: interrupted mid-render — render in the background
+		// after startup (see Start).
+		toRender = append(toRender, sessionID)
 	}
 
-	log.Debug().Stringer("recorder-id", recorderID).Msg("Startup cleanup done")
-	return nil
+	log.Debug().
+		Stringer("recorder-id", recorderID).
+		Int("rendering-async", len(toRender)).
+		Msg("Startup cleanup done")
+	return toRender, nil
 }
 
 func (f *Fs) closeSession(ctx context.Context, recorderID, sessionID uuid.UUID) error {

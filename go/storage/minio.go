@@ -173,6 +173,16 @@ func (m *Minio) Start(ctx context.Context) error {
 		m.system.Recorders = make(map[uuid.UUID]Recorder)
 	}
 
+	// Interrupted sessions to re-render. Collected during the (single-threaded,
+	// lock-free) population loop below and rendered in the background only AFTER
+	// it completes — rendering takes dataLock, which would race the unlocked
+	// m.system writes here if started mid-loop.
+	type interruptedSession struct {
+		recorderID uuid.UUID
+		sessionID  uuid.UUID
+	}
+	var pendingRenders []interruptedSession
+
 	for _, recorderID := range recorderIDs {
 		recorderMetadata, err := m.getRecorderMetadata(ctx, recorderID)
 		if err != nil {
@@ -213,11 +223,32 @@ func (m *Minio) Start(ctx context.Context) error {
 			m.system.Recorders[recorderID].Sessions[sessionID] = *sessionMetadata
 		}
 
-		if err := m.closeSessions(ctx, recorderID); err != nil {
+		toRender, err := m.closeSessions(ctx, recorderID)
+		if err != nil {
 			log.Err(err).Msg("Cannot close sessions")
 
 			continue
 		}
+		for _, sessionID := range toRender {
+			pendingRenders = append(pendingRenders, interruptedSession{recorderID, sessionID})
+		}
+	}
+
+	// Re-render interrupted sessions in the background, sequentially, so startup
+	// is never blocked and we don't fire many heavy parallel encodes at once.
+	// Spawned only now that the recorder/session maps are fully populated, so it
+	// can safely take dataLock.
+	if len(pendingRenders) > 0 {
+		go func(items []interruptedSession) {
+			for _, it := range items {
+				if err := m.closeSession(context.Background(), it.recorderID, it.sessionID, nil); err != nil {
+					log.Err(err).
+						Stringer("recorder-id", it.recorderID).
+						Stringer("session-id", it.sessionID).
+						Msg("Cannot close interrupted session on startup")
+				}
+			}
+		}(pendingRenders)
 	}
 
 	// Start the session timeout checker
@@ -1446,19 +1477,21 @@ func (m *Minio) EnsureRecorderExists(ctx context.Context, recorderID uuid.UUID, 
 	}
 }
 
-// closeSessions is the startup cleanup pass. It closes PROCESSING sessions
-// (those interrupted mid-render) but LEAVES RECORDING sessions alone so the
-// recorder can resume them on its next SafeChunks call. If the recorder
-// never reconnects, the RECORDING session simply stays on disk; the user
-// can delete it via the UI / session_source_client.
-func (m *Minio) closeSessions(ctx context.Context, recorderID uuid.UUID) error {
+// closeSessions is the startup cleanup pass. It LEAVES RECORDING sessions alone
+// so the recorder can resume them on its next SafeChunks call, and returns the
+// IDs of sessions interrupted mid-render (PROCESSING / UNKNOWN) that need
+// re-rendering. It does NOT render them — the caller renders in the background
+// after startup, so boot is never blocked by a (potentially minutes-long)
+// re-encode.
+func (m *Minio) closeSessions(ctx context.Context, recorderID uuid.UUID) ([]uuid.UUID, error) {
 	log.Debug().Stringer("recorder-id", recorderID).Msg("Startup cleanup for recorder")
 
 	sessionIDs, err := m.readSessionIDs(ctx, recorderID)
 	if err != nil {
-		return fmt.Errorf("cannot read session IDs: %w", err)
+		return nil, fmt.Errorf("cannot read session IDs: %w", err)
 	}
 
+	var toRender []uuid.UUID
 	for _, sessionID := range sessionIDs {
 		sm, err := m.getSessionMetadata(ctx, recorderID, sessionID)
 		if err != nil {
@@ -1484,18 +1517,16 @@ func (m *Minio) closeSessions(ctx context.Context, recorderID uuid.UUID) error {
 			continue
 		}
 
-		// PROCESSING / UNKNOWN: interrupted mid-render, finish the job.
-		if err := m.closeSession(ctx, recorderID, sessionID, nil); err != nil {
-			log.Err(err).
-				Stringer("recorder-id", recorderID).
-				Stringer("session-id", sessionID).
-				Msg("Cannot close session on startup")
-			continue
-		}
+		// PROCESSING / UNKNOWN: interrupted mid-render — render it in the
+		// background after startup (see Start).
+		toRender = append(toRender, sessionID)
 	}
 
-	log.Debug().Stringer("recorder-id", recorderID).Msg("Startup cleanup done")
-	return nil
+	log.Debug().
+		Stringer("recorder-id", recorderID).
+		Int("rendering-async", len(toRender)).
+		Msg("Startup cleanup done")
+	return toRender, nil
 }
 
 // closeOrphanRecordingSessions sweeps for sessions that are still in

@@ -94,6 +94,9 @@ const LED_STARTUP_BLINK_COUNT: u32 = 3;
 const LED_CUT_BLINK_COUNT: u32 = 3;
 // Half-period of a blink: the LED is on this long, then off this long.
 const LED_BLINK_HALF_MS: u64 = 80;
+// How often an idle LED task wakes to re-check the shutdown flag, so the LED is
+// turned off promptly on termination instead of waiting for its channel to close.
+const LED_SHUTDOWN_POLL: Duration = Duration::from_millis(200);
 
 #[derive(Parser, Debug, Clone)]
 #[command(name = "recorder", about = "Session Recorder audio client")]
@@ -580,8 +583,13 @@ impl SessionRecorder {
         blink_led(&led, LED_STARTUP_BLINK_COUNT, &shutdown).await;
         let _ = led.off();
         while !shutdown.load(Ordering::Relaxed) {
-            let Some(on) = rx.recv().await else { break };
-            let _ = if on { led.on() } else { led.off() };
+            match tokio::time::timeout(LED_SHUTDOWN_POLL, rx.recv()).await {
+                Ok(Some(on)) => {
+                    let _ = if on { led.on() } else { led.off() };
+                }
+                Ok(None) => break,  // all senders dropped
+                Err(_) => continue, // timeout: re-check shutdown
+            }
         }
         let _ = led.off();
     }
@@ -597,7 +605,11 @@ impl SessionRecorder {
         let _ = led.off();
         let mut on = false;
         while !shutdown.load(Ordering::Relaxed) {
-            let Some(event) = rx.recv().await else { break };
+            let event = match tokio::time::timeout(LED_SHUTDOWN_POLL, rx.recv()).await {
+                Ok(Some(event)) => event,
+                Ok(None) => break,      // all senders dropped
+                Err(_) => continue,     // timeout: re-check shutdown
+            };
             match event {
                 LedUploadEvent::Sent => {
                     on = !on;

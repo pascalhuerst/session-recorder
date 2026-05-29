@@ -10,7 +10,7 @@ use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::thread;
-use std::time::{Duration, Instant};
+use std::time::{Duration, SystemTime};
 
 /// Callback function type for key press events
 pub type PressCallback = Box<dyn Fn() + Send + Sync>;
@@ -24,7 +24,7 @@ pub type ReleaseCallback = Box<dyn Fn(Duration) + Send + Sync>;
 pub struct KeyEvent {
     pub press_callback: Arc<PressCallback>,
     pub release_callback: Arc<ReleaseCallback>,
-    pub press_timestamp: Option<Instant>,
+    pub press_timestamp: Option<SystemTime>,
 }
 
 /// Input key handler that monitors Linux input events
@@ -230,14 +230,17 @@ impl InputKey {
         if let Some(key_event) = event_map_guard.get_mut(&key) {
             match event.value() {
                 1 => {
-                    // Key press
-                    key_event.press_timestamp = Some(Instant::now());
+                    // Key press: remember the kernel's event timestamp (not when
+                    // we happened to poll it), so the hold is the real press time.
+                    key_event.press_timestamp = Some(event.timestamp());
                     (key_event.press_callback)();
                 }
                 0 => {
-                    // Key release
+                    // Key release: hold = release timestamp − press timestamp, both
+                    // from the kernel, so the 100 ms poll cadence can't skew it.
                     if let Some(press_time) = key_event.press_timestamp.take() {
-                        let hold_duration = press_time.elapsed();
+                        let hold_duration =
+                            event.timestamp().duration_since(press_time).unwrap_or_default();
                         (key_event.release_callback)(hold_duration);
                     } else {
                         // Release without corresponding press - still call the callback

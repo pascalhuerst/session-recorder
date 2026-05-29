@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted, nextTick } from 'vue';
+import { computed, ref, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import SessionMenu from './SessionMenu.vue';
 import StatusIndicator from './StatusIndicator.vue';
@@ -61,6 +61,7 @@ onUnmounted(() => {
   if (interval) {
     clearInterval(interval);
   }
+  document.removeEventListener('mousedown', onDocumentMouseDown, true);
 });
 
 const elapsedTime = computed(() => {
@@ -78,7 +79,20 @@ const elapsedTime = computed(() => {
   return `${pad(minutes)}:${pad(seconds % 60)}`;
 });
 
+// TEMP DEBUG: trace edit lifecycle. Remove once the rename bug is understood.
+const dbg = (...a: unknown[]) =>
+  console.log('[rename]', props.session.id?.slice(0, 8), ...a);
+watch(isEditing, (v) => {
+  dbg('isEditing ->', v);
+  if (v) {
+    document.addEventListener('mousedown', onDocumentMouseDown, true);
+  } else {
+    document.removeEventListener('mousedown', onDocumentMouseDown, true);
+  }
+});
+
 const startEditing = () => {
+  dbg('startEditing called, canEdit=', canEdit.value);
   if (!canEdit.value) return;
 
   // Edit in a dedicated <input> bound to local state. The display title is a
@@ -91,6 +105,7 @@ const startEditing = () => {
   nextTick(() => {
     inputRef.value?.focus();
     inputRef.value?.select();
+    dbg('after focus(), document.activeElement is input?', document.activeElement === inputRef.value);
   });
 };
 
@@ -102,36 +117,57 @@ const cancelEditing = () => {
 const saveTitle = async () => {
   if (!isEditing.value) return;
 
-  isEditing.value = false;
-
-  const newName = editedName.value.trim();
+  // Read the typed value straight from the input element. v-model (the 'input'
+  // event) isn't updating editedName reliably in this environment, so the DOM
+  // value is the source of truth for what the user typed.
+  const domValue = inputRef.value?.value;
+  const newName = (domValue ?? editedName.value).trim();
   const oldName = props.session.name || '';
 
+  dbg('saveTitle: domValue=', JSON.stringify(domValue), 'editedName=', JSON.stringify(editedName.value), 'old=', JSON.stringify(oldName));
+
+  isEditing.value = false;
+
   if (!newName || newName === oldName) {
+    dbg('saveTitle: unchanged/empty -> not sending');
     return;
   }
 
   try {
+    dbg('saveTitle: sending setName', JSON.stringify({ recorderId: props.recorderId, sessionId: props.session.id, name: newName }));
     await setName({
       recorderId: props.recorderId,
       sessionId: props.session.id,
       name: newName,
     });
+    dbg('saveTitle: setName resolved OK');
     toastService.success('Session renamed successfully');
   } catch (error) {
+    dbg('saveTitle: setName FAILED', error);
     console.error('Failed to rename session:', error);
     toastService.error('Failed to rename session');
   }
 };
 
 const onKeydown = (event: KeyboardEvent) => {
+  dbg('keydown:', event.key, 'isEditing=', isEditing.value);
   if (event.key === 'Enter') {
     event.preventDefault();
-    inputRef.value?.blur(); // blur triggers saveTitle
+    // Call saveTitle directly — the input's native blur event proved
+    // unreliable here, so we don't route the exit through @blur.
+    void saveTitle();
   } else if (event.key === 'Escape') {
     event.preventDefault();
     cancelEditing();
-    inputRef.value?.blur();
+  }
+};
+
+// Exit editing when the user clicks anywhere outside the input. Active only
+// while editing. Used instead of @blur, which didn't fire reliably.
+const onDocumentMouseDown = (event: MouseEvent) => {
+  if (isEditing.value && event.target !== inputRef.value) {
+    dbg('outside mousedown -> saveTitle');
+    void saveTitle();
   }
 };
 

@@ -25,6 +25,8 @@ func usage() {
 	fmt.Fprintln(os.Stderr, "  session_source_client list-sessions <recorder-id>")
 	fmt.Fprintln(os.Stderr, "  session_source_client delete-session <recorder-id> <session-id>")
 	fmt.Fprintln(os.Stderr, "  session_source_client watch-recorders [recorder-id]")
+	fmt.Fprintln(os.Stderr, "  session_source_client rename-session <recorder-id> <session-id> <new-name>")
+	fmt.Fprintln(os.Stderr, "  session_source_client watch-session <recorder-id> <session-id>")
 	os.Exit(2)
 }
 
@@ -75,6 +77,22 @@ func main() {
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer cancel()
 		watchRecorders(ctx, client, filter)
+
+	case "rename-session":
+		if len(argv) < 5 {
+			log.Fatal().Msg("Missing recorder ID, session ID, or new name")
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		renameSession(ctx, client, argv[2], argv[3], argv[4])
+
+	case "watch-session":
+		if len(argv) < 4 {
+			log.Fatal().Msg("Missing recorder ID or session ID")
+		}
+		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer cancel()
+		watchSession(ctx, client, argv[2], argv[3])
 
 	default:
 		usage()
@@ -183,6 +201,36 @@ func watchRecorders(ctx context.Context, client sspb.SessionSourceClient, filter
 	}
 }
 
+func watchSession(ctx context.Context, client sspb.SessionSourceClient, recorderID, filter string) {
+	req := &sspb.StreamSessionRequest{
+		RecorderID: recorderID,
+	}
+	stream, err := client.StreamSessions(ctx, req)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Cannot watch session. Giving up")
+	}
+
+	if filter != "" {
+		fmt.Printf("Watching all sessions (Ctrl-C to stop)\n")
+	} else {
+		fmt.Printf("Watching session %s (Ctrl-C to stop)\n", filter)
+	}
+
+	for {
+		msg, err := stream.Recv()
+		if err != nil {
+			log.Fatal().Err(err).Msg("Cannot receive session update. Giving up")
+		}
+		if filter != "" && msg.ID != filter {
+			continue
+		}
+
+		ts := time.Now().Format("15:04:05.000")
+		fmt.Printf("%s %s\n", ts, msg.ID, formatSessionInfo(msg))
+
+	}
+}
+
 // formatRecorderInfo renders the Recorder.info oneof into a printable suffix.
 func formatRecorderInfo(rec *sspb.Recorder) string {
 	switch info := rec.GetInfo().(type) {
@@ -207,6 +255,19 @@ func signalStatusName(s cmpb.SignalStatus) string {
 	}
 }
 
+func formatSessionInfo(msg *sspb.Session) string {
+	switch info := msg.GetInfo().(type) {
+	case *sspb.Session_Updated:
+		s := info.Updated
+		//return fmt.Sprintf("  %s", s.String())
+		return fmt.Sprintf("  name=\"%s\"  state=%s\n", s.GetName(), s.GetState().String())
+	case *sspb.Session_Removed:
+		return "  REMOVED"
+	default:
+		return ""
+	}
+}
+
 func deleteSession(ctx context.Context, client sspb.SessionSourceClient, recorderID, sessionID string) {
 	req := &sspb.DeleteSessionRequest{
 		RecorderID: recorderID,
@@ -222,5 +283,24 @@ func deleteSession(ctx context.Context, client sspb.SessionSourceClient, recorde
 		fmt.Printf("Session %s deleted\n", sessionID)
 	} else {
 		fmt.Printf("Session %s deletion failed: %s\n", sessionID, resp.ErrorMessage)
+	}
+}
+
+func renameSession(ctx context.Context, client sspb.SessionSourceClient, recorderID, sessionID, newName string) {
+	req := &sspb.SetNameRequest{
+		RecorderID: recorderID,
+		SessionID:  sessionID,
+		Name:       newName,
+	}
+
+	resp, err := client.SetName(ctx, req)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Cannot rename session. Giving up")
+	}
+
+	if resp.Success {
+		fmt.Printf("Session %s renamed to %s\n", sessionID, newName)
+	} else {
+		fmt.Printf("Session %s renaming failed: %s\n", sessionID, resp.ErrorMessage)
 	}
 }

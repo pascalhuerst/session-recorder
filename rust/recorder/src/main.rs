@@ -1017,8 +1017,16 @@ impl SessionRecorder {
                 cut = cut_rx.recv() => {
                     let Some(trigger) = cut else { break; };
                     if recording {
-                        // Flush whatever is buffered as the ending session's final chunk
-                        // so its tail isn't carried into the new session.
+                        // Act on the cut immediately: attribute everything captured
+                        // up to this point to the ending session — the partial
+                        // sub-window still sitting in window_buf plus the accumulated
+                        // pending bytes — and send it now, rather than waiting for a
+                        // full chunk or letting it bleed into the new session.
+                        for &s in &window_buf {
+                            let i = (s.clamp(-1.0, 1.0) * 32767.0) as i16;
+                            pending.extend_from_slice(&i.to_le_bytes());
+                        }
+                        window_buf.clear();
                         flush_pending(&outbox, &mut pending, session_id.as_deref(), chunk_counter).await;
                         let new_id = Uuid::new_v4().to_string();
                         info!("Cut ({:?}): ending current session, starting {}", trigger, new_id);
@@ -1153,6 +1161,23 @@ impl SessionRecorder {
                     for &s in &window {
                         let i = (s.clamp(-1.0, 1.0) * 32767.0) as i16;
                         pending.extend_from_slice(&i.to_le_bytes());
+                    }
+
+                    // Send the first chunk of a session as soon as any audio is
+                    // buffered, so the server registers the new session — and
+                    // closes the previous one — promptly after a cut or recording
+                    // start, instead of waiting ~chunk_bytes. Later chunks batch up.
+                    if chunk_counter == 0 && !pending.is_empty() && pending.len() < chunk_bytes {
+                        let size = pending.len();
+                        let data: Vec<u8> = std::mem::take(&mut pending);
+                        let queue_len =
+                            enqueue_audio_chunk(&outbox, current_session, chunk_counter, data)
+                                .await;
+                        debug!(
+                            "first chunk #{} enqueued early ({} bytes, outbox depth={}, session={})",
+                            chunk_counter, size, queue_len, current_session
+                        );
+                        chunk_counter = chunk_counter.wrapping_add(1);
                     }
 
                     while pending.len() >= chunk_bytes {

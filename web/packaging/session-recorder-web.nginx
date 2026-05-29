@@ -41,9 +41,19 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_set_header Accept-Encoding "";
+
+        # The Stream* RPCs (StreamRecorders/StreamSessions/StreamSessionAudio)
+        # are long-lived gRPC-Web server streams. nginx must NOT buffer them, or
+        # it breaks the incremental stream and the client reports
+        # "RpcError: Error in input stream". Keep the upstream connection alive
+        # and let idle streams stay open (updates can be sparse).
+        proxy_buffering off;
+        proxy_request_buffering off;
+        proxy_set_header Connection "";
+
         proxy_connect_timeout 60s;
-        proxy_send_timeout 60s;
-        proxy_read_timeout 60s;
+        proxy_send_timeout 3600s;
+        proxy_read_timeout 3600s;
         add_header 'Access-Control-Allow-Origin' '*' always;
         add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS' always;
         add_header 'Access-Control-Allow-Headers' 'Content-Type,grpc-timeout,x-grpc-web,x-user-agent' always;

@@ -215,6 +215,13 @@ export const streamSessions = (args: {
         args.onEnd();
       }
     } catch (error) {
+      // Aborting the stream (recorder switch / component unmount) is intentional
+      // teardown via the returned stop() — not a failure. The server stream is
+      // fine; just stop quietly.
+      if (abortController.signal.aborted) {
+        return;
+      }
+
       console.error('StreamSessions error:', error);
 
       if (args.onError) {

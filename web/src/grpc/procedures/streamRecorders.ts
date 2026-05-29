@@ -26,6 +26,10 @@ export const streamRecorders = (args: {
         args.onEnd();
       }
     } catch (error) {
+      // Intentional teardown via the returned stop() — not a failure.
+      if (abortController.signal.aborted) {
+        return;
+      }
       console.error('StreamRecorders error:', error);
       if (args.onError) {
         args.onError(error as Error);

@@ -11,6 +11,14 @@ set -e
 CONF=/etc/nginx/conf.d/session-recorder-web.conf
 
 if [ "$1" -ge 1 ] 2>/dev/null; then
+  # Under SELinux, nginx may only connect to ports labeled http_port_t. The
+  # backend's gRPC-Web port (8081) isn't in that set, so the /grpc/ proxy_pass
+  # is denied (502 Bad Gateway). Allow nginx to make outbound connections.
+  # Guarded + best-effort: a no-op when SELinux/tooling is absent.
+  if command -v setsebool >/dev/null 2>&1; then
+    setsebool -P httpd_can_network_connect 1 || true
+  fi
+
   if command -v nginx >/dev/null 2>&1; then
     if nginx -t 2>/dev/null; then
       if [ -d /run/systemd/system ]; then

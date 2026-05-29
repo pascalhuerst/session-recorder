@@ -59,6 +59,11 @@ export const streamSessionAudio = (args: {
         args.onEnd();
       }
     } catch (error) {
+      // Intentional teardown via the returned stop() — not a failure.
+      if (abortController.signal.aborted) {
+        return;
+      }
+
       console.error('StreamSessionAudio error:', error);
 
       if (args.onError) {

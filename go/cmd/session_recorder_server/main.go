@@ -282,32 +282,41 @@ func main() {
 		sessionSourceMdns.Close()
 	}
 
+	const maxShutdownTimeout = 10 * time.Second
+
 	// 2. Stop the gRPC-Web HTTP listener. Long-lived gRPC-Web streams (the
 	//    UI's StreamRecorders / StreamSessions / StreamSessionAudio) keep the
 	//    HTTP connection open, so Shutdown will hang on the deadline. Force
 	//    Close() afterwards to free the port and unblock the wrapped streams.
-	shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), 3*time.Second)
-	if err := grpcWebHttpServer.Shutdown(shutdownCtx); err != nil {
-		log.Warn().Err(err).Msg("gRPC-Web graceful shutdown timed out, force-closing")
-		_ = grpcWebHttpServer.Close()
-	}
-	cancelShutdown()
-
+	go func() {
+		shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), maxShutdownTimeout)
+		if err := grpcWebHttpServer.Shutdown(shutdownCtx); err != nil {
+			log.Warn().Err(err).Msg("gRPC-Web graceful shutdown timed out, force-closing")
+			_ = grpcWebHttpServer.Close()
+		}
+		cancelShutdown()
+	}()
 	// 3. Gracefully stop the gRPC servers, but bounded — both have long-lived
 	//    server-streaming RPCs (chunk-sink: GetCommands blocks on
 	//    server.Context().Done(); session-source: the UI Stream* handlers).
 	//    GracefulStop won't cancel those handler contexts on its own, so we
 	//    fall back to Stop() after the deadline to force them out.
-	grpc.ShutdownServer(chunkSinkGrpcServer, "chunk-sink", 3*time.Second)
-	grpc.ShutdownServer(sessionSourceGrpcServer, "session-source", 3*time.Second)
+	go func() {
+		grpc.ShutdownServer(chunkSinkGrpcServer, "chunk-sink", maxShutdownTimeout)
+	}()
+	go func() {
+		grpc.ShutdownServer(sessionSourceGrpcServer, "session-source", maxShutdownTimeout)
+	}()
 
 	// 4. Flush in-flight chunk buffers as resumable partial state so a restart
 	//    can pick up exactly where we left off (no audio gap).
-	shutdownCtx, cancelShutdown = context.WithTimeout(context.Background(), 30*time.Second)
-	if err := sessionStorage.Shutdown(shutdownCtx); err != nil {
-		log.Err(err).Msg("Storage shutdown error")
-	}
-	cancelShutdown()
+	go func() {
+		shutdownCtx, cancelShutdown := context.WithTimeout(context.Background(), maxShutdownTimeout)
+		if err := sessionStorage.Shutdown(shutdownCtx); err != nil {
+			log.Err(err).Msg("Storage shutdown error")
+		}
+		cancelShutdown()
+	}()
 
 	// 5. Close the mDNS server itself.
 	mdnsServer.Close()

@@ -91,7 +91,9 @@ impl Default for ChunkSinkConfig {
 pub struct AudioChunk {
     pub session_id: String,
     pub chunk_count: u32,
-    pub data: Vec<u32>,
+    /// Packed little-endian s16 PCM (interleaved), matching the `bytes data`
+    /// wire field and the stored data.raw layout.
+    pub data: Vec<u8>,
     pub timestamp: SystemTime,
 }
 

@@ -13,7 +13,9 @@ message Chunks {
     uint32 chunkCount = 3;
     google.protobuf.Timestamp timeCreated = 4;
 
-    repeated uint32 data = 5;
+    // Packed little-endian signed 16-bit PCM (interleaved channels) — the same
+    // layout stored as data.raw. Fixed 2 bytes per sample, unlike a varint type.
+    bytes data = 5;
 }
 
 message GetCommandRequest {

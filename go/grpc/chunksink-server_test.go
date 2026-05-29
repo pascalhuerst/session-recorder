@@ -173,7 +173,7 @@ func TestChunkSinkServer_SetChunks_NoCallback(t *testing.T) {
 		RecorderID: uuid.New().String(),
 		SessionID:  uuid.New().String(),
 		ChunkCount: 1,
-		Data:       []uint32{1, 2, 3, 4, 5},
+		Data:       []byte{1, 2, 3, 4, 5, 6},
 	}
 
 	resp, err := server.SetChunks(context.Background(), chunks)
@@ -211,7 +211,7 @@ func TestChunkSinkServer_SetChunks_WithCallback(t *testing.T) {
 		RecorderID: expectedRecorderID,
 		SessionID:  uuid.New().String(),
 		ChunkCount: 1,
-		Data:       []uint32{1, 2, 3, 4, 5},
+		Data:       []byte{1, 2, 3, 4, 5, 6},
 	}
 
 	resp, err := server.SetChunks(context.Background(), chunks)
@@ -243,7 +243,7 @@ func TestChunkSinkServer_SetChunks_CallbackError(t *testing.T) {
 		RecorderID: uuid.New().String(),
 		SessionID:  uuid.New().String(),
 		ChunkCount: 1,
-		Data:       []uint32{1, 2, 3, 4, 5},
+		Data:       []byte{1, 2, 3, 4, 5, 6},
 	}
 
 	resp, err := server.SetChunks(context.Background(), chunks)

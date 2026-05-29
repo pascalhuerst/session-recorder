@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/binary"
 	"fmt"
 	"sync"
 
@@ -142,10 +143,18 @@ func (h *ChunkSinkHandler) setChunks(ctx context.Context, chunks *cspb.Chunks) e
 	state.recording = true
 	h.lock.Unlock()
 
-	// We have s16 samples, but stored int u32
-	samples := make([]int16, 0, len(chunks.Data))
-	for _, sample := range chunks.Data {
-		samples = append(samples, int16(sample))
+	// data is packed little-endian s16 PCM (2 bytes per sample).
+	raw := chunks.Data
+	if len(raw)%2 != 0 {
+		log.Warn().
+			Str("recorder-id", recorderID.String()).
+			Int("bytes", len(raw)).
+			Msg("Chunk data has odd byte length; dropping trailing byte")
+		raw = raw[:len(raw)-1]
+	}
+	samples := make([]int16, len(raw)/2)
+	for i := range samples {
+		samples[i] = int16(binary.LittleEndian.Uint16(raw[i*2:]))
 	}
 
 	timeCreated := chunks.TimeCreated.AsTime()

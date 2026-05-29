@@ -47,6 +47,19 @@ const CLIPPING_THRESHOLD: f32 = 32767.0 / 32768.0;
 // fresh mDNS event would otherwise wake us up.
 const RECONCILE_INTERVAL: Duration = Duration::from_secs(5);
 
+// One captured "frame" is one inter-channel sample (NUM_CHANNELS samples). On
+// the wire samples are packed little-endian s16 (AudioChunk.data is `bytes`),
+// so a frame is exactly NUM_CHANNELS * 2 bytes.
+const WIRE_BYTES_PER_FRAME: usize = NUM_CHANNELS as usize * 2;
+// Default per-chunk target: ~512 KiB per uploaded chunk. The encoding is fixed
+// width, so this is exact and stays well under gRPC's default 4 MiB max message
+// size.
+const DEFAULT_CHUNK_TARGET_BYTES: usize = 512 * 1024;
+const DEFAULT_CHUNK_FRAMES: usize = DEFAULT_CHUNK_TARGET_BYTES / WIRE_BYTES_PER_FRAME;
+// gRPC's library-default maximum receive message size. The server does not raise
+// it, so an encoded chunk must stay below this or it will be rejected.
+const GRPC_DEFAULT_MAX_MSG_BYTES: usize = 4 * 1024 * 1024;
+
 #[derive(Clone)]
 struct DetectorConfig {
     sample_rate: u32,
@@ -138,38 +151,45 @@ struct Args {
     /// When the buffer fills, the oldest chunks are dropped.
     #[arg(long, default_value_t = 120.0)]
     send_buffer_secs: f64,
+
+    /// Number of audio frames (one inter-channel sample each) to accumulate
+    /// before uploading a chunk. Larger means fewer, bigger uploads. The default
+    /// targets ~512 KiB per chunk; keep the encoded message under the server's
+    /// gRPC limit (4 MiB by default).
+    #[arg(long, default_value_t = DEFAULT_CHUNK_FRAMES)]
+    chunk_frames: usize,
 }
 
 /// Bounded outbox of ready-to-send chunks. Drops the oldest entry when the
-/// total buffered audio (counted in u32 samples) would exceed capacity.
+/// total buffered audio (counted in bytes) would exceed capacity.
 /// Drained by the chunk sender task whenever ≥1 client is connected.
 struct Outbox {
     deque: VecDeque<AudioChunk>,
-    total_samples: usize,
-    capacity_samples: usize,
+    total_bytes: usize,
+    capacity_bytes: usize,
 }
 
 impl Outbox {
-    fn new(capacity_samples: usize) -> Self {
+    fn new(capacity_bytes: usize) -> Self {
         Self {
             deque: VecDeque::new(),
-            total_samples: 0,
-            capacity_samples: capacity_samples.max(1),
+            total_bytes: 0,
+            capacity_bytes: capacity_bytes.max(1),
         }
     }
 
     fn push(&mut self, chunk: AudioChunk) {
-        self.total_samples += chunk.data.len();
+        self.total_bytes += chunk.data.len();
         self.deque.push_back(chunk);
-        while self.total_samples > self.capacity_samples {
+        while self.total_bytes > self.capacity_bytes {
             let Some(dropped) = self.deque.pop_front() else {
                 break;
             };
-            self.total_samples = self.total_samples.saturating_sub(dropped.data.len());
+            self.total_bytes = self.total_bytes.saturating_sub(dropped.data.len());
             warn!(
-                "Outbox full ({}/{} samples), dropping oldest chunk ({} samples, session={})",
-                self.total_samples,
-                self.capacity_samples,
+                "Outbox full ({}/{} bytes), dropping oldest chunk ({} bytes, session={})",
+                self.total_bytes,
+                self.capacity_bytes,
                 dropped.data.len(),
                 dropped.session_id,
             );
@@ -178,15 +198,15 @@ impl Outbox {
 
     fn pop_front(&mut self) -> Option<AudioChunk> {
         let chunk = self.deque.pop_front()?;
-        self.total_samples = self.total_samples.saturating_sub(chunk.data.len());
+        self.total_bytes = self.total_bytes.saturating_sub(chunk.data.len());
         Some(chunk)
     }
 
     /// Restore a chunk that was popped but failed to send. Re-prepends without
-    /// triggering drop-oldest (the sample count was already accounted for at
+    /// triggering drop-oldest (the byte count was already accounted for at
     /// original push time and zeroed at pop time).
     fn push_front_in_flight(&mut self, chunk: AudioChunk) {
-        self.total_samples += chunk.data.len();
+        self.total_bytes += chunk.data.len();
         self.deque.push_front(chunk);
     }
 
@@ -194,9 +214,9 @@ impl Outbox {
         self.deque.len()
     }
 
-    /// (queued chunks, buffered samples, capacity in samples)
+    /// (queued chunks, buffered bytes, capacity in bytes)
     fn stats(&self) -> (usize, usize, usize) {
-        (self.deque.len(), self.total_samples, self.capacity_samples)
+        (self.deque.len(), self.total_bytes, self.capacity_bytes)
     }
 }
 
@@ -265,14 +285,32 @@ impl SessionRecorder {
             clipping: false,
         };
 
-        let capacity_samples = (audio_settings.sample_rate as f64
+        let capacity_bytes = (audio_settings.sample_rate as f64
             * audio_settings.num_channels as f64
+            * 2.0 // 2 bytes per s16 sample
             * args.send_buffer_secs) as usize;
         info!(
-            "Send-buffer outbox: {} samples (~{:.1} s of audio)",
-            capacity_samples, args.send_buffer_secs
+            "Send-buffer outbox: {} bytes (~{:.1} s of audio)",
+            capacity_bytes, args.send_buffer_secs
         );
-        let outbox = Arc::new(tokio::sync::Mutex::new(Outbox::new(capacity_samples)));
+        let outbox = Arc::new(tokio::sync::Mutex::new(Outbox::new(capacity_bytes)));
+
+        let chunk_bytes = args.chunk_frames * WIRE_BYTES_PER_FRAME;
+        info!(
+            "Chunk target: {} frames (~{:.1} s, {} KiB/upload)",
+            args.chunk_frames,
+            args.chunk_frames as f64 / SAMPLE_RATE as f64,
+            chunk_bytes / 1024,
+        );
+        if chunk_bytes > GRPC_DEFAULT_MAX_MSG_BYTES {
+            warn!(
+                "chunk-frames={} produces ~{} KiB messages, over the gRPC 4 MiB limit; \
+                 the server will reject them. Lower --chunk-frames or raise the server's \
+                 max receive message size.",
+                args.chunk_frames,
+                chunk_bytes / 1024,
+            );
+        }
 
         Self {
             args,
@@ -585,10 +623,12 @@ impl SessionRecorder {
         self.drain_handle = Some(drain_handle);
 
         let led_rec_tx = self.led_rec_tx.clone();
+        let chunk_frames = self.args.chunk_frames;
 
         let handle = tokio::spawn(async move {
             Self::audio_processing_task(
                 samples_rx, clients, shutdown, status, detector, cut_rx, led_rec_tx, outbox,
+                chunk_frames,
             )
             .await;
         });
@@ -914,13 +954,15 @@ impl SessionRecorder {
         mut cut_rx: tokio::sync::mpsc::Receiver<CutTrigger>,
         led_rec_tx: Option<tokio::sync::mpsc::Sender<LedRecEvent>>,
         outbox: Arc<tokio::sync::Mutex<Outbox>>,
+        chunk_frames: usize,
     ) {
         info!(
-            "Audio processing task started (threshold={} dB, window={}s, attack={}s, release={}s)",
+            "Audio processing task started (threshold={} dB, window={}s, attack={}s, release={}s, chunk_frames={})",
             detector.threshold_db,
             detector.window_time_s,
             detector.attack_time_s,
-            detector.release_time_s
+            detector.release_time_s,
+            chunk_frames
         );
 
         let window_samples = ((detector.sample_rate as f64 * detector.window_time_s) as usize)
@@ -938,6 +980,14 @@ impl SessionRecorder {
         let mut session_id: Option<String> = None;
         let mut chunk_counter = 0u32;
 
+        // s16 PCM bytes are accumulated here until a full chunk (chunk_bytes) is
+        // ready, decoupling the upload chunk size from the detector window.
+        // chunk_bytes is frame-aligned (a multiple of num_channels*2), as is
+        // every window's byte length, so draining chunk_bytes at a time preserves
+        // frames.
+        let chunk_bytes = chunk_frames * detector.num_channels as usize * 2;
+        let mut pending: Vec<u8> = Vec::with_capacity(chunk_bytes + window_samples * 2);
+
         while !shutdown.load(Ordering::Relaxed) {
             tokio::select! {
                 maybe_chunk = samples_rx.recv() => {
@@ -947,6 +997,9 @@ impl SessionRecorder {
                 cut = cut_rx.recv() => {
                     let Some(trigger) = cut else { break; };
                     if recording {
+                        // Flush whatever is buffered as the ending session's final chunk
+                        // so its tail isn't carried into the new session.
+                        flush_pending(&outbox, &mut pending, session_id.as_deref(), chunk_counter).await;
                         let new_id = Uuid::new_v4().to_string();
                         info!("Cut ({:?}): ending current session, starting {}", trigger, new_id);
                         session_id = Some(new_id);
@@ -995,6 +1048,7 @@ impl SessionRecorder {
                     below_count = 0;
                     if !recording && above_count >= attack_windows {
                         recording = true;
+                        pending.clear();
                         let new_id = Uuid::new_v4().to_string();
                         info!(
                             "Recording started (RMS {:.1} dB), session: {}",
@@ -1013,6 +1067,9 @@ impl SessionRecorder {
                     above_count = 0;
                     if recording && below_count >= release_windows {
                         recording = false;
+                        // Flush the remaining buffered samples as the session's
+                        // final (partial) chunk so the tail isn't dropped.
+                        flush_pending(&outbox, &mut pending, session_id.as_deref(), chunk_counter).await;
                         info!("Recording stopped (RMS {:.1} dB)", rms_db);
                         session_id = None;
                         if let Some(tx) = &led_rec_tx {
@@ -1065,40 +1122,34 @@ impl SessionRecorder {
                     );
                 }
 
-                // If recording, enqueue the window's samples for the sender task.
+                // If recording, accumulate the window's samples and upload a
+                // chunk every time chunk_samples have piled up.
                 if recording {
                     let Some(current_session) = session_id.as_ref() else {
                         continue;
                     };
 
-                    let data: Vec<u32> = window
-                        .iter()
-                        .map(|&s| {
-                            let i = (s.clamp(-1.0, 1.0) * 32767.0) as i16;
-                            i as i32 as u32
-                        })
-                        .collect();
+                    for &s in &window {
+                        let i = (s.clamp(-1.0, 1.0) * 32767.0) as i16;
+                        pending.extend_from_slice(&i.to_le_bytes());
+                    }
 
-                    let chunk = AudioChunk {
-                        session_id: current_session.clone(),
-                        chunk_count: chunk_counter,
-                        data,
-                        timestamp: SystemTime::now(),
-                    };
-
-                    let queue_len = {
-                        let mut g = outbox.lock().await;
-                        g.push(chunk);
-                        g.len()
-                    };
-                    debug!(
-                        "chunk #{} enqueued (outbox depth={}, session={})",
-                        chunk_counter, queue_len, current_session
-                    );
-                    chunk_counter = chunk_counter.wrapping_add(1);
+                    while pending.len() >= chunk_bytes {
+                        let data: Vec<u8> = pending.drain(..chunk_bytes).collect();
+                        let queue_len =
+                            enqueue_audio_chunk(&outbox, current_session, chunk_counter, data).await;
+                        debug!(
+                            "chunk #{} enqueued ({} bytes, outbox depth={}, session={})",
+                            chunk_counter, chunk_bytes, queue_len, current_session
+                        );
+                        chunk_counter = chunk_counter.wrapping_add(1);
+                    }
                 }
             }
         }
+
+        // On shutdown, flush any buffered tail so a clean stop doesn't drop it.
+        flush_pending(&outbox, &mut pending, session_id.as_deref(), chunk_counter).await;
 
         info!("Audio processing task stopped");
     }
@@ -1117,10 +1168,48 @@ impl SessionRecorder {
 
     /// (queued chunks, buffered seconds, capacity seconds) of the send outbox.
     async fn outbox_stats(&self) -> (usize, f64, f64) {
-        let (chunks, samples, capacity) = self.outbox.lock().await.stats();
-        let per_sec = (SAMPLE_RATE * NUM_CHANNELS) as f64;
-        (chunks, samples as f64 / per_sec, capacity as f64 / per_sec)
+        let (chunks, bytes, capacity) = self.outbox.lock().await.stats();
+        let bytes_per_sec = (SAMPLE_RATE * NUM_CHANNELS) as f64 * 2.0; // 2 bytes per s16 sample
+        (chunks, bytes as f64 / bytes_per_sec, capacity as f64 / bytes_per_sec)
     }
+}
+
+/// Build an AudioChunk from accumulated samples and push it onto the outbox.
+/// Returns the resulting outbox depth.
+async fn enqueue_audio_chunk(
+    outbox: &Arc<tokio::sync::Mutex<Outbox>>,
+    session_id: &str,
+    chunk_count: u32,
+    data: Vec<u8>,
+) -> usize {
+    let chunk = AudioChunk {
+        session_id: session_id.to_string(),
+        chunk_count,
+        data,
+        timestamp: SystemTime::now(),
+    };
+    let mut g = outbox.lock().await;
+    g.push(chunk);
+    g.len()
+}
+
+/// Flush any buffered samples as a final (partial) chunk for the given session,
+/// leaving `pending` empty. No-op when there is nothing buffered.
+async fn flush_pending(
+    outbox: &Arc<tokio::sync::Mutex<Outbox>>,
+    pending: &mut Vec<u8>,
+    session_id: Option<&str>,
+    chunk_count: u32,
+) {
+    if pending.is_empty() {
+        return;
+    }
+    let Some(session) = session_id else {
+        pending.clear();
+        return;
+    };
+    let data = std::mem::take(pending);
+    enqueue_audio_chunk(outbox, session, chunk_count, data).await;
 }
 
 /// Subscribe to the ChunkSink server's command stream and forward `CmdCutSession`

@@ -3,9 +3,7 @@ package main
 // Implement a chunk sink client for testing purposes
 
 import (
-	"bytes"
 	"context"
-	"encoding/binary"
 	"flag"
 	"fmt"
 	"time"
@@ -28,7 +26,6 @@ import (
 const (
 	chunkSinkPort = 8779
 	recorderID    = "2bb00a6a-c468-41b0-b8b8-40e3cd22450e"
-	chunkSize     = 480000 // 10 seconds at 48000kHz
 )
 
 //go:embed test_data/sine_1k_48k_s16_c2.raw
@@ -75,10 +72,9 @@ func main() {
 		TimeCreated: timestamppb.Now(),
 	}
 
-	chunkData := make([]uint32, chunkSize)
-	if err := binary.Read(bytes.NewReader(byteSamples), binary.LittleEndian, chunkData); err != nil {
-		log.Fatal().Err(err).Msg("Cannot read samples")
-	}
+	// data is packed little-endian s16 PCM; the embedded file already is that,
+	// so send its raw bytes as-is.
+	chunkData := byteSamples
 
 	go func() {
 		for {

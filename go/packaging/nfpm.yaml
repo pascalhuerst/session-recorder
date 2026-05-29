@@ -1,15 +1,21 @@
 # nfpm config for the Session Recorder backend (.deb and .rpm).
-# Run from the REPO ROOT (all paths below are repo-root-relative):
-#   GOOS=linux GOARCH=arm64 CGO_ENABLED=0 \
+# Run from the REPO ROOT (all paths below are repo-root-relative). Build the
+# binary for the target arch, then package with a matching PKG_ARCH (nfpm maps
+# amd64 -> x86_64 / arm64 -> aarch64 for rpm automatically):
+#   ARCH=arm64   # or amd64
+#   GOOS=linux GOARCH=$ARCH CGO_ENABLED=0 \
 #     go build -C go -o dist/session-recorder-server ./cmd/session_recorder_server
-#   VERSION=1.2.3 nfpm package --packager deb --config go/packaging/nfpm.yaml \
-#     --target dist/session-recorder-server_1.2.3_arm64.deb
-#   VERSION=1.2.3 nfpm package --packager rpm --config go/packaging/nfpm.yaml \
-#     --target dist/session-recorder-server-1.2.3.aarch64.rpm
+#   VERSION=1.2.3 PKG_ARCH=$ARCH nfpm package --packager deb \
+#     --config go/packaging/nfpm.yaml \
+#     --target dist/session-recorder-server_1.2.3_$ARCH.deb
+#   VERSION=1.2.3 PKG_ARCH=$ARCH nfpm package --packager rpm \
+#     --config go/packaging/nfpm.yaml --target dist/session-recorder-server-1.2.3.rpm
 #
-# ${VERSION} is supplied via env (e.g. the git tag without the leading 'v').
+# ${VERSION} and ${PKG_ARCH} are supplied via env. NOTE: nfpm has no env-default
+# syntax — if PKG_ARCH is unset it silently falls back to the host arch, so
+# always set it.
 name: session-recorder-server
-arch: arm64
+arch: ${PKG_ARCH}
 platform: linux
 version: ${VERSION}
 section: sound

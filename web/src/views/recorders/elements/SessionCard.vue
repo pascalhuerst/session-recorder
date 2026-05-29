@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, onMounted, onUnmounted } from 'vue';
+import { computed, ref, onMounted, onUnmounted, nextTick } from 'vue';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import SessionMenu from './SessionMenu.vue';
 import StatusIndicator from './StatusIndicator.vue';
@@ -20,7 +20,7 @@ const props = defineProps<{
   index: number;
 }>();
 
-const titleRef = ref<HTMLElement | null>(null);
+const inputRef = ref<HTMLInputElement | null>(null);
 const finishedCardRef = ref<InstanceType<typeof SessionCardFinished> | null>(null);
 const isEditing = ref(false);
 const editedName = ref('');
@@ -81,44 +81,33 @@ const elapsedTime = computed(() => {
 const startEditing = () => {
   if (!canEdit.value) return;
 
-  isEditing.value = true;
+  // Edit in a dedicated <input> bound to local state. The display title is a
+  // {{ }} interpolation, which must NOT be made contenteditable: Vue re-renders
+  // that text node on every incoming session update and would wipe the user's
+  // keystrokes mid-edit. editedName is local and survives those re-renders.
   editedName.value = props.session.name || '';
+  isEditing.value = true;
 
-  // Select all text so user can replace immediately
-  requestAnimationFrame(() => {
-    const selection = window.getSelection();
-    const range = document.createRange();
-    if (titleRef.value && selection) {
-      range.selectNodeContents(titleRef.value);
-      selection.removeAllRanges();
-      selection.addRange(range);
-    }
+  nextTick(() => {
+    inputRef.value?.focus();
+    inputRef.value?.select();
   });
 };
 
 const cancelEditing = () => {
   isEditing.value = false;
-  if (titleRef.value) {
-    titleRef.value.textContent = displayName.value;
-  }
+  editedName.value = '';
 };
 
 const saveTitle = async () => {
   if (!isEditing.value) return;
 
-  const newName = titleRef.value?.textContent?.trim() || '';
-  const oldName = props.session.name || '';
-
   isEditing.value = false;
 
-  if (newName === oldName || newName === displayName.value) {
-    return;
-  }
+  const newName = editedName.value.trim();
+  const oldName = props.session.name || '';
 
-  if (!newName) {
-    if (titleRef.value) {
-      titleRef.value.textContent = displayName.value;
-    }
+  if (!newName || newName === oldName) {
     return;
   }
 
@@ -132,20 +121,17 @@ const saveTitle = async () => {
   } catch (error) {
     console.error('Failed to rename session:', error);
     toastService.error('Failed to rename session');
-    if (titleRef.value) {
-      titleRef.value.textContent = displayName.value;
-    }
   }
 };
 
 const onKeydown = (event: KeyboardEvent) => {
   if (event.key === 'Enter') {
     event.preventDefault();
-    titleRef.value?.blur();
+    inputRef.value?.blur(); // blur triggers saveTitle
   } else if (event.key === 'Escape') {
     event.preventDefault();
     cancelEditing();
-    titleRef.value?.blur();
+    inputRef.value?.blur();
   }
 };
 
@@ -213,14 +199,20 @@ const onDeleteProcessing = () => {
 
       <span class="time-range">{{ timeRange }}</span>
 
-      <span
-        ref="titleRef"
-        class="title"
-        :class="{ editing: isEditing, readonly: !canEdit }"
-        :contenteditable="canEdit"
-        @focus="startEditing"
+      <input
+        v-if="isEditing"
+        ref="inputRef"
+        v-model="editedName"
+        type="text"
+        class="title title-input editing"
         @blur="saveTitle"
         @keydown="onKeydown"
+      />
+      <span
+        v-else
+        class="title"
+        :class="{ readonly: !canEdit }"
+        @click="startEditing"
         >{{ displayName }}</span
       >
 
@@ -321,6 +313,18 @@ const onDeleteProcessing = () => {
 .title:focus,
 .title.editing {
   outline-color: var(--accent);
+}
+
+/* The edit <input> reuses .title for size/weight but must shed the native
+   input chrome so it blends with the display span. */
+.title-input {
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  font-family: inherit;
+  color: inherit;
+  min-width: 0;
 }
 
 .title.readonly {

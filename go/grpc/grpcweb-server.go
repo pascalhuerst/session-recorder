@@ -3,6 +3,7 @@ package grpc
 import (
 	"errors"
 	"fmt"
+	"net"
 	"net/http"
 
 	"github.com/improbable-eng/grpc-web/go/grpcweb"
@@ -34,9 +35,18 @@ func StartGrpcWebServer(grpcServer *grpc.Server, port uint16) (*http.Server, err
 
 	httpServer := &http.Server{Addr: addr, Handler: handler}
 
+	// Bind IPv4 only. http.Server.ListenAndServe would listen on "tcp" which
+	// resolves ":port" to the IPv6 wildcard (":::port", dual-stack); the rest of
+	// the system (StartProtocolServer, the recorder, the UI) is IPv4-only, so
+	// listen on tcp4 explicitly.
+	listener, err := net.Listen("tcp4", addr)
+	if err != nil {
+		return nil, fmt.Errorf("cannot listen on %s: %w", addr, err)
+	}
+
 	go func() {
-		log.Info().Str("addr", addr).Msg("gRPC-Web server listening")
-		if err := httpServer.ListenAndServe(); err != nil &&
+		log.Info().Str("addr", listener.Addr().String()).Msg("gRPC-Web server listening")
+		if err := httpServer.Serve(listener); err != nil &&
 			!errors.Is(err, http.ErrServerClosed) {
 			log.Err(err).Msg("gRPC-Web server failed")
 		}

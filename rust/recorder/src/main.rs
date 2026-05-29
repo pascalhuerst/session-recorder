@@ -79,15 +79,21 @@ enum CutTrigger {
     Remote,
 }
 
+/// Upload-LED events. The LED toggles once per chunk that reaches the backend,
+/// goes dark when recording stops, and blinks briefly when a cut happens.
 #[derive(Debug, Clone, Copy)]
-enum LedRecEvent {
-    State(bool),
-    NewSession,
+enum LedUploadEvent {
+    Sent,
+    Off,
+    Cut,
 }
 
-const LED_BLINK_COUNT: u32 = 10;
+// Both LEDs blink this many times at startup as a power-on indication; the
+// upload LED blinks this many times when a cut happens.
+const LED_STARTUP_BLINK_COUNT: u32 = 3;
+const LED_CUT_BLINK_COUNT: u32 = 3;
+// Half-period of a blink: the LED is on this long, then off this long.
 const LED_BLINK_HALF_MS: u64 = 80;
-const LED_UPLOAD_PULSE_MS: u64 = 50;
 
 #[derive(Parser, Debug, Clone)]
 #[command(name = "recorder", about = "Session Recorder audio client")]
@@ -128,12 +134,13 @@ struct Args {
     #[arg(long, default_value_t = 30.0)]
     release_time: f64,
 
-    /// sysfs name of the recording-state LED (on = signal, off = silence;
-    /// blinks 10× on new session)
+    /// sysfs name of the recording-state LED (on while recording, off when idle;
+    /// blinks a few times at startup)
     #[arg(long)]
     led_rec_state: Option<String>,
 
-    /// sysfs name of the upload-pulse LED (brief flash per uploaded chunk)
+    /// sysfs name of the upload LED (toggles per uploaded chunk, off when
+    /// recording stops, blinks on a cut; blinks a few times at startup)
     #[arg(long)]
     led_upload: Option<String>,
 
@@ -241,12 +248,16 @@ struct SessionRecorder {
     recorder_status: Arc<tokio::sync::Mutex<RecorderStatusInfo>>,
 
     shutdown_signal: Arc<AtomicBool>,
+    // True while a session is actively recording (stays true across a cut, goes
+    // false when recording stops). Gates the upload LED so chunks drained after
+    // a session ends don't toggle it back on.
+    session_active: Arc<AtomicBool>,
 
     outbox: Arc<tokio::sync::Mutex<Outbox>>,
 
     cut_tx: Option<tokio::sync::mpsc::Sender<CutTrigger>>,
-    led_rec_tx: Option<tokio::sync::mpsc::Sender<LedRecEvent>>,
-    led_upload_tx: Option<tokio::sync::mpsc::Sender<()>>,
+    led_rec_tx: Option<tokio::sync::mpsc::Sender<bool>>,
+    led_upload_tx: Option<tokio::sync::mpsc::Sender<LedUploadEvent>>,
 
     input_key: Option<InputKey>,
 
@@ -329,6 +340,7 @@ impl SessionRecorder {
             callback_handle: None,
             recorder_status: Arc::new(tokio::sync::Mutex::new(initial_status)),
             shutdown_signal: Arc::new(AtomicBool::new(false)),
+            session_active: Arc::new(AtomicBool::new(false)),
             outbox,
             cut_tx: None,
             led_rec_tx: None,
@@ -536,7 +548,7 @@ impl SessionRecorder {
         if let Some(name) = self.args.led_rec_state.as_deref() {
             match Led::new(name) {
                 Ok(led) => {
-                    let (tx, rx) = tokio::sync::mpsc::channel::<LedRecEvent>(32);
+                    let (tx, rx) = tokio::sync::mpsc::channel::<bool>(32);
                     let shutdown = self.shutdown_signal.clone();
                     self.led_rec_tx = Some(tx);
                     self.led_rec_handle = Some(tokio::spawn(Self::led_rec_task(led, rx, shutdown)));
@@ -547,7 +559,7 @@ impl SessionRecorder {
         if let Some(name) = self.args.led_upload.as_deref() {
             match Led::new(name) {
                 Ok(led) => {
-                    let (tx, rx) = tokio::sync::mpsc::channel::<()>(32);
+                    let (tx, rx) = tokio::sync::mpsc::channel::<LedUploadEvent>(32);
                     let shutdown = self.shutdown_signal.clone();
                     self.led_upload_tx = Some(tx);
                     self.led_upload_handle =
@@ -558,52 +570,49 @@ impl SessionRecorder {
         }
     }
 
+    /// Recording-state LED: blinks a few times at startup, then is simply on
+    /// while recording and off when idle (driven by `bool` events).
     async fn led_rec_task(
         led: Led,
-        mut rx: tokio::sync::mpsc::Receiver<LedRecEvent>,
+        mut rx: tokio::sync::mpsc::Receiver<bool>,
         shutdown: Arc<AtomicBool>,
     ) {
+        blink_led(&led, LED_STARTUP_BLINK_COUNT, &shutdown).await;
         let _ = led.off();
-        let mut current_state = false;
         while !shutdown.load(Ordering::Relaxed) {
-            let Some(event) = rx.recv().await else { break };
-            match event {
-                LedRecEvent::State(on) => {
-                    current_state = on;
-                    let _ = if on { led.on() } else { led.off() };
-                }
-                LedRecEvent::NewSession => {
-                    for _ in 0..LED_BLINK_COUNT {
-                        if shutdown.load(Ordering::Relaxed) {
-                            return;
-                        }
-                        let _ = led.on();
-                        tokio::time::sleep(Duration::from_millis(LED_BLINK_HALF_MS)).await;
-                        let _ = led.off();
-                        tokio::time::sleep(Duration::from_millis(LED_BLINK_HALF_MS)).await;
-                    }
-                    let _ = if current_state { led.on() } else { led.off() };
-                }
-            }
+            let Some(on) = rx.recv().await else { break };
+            let _ = if on { led.on() } else { led.off() };
         }
         let _ = led.off();
     }
 
+    /// Upload LED: blinks a few times at startup, then toggles once per chunk
+    /// sent (Sent), goes dark when recording stops (Off), and blinks on a cut.
     async fn led_upload_task(
         led: Led,
-        mut rx: tokio::sync::mpsc::Receiver<()>,
+        mut rx: tokio::sync::mpsc::Receiver<LedUploadEvent>,
         shutdown: Arc<AtomicBool>,
     ) {
+        blink_led(&led, LED_STARTUP_BLINK_COUNT, &shutdown).await;
         let _ = led.off();
+        let mut on = false;
         while !shutdown.load(Ordering::Relaxed) {
-            if rx.recv().await.is_none() {
-                break;
+            let Some(event) = rx.recv().await else { break };
+            match event {
+                LedUploadEvent::Sent => {
+                    on = !on;
+                    let _ = if on { led.on() } else { led.off() };
+                }
+                LedUploadEvent::Off => {
+                    on = false;
+                    let _ = led.off();
+                }
+                LedUploadEvent::Cut => {
+                    blink_led(&led, LED_CUT_BLINK_COUNT, &shutdown).await;
+                    on = false;
+                    let _ = led.off();
+                }
             }
-            // Coalesce queued pulses so we don't flicker forever after a burst
-            while rx.try_recv().is_ok() {}
-            let _ = led.on();
-            tokio::time::sleep(Duration::from_millis(LED_UPLOAD_PULSE_MS)).await;
-            let _ = led.off();
         }
         let _ = led.off();
     }
@@ -637,6 +646,8 @@ impl SessionRecorder {
         self.drain_handle = Some(drain_handle);
 
         let led_rec_tx = self.led_rec_tx.clone();
+        let led_upload_tx = self.led_upload_tx.clone();
+        let session_active = self.session_active.clone();
         let chunk_frames = self.args.chunk_frames;
 
         let handle = tokio::spawn(async move {
@@ -648,6 +659,8 @@ impl SessionRecorder {
                 detector,
                 cut_rx,
                 led_rec_tx,
+                led_upload_tx,
+                session_active,
                 outbox,
                 chunk_frames,
             )
@@ -662,9 +675,10 @@ impl SessionRecorder {
         let clients = Arc::clone(&self.grpc_clients);
         let shutdown = self.shutdown_signal.clone();
         let led_upload_tx = self.led_upload_tx.clone();
+        let session_active = self.session_active.clone();
 
         let handle = tokio::spawn(async move {
-            Self::chunk_sender_task(outbox, clients, shutdown, led_upload_tx).await;
+            Self::chunk_sender_task(outbox, clients, shutdown, led_upload_tx, session_active).await;
         });
 
         self.sender_handle = Some(handle);
@@ -678,7 +692,8 @@ impl SessionRecorder {
         outbox: Arc<tokio::sync::Mutex<Outbox>>,
         clients: Arc<tokio::sync::Mutex<HashMap<String, ClientInfo>>>,
         shutdown: Arc<AtomicBool>,
-        led_upload_tx: Option<tokio::sync::mpsc::Sender<()>>,
+        led_upload_tx: Option<tokio::sync::mpsc::Sender<LedUploadEvent>>,
+        session_active: Arc<AtomicBool>,
     ) {
         info!("Chunk sender task started");
         let idle_sleep = Duration::from_millis(20);
@@ -721,8 +736,13 @@ impl SessionRecorder {
             }
 
             if sent_to_any {
-                if let Some(tx) = &led_upload_tx {
-                    let _ = tx.try_send(());
+                // Toggle the upload LED per chunk, but only while a session is
+                // active — chunks drained after recording stops must not light
+                // it back up (the audio task forces it off on stop).
+                if session_active.load(Ordering::Relaxed)
+                    && let Some(tx) = &led_upload_tx
+                {
+                    let _ = tx.try_send(LedUploadEvent::Sent);
                 }
             } else {
                 outbox.lock().await.push_front_in_flight(chunk);
@@ -972,7 +992,9 @@ impl SessionRecorder {
         status: Arc<tokio::sync::Mutex<RecorderStatusInfo>>,
         detector: DetectorConfig,
         mut cut_rx: tokio::sync::mpsc::Receiver<CutTrigger>,
-        led_rec_tx: Option<tokio::sync::mpsc::Sender<LedRecEvent>>,
+        led_rec_tx: Option<tokio::sync::mpsc::Sender<bool>>,
+        led_upload_tx: Option<tokio::sync::mpsc::Sender<LedUploadEvent>>,
+        session_active: Arc<AtomicBool>,
         outbox: Arc<tokio::sync::Mutex<Outbox>>,
         chunk_frames: usize,
     ) {
@@ -1032,9 +1054,11 @@ impl SessionRecorder {
                         info!("Cut ({:?}): ending current session, starting {}", trigger, new_id);
                         session_id = Some(new_id);
                         chunk_counter = 0;
-                        if let Some(tx) = &led_rec_tx {
-                            let _ = tx.try_send(LedRecEvent::NewSession);
-                            debug!("LED rec-state: NewSession (cut)");
+                        // Recording continues across a cut, so the rec-state LED
+                        // stays on; blink the upload LED to mark the boundary.
+                        if let Some(tx) = &led_upload_tx {
+                            let _ = tx.try_send(LedUploadEvent::Cut);
+                            debug!("LED upload: Cut (blink)");
                         }
                     } else {
                         info!("Cut ({:?}) ignored: not currently recording", trigger);
@@ -1084,10 +1108,10 @@ impl SessionRecorder {
                         );
                         session_id = Some(new_id);
                         chunk_counter = 0;
+                        session_active.store(true, Ordering::Relaxed);
                         if let Some(tx) = &led_rec_tx {
-                            let _ = tx.try_send(LedRecEvent::State(true));
-                            let _ = tx.try_send(LedRecEvent::NewSession);
-                            debug!("LED rec-state: State(true) + NewSession");
+                            let _ = tx.try_send(true);
+                            debug!("LED rec-state: on");
                         }
                     }
                 } else {
@@ -1095,6 +1119,9 @@ impl SessionRecorder {
                     above_count = 0;
                     if recording && below_count >= release_windows {
                         recording = false;
+                        // Stop gating before the final flush so the last chunk's
+                        // send doesn't toggle the upload LED back on.
+                        session_active.store(false, Ordering::Relaxed);
                         // Flush the remaining buffered samples as the session's
                         // final (partial) chunk so the tail isn't dropped.
                         flush_pending(&outbox, &mut pending, session_id.as_deref(), chunk_counter)
@@ -1102,8 +1129,12 @@ impl SessionRecorder {
                         info!("Recording stopped (RMS {:.1} dB)", rms_db);
                         session_id = None;
                         if let Some(tx) = &led_rec_tx {
-                            let _ = tx.try_send(LedRecEvent::State(false));
-                            debug!("LED rec-state: State(false)");
+                            let _ = tx.try_send(false);
+                            debug!("LED rec-state: off");
+                        }
+                        if let Some(tx) = &led_upload_tx {
+                            let _ = tx.try_send(LedUploadEvent::Off);
+                            debug!("LED upload: off");
                         }
                     }
                 }
@@ -1222,6 +1253,20 @@ impl SessionRecorder {
             bytes as f64 / bytes_per_sec,
             capacity as f64 / bytes_per_sec,
         )
+    }
+}
+
+/// Blink an LED `count` times (on/off at LED_BLINK_HALF_MS each). Returns early
+/// if shutdown is signalled; leaves the LED off.
+async fn blink_led(led: &Led, count: u32, shutdown: &Arc<AtomicBool>) {
+    for _ in 0..count {
+        if shutdown.load(Ordering::Relaxed) {
+            return;
+        }
+        let _ = led.on();
+        tokio::time::sleep(Duration::from_millis(LED_BLINK_HALF_MS)).await;
+        let _ = led.off();
+        tokio::time::sleep(Duration::from_millis(LED_BLINK_HALF_MS)).await;
     }
 }
 

@@ -140,9 +140,14 @@ async fn run_browser(
         browser_path.as_str()
     );
 
-    let browser = Proxy::new(&conn, AVAHI_DEST, browser_path.as_str(), AVAHI_BROWSER_IFACE)
-        .await
-        .context("creating ServiceBrowser proxy")?;
+    let browser = Proxy::new(
+        &conn,
+        AVAHI_DEST,
+        browser_path.as_str(),
+        AVAHI_BROWSER_IFACE,
+    )
+    .await
+    .context("creating ServiceBrowser proxy")?;
 
     let mut item_new = browser.receive_signal("ItemNew").await?;
     let mut item_remove = browser.receive_signal("ItemRemove").await?;
@@ -240,8 +245,7 @@ mod tests {
 
     #[test]
     fn strips_local_domain_and_trailing_dot() {
-        let (typ, domain) =
-            avahi_type_and_domain("_session-recorder-chunksink._tcp.local.");
+        let (typ, domain) = avahi_type_and_domain("_session-recorder-chunksink._tcp.local.");
         assert_eq!(typ, "_session-recorder-chunksink._tcp");
         assert_eq!(domain, "");
     }

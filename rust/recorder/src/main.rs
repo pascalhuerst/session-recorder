@@ -13,6 +13,9 @@ use recorder::audio::{
     callback_thread::start_callback_thread,
     channels::{CaptureConsumer, new_capture_ring},
 };
+use recorder::discovery::{
+    self, DiscoveryConfig, DiscoveryMethod, ServiceDiscovery, ServiceEvent, ServiceInfo,
+};
 use recorder::grpc::chunk_sink_client::{
     AudioChunk, ChunkSinkClientService, ChunkSinkConfig, RecorderStatusInfo,
     chunksink::{GetCommandRequest, chunk_sink_client::ChunkSinkClient, command::Command},
@@ -20,9 +23,6 @@ use recorder::grpc::chunk_sink_client::{
 };
 use recorder::io::input_key::InputKey;
 use recorder::io::led::Led;
-use recorder::discovery::{
-    self, DiscoveryConfig, DiscoveryMethod, ServiceDiscovery, ServiceEvent, ServiceInfo,
-};
 use ringbuf::traits::Consumer;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
@@ -641,7 +641,14 @@ impl SessionRecorder {
 
         let handle = tokio::spawn(async move {
             Self::audio_processing_task(
-                samples_rx, clients, shutdown, status, detector, cut_rx, led_rec_tx, outbox,
+                samples_rx,
+                clients,
+                shutdown,
+                status,
+                detector,
+                cut_rx,
+                led_rec_tx,
+                outbox,
                 chunk_frames,
             )
             .await;
@@ -1082,7 +1089,8 @@ impl SessionRecorder {
                         recording = false;
                         // Flush the remaining buffered samples as the session's
                         // final (partial) chunk so the tail isn't dropped.
-                        flush_pending(&outbox, &mut pending, session_id.as_deref(), chunk_counter).await;
+                        flush_pending(&outbox, &mut pending, session_id.as_deref(), chunk_counter)
+                            .await;
                         info!("Recording stopped (RMS {:.1} dB)", rms_db);
                         session_id = None;
                         if let Some(tx) = &led_rec_tx {
@@ -1150,7 +1158,8 @@ impl SessionRecorder {
                     while pending.len() >= chunk_bytes {
                         let data: Vec<u8> = pending.drain(..chunk_bytes).collect();
                         let queue_len =
-                            enqueue_audio_chunk(&outbox, current_session, chunk_counter, data).await;
+                            enqueue_audio_chunk(&outbox, current_session, chunk_counter, data)
+                                .await;
                         debug!(
                             "chunk #{} enqueued ({} bytes, outbox depth={}, session={})",
                             chunk_counter, chunk_bytes, queue_len, current_session
@@ -1183,7 +1192,11 @@ impl SessionRecorder {
     async fn outbox_stats(&self) -> (usize, f64, f64) {
         let (chunks, bytes, capacity) = self.outbox.lock().await.stats();
         let bytes_per_sec = (SAMPLE_RATE * NUM_CHANNELS) as f64 * 2.0; // 2 bytes per s16 sample
-        (chunks, bytes as f64 / bytes_per_sec, capacity as f64 / bytes_per_sec)
+        (
+            chunks,
+            bytes as f64 / bytes_per_sec,
+            capacity as f64 / bytes_per_sec,
+        )
     }
 }
 

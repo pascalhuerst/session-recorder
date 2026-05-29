@@ -23,6 +23,7 @@ use recorder::grpc::chunk_sink_client::{
 };
 use recorder::io::input_key::InputKey;
 use recorder::io::led::Led;
+use recorder::io::ws2812::{Mode, Ws2812};
 use ringbuf::traits::Consumer;
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
@@ -98,6 +99,34 @@ const LED_BLINK_HALF_MS: u64 = 80;
 // turned off promptly on termination instead of waiting for its channel to close.
 const LED_SHUTDOWN_POLL: Duration = Duration::from_millis(200);
 
+// WS2812 I2C status display. The controller drives two pixel-LED channels:
+// channel 0 shows the overall state (color = audio, mode = link/activity),
+// channel 1 is a live RMS meter.
+const LED_I2C_STATUS_CH: u8 = 0;
+const LED_I2C_METER_CH: u8 = 1;
+const LED_I2C_TICK: Duration = Duration::from_millis(50);
+const LED_I2C_BRIGHTNESS: u8 = 64;
+// RMS amplitude (percent) above which we consider "some signal present" but, when
+// not recording, still below the record threshold — shown amber. ~ -40 dBFS.
+const LED_I2C_SIGNAL_FLOOR_PERCENT: f64 = 1.0;
+
+/// Parse an I2C address given as hex (`0x20`) or decimal (`32`).
+fn parse_i2c_address(s: &str) -> Result<u16, String> {
+    let s = s.trim();
+    let parsed = match s.strip_prefix("0x").or_else(|| s.strip_prefix("0X")) {
+        Some(hex) => u16::from_str_radix(hex, 16),
+        None => s.parse::<u16>(),
+    };
+    parsed.map_err(|_| format!("invalid I2C address: {s}"))
+}
+
+/// The visual shown on the status channel; tracked so we only write to I2C on change.
+#[derive(Clone, Copy, PartialEq)]
+struct StatusVisual {
+    mode: Mode,
+    color: (u8, u8, u8),
+}
+
 #[derive(Parser, Debug, Clone)]
 #[command(name = "recorder", about = "Session Recorder audio client")]
 struct Args {
@@ -146,6 +175,16 @@ struct Args {
     /// recording stops, blinks on a cut; blinks a few times at startup)
     #[arg(long)]
     led_upload: Option<String>,
+
+    /// I2C bus of the WS2812 pixel-LED controller — a bus number (e.g. `1`) or
+    /// a device path (e.g. `/dev/i2c-2`). When set, the recorder drives the
+    /// controller with richer status than the single on/off --led-* LEDs.
+    #[arg(long, default_value = "/dev/i2c-2")]
+    led_i2c_bus: Option<String>,
+
+    /// I2C slave address of the WS2812 pixel-LED controller (hex like `0x20` or decimal)
+    #[arg(long, default_value = "0x20", value_parser = parse_i2c_address)]
+    led_i2c_address: u16,
 
     /// `/dev/input/eventNN` number to read a local cut-session key from
     #[arg(long, requires = "input_keycode", requires = "input_hold_ms")]
@@ -270,6 +309,7 @@ struct SessionRecorder {
     sender_handle: Option<tokio::task::JoinHandle<()>>,
     led_rec_handle: Option<tokio::task::JoinHandle<()>>,
     led_upload_handle: Option<tokio::task::JoinHandle<()>>,
+    led_i2c_handle: Option<tokio::task::JoinHandle<()>>,
 }
 
 struct ClientInfo {
@@ -355,6 +395,7 @@ impl SessionRecorder {
             sender_handle: None,
             led_rec_handle: None,
             led_upload_handle: None,
+            led_i2c_handle: None,
         }
     }
 
@@ -368,6 +409,7 @@ impl SessionRecorder {
         self.setup_audio_processing().await?;
 
         self.start_led_tasks();
+        self.start_led_i2c_task();
         self.start_audio_processing_task().await;
         self.start_chunk_sender_task();
         self.start_discovery_task().await;
@@ -407,6 +449,9 @@ impl SessionRecorder {
             let _ = handle.await;
         }
         if let Some(handle) = self.led_upload_handle.take() {
+            let _ = handle.await;
+        }
+        if let Some(handle) = self.led_i2c_handle.take() {
             let _ = handle.await;
         }
         if let Some(handle) = self.callback_handle.take() {
@@ -607,8 +652,8 @@ impl SessionRecorder {
         while !shutdown.load(Ordering::Relaxed) {
             let event = match tokio::time::timeout(LED_SHUTDOWN_POLL, rx.recv()).await {
                 Ok(Some(event)) => event,
-                Ok(None) => break,      // all senders dropped
-                Err(_) => continue,     // timeout: re-check shutdown
+                Ok(None) => break,  // all senders dropped
+                Err(_) => continue, // timeout: re-check shutdown
             };
             match event {
                 LedUploadEvent::Sent => {
@@ -627,6 +672,107 @@ impl SessionRecorder {
             }
         }
         let _ = led.off();
+    }
+
+    fn start_led_i2c_task(&mut self) {
+        let Some(bus) = self.args.led_i2c_bus.clone() else {
+            return;
+        };
+        let address = self.args.led_i2c_address;
+
+        let mut dev = match Ws2812::open(&bus, address) {
+            Ok(d) => d,
+            Err(e) => {
+                warn!("Cannot open WS2812 controller on {bus} @ {address:#04x}: {e}");
+                return;
+            }
+        };
+        match dev.version() {
+            Ok(v) => info!("WS2812 controller firmware version {v}"),
+            Err(e) => warn!("WS2812 controller: cannot read version ({e}); continuing anyway"),
+        }
+
+        let status = Arc::clone(&self.recorder_status);
+        let clients = Arc::clone(&self.grpc_clients);
+        let shutdown = self.shutdown_signal.clone();
+        self.led_i2c_handle = Some(tokio::spawn(Self::led_i2c_task(
+            dev, status, clients, shutdown,
+        )));
+    }
+
+    /// Drive the WS2812 pixel-LED controller from the recorder's live state.
+    /// The status channel encodes audio state in its color (red=clipping,
+    /// green=recording, amber=signal-but-not-loud, dim-blue=idle) and the
+    /// link/activity in its mode (breathe=no backend, cylon=recording+streaming,
+    /// solid=idle). The meter channel shows the current RMS level. Turns both
+    /// channels off on exit.
+    async fn led_i2c_task(
+        mut dev: Ws2812,
+        recorder_status: Arc<tokio::sync::Mutex<RecorderStatusInfo>>,
+        clients: Arc<tokio::sync::Mutex<HashMap<String, ClientInfo>>>,
+        shutdown: Arc<AtomicBool>,
+    ) {
+        info!("WS2812 status task started");
+
+        // One-time setup. The Arduino keeps its registers across recorder
+        // restarts, so set every register the chosen modes rely on.
+        let num_leds = dev.num_leds().unwrap_or(12);
+        let _ = dev.set_brightness(LED_I2C_STATUS_CH, LED_I2C_BRIGHTNESS);
+        let _ = dev.set_speed(LED_I2C_STATUS_CH, 160);
+        let _ = dev.set_length(LED_I2C_STATUS_CH, (num_leds / 3).max(1));
+        let _ = dev.set_brightness(LED_I2C_METER_CH, LED_I2C_BRIGHTNESS);
+        let _ = dev.set_meter_zones(LED_I2C_METER_CH, 60, 85, 4);
+        let _ = dev.set_mode(LED_I2C_METER_CH, Mode::Meter);
+
+        let mut last: Option<StatusVisual> = None;
+        let mut tick = interval(LED_I2C_TICK);
+
+        while !shutdown.load(Ordering::Relaxed) {
+            tick.tick().await;
+
+            let (recording, rms_percent, clipping) = {
+                let s = recorder_status.lock().await;
+                (
+                    matches!(s.signal_status, SignalStatus::Signal),
+                    s.rms_percent,
+                    s.clipping,
+                )
+            };
+            let connected = !clients.lock().await.is_empty();
+
+            // Color encodes the audio state; mode encodes the link / activity.
+            let color = if clipping {
+                (255, 0, 0) // clipping → red
+            } else if recording {
+                (0, 255, 0) // recording → green
+            } else if rms_percent >= LED_I2C_SIGNAL_FLOOR_PERCENT {
+                (255, 160, 0) // signal present but below the record threshold → amber
+            } else {
+                (0, 40, 120) // idle → dim blue
+            };
+            let mode = if !connected {
+                Mode::Breathe // no backend reachable → pulse
+            } else if recording {
+                Mode::Cylon // recording & streaming → moving comet
+            } else {
+                Mode::Solid // connected & idle → steady
+            };
+
+            let visual = StatusVisual { mode, color };
+            if last != Some(visual) {
+                let _ = dev.set_color(LED_I2C_STATUS_CH, color.0, color.1, color.2);
+                let _ = dev.set_mode(LED_I2C_STATUS_CH, mode);
+                last = Some(visual);
+            }
+
+            // Meter channel: push the current RMS as a 0..100% sample each tick.
+            let level = rms_percent.clamp(0.0, 100.0) as u8;
+            let _ = dev.push_meter(LED_I2C_METER_CH, level);
+        }
+
+        let _ = dev.off(LED_I2C_STATUS_CH);
+        let _ = dev.off(LED_I2C_METER_CH);
+        info!("WS2812 status task stopped");
     }
 
     async fn start_audio_processing_task(&mut self) {

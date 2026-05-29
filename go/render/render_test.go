@@ -32,9 +32,9 @@ func genSineRaw(freqHz float64, seconds float64) []byte {
 	nFrames := int(seconds * sampleRate)
 	buf := bytes.NewBuffer(make([]byte, 0, nFrames*bytesPerFrame))
 	const amplitude = 16000.0
-	for i := 0; i < nFrames; i++ {
+	for i := range nFrames {
 		v := int16(amplitude * math.Sin(2*math.Pi*freqHz*float64(i)/float64(sampleRate)))
-		for c := 0; c < numChannels; c++ {
+		for range numChannels {
 			binary.Write(buf, binary.LittleEndian, v)
 		}
 	}

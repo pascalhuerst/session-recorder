@@ -593,7 +593,11 @@ func (f *Fs) renderSession(ctx context.Context, recorderID, sessionID uuid.UUID)
 		if err != nil {
 			return fmt.Errorf("cannot create waveform: %w", err)
 		}
-		return f.writeFile(f.sessionFilePath(recorderID, sessionID, FILENAME_WAVEFORM), waveformData.Bytes())
+		datBytes := waveformData.Bytes()
+		if err := f.writeFile(f.sessionFilePath(recorderID, sessionID, FILENAME_WAVEFORM), datBytes); err != nil {
+			return err
+		}
+		return f.writePreview(recorderID, sessionID, datBytes)
 	})
 
 	eg.Go(func() error {
@@ -633,6 +637,38 @@ func (f *Fs) renderSession(ctx context.Context, recorderID, sessionID uuid.UUID)
 
 	log.Debug().Stringer("recorder-id", recorderID).Stringer("session-id", sessionID).Msg("Done rendering session")
 	return nil
+}
+
+// writePreview renders a fixed-size PNG thumbnail from a waveform .dat and
+// writes it as preview.png next to the session's other assets.
+func (f *Fs) writePreview(recorderID, sessionID uuid.UUID, datBytes []byte) error {
+	previewBuf, err := render.WaveformPNG(bytes.NewReader(datBytes), render.PreviewWidth, render.PreviewHeight)
+	if err != nil {
+		return fmt.Errorf("cannot render preview: %w", err)
+	}
+	return f.writeFile(f.sessionFilePath(recorderID, sessionID, FILENAME_PREVIEW), previewBuf.Bytes())
+}
+
+// EnsurePreview renders preview.png from waveform.dat when the preview is
+// missing. It returns true if it created one, and is a no-op (false, nil) when
+// the preview already exists or there is no waveform.dat to render from.
+func (f *Fs) EnsurePreview(_ context.Context, recorderID, sessionID uuid.UUID) (bool, error) {
+	if _, err := os.Stat(f.sessionFilePath(recorderID, sessionID, FILENAME_PREVIEW)); err == nil {
+		return false, nil // preview already exists
+	}
+
+	datBytes, err := os.ReadFile(f.sessionFilePath(recorderID, sessionID, FILENAME_WAVEFORM))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil // no waveform.dat → nothing to render from
+		}
+		return false, fmt.Errorf("cannot read waveform.dat: %w", err)
+	}
+
+	if err := f.writePreview(recorderID, sessionID, datBytes); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 // writeFile writes data atomically (temp file + rename).

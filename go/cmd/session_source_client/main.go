@@ -226,7 +226,7 @@ func watchSession(ctx context.Context, client sspb.SessionSourceClient, recorder
 		}
 
 		ts := time.Now().Format("15:04:05.000")
-		fmt.Printf("%s %s\n", ts, msg.ID, formatSessionInfo(msg))
+		fmt.Printf("%s %s %s\n", ts, msg.ID, formatSessionInfo(msg))
 
 	}
 }

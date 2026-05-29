@@ -39,8 +39,8 @@ func decodeFlacToRaw(t *testing.T, flacBytes []byte) []byte {
 			t.Fatalf("ParseNext: %v", err)
 		}
 		n := len(fr.Subframes[0].Samples)
-		for i := 0; i < n; i++ {
-			for ch := 0; ch < numChannels; ch++ {
+		for i := range n {
+			for ch := range numChannels {
 				binary.Write(out, binary.LittleEndian, int16(fr.Subframes[ch].Samples[i]))
 			}
 		}
@@ -145,7 +145,7 @@ func TestOpusRoundTripPreservesTone(t *testing.T) {
 func toMonoFloat(raw []byte) []float64 {
 	nFrames := len(raw) / bytesPerFrame
 	out := make([]float64, nFrames)
-	for i := 0; i < nFrames; i++ {
+	for i := range nFrames {
 		l := int16(binary.LittleEndian.Uint16(raw[i*bytesPerFrame:]))
 		r := int16(binary.LittleEndian.Uint16(raw[i*bytesPerFrame+2:]))
 		out[i] = (float64(l) + float64(r)) / 2

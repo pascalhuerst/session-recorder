@@ -495,19 +495,21 @@ func (h *SessionSourceHandler) removeSession(ctx context.Context, recorderID, se
 	return nil
 }
 
-// runRetentionSweeper periodically deletes finished sessions older than
-// retentionPeriod that are not marked Keep. It sweeps once immediately (so a
-// restart catches up on anything that expired while the server was down) and
-// then every interval, until ctx is cancelled. It runs in its own goroutine;
-// chunk reception and all other RPCs continue concurrently, since storage
-// access is serialized by the backend's data lock.
-func (h *SessionSourceHandler) runRetentionSweeper(ctx context.Context, retentionPeriod, interval time.Duration) {
+// runHousekeeping periodically performs background maintenance: it deletes
+// finished sessions older than retentionPeriod that are not marked Keep, and
+// backfills preview.png thumbnails for finished sessions that lack one (e.g.
+// rendered before previews existed). It runs once immediately (so a restart
+// catches up on anything that changed while the server was down) and then every
+// interval, until ctx is cancelled. It runs in its own goroutine; chunk
+// reception and all other RPCs continue concurrently, since storage access is
+// serialized by the backend's data lock.
+func (h *SessionSourceHandler) runHousekeeping(ctx context.Context, retentionPeriod, interval time.Duration) {
 	log.Info().
 		Dur("retention-period", retentionPeriod).
 		Dur("interval", interval).
-		Msg("Retention sweeper started")
+		Msg("Housekeeping started")
 
-	h.sweepExpiredSessions(ctx, retentionPeriod)
+	h.housekeep(ctx, retentionPeriod)
 
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
@@ -515,12 +517,19 @@ func (h *SessionSourceHandler) runRetentionSweeper(ctx context.Context, retentio
 	for {
 		select {
 		case <-ctx.Done():
-			log.Info().Msg("Retention sweeper stopped")
+			log.Info().Msg("Housekeeping stopped")
 			return
 		case <-ticker.C:
-			h.sweepExpiredSessions(ctx, retentionPeriod)
+			h.housekeep(ctx, retentionPeriod)
 		}
 	}
+}
+
+// housekeep runs one maintenance pass: retention sweep followed by preview
+// backfill.
+func (h *SessionSourceHandler) housekeep(ctx context.Context, retentionPeriod time.Duration) {
+	h.sweepExpiredSessions(ctx, retentionPeriod)
+	h.backfillMissingPreviews(ctx)
 }
 
 // hasRenderedSegment reports whether the session has at least one successfully
@@ -572,6 +581,33 @@ func (h *SessionSourceHandler) sweepExpiredSessions(ctx context.Context, retenti
 				Stringer("recorder-id", ref.RecorderID).
 				Stringer("session-id", ref.SessionID).
 				Msg("Cannot delete expired session")
+		}
+	}
+}
+
+// backfillMissingPreviews generates preview.png for every FINISHED session that
+// doesn't have one yet, so sessions rendered before previews existed get a
+// thumbnail. EnsurePreview is cheap (a stat) when the preview is already there,
+// so this is safe to run on every housekeeping pass. Sessions are snapshotted
+// up front so the live session maps are never touched.
+func (h *SessionSourceHandler) backfillMissingPreviews(ctx context.Context) {
+	for _, ref := range h.sessionStorage.SnapshotSessions() {
+		if ref.Session.State != storage.SessionStateFinished {
+			continue
+		}
+		created, err := h.sessionStorage.EnsurePreview(ctx, ref.RecorderID, ref.SessionID)
+		if err != nil {
+			log.Err(err).
+				Stringer("recorder-id", ref.RecorderID).
+				Stringer("session-id", ref.SessionID).
+				Msg("Cannot backfill session preview")
+			continue
+		}
+		if created {
+			log.Info().
+				Stringer("recorder-id", ref.RecorderID).
+				Stringer("session-id", ref.SessionID).
+				Msg("Backfilled missing session preview")
 		}
 	}
 }

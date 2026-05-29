@@ -221,10 +221,11 @@ func main() {
 
 	sessionSourceHandler := NewSessionSourceHandler(sessionStorage, chunkSinkServer, recorderBroadcaster, sessionBroadcaster, audioBroadcaster, emailSender, fileSharer)
 
-	// Periodically delete finished, non-kept sessions older than the retention
-	// period (runs once now, then on the interval). Runs alongside chunk
-	// reception; stops when ctx is cancelled on shutdown.
-	go sessionSourceHandler.runRetentionSweeper(ctx, *retentionPeriod, *retentionInterval)
+	// Periodic background maintenance: delete finished, non-kept sessions older
+	// than the retention period, and backfill missing preview thumbnails (runs
+	// once now, then on the interval). Runs alongside chunk reception; stops when
+	// ctx is cancelled on shutdown.
+	go sessionSourceHandler.runHousekeeping(ctx, *retentionPeriod, *retentionInterval)
 
 	sessionSourceServer := grpc.NewSessionSourceServer(&grpc.SessionSourceServerConfig{
 		Name:                 hostname,

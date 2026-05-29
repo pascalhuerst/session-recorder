@@ -74,6 +74,7 @@ const (
 	FILENAME_OGG      = Filename("data.ogg")
 	FILENAME_FLAC     = Filename("data.flac")
 	FILENAME_WAVEFORM = Filename("waveform.dat")
+	FILENAME_PREVIEW  = Filename("preview.png")
 	FILENAME_METADATA = Filename("metadata.json")
 
 	SEGMENT_FILENAME_OGG  = Filename("segment.ogg")
@@ -149,6 +150,12 @@ type Storage interface {
 
 	// GetSegmentFileReader returns a reader for a segment file
 	GetSegmentFileReader(ctx context.Context, asset SegmentAssetOptions) (io.ReadCloser, int64, error)
+
+	// EnsurePreview renders preview.png from waveform.dat when the preview is
+	// missing, returning true if it created one. It is a no-op (false, nil) when
+	// the preview already exists or there is no waveform.dat to render from. Used
+	// by the housekeeping backfill for sessions rendered before previews existed.
+	EnsurePreview(ctx context.Context, recorderID, sessionID uuid.UUID) (bool, error)
 
 	// Segment operations
 	CreateSegment(ctx context.Context, recorderID, sessionID, segmentID uuid.UUID, segment Segment) error

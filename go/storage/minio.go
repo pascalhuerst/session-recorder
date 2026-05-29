@@ -907,6 +907,50 @@ func (m *Minio) markSessionError(ctx context.Context, recorderID, sessionID uuid
 	m.notifyStateChange(sm, previousState)
 }
 
+// uploadPreview renders a fixed-size PNG thumbnail from a waveform .dat and
+// stores it as preview.png next to the session's other assets.
+func (m *Minio) uploadPreview(ctx context.Context, recorderID, sessionID uuid.UUID, datBytes []byte) error {
+	previewBuf, err := render.WaveformPNG(bytes.NewReader(datBytes), render.PreviewWidth, render.PreviewHeight)
+	if err != nil {
+		return fmt.Errorf("cannot render preview: %w", err)
+	}
+	previewObject := fmt.Sprintf("%s/sessions/%s/%s", recorderID, sessionID, FILENAME_PREVIEW)
+	if _, err := m.client.PutObject(ctx, bucketName, previewObject, previewBuf, int64(previewBuf.Len()), minio.PutObjectOptions{ContentType: "image/png"}); err != nil {
+		return fmt.Errorf("cannot upload preview: %w", err)
+	}
+	return nil
+}
+
+// EnsurePreview renders preview.png from waveform.dat when the preview is
+// missing. It returns true if it created one, and is a no-op (false, nil) when
+// the preview already exists or there is no waveform.dat to render from.
+func (m *Minio) EnsurePreview(ctx context.Context, recorderID, sessionID uuid.UUID) (bool, error) {
+	previewObject := fmt.Sprintf("%s/sessions/%s/%s", recorderID, sessionID, FILENAME_PREVIEW)
+	if _, err := m.client.StatObject(ctx, bucketName, previewObject, minio.StatObjectOptions{}); err == nil {
+		return false, nil // preview already exists
+	}
+
+	waveformObject := fmt.Sprintf("%s/sessions/%s/%s", recorderID, sessionID, FILENAME_WAVEFORM)
+	if _, err := m.client.StatObject(ctx, bucketName, waveformObject, minio.StatObjectOptions{}); err != nil {
+		return false, nil // no waveform.dat → nothing to render from
+	}
+
+	obj, err := m.client.GetObject(ctx, bucketName, waveformObject, minio.GetObjectOptions{})
+	if err != nil {
+		return false, fmt.Errorf("cannot get waveform.dat: %w", err)
+	}
+	defer obj.Close()
+	datBytes, err := io.ReadAll(obj)
+	if err != nil {
+		return false, fmt.Errorf("cannot read waveform.dat: %w", err)
+	}
+
+	if err := m.uploadPreview(ctx, recorderID, sessionID, datBytes); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 // renderInMemorySession is the "buffer-only" rendering path. The recorder went
 // silent (or got cut) before the in-memory buffer ever reached minChunkSize,
 // so nothing was uploaded as a chunks/<n>. The bytes are right here in
@@ -956,8 +1000,12 @@ func (m *Minio) renderInMemorySession(ctx context.Context, recorderID, sessionID
 		if werr != nil {
 			return fmt.Errorf("cannot create waveform: %w", werr)
 		}
-		if _, err := m.client.PutObject(egCtx, bucketName, waveformObject, waveformData, int64(waveformData.Len()), minio.PutObjectOptions{}); err != nil {
+		datBytes := waveformData.Bytes()
+		if _, err := m.client.PutObject(egCtx, bucketName, waveformObject, bytes.NewReader(datBytes), int64(len(datBytes)), minio.PutObjectOptions{}); err != nil {
 			return fmt.Errorf("cannot upload waveform: %w", err)
+		}
+		if err := m.uploadPreview(egCtx, recorderID, sessionID, datBytes); err != nil {
+			return err
 		}
 		return nil
 	})
@@ -1135,9 +1183,14 @@ func (m *Minio) renderDerivedFiles(ctx context.Context, recorderID, sessionID uu
 			log.Err(err).Msg("Cannot create waveform")
 			return fmt.Errorf("cannot create waveform: %w", err)
 		}
+		datBytes := waveformData.Bytes()
 		waveformObject := fmt.Sprintf("%s/sessions/%s/waveform.dat", recorderID, sessionID)
-		if _, err := m.client.PutObject(ctx, bucketName, waveformObject, waveformData, int64(waveformData.Len()), minio.PutObjectOptions{}); err != nil {
+		if _, err := m.client.PutObject(ctx, bucketName, waveformObject, bytes.NewReader(datBytes), int64(len(datBytes)), minio.PutObjectOptions{}); err != nil {
 			log.Err(err).Str("object", waveformObject).Msg("Cannot put object")
+			return err
+		}
+		if err := m.uploadPreview(ctx, recorderID, sessionID, datBytes); err != nil {
+			log.Err(err).Msg("Cannot upload preview")
 			return err
 		}
 		return nil

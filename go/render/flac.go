@@ -65,7 +65,7 @@ func Flac(dst io.Writer, src io.Reader) error {
 			subframe.SubHeader = frame.SubHeader{Pred: frame.PredVerbatim}
 			subframe.NSamples = nFrames
 			subframe.Samples = subframe.Samples[:nFrames]
-			for i := 0; i < nFrames; i++ {
+			for i := range nFrames {
 				s := int16(binary.LittleEndian.Uint16(rbuf[(i*numChannels+ch)*2:]))
 				subframe.Samples[i] = int32(s)
 			}

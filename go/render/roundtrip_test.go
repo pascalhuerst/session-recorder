@@ -96,6 +96,8 @@ func TestFlacRoundTripNonAligned(t *testing.T) {
 }
 
 func TestOpusRoundTripPreservesTone(t *testing.T) {
+	skipIfRace(t)
+
 	const freq = 1000.0
 	in := genSineRaw(freq, 5)
 

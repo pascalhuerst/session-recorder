@@ -4,9 +4,20 @@ import (
 	"bytes"
 	"encoding/binary"
 	"math"
+	"testing"
 
 	_ "embed"
 )
+
+// skipIfRace skips tests that build a kazzmir/opus-go encoder. That library is
+// ccgo-transpiled libopus and does C-style pointer arithmetic that the race
+// detector's checkptr instrumentation fatally rejects (`go test -race`). Normal
+// builds and the shipped binaries are unaffected.
+func skipIfRace(t *testing.T) {
+	if raceEnabled {
+		t.Skip("skipped under -race: opus-go (transpiled libopus) trips checkptr")
+	}
+}
 
 // rawTestAudio is shared raw PCM test input (s16le, 2ch, 48kHz) used by the
 // clip / flac tests in this package.

@@ -97,6 +97,8 @@ func TestSegmentReader_ShortStreamClamps(t *testing.T) {
 }
 
 func TestSegmentReader_EncodesOgg(t *testing.T) {
+	skipIfRace(t)
+
 	r, err := SegmentReader(bytes.NewReader(rawTestAudio), 24000, 48000)
 	if err != nil {
 		t.Fatalf("SegmentReader() error = %v", err)

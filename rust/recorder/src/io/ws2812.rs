@@ -25,8 +25,8 @@ const REG_COLOR_R: u8 = 0x02; // R, G, B are consecutive (0x02..0x04)
 const REG_SPEED: u8 = 0x05;
 const REG_LENGTH: u8 = 0x06;
 const REG_DIRECTION: u8 = 0x07;
-const REG_METER_LEVEL: u8 = 0x08;
-const REG_METER_GREEN: u8 = 0x09; // GREEN, RED, DECAY are consecutive (0x09..0x0B)
+const REG_METER_LEVEL: u8 = 0x08; // LEVEL and PEAK are consecutive (0x08..0x09)
+const REG_METER_GREEN: u8 = 0x0A; // GREEN, RED, DECAY, PEAK_DECAY consecutive (0x0A..0x0D)
 
 // Global, read-only registers (absolute addresses).
 const REG_NUM_LEDS: u8 = 0x70;
@@ -152,17 +152,31 @@ impl Ws2812 {
         self.write_reg(Self::ch_addr(ch, REG_DIRECTION), counter_clockwise as u8)
     }
 
-    /// Push one meter sample (0..100%). The firmware consumes it each frame
-    /// (instant attack, then auto-decay), so drive it continuously for a live
-    /// level meter.
-    pub fn push_meter(&mut self, ch: u8, percent: u8) -> io::Result<()> {
-        self.write_reg(Self::ch_addr(ch, REG_METER_LEVEL), percent.min(100))
+    /// Push the bar and peak-hold inputs in a single block write (the firmware
+    /// consumes both each frame). Drive continuously for a live PPM-style meter:
+    /// `level` typically the analysis-window RMS, `peak` the max-|sample|.
+    pub fn push_meter_and_peak(&mut self, ch: u8, level: u8, peak: u8) -> io::Result<()> {
+        self.write_block(
+            Self::ch_addr(ch, REG_METER_LEVEL),
+            &[level.min(100), peak.min(100)],
+        )
     }
 
-    /// Configure the meter's color zones and fall rate: pixels up to `green` are
-    /// green, at/above `red` are red (between is amber); `decay` is percent/frame.
-    pub fn set_meter_zones(&mut self, ch: u8, green: u8, red: u8, decay: u8) -> io::Result<()> {
-        self.write_block(Self::ch_addr(ch, REG_METER_GREEN), &[green, red, decay])
+    /// Configure color zones + fall rates as one block: pixels up to `green`
+    /// are green, at/above `red` are red (amber between); `bar_decay` and
+    /// `peak_decay` are percent/frame.
+    pub fn set_meter_zones(
+        &mut self,
+        ch: u8,
+        green: u8,
+        red: u8,
+        bar_decay: u8,
+        peak_decay: u8,
+    ) -> io::Result<()> {
+        self.write_block(
+            Self::ch_addr(ch, REG_METER_GREEN),
+            &[green, red, bar_decay, peak_decay],
+        )
     }
 
     pub fn off(&mut self, ch: u8) -> io::Result<()> {

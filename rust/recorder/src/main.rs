@@ -91,8 +91,10 @@ enum LedEvent {
     Cut,
     ChunkSent,
     LevelUpdate {
-        rms_left_percent: f64,
-        rms_right_percent: f64,
+        left_rms_percent: f64,
+        left_peak_percent: f64,
+        right_rms_percent: f64,
+        right_peak_percent: f64,
     },
 }
 
@@ -118,7 +120,26 @@ const LED_I2C_BRIGHTNESS: u8 = 64;
 // 13..15; the remaining pixels 9..12 fall in the amber zone.
 const LED_I2C_METER_GREEN_PERCENT: u8 = 53;
 const LED_I2C_METER_RED_PERCENT: u8 = 86;
-const LED_I2C_METER_DECAY: u8 = 4;
+// Bar decay: ~4%/frame (≈16 ms) → ~0.4 s full fall. Peak decay much slower so
+// the peak-hold pixel lingers ~1.5 s above the bar after a transient.
+const LED_I2C_METER_BAR_DECAY: u8 = 4;
+const LED_I2C_METER_PEAK_DECAY: u8 = 1;
+// Meter analysis window — short enough to catch transients (and respond
+// visibly), independent of the 250 ms detector window.
+const METER_WINDOW_SECS: f64 = 0.030;
+// Bottom of the dBFS → 0..100 % meter scale. Above 0 dBFS clamps to 100.
+const METER_DB_FLOOR: f64 = -60.0;
+
+/// Convert a linear amplitude (0..1) to a meter percent on a dBFS scale:
+/// amplitude `1.0` → 100 %, `METER_DB_FLOOR` (e.g. −60 dB) → 0 %. Below the
+/// floor and at exact silence returns 0.
+fn amplitude_to_meter_percent(amp: f32) -> f64 {
+    if amp <= 1e-9 {
+        return 0.0;
+    }
+    let db = 20.0 * (amp as f64).log10();
+    ((db - METER_DB_FLOOR) / -METER_DB_FLOOR * 100.0).clamp(0.0, 100.0)
+}
 
 /// Parse an I2C address given as hex (`0x20`) or decimal (`32`).
 fn parse_i2c_address(s: &str) -> Result<u16, String> {
@@ -130,15 +151,17 @@ fn parse_i2c_address(s: &str) -> Result<u16, String> {
     parsed.map_err(|_| format!("invalid I2C address: {s}"))
 }
 
-/// State the LED manager maintains as events arrive. Per-channel RMS is
-/// cached here so the manager can push fresh meter samples on every tick,
-/// independent of the detector-window cadence.
+/// State the LED manager maintains as events arrive. Per-channel RMS (bar) and
+/// peak are cached so the cleanup arm has the latest values on shutdown; the
+/// manager pushes them straight to I2C the moment each LevelUpdate arrives.
 #[derive(Default)]
 struct LedState {
     recording: bool,
     upload_led_on: bool,
-    rms_left_percent: f64,
-    rms_right_percent: f64,
+    left_rms_percent: f64,
+    left_peak_percent: f64,
+    right_rms_percent: f64,
+    right_peak_percent: f64,
 }
 
 #[derive(Parser, Debug, Clone)]
@@ -664,7 +687,7 @@ impl SessionRecorder {
             let _ = l.off();
         }
 
-        // Configure both I2C channels as identical peak meters. The Arduino
+        // Configure both I2C channels as identical PPM meters. The Arduino
         // retains its registers across recorder restarts, so set every
         // register the meter mode depends on.
         if let Some(dev) = i2c.as_mut() {
@@ -674,7 +697,8 @@ impl SessionRecorder {
                     ch,
                     LED_I2C_METER_GREEN_PERCENT,
                     LED_I2C_METER_RED_PERCENT,
-                    LED_I2C_METER_DECAY,
+                    LED_I2C_METER_BAR_DECAY,
+                    LED_I2C_METER_PEAK_DECAY,
                 );
                 let _ = dev.set_mode(ch, Mode::Meter);
             }
@@ -721,21 +745,37 @@ impl SessionRecorder {
                                 }
                             }
                         }
-                        LedEvent::LevelUpdate { rms_left_percent, rms_right_percent } => {
-                            state.rms_left_percent = rms_left_percent;
-                            state.rms_right_percent = rms_right_percent;
+                        LedEvent::LevelUpdate {
+                            left_rms_percent,
+                            left_peak_percent,
+                            right_rms_percent,
+                            right_peak_percent,
+                        } => {
+                            state.left_rms_percent = left_rms_percent;
+                            state.left_peak_percent = left_peak_percent;
+                            state.right_rms_percent = right_rms_percent;
+                            state.right_peak_percent = right_peak_percent;
+                            // Push to I2C straight away — the firmware consumes
+                            // both inputs each frame, so feeding it on every
+                            // event keeps the bar / peak indicator faithful.
+                            if let Some(dev) = i2c.as_mut() {
+                                let _ = dev.push_meter_and_peak(
+                                    LED_I2C_LEFT_CH,
+                                    left_rms_percent.clamp(0.0, 100.0) as u8,
+                                    left_peak_percent.clamp(0.0, 100.0) as u8,
+                                );
+                                let _ = dev.push_meter_and_peak(
+                                    LED_I2C_RIGHT_CH,
+                                    right_rms_percent.clamp(0.0, 100.0) as u8,
+                                    right_peak_percent.clamp(0.0, 100.0) as u8,
+                                );
+                            }
                         }
                     }
                 }
                 _ = tick.tick() => {
-                    // Push fresh meter samples and re-check shutdown every 50 ms
-                    // so Ctrl+C is noticed promptly even with no events.
-                    if let Some(dev) = i2c.as_mut() {
-                        let left = state.rms_left_percent.clamp(0.0, 100.0) as u8;
-                        let right = state.rms_right_percent.clamp(0.0, 100.0) as u8;
-                        let _ = dev.push_meter(LED_I2C_LEFT_CH, left);
-                        let _ = dev.push_meter(LED_I2C_RIGHT_CH, right);
-                    }
+                    // Just a shutdown-poll heartbeat; meter pushes are driven
+                    // by LevelUpdate events (~33 Hz from the audio task).
                 }
             }
         }
@@ -1155,10 +1195,52 @@ impl SessionRecorder {
         let chunk_bytes = chunk_frames * detector.num_channels as usize * 2;
         let mut pending: Vec<u8> = Vec::with_capacity(chunk_bytes + window_samples * 2);
 
+        // Meter accumulator (independent of the detector window). One emission
+        // per ~30 ms of audio: short enough to catch transients and to make
+        // the bar visibly move on quiet content. RMS feeds the bar; max-|sample|
+        // feeds the PPM peak-hold indicator.
+        let meter_window_frames =
+            ((detector.sample_rate as f64 * METER_WINDOW_SECS) as usize).max(1);
+        let mut meter_peak_l = 0f32;
+        let mut meter_peak_r = 0f32;
+        let mut meter_ssq_l = 0f32;
+        let mut meter_ssq_r = 0f32;
+        let mut meter_frames = 0usize;
+
         while !shutdown.load(Ordering::Relaxed) {
             tokio::select! {
                 maybe_chunk = samples_rx.recv() => {
                     let Some(chunk) = maybe_chunk else { break; };
+                    // Update the meter accumulator frame by frame and emit a
+                    // LevelUpdate every meter_window_frames; a single chunk may
+                    // close zero, one, or several meter windows.
+                    for frame in chunk.chunks_exact(2) {
+                        let (l, r) = (frame[0], frame[1]);
+                        let (al, ar) = (l.abs(), r.abs());
+                        if al > meter_peak_l { meter_peak_l = al; }
+                        if ar > meter_peak_r { meter_peak_r = ar; }
+                        meter_ssq_l += l * l;
+                        meter_ssq_r += r * r;
+                        meter_frames += 1;
+                        if meter_frames >= meter_window_frames {
+                            let frames_f = meter_frames as f32;
+                            let rms_l = (meter_ssq_l / frames_f).sqrt();
+                            let rms_r = (meter_ssq_r / frames_f).sqrt();
+                            if let Some(tx) = &led_event_tx {
+                                let _ = tx.try_send(LedEvent::LevelUpdate {
+                                    left_rms_percent: amplitude_to_meter_percent(rms_l),
+                                    left_peak_percent: amplitude_to_meter_percent(meter_peak_l),
+                                    right_rms_percent: amplitude_to_meter_percent(rms_r),
+                                    right_peak_percent: amplitude_to_meter_percent(meter_peak_r),
+                                });
+                            }
+                            meter_peak_l = 0.0;
+                            meter_peak_r = 0.0;
+                            meter_ssq_l = 0.0;
+                            meter_ssq_r = 0.0;
+                            meter_frames = 0;
+                        }
+                    }
                     window_buf.extend_from_slice(&chunk);
                 }
                 cut = cut_rx.recv() => {
@@ -1193,25 +1275,12 @@ impl SessionRecorder {
             while window_buf.len() >= window_samples {
                 let window: Vec<f32> = window_buf.drain(..window_samples).collect();
 
-                // Per-channel sum-of-squares from interleaved L,R,L,R,… samples.
-                // The mono RMS used for the detector / wire status is derived
-                // from the same sums, so we only walk the window once.
-                let (mut ssq_l, mut ssq_r) = (0f32, 0f32);
-                for frame in window.chunks_exact(2) {
-                    ssq_l += frame[0] * frame[0];
-                    ssq_r += frame[1] * frame[1];
-                }
-                let frames = (window.len() / 2) as f32;
-                let (rms_l, rms_r) = if frames > 0.0 {
-                    ((ssq_l / frames).sqrt(), (ssq_r / frames).sqrt())
-                } else {
-                    (0.0, 0.0)
-                };
-                let mean_square = if frames > 0.0 {
-                    (ssq_l + ssq_r) / (2.0 * frames)
-                } else {
-                    0.0
-                };
+                // Mono RMS over the (long) detector window: used for the
+                // detector smoothing and the wire RecorderStatus only. The
+                // I2C meter is driven by a separate, shorter analysis window
+                // in the samples_rx arm.
+                let mean_square: f32 =
+                    window.iter().map(|&x| x * x).sum::<f32>() / window.len() as f32;
                 let rms = mean_square.sqrt();
                 let rms_db = if rms < 1e-9 {
                     RMS_FLOOR_DB
@@ -1288,12 +1357,6 @@ impl SessionRecorder {
                 };
                 {
                     *status.lock().await = status_info.clone();
-                }
-                if let Some(tx) = &led_event_tx {
-                    let _ = tx.try_send(LedEvent::LevelUpdate {
-                        rms_left_percent: (rms_l as f64) * 100.0,
-                        rms_right_percent: (rms_r as f64) * 100.0,
-                    });
                 }
 
                 // Fan out RecorderStatus to every connected client this window

@@ -80,7 +80,8 @@ static void onI2CRequest() {
 
 static uint16_t stepCounter[NUM_CHANNELS]; // phase accumulator per channel
 static uint16_t cometPhase[NUM_CHANNELS];  // sub-pixel comet position (Q8.8 in pixel units)
-static uint8_t  meterLevel[NUM_CHANNELS];  // current decayed meter level per channel
+static uint8_t  meterLevel[NUM_CHANNELS];  // current decayed bar level per channel
+static uint8_t  meterPeak[NUM_CHANNELS];   // current decayed peak-hold indicator level
 
 static CRGB primaryColor(uint8_t ch) {
     return CRGB(reg(ch, REG_COLOR_R), reg(ch, REG_COLOR_G), reg(ch, REG_COLOR_B));
@@ -145,21 +146,39 @@ static void renderBreathe(uint8_t ch) {
     fill_solid(leds[ch], NUM_LEDS, color);
 }
 
-// Peak level meter: a bargraph whose length tracks the most recent level
-// sample, snapping up instantly and decaying down on its own. Pixels are
-// colored by their position on the ring: green up to REG_METER_GREEN, amber up
-// to REG_METER_RED, red beyond.
+// PPM-style peak meter. Two independent inputs from the master:
+//   * REG_METER_LEVEL drives the BAR — fast attack, REG_METER_DECAY fall rate.
+//   * REG_METER_PEAK  drives the PEAK-HOLD indicator pixel — fast attack,
+//     REG_METER_PEAK_DECAY fall rate (typically much slower than the bar).
+// The master is expected to write both each analysis window; both are consumed
+// (reset to 0) here so their stale value can't survive into the next frame.
+// Pixel color depends on POSITION (green up to REG_METER_GREEN, red at/above
+// REG_METER_RED, amber in between), not on which input lit it.
 static void renderMeter(uint8_t ch) {
     CRGB* px = leds[ch];
-    uint8_t input = reg(ch, REG_METER_LEVEL);
-    if (input > 100) input = 100;
-    regs[regAddr(ch, REG_METER_LEVEL)] = 0; // consume the sample so it decays
 
-    if (input > meterLevel[ch]) {
-        meterLevel[ch] = input; // fast attack to new peaks
+    // Consume both inputs.
+    uint8_t levelInput = reg(ch, REG_METER_LEVEL);
+    uint8_t peakInput  = reg(ch, REG_METER_PEAK);
+    if (levelInput > 100) levelInput = 100;
+    if (peakInput  > 100) peakInput  = 100;
+    regs[regAddr(ch, REG_METER_LEVEL)] = 0;
+    regs[regAddr(ch, REG_METER_PEAK)]  = 0;
+
+    // Bar: instant attack to new input, otherwise decay.
+    if (levelInput > meterLevel[ch]) {
+        meterLevel[ch] = levelInput;
     } else {
         uint8_t decay = reg(ch, REG_METER_DECAY);
         meterLevel[ch] = (meterLevel[ch] > decay) ? (meterLevel[ch] - decay) : 0;
+    }
+
+    // Peak hold: instant attack to new input, otherwise slow decay.
+    if (peakInput > meterPeak[ch]) {
+        meterPeak[ch] = peakInput;
+    } else {
+        uint8_t pdecay = reg(ch, REG_METER_PEAK_DECAY);
+        meterPeak[ch] = (meterPeak[ch] > pdecay) ? (meterPeak[ch] - pdecay) : 0;
     }
 
     const uint8_t greenTo = reg(ch, REG_METER_GREEN);
@@ -167,14 +186,33 @@ static void renderMeter(uint8_t ch) {
     const bool ccw = reg(ch, REG_DIRECTION) != 0;
 
     fill_solid(px, NUM_LEDS, CRGB::Black);
-    const uint8_t lit = ((uint16_t)meterLevel[ch] * NUM_LEDS + 50) / 100;
-    for (uint8_t i = 0; i < lit; i++) {
-        uint8_t pp = ((uint16_t)(i + 1) * 100) / NUM_LEDS; // this pixel's percent
+
+    // Render the bar.
+    const uint8_t litBar = ((uint16_t)meterLevel[ch] * NUM_LEDS + 50) / 100;
+    for (uint8_t i = 0; i < litBar; i++) {
+        const uint8_t pp = ((uint16_t)(i + 1) * 100) / NUM_LEDS;
         CRGB c;
         if (pp >= redFrom)     c = CRGB::Red;
-        else if (pp > greenTo) c = CRGB::Orange; // amber transition zone
+        else if (pp > greenTo) c = CRGB::Orange;
         else                   c = CRGB::Green;
-        uint8_t idx = ccw ? (NUM_LEDS - 1 - i) : i;
+        const uint8_t idx = ccw ? (NUM_LEDS - 1 - i) : i;
+        px[idx] = c;
+    }
+
+    // Render the peak-hold indicator as a single bright pixel, painted on top
+    // of the bar (when peak floats above the bar it's a visibly separate dot;
+    // when peak == bar level it just overlaps the leading bar pixel).
+    if (meterPeak[ch] > 0) {
+        uint8_t peakIdx = ((uint16_t)meterPeak[ch] * NUM_LEDS + 50) / 100;
+        if (peakIdx == 0) peakIdx = 1;
+        if (peakIdx > NUM_LEDS) peakIdx = NUM_LEDS;
+        const uint8_t pidx = peakIdx - 1;
+        const uint8_t pp = ((uint16_t)(pidx + 1) * 100) / NUM_LEDS;
+        CRGB c;
+        if (pp >= redFrom)     c = CRGB::Red;
+        else if (pp > greenTo) c = CRGB::Orange;
+        else                   c = CRGB::Green;
+        const uint8_t idx = ccw ? (NUM_LEDS - 1 - pidx) : pidx;
         px[idx] = c;
     }
 }
@@ -219,9 +257,10 @@ static void initChannelDefaults(uint8_t ch) {
     regs[regAddr(ch, REG_SPEED)]       = 160;
     regs[regAddr(ch, REG_LENGTH)]      = NUM_LEDS / 3 > 0 ? NUM_LEDS / 3 : 1;
     regs[regAddr(ch, REG_DIRECTION)]   = 0;
-    regs[regAddr(ch, REG_METER_GREEN)] = 60; // green up to 60%
-    regs[regAddr(ch, REG_METER_RED)]   = 85; // red from 85% up
-    regs[regAddr(ch, REG_METER_DECAY)] = 4;  // ~4%/frame (~15ms) -> full fall ~0.4s
+    regs[regAddr(ch, REG_METER_GREEN)]      = 60; // green up to 60%
+    regs[regAddr(ch, REG_METER_RED)]        = 85; // red from 85% up
+    regs[regAddr(ch, REG_METER_DECAY)]      = 4;  // bar ~4%/frame (~15ms) -> full fall ~0.4s
+    regs[regAddr(ch, REG_METER_PEAK_DECAY)] = 1;  // peak ~1%/frame -> hold ~1.5s before fading out
 }
 
 void setup() {

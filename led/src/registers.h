@@ -29,13 +29,19 @@ enum ChannelRegister : uint8_t {
     REG_LENGTH     = 0x06, // tail/comet length in pixels (1..NUM_LEDS)
     REG_DIRECTION  = 0x07, // 0 = clockwise, non-zero = counter-clockwise
 
-    // Peak level meter (MODE_METER). Write a sample to REG_METER_LEVEL; it is
-    // consumed each frame (peak-hold then decay), so a single write rises
-    // instantly and falls on its own.
-    REG_METER_LEVEL = 0x08, // input level 0..100 percent (write each sample)
-    REG_METER_GREEN = 0x09, // pixels up to this percent are GREEN
-    REG_METER_RED   = 0x0A, // pixels at/above this percent are RED (between = amber)
-    REG_METER_DECAY = 0x0B, // fall rate in percent-per-frame
+    // Peak level meter (MODE_METER). Two independent inputs feed the display:
+    //  * REG_METER_LEVEL drives the BAR — fast attack, REG_METER_DECAY fall rate.
+    //  * REG_METER_PEAK  drives a single PEAK-HOLD indicator pixel painted on
+    //    top of the bar — fast attack, slow REG_METER_PEAK_DECAY fall rate.
+    // Both inputs are CONSUMED each frame (reset to 0 by the firmware), so the
+    // master is expected to write them continuously (e.g. RMS into LEVEL and
+    // max-|sample| into PEAK over the same short analysis window).
+    REG_METER_LEVEL      = 0x08, // bar input  (0..100 %, write each frame)
+    REG_METER_PEAK       = 0x09, // peak input (0..100 %, write each frame)
+    REG_METER_GREEN      = 0x0A, // pixels up to this percent are GREEN
+    REG_METER_RED        = 0x0B, // pixels at/above this percent are RED (between = amber)
+    REG_METER_DECAY      = 0x0C, // bar fall rate in percent-per-frame
+    REG_METER_PEAK_DECAY = 0x0D, // peak-hold fall rate in percent-per-frame
 };
 
 static const uint8_t CHANNEL_STRIDE = 0x20; // bytes reserved per channel block
@@ -62,4 +68,4 @@ enum Mode : uint8_t {
     MODE_COUNT
 };
 
-static const uint8_t FIRMWARE_VERSION = 3;
+static const uint8_t FIRMWARE_VERSION = 4;

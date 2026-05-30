@@ -80,13 +80,17 @@ enum CutTrigger {
     Remote,
 }
 
-/// Upload-LED events. The LED toggles once per chunk that reaches the backend,
-/// goes dark when recording stops, and blinks briefly when a cut happens.
+/// Every LED-relevant event the recorder produces. A single LED manager task
+/// consumes these and decides how each output (sysfs LEDs + WS2812 channels)
+/// should react — all the "if recording then …, on cut blink …" policy lives
+/// in one place, instead of being threaded across the audio/sender tasks.
 #[derive(Debug, Clone, Copy)]
-enum LedUploadEvent {
-    Sent,
-    Off,
+enum LedEvent {
+    RecordingStarted,
+    RecordingStopped,
     Cut,
+    ChunkSent,
+    LevelUpdate { rms_percent: f64, clipping: bool },
 }
 
 // Both LEDs blink this many times at startup as a power-on indication; the
@@ -95,9 +99,6 @@ const LED_STARTUP_BLINK_COUNT: u32 = 3;
 const LED_CUT_BLINK_COUNT: u32 = 3;
 // Half-period of a blink: the LED is on this long, then off this long.
 const LED_BLINK_HALF_MS: u64 = 80;
-// How often an idle LED task wakes to re-check the shutdown flag, so the LED is
-// turned off promptly on termination instead of waiting for its channel to close.
-const LED_SHUTDOWN_POLL: Duration = Duration::from_millis(200);
 
 // WS2812 I2C status display. The controller drives two pixel-LED channels:
 // channel 0 shows the overall state (color = audio, mode = link/activity),
@@ -125,6 +126,18 @@ fn parse_i2c_address(s: &str) -> Result<u16, String> {
 struct StatusVisual {
     mode: Mode,
     color: (u8, u8, u8),
+}
+
+/// State the LED manager maintains as events arrive; all visuals are derived
+/// from this single snapshot.
+#[derive(Default)]
+struct LedState {
+    recording: bool,
+    connected: bool,
+    rms_percent: f64,
+    clipping: bool,
+    upload_led_on: bool,
+    status_visual: Option<StatusVisual>,
 }
 
 #[derive(Parser, Debug, Clone)]
@@ -290,16 +303,11 @@ struct SessionRecorder {
     recorder_status: Arc<tokio::sync::Mutex<RecorderStatusInfo>>,
 
     shutdown_signal: Arc<AtomicBool>,
-    // True while a session is actively recording (stays true across a cut, goes
-    // false when recording stops). Gates the upload LED so chunks drained after
-    // a session ends don't toggle it back on.
-    session_active: Arc<AtomicBool>,
 
     outbox: Arc<tokio::sync::Mutex<Outbox>>,
 
     cut_tx: Option<tokio::sync::mpsc::Sender<CutTrigger>>,
-    led_rec_tx: Option<tokio::sync::mpsc::Sender<bool>>,
-    led_upload_tx: Option<tokio::sync::mpsc::Sender<LedUploadEvent>>,
+    led_event_tx: Option<tokio::sync::mpsc::Sender<LedEvent>>,
 
     input_key: Option<InputKey>,
 
@@ -307,9 +315,7 @@ struct SessionRecorder {
     audio_handle: Option<tokio::task::JoinHandle<()>>,
     drain_handle: Option<tokio::task::JoinHandle<()>>,
     sender_handle: Option<tokio::task::JoinHandle<()>>,
-    led_rec_handle: Option<tokio::task::JoinHandle<()>>,
-    led_upload_handle: Option<tokio::task::JoinHandle<()>>,
-    led_i2c_handle: Option<tokio::task::JoinHandle<()>>,
+    led_manager_handle: Option<tokio::task::JoinHandle<()>>,
 }
 
 struct ClientInfo {
@@ -383,19 +389,15 @@ impl SessionRecorder {
             callback_handle: None,
             recorder_status: Arc::new(tokio::sync::Mutex::new(initial_status)),
             shutdown_signal: Arc::new(AtomicBool::new(false)),
-            session_active: Arc::new(AtomicBool::new(false)),
             outbox,
             cut_tx: None,
-            led_rec_tx: None,
-            led_upload_tx: None,
+            led_event_tx: None,
             input_key: None,
             discovery_handle: None,
             audio_handle: None,
             drain_handle: None,
             sender_handle: None,
-            led_rec_handle: None,
-            led_upload_handle: None,
-            led_i2c_handle: None,
+            led_manager_handle: None,
         }
     }
 
@@ -408,8 +410,7 @@ impl SessionRecorder {
         self.setup_service_discovery().await?;
         self.setup_audio_processing().await?;
 
-        self.start_led_tasks();
-        self.start_led_i2c_task();
+        self.start_led_manager();
         self.start_audio_processing_task().await;
         self.start_chunk_sender_task();
         self.start_discovery_task().await;
@@ -442,16 +443,10 @@ impl SessionRecorder {
         }
         // Dropping the InputKey stops its worker thread (see InputKey::Drop)
         self.input_key.take();
-        // Drop LED senders so the LED tasks finish, then await them.
-        self.led_rec_tx.take();
-        self.led_upload_tx.take();
-        if let Some(handle) = self.led_rec_handle.take() {
-            let _ = handle.await;
-        }
-        if let Some(handle) = self.led_upload_handle.take() {
-            let _ = handle.await;
-        }
-        if let Some(handle) = self.led_i2c_handle.take() {
+        // Drop the LED event sender so the manager's recv() returns None, then
+        // await it (it also polls the shutdown flag on its 50 ms tick).
+        self.led_event_tx.take();
+        if let Some(handle) = self.led_manager_handle.take() {
             let _ = handle.await;
         }
         if let Some(handle) = self.callback_handle.take() {
@@ -592,187 +587,180 @@ impl SessionRecorder {
         Ok(())
     }
 
-    fn start_led_tasks(&mut self) {
-        if let Some(name) = self.args.led_rec_state.as_deref() {
-            match Led::new(name) {
-                Ok(led) => {
-                    let (tx, rx) = tokio::sync::mpsc::channel::<bool>(32);
-                    let shutdown = self.shutdown_signal.clone();
-                    self.led_rec_tx = Some(tx);
-                    self.led_rec_handle = Some(tokio::spawn(Self::led_rec_task(led, rx, shutdown)));
+    /// Open every configured LED output and spawn the single manager task that
+    /// owns them all. If nothing is configured the task isn't spawned and the
+    /// event channel stays None; producers' `try_send`s are then no-ops.
+    fn start_led_manager(&mut self) {
+        let rec_led = self.args.led_rec_state.as_deref().and_then(|name| {
+            Led::new(name)
+                .inspect_err(|e| warn!("Cannot open led-rec-state LED '{name}': {e}"))
+                .ok()
+        });
+        let upload_led = self.args.led_upload.as_deref().and_then(|name| {
+            Led::new(name)
+                .inspect_err(|e| warn!("Cannot open led-upload LED '{name}': {e}"))
+                .ok()
+        });
+        let i2c = self.args.led_i2c_bus.as_deref().and_then(|bus| {
+            let address = self.args.led_i2c_address;
+            match Ws2812::open(bus, address) {
+                Ok(mut d) => {
+                    match d.version() {
+                        Ok(v) => info!("WS2812 controller firmware version {v}"),
+                        Err(e) => {
+                            warn!("WS2812 controller: cannot read version ({e}); continuing anyway")
+                        }
+                    }
+                    Some(d)
                 }
-                Err(e) => warn!("Cannot open led-rec-state LED '{}': {}", name, e),
-            }
-        }
-        if let Some(name) = self.args.led_upload.as_deref() {
-            match Led::new(name) {
-                Ok(led) => {
-                    let (tx, rx) = tokio::sync::mpsc::channel::<LedUploadEvent>(32);
-                    let shutdown = self.shutdown_signal.clone();
-                    self.led_upload_tx = Some(tx);
-                    self.led_upload_handle =
-                        Some(tokio::spawn(Self::led_upload_task(led, rx, shutdown)));
+                Err(e) => {
+                    warn!("Cannot open WS2812 controller on {bus} @ {address:#04x}: {e}");
+                    None
                 }
-                Err(e) => warn!("Cannot open led-upload LED '{}': {}", name, e),
             }
-        }
-    }
+        });
 
-    /// Recording-state LED: blinks a few times at startup, then is simply on
-    /// while recording and off when idle (driven by `bool` events).
-    async fn led_rec_task(
-        led: Led,
-        mut rx: tokio::sync::mpsc::Receiver<bool>,
-        shutdown: Arc<AtomicBool>,
-    ) {
-        blink_led(&led, LED_STARTUP_BLINK_COUNT, &shutdown).await;
-        let _ = led.off();
-        while !shutdown.load(Ordering::Relaxed) {
-            match tokio::time::timeout(LED_SHUTDOWN_POLL, rx.recv()).await {
-                Ok(Some(on)) => {
-                    let _ = if on { led.on() } else { led.off() };
-                }
-                Ok(None) => break,  // all senders dropped
-                Err(_) => continue, // timeout: re-check shutdown
-            }
-        }
-        let _ = led.off();
-    }
-
-    /// Upload LED: blinks a few times at startup, then toggles once per chunk
-    /// sent (Sent), goes dark when recording stops (Off), and blinks on a cut.
-    async fn led_upload_task(
-        led: Led,
-        mut rx: tokio::sync::mpsc::Receiver<LedUploadEvent>,
-        shutdown: Arc<AtomicBool>,
-    ) {
-        blink_led(&led, LED_STARTUP_BLINK_COUNT, &shutdown).await;
-        let _ = led.off();
-        let mut on = false;
-        while !shutdown.load(Ordering::Relaxed) {
-            let event = match tokio::time::timeout(LED_SHUTDOWN_POLL, rx.recv()).await {
-                Ok(Some(event)) => event,
-                Ok(None) => break,  // all senders dropped
-                Err(_) => continue, // timeout: re-check shutdown
-            };
-            match event {
-                LedUploadEvent::Sent => {
-                    on = !on;
-                    let _ = if on { led.on() } else { led.off() };
-                }
-                LedUploadEvent::Off => {
-                    on = false;
-                    let _ = led.off();
-                }
-                LedUploadEvent::Cut => {
-                    blink_led(&led, LED_CUT_BLINK_COUNT, &shutdown).await;
-                    on = false;
-                    let _ = led.off();
-                }
-            }
-        }
-        let _ = led.off();
-    }
-
-    fn start_led_i2c_task(&mut self) {
-        let Some(bus) = self.args.led_i2c_bus.clone() else {
+        if rec_led.is_none() && upload_led.is_none() && i2c.is_none() {
             return;
-        };
-        let address = self.args.led_i2c_address;
-
-        let mut dev = match Ws2812::open(&bus, address) {
-            Ok(d) => d,
-            Err(e) => {
-                warn!("Cannot open WS2812 controller on {bus} @ {address:#04x}: {e}");
-                return;
-            }
-        };
-        match dev.version() {
-            Ok(v) => info!("WS2812 controller firmware version {v}"),
-            Err(e) => warn!("WS2812 controller: cannot read version ({e}); continuing anyway"),
         }
 
-        let status = Arc::clone(&self.recorder_status);
+        let (tx, rx) = tokio::sync::mpsc::channel::<LedEvent>(64);
+        self.led_event_tx = Some(tx);
         let clients = Arc::clone(&self.grpc_clients);
         let shutdown = self.shutdown_signal.clone();
-        self.led_i2c_handle = Some(tokio::spawn(Self::led_i2c_task(
-            dev, status, clients, shutdown,
+        self.led_manager_handle = Some(tokio::spawn(Self::led_manager_task(
+            rec_led, upload_led, i2c, rx, clients, shutdown,
         )));
     }
 
-    /// Drive the WS2812 pixel-LED controller from the recorder's live state.
-    /// The status channel encodes audio state in its color (red=clipping,
-    /// green=recording, amber=signal-but-not-loud, dim-blue=idle) and the
-    /// link/activity in its mode (breathe=no backend, cylon=recording+streaming,
-    /// solid=idle). The meter channel shows the current RMS level. Turns both
-    /// channels off on exit.
-    async fn led_i2c_task(
-        mut dev: Ws2812,
-        recorder_status: Arc<tokio::sync::Mutex<RecorderStatusInfo>>,
+    /// The single decision point for every LED output. Receives semantic events
+    /// from the audio + chunk-sender + (future) discovery tasks and translates
+    /// them into the appropriate sysfs writes and I2C register writes. Connection
+    /// state is polled from the clients map on each tick — it's the one piece of
+    /// state that's already canonical elsewhere, so emitting events for it would
+    /// be redundant.
+    ///
+    /// Output mapping (one place — change here to tweak visuals):
+    /// * sysfs rec-state LED: on while recording, off otherwise; startup blink.
+    /// * sysfs upload LED: toggles per ChunkSent (only while recording), forced
+    ///   off on RecordingStopped, blinks on Cut; startup blink.
+    /// * WS2812 status channel: color = audio (red=clipping, green=recording,
+    ///   amber=signal-but-not-loud, dim-blue=idle); mode = link/activity
+    ///   (breathe=no backend, cylon=recording+streaming, solid=idle).
+    /// * WS2812 meter channel: live RMS pushed on the 50 ms tick.
+    async fn led_manager_task(
+        rec_led: Option<Led>,
+        upload_led: Option<Led>,
+        mut i2c: Option<Ws2812>,
+        mut rx: tokio::sync::mpsc::Receiver<LedEvent>,
         clients: Arc<tokio::sync::Mutex<HashMap<String, ClientInfo>>>,
         shutdown: Arc<AtomicBool>,
     ) {
-        info!("WS2812 status task started");
+        info!("LED manager task started");
 
-        // One-time setup. The Arduino keeps its registers across recorder
-        // restarts, so set every register the chosen modes rely on.
-        let num_leds = dev.num_leds().unwrap_or(12);
-        let _ = dev.set_brightness(LED_I2C_STATUS_CH, LED_I2C_BRIGHTNESS);
-        let _ = dev.set_speed(LED_I2C_STATUS_CH, 160);
-        let _ = dev.set_length(LED_I2C_STATUS_CH, (num_leds / 3).max(1));
-        let _ = dev.set_brightness(LED_I2C_METER_CH, LED_I2C_BRIGHTNESS);
-        let _ = dev.set_meter_zones(LED_I2C_METER_CH, 60, 85, 4);
-        let _ = dev.set_mode(LED_I2C_METER_CH, Mode::Meter);
+        // Startup blink (each output independently). Done sequentially — the
+        // blink is short and only runs once.
+        if let Some(l) = &rec_led {
+            blink_led(l, LED_STARTUP_BLINK_COUNT, &shutdown).await;
+            let _ = l.off();
+        }
+        if let Some(l) = &upload_led {
+            blink_led(l, LED_STARTUP_BLINK_COUNT, &shutdown).await;
+            let _ = l.off();
+        }
 
-        let mut last: Option<StatusVisual> = None;
+        // The Arduino retains its registers across recorder restarts, so set
+        // every register the chosen modes depend on.
+        if let Some(dev) = i2c.as_mut() {
+            let num_leds = dev.num_leds().unwrap_or(15);
+            let _ = dev.set_brightness(LED_I2C_STATUS_CH, LED_I2C_BRIGHTNESS);
+            let _ = dev.set_speed(LED_I2C_STATUS_CH, 160);
+            let _ = dev.set_length(LED_I2C_STATUS_CH, (num_leds / 3).max(1));
+            let _ = dev.set_brightness(LED_I2C_METER_CH, LED_I2C_BRIGHTNESS);
+            let _ = dev.set_meter_zones(LED_I2C_METER_CH, 60, 85, 4);
+            let _ = dev.set_mode(LED_I2C_METER_CH, Mode::Meter);
+        }
+
+        let mut state = LedState::default();
+        apply_status_visual(&mut state, i2c.as_mut());
+
         let mut tick = interval(LED_I2C_TICK);
 
         while !shutdown.load(Ordering::Relaxed) {
-            tick.tick().await;
-
-            let (recording, rms_percent, clipping) = {
-                let s = recorder_status.lock().await;
-                (
-                    matches!(s.signal_status, SignalStatus::Signal),
-                    s.rms_percent,
-                    s.clipping,
-                )
-            };
-            let connected = !clients.lock().await.is_empty();
-
-            // Color encodes the audio state; mode encodes the link / activity.
-            let color = if clipping {
-                (255, 0, 0) // clipping → red
-            } else if recording {
-                (0, 255, 0) // recording → green
-            } else if rms_percent >= LED_I2C_SIGNAL_FLOOR_PERCENT {
-                (255, 160, 0) // signal present but below the record threshold → amber
-            } else {
-                (0, 40, 120) // idle → dim blue
-            };
-            let mode = if !connected {
-                Mode::Breathe // no backend reachable → pulse
-            } else if recording {
-                Mode::Cylon // recording & streaming → moving comet
-            } else {
-                Mode::Solid // connected & idle → steady
-            };
-
-            let visual = StatusVisual { mode, color };
-            if last != Some(visual) {
-                let _ = dev.set_color(LED_I2C_STATUS_CH, color.0, color.1, color.2);
-                let _ = dev.set_mode(LED_I2C_STATUS_CH, mode);
-                last = Some(visual);
+            tokio::select! {
+                biased;
+                maybe_ev = rx.recv() => {
+                    let Some(ev) = maybe_ev else { break };
+                    match ev {
+                        LedEvent::RecordingStarted => {
+                            state.recording = true;
+                            state.upload_led_on = false;
+                            if let Some(l) = &rec_led { let _ = l.on(); }
+                            if let Some(l) = &upload_led { let _ = l.off(); }
+                            apply_status_visual(&mut state, i2c.as_mut());
+                        }
+                        LedEvent::RecordingStopped => {
+                            state.recording = false;
+                            state.upload_led_on = false;
+                            if let Some(l) = &rec_led { let _ = l.off(); }
+                            if let Some(l) = &upload_led { let _ = l.off(); }
+                            apply_status_visual(&mut state, i2c.as_mut());
+                        }
+                        LedEvent::Cut => {
+                            if let Some(l) = &upload_led {
+                                // Briefly blocks event processing (~480 ms); cuts
+                                // are infrequent and queued events resume after.
+                                blink_led(l, LED_CUT_BLINK_COUNT, &shutdown).await;
+                                state.upload_led_on = false;
+                                let _ = l.off();
+                            }
+                        }
+                        LedEvent::ChunkSent => {
+                            // Toggle the upload LED only while recording: a
+                            // chunk drained after the session ended must not
+                            // light it back up.
+                            if state.recording {
+                                state.upload_led_on = !state.upload_led_on;
+                                if let Some(l) = &upload_led {
+                                    let _ = if state.upload_led_on { l.on() } else { l.off() };
+                                }
+                            }
+                        }
+                        LedEvent::LevelUpdate { rms_percent, clipping } => {
+                            state.rms_percent = rms_percent;
+                            state.clipping = clipping;
+                            apply_status_visual(&mut state, i2c.as_mut());
+                        }
+                    }
+                }
+                _ = tick.tick() => {
+                    // Poll connection state and push a meter sample. Re-checking
+                    // the shutdown flag this often keeps the manager responsive
+                    // to Ctrl+C even when no events are arriving.
+                    let connected = !clients.lock().await.is_empty();
+                    if state.connected != connected {
+                        state.connected = connected;
+                        apply_status_visual(&mut state, i2c.as_mut());
+                    }
+                    if let Some(dev) = i2c.as_mut() {
+                        let level = state.rms_percent.clamp(0.0, 100.0) as u8;
+                        let _ = dev.push_meter(LED_I2C_METER_CH, level);
+                    }
+                }
             }
-
-            // Meter channel: push the current RMS as a 0..100% sample each tick.
-            let level = rms_percent.clamp(0.0, 100.0) as u8;
-            let _ = dev.push_meter(LED_I2C_METER_CH, level);
         }
 
-        let _ = dev.off(LED_I2C_STATUS_CH);
-        let _ = dev.off(LED_I2C_METER_CH);
-        info!("WS2812 status task stopped");
+        if let Some(l) = &rec_led {
+            let _ = l.off();
+        }
+        if let Some(l) = &upload_led {
+            let _ = l.off();
+        }
+        if let Some(dev) = i2c.as_mut() {
+            let _ = dev.off(LED_I2C_STATUS_CH);
+            let _ = dev.off(LED_I2C_METER_CH);
+        }
+        info!("LED manager task stopped");
     }
 
     async fn start_audio_processing_task(&mut self) {
@@ -803,9 +791,7 @@ impl SessionRecorder {
         });
         self.drain_handle = Some(drain_handle);
 
-        let led_rec_tx = self.led_rec_tx.clone();
-        let led_upload_tx = self.led_upload_tx.clone();
-        let session_active = self.session_active.clone();
+        let led_event_tx = self.led_event_tx.clone();
         let chunk_frames = self.args.chunk_frames;
 
         let handle = tokio::spawn(async move {
@@ -816,9 +802,7 @@ impl SessionRecorder {
                 status,
                 detector,
                 cut_rx,
-                led_rec_tx,
-                led_upload_tx,
-                session_active,
+                led_event_tx,
                 outbox,
                 chunk_frames,
             )
@@ -832,11 +816,10 @@ impl SessionRecorder {
         let outbox = Arc::clone(&self.outbox);
         let clients = Arc::clone(&self.grpc_clients);
         let shutdown = self.shutdown_signal.clone();
-        let led_upload_tx = self.led_upload_tx.clone();
-        let session_active = self.session_active.clone();
+        let led_event_tx = self.led_event_tx.clone();
 
         let handle = tokio::spawn(async move {
-            Self::chunk_sender_task(outbox, clients, shutdown, led_upload_tx, session_active).await;
+            Self::chunk_sender_task(outbox, clients, shutdown, led_event_tx).await;
         });
 
         self.sender_handle = Some(handle);
@@ -850,8 +833,7 @@ impl SessionRecorder {
         outbox: Arc<tokio::sync::Mutex<Outbox>>,
         clients: Arc<tokio::sync::Mutex<HashMap<String, ClientInfo>>>,
         shutdown: Arc<AtomicBool>,
-        led_upload_tx: Option<tokio::sync::mpsc::Sender<LedUploadEvent>>,
-        session_active: Arc<AtomicBool>,
+        led_event_tx: Option<tokio::sync::mpsc::Sender<LedEvent>>,
     ) {
         info!("Chunk sender task started");
         let idle_sleep = Duration::from_millis(20);
@@ -894,13 +876,10 @@ impl SessionRecorder {
             }
 
             if sent_to_any {
-                // Toggle the upload LED per chunk, but only while a session is
-                // active — chunks drained after recording stops must not light
-                // it back up (the audio task forces it off on stop).
-                if session_active.load(Ordering::Relaxed)
-                    && let Some(tx) = &led_upload_tx
-                {
-                    let _ = tx.try_send(LedUploadEvent::Sent);
+                // The manager decides whether to toggle the upload LED (it
+                // suppresses ChunkSent that arrives after RecordingStopped).
+                if let Some(tx) = &led_event_tx {
+                    let _ = tx.try_send(LedEvent::ChunkSent);
                 }
             } else {
                 outbox.lock().await.push_front_in_flight(chunk);
@@ -1150,9 +1129,7 @@ impl SessionRecorder {
         status: Arc<tokio::sync::Mutex<RecorderStatusInfo>>,
         detector: DetectorConfig,
         mut cut_rx: tokio::sync::mpsc::Receiver<CutTrigger>,
-        led_rec_tx: Option<tokio::sync::mpsc::Sender<bool>>,
-        led_upload_tx: Option<tokio::sync::mpsc::Sender<LedUploadEvent>>,
-        session_active: Arc<AtomicBool>,
+        led_event_tx: Option<tokio::sync::mpsc::Sender<LedEvent>>,
         outbox: Arc<tokio::sync::Mutex<Outbox>>,
         chunk_frames: usize,
     ) {
@@ -1212,11 +1189,8 @@ impl SessionRecorder {
                         info!("Cut ({:?}): ending current session, starting {}", trigger, new_id);
                         session_id = Some(new_id);
                         chunk_counter = 0;
-                        // Recording continues across a cut, so the rec-state LED
-                        // stays on; blink the upload LED to mark the boundary.
-                        if let Some(tx) = &led_upload_tx {
-                            let _ = tx.try_send(LedUploadEvent::Cut);
-                            debug!("LED upload: Cut (blink)");
+                        if let Some(tx) = &led_event_tx {
+                            let _ = tx.try_send(LedEvent::Cut);
                         }
                     } else {
                         info!("Cut ({:?}) ignored: not currently recording", trigger);
@@ -1266,10 +1240,8 @@ impl SessionRecorder {
                         );
                         session_id = Some(new_id);
                         chunk_counter = 0;
-                        session_active.store(true, Ordering::Relaxed);
-                        if let Some(tx) = &led_rec_tx {
-                            let _ = tx.try_send(true);
-                            debug!("LED rec-state: on");
+                        if let Some(tx) = &led_event_tx {
+                            let _ = tx.try_send(LedEvent::RecordingStarted);
                         }
                     }
                 } else {
@@ -1277,23 +1249,20 @@ impl SessionRecorder {
                     above_count = 0;
                     if recording && below_count >= release_windows {
                         recording = false;
-                        // Stop gating before the final flush so the last chunk's
-                        // send doesn't toggle the upload LED back on.
-                        session_active.store(false, Ordering::Relaxed);
+                        // Notify the manager BEFORE the final flush. The
+                        // ChunkSent for that flushed chunk reaches the manager
+                        // only after the sender task processes it, so the
+                        // manager already has recording=false and won't toggle
+                        // the upload LED back on.
+                        if let Some(tx) = &led_event_tx {
+                            let _ = tx.try_send(LedEvent::RecordingStopped);
+                        }
                         // Flush the remaining buffered samples as the session's
                         // final (partial) chunk so the tail isn't dropped.
                         flush_pending(&outbox, &mut pending, session_id.as_deref(), chunk_counter)
                             .await;
                         info!("Recording stopped (RMS {:.1} dB)", rms_db);
                         session_id = None;
-                        if let Some(tx) = &led_rec_tx {
-                            let _ = tx.try_send(false);
-                            debug!("LED rec-state: off");
-                        }
-                        if let Some(tx) = &led_upload_tx {
-                            let _ = tx.try_send(LedUploadEvent::Off);
-                            debug!("LED upload: off");
-                        }
                     }
                 }
 
@@ -1312,6 +1281,12 @@ impl SessionRecorder {
                 };
                 {
                     *status.lock().await = status_info.clone();
+                }
+                if let Some(tx) = &led_event_tx {
+                    let _ = tx.try_send(LedEvent::LevelUpdate {
+                        rms_percent: status_info.rms_percent,
+                        clipping: status_info.clipping,
+                    });
                 }
 
                 // Fan out RecorderStatus to every connected client this window
@@ -1411,6 +1386,36 @@ impl SessionRecorder {
             bytes as f64 / bytes_per_sec,
             capacity as f64 / bytes_per_sec,
         )
+    }
+}
+
+/// Compute the visual the WS2812 status channel should show from the manager's
+/// current state and write it out — but only when it changes, to keep I2C
+/// traffic to the minimum needed. The mapping (color from audio state, mode from
+/// link/activity) lives here; tweak in one place to retune the display.
+fn apply_status_visual(state: &mut LedState, i2c: Option<&mut Ws2812>) {
+    let Some(dev) = i2c else { return };
+    let color = if state.clipping {
+        (255, 0, 0) // clipping → red
+    } else if state.recording {
+        (0, 255, 0) // recording → green
+    } else if state.rms_percent >= LED_I2C_SIGNAL_FLOOR_PERCENT {
+        (255, 160, 0) // signal present but below the record threshold → amber
+    } else {
+        (0, 40, 120) // idle → dim blue
+    };
+    let mode = if !state.connected {
+        Mode::Breathe // no backend reachable → pulse
+    } else if state.recording {
+        Mode::Cylon // recording & streaming → moving comet
+    } else {
+        Mode::Solid // connected & idle → steady
+    };
+    let visual = StatusVisual { mode, color };
+    if state.status_visual != Some(visual) {
+        let _ = dev.set_color(LED_I2C_STATUS_CH, color.0, color.1, color.2);
+        let _ = dev.set_mode(LED_I2C_STATUS_CH, mode);
+        state.status_visual = Some(visual);
     }
 }
 

@@ -90,7 +90,10 @@ enum LedEvent {
     RecordingStopped,
     Cut,
     ChunkSent,
-    LevelUpdate { rms_percent: f64, clipping: bool },
+    LevelUpdate {
+        rms_left_percent: f64,
+        rms_right_percent: f64,
+    },
 }
 
 // Both LEDs blink this many times at startup as a power-on indication; the
@@ -100,16 +103,22 @@ const LED_CUT_BLINK_COUNT: u32 = 3;
 // Half-period of a blink: the LED is on this long, then off this long.
 const LED_BLINK_HALF_MS: u64 = 80;
 
-// WS2812 I2C status display. The controller drives two pixel-LED channels:
-// channel 0 shows the overall state (color = audio, mode = link/activity),
-// channel 1 is a live RMS meter.
-const LED_I2C_STATUS_CH: u8 = 0;
-const LED_I2C_METER_CH: u8 = 1;
+// WS2812 I2C: both channels are stereo peak-level meters (channel 0 = left,
+// channel 1 = right). The audio task sends per-channel RMS in LevelUpdate; the
+// manager pushes the cached level on each tick so the firmware-side decay stays
+// smooth between detector windows.
+const LED_I2C_LEFT_CH: u8 = 0;
+const LED_I2C_RIGHT_CH: u8 = 1;
 const LED_I2C_TICK: Duration = Duration::from_millis(50);
 const LED_I2C_BRIGHTNESS: u8 = 64;
-// RMS amplitude (percent) above which we consider "some signal present" but, when
-// not recording, still below the record threshold — shown amber. ~ -40 dBFS.
-const LED_I2C_SIGNAL_FLOOR_PERCENT: f64 = 1.0;
+// Meter color zones tuned for 15-LED strips: first 8 green, next 4 amber, last
+// 3 red. The firmware colors pixel i (0-indexed) by its position percent
+// pp = (i+1)*100/15, so pp ∈ {6,13,20,26,33,40,46,53,60,66,73,80,86,93,100}.
+// greenTo=53 → green band covers pixels 1..8; redFrom=86 → red covers pixels
+// 13..15; the remaining pixels 9..12 fall in the amber zone.
+const LED_I2C_METER_GREEN_PERCENT: u8 = 53;
+const LED_I2C_METER_RED_PERCENT: u8 = 86;
+const LED_I2C_METER_DECAY: u8 = 4;
 
 /// Parse an I2C address given as hex (`0x20`) or decimal (`32`).
 fn parse_i2c_address(s: &str) -> Result<u16, String> {
@@ -121,23 +130,15 @@ fn parse_i2c_address(s: &str) -> Result<u16, String> {
     parsed.map_err(|_| format!("invalid I2C address: {s}"))
 }
 
-/// The visual shown on the status channel; tracked so we only write to I2C on change.
-#[derive(Clone, Copy, PartialEq)]
-struct StatusVisual {
-    mode: Mode,
-    color: (u8, u8, u8),
-}
-
-/// State the LED manager maintains as events arrive; all visuals are derived
-/// from this single snapshot.
+/// State the LED manager maintains as events arrive. Per-channel RMS is
+/// cached here so the manager can push fresh meter samples on every tick,
+/// independent of the detector-window cadence.
 #[derive(Default)]
 struct LedState {
     recording: bool,
-    connected: bool,
-    rms_percent: f64,
-    clipping: bool,
     upload_led_on: bool,
-    status_visual: Option<StatusVisual>,
+    rms_left_percent: f64,
+    rms_right_percent: f64,
 }
 
 #[derive(Parser, Debug, Clone)]
@@ -626,34 +627,28 @@ impl SessionRecorder {
 
         let (tx, rx) = tokio::sync::mpsc::channel::<LedEvent>(64);
         self.led_event_tx = Some(tx);
-        let clients = Arc::clone(&self.grpc_clients);
         let shutdown = self.shutdown_signal.clone();
         self.led_manager_handle = Some(tokio::spawn(Self::led_manager_task(
-            rec_led, upload_led, i2c, rx, clients, shutdown,
+            rec_led, upload_led, i2c, rx, shutdown,
         )));
     }
 
     /// The single decision point for every LED output. Receives semantic events
-    /// from the audio + chunk-sender + (future) discovery tasks and translates
-    /// them into the appropriate sysfs writes and I2C register writes. Connection
-    /// state is polled from the clients map on each tick — it's the one piece of
-    /// state that's already canonical elsewhere, so emitting events for it would
-    /// be redundant.
+    /// from the audio + chunk-sender tasks and translates them into sysfs / I2C
+    /// writes.
     ///
     /// Output mapping (one place — change here to tweak visuals):
     /// * sysfs rec-state LED: on while recording, off otherwise; startup blink.
     /// * sysfs upload LED: toggles per ChunkSent (only while recording), forced
     ///   off on RecordingStopped, blinks on Cut; startup blink.
-    /// * WS2812 status channel: color = audio (red=clipping, green=recording,
-    ///   amber=signal-but-not-loud, dim-blue=idle); mode = link/activity
-    ///   (breathe=no backend, cylon=recording+streaming, solid=idle).
-    /// * WS2812 meter channel: live RMS pushed on the 50 ms tick.
+    /// * WS2812 channel 0 / 1: stereo peak meters for left / right. The audio
+    ///   task computes per-channel RMS each detector window; the manager pushes
+    ///   the cached level on every tick so the firmware-side decay stays smooth.
     async fn led_manager_task(
         rec_led: Option<Led>,
         upload_led: Option<Led>,
         mut i2c: Option<Ws2812>,
         mut rx: tokio::sync::mpsc::Receiver<LedEvent>,
-        clients: Arc<tokio::sync::Mutex<HashMap<String, ClientInfo>>>,
         shutdown: Arc<AtomicBool>,
     ) {
         info!("LED manager task started");
@@ -669,21 +664,23 @@ impl SessionRecorder {
             let _ = l.off();
         }
 
-        // The Arduino retains its registers across recorder restarts, so set
-        // every register the chosen modes depend on.
+        // Configure both I2C channels as identical peak meters. The Arduino
+        // retains its registers across recorder restarts, so set every
+        // register the meter mode depends on.
         if let Some(dev) = i2c.as_mut() {
-            let num_leds = dev.num_leds().unwrap_or(15);
-            let _ = dev.set_brightness(LED_I2C_STATUS_CH, LED_I2C_BRIGHTNESS);
-            let _ = dev.set_speed(LED_I2C_STATUS_CH, 160);
-            let _ = dev.set_length(LED_I2C_STATUS_CH, (num_leds / 3).max(1));
-            let _ = dev.set_brightness(LED_I2C_METER_CH, LED_I2C_BRIGHTNESS);
-            let _ = dev.set_meter_zones(LED_I2C_METER_CH, 60, 85, 4);
-            let _ = dev.set_mode(LED_I2C_METER_CH, Mode::Meter);
+            for ch in [LED_I2C_LEFT_CH, LED_I2C_RIGHT_CH] {
+                let _ = dev.set_brightness(ch, LED_I2C_BRIGHTNESS);
+                let _ = dev.set_meter_zones(
+                    ch,
+                    LED_I2C_METER_GREEN_PERCENT,
+                    LED_I2C_METER_RED_PERCENT,
+                    LED_I2C_METER_DECAY,
+                );
+                let _ = dev.set_mode(ch, Mode::Meter);
+            }
         }
 
         let mut state = LedState::default();
-        apply_status_visual(&mut state, i2c.as_mut());
-
         let mut tick = interval(LED_I2C_TICK);
 
         while !shutdown.load(Ordering::Relaxed) {
@@ -697,14 +694,12 @@ impl SessionRecorder {
                             state.upload_led_on = false;
                             if let Some(l) = &rec_led { let _ = l.on(); }
                             if let Some(l) = &upload_led { let _ = l.off(); }
-                            apply_status_visual(&mut state, i2c.as_mut());
                         }
                         LedEvent::RecordingStopped => {
                             state.recording = false;
                             state.upload_led_on = false;
                             if let Some(l) = &rec_led { let _ = l.off(); }
                             if let Some(l) = &upload_led { let _ = l.off(); }
-                            apply_status_visual(&mut state, i2c.as_mut());
                         }
                         LedEvent::Cut => {
                             if let Some(l) = &upload_led {
@@ -726,25 +721,20 @@ impl SessionRecorder {
                                 }
                             }
                         }
-                        LedEvent::LevelUpdate { rms_percent, clipping } => {
-                            state.rms_percent = rms_percent;
-                            state.clipping = clipping;
-                            apply_status_visual(&mut state, i2c.as_mut());
+                        LedEvent::LevelUpdate { rms_left_percent, rms_right_percent } => {
+                            state.rms_left_percent = rms_left_percent;
+                            state.rms_right_percent = rms_right_percent;
                         }
                     }
                 }
                 _ = tick.tick() => {
-                    // Poll connection state and push a meter sample. Re-checking
-                    // the shutdown flag this often keeps the manager responsive
-                    // to Ctrl+C even when no events are arriving.
-                    let connected = !clients.lock().await.is_empty();
-                    if state.connected != connected {
-                        state.connected = connected;
-                        apply_status_visual(&mut state, i2c.as_mut());
-                    }
+                    // Push fresh meter samples and re-check shutdown every 50 ms
+                    // so Ctrl+C is noticed promptly even with no events.
                     if let Some(dev) = i2c.as_mut() {
-                        let level = state.rms_percent.clamp(0.0, 100.0) as u8;
-                        let _ = dev.push_meter(LED_I2C_METER_CH, level);
+                        let left = state.rms_left_percent.clamp(0.0, 100.0) as u8;
+                        let right = state.rms_right_percent.clamp(0.0, 100.0) as u8;
+                        let _ = dev.push_meter(LED_I2C_LEFT_CH, left);
+                        let _ = dev.push_meter(LED_I2C_RIGHT_CH, right);
                     }
                 }
             }
@@ -757,8 +747,8 @@ impl SessionRecorder {
             let _ = l.off();
         }
         if let Some(dev) = i2c.as_mut() {
-            let _ = dev.off(LED_I2C_STATUS_CH);
-            let _ = dev.off(LED_I2C_METER_CH);
+            let _ = dev.off(LED_I2C_LEFT_CH);
+            let _ = dev.off(LED_I2C_RIGHT_CH);
         }
         info!("LED manager task stopped");
     }
@@ -1203,8 +1193,25 @@ impl SessionRecorder {
             while window_buf.len() >= window_samples {
                 let window: Vec<f32> = window_buf.drain(..window_samples).collect();
 
-                let mean_square: f32 =
-                    window.iter().map(|&x| x * x).sum::<f32>() / window.len() as f32;
+                // Per-channel sum-of-squares from interleaved L,R,L,R,… samples.
+                // The mono RMS used for the detector / wire status is derived
+                // from the same sums, so we only walk the window once.
+                let (mut ssq_l, mut ssq_r) = (0f32, 0f32);
+                for frame in window.chunks_exact(2) {
+                    ssq_l += frame[0] * frame[0];
+                    ssq_r += frame[1] * frame[1];
+                }
+                let frames = (window.len() / 2) as f32;
+                let (rms_l, rms_r) = if frames > 0.0 {
+                    ((ssq_l / frames).sqrt(), (ssq_r / frames).sqrt())
+                } else {
+                    (0.0, 0.0)
+                };
+                let mean_square = if frames > 0.0 {
+                    (ssq_l + ssq_r) / (2.0 * frames)
+                } else {
+                    0.0
+                };
                 let rms = mean_square.sqrt();
                 let rms_db = if rms < 1e-9 {
                     RMS_FLOOR_DB
@@ -1284,8 +1291,8 @@ impl SessionRecorder {
                 }
                 if let Some(tx) = &led_event_tx {
                     let _ = tx.try_send(LedEvent::LevelUpdate {
-                        rms_percent: status_info.rms_percent,
-                        clipping: status_info.clipping,
+                        rms_left_percent: (rms_l as f64) * 100.0,
+                        rms_right_percent: (rms_r as f64) * 100.0,
                     });
                 }
 
@@ -1386,36 +1393,6 @@ impl SessionRecorder {
             bytes as f64 / bytes_per_sec,
             capacity as f64 / bytes_per_sec,
         )
-    }
-}
-
-/// Compute the visual the WS2812 status channel should show from the manager's
-/// current state and write it out — but only when it changes, to keep I2C
-/// traffic to the minimum needed. The mapping (color from audio state, mode from
-/// link/activity) lives here; tweak in one place to retune the display.
-fn apply_status_visual(state: &mut LedState, i2c: Option<&mut Ws2812>) {
-    let Some(dev) = i2c else { return };
-    let color = if state.clipping {
-        (255, 0, 0) // clipping → red
-    } else if state.recording {
-        (0, 255, 0) // recording → green
-    } else if state.rms_percent >= LED_I2C_SIGNAL_FLOOR_PERCENT {
-        (255, 160, 0) // signal present but below the record threshold → amber
-    } else {
-        (0, 40, 120) // idle → dim blue
-    };
-    let mode = if !state.connected {
-        Mode::Breathe // no backend reachable → pulse
-    } else if state.recording {
-        Mode::Cylon // recording & streaming → moving comet
-    } else {
-        Mode::Solid // connected & idle → steady
-    };
-    let visual = StatusVisual { mode, color };
-    if state.status_visual != Some(visual) {
-        let _ = dev.set_color(LED_I2C_STATUS_CH, color.0, color.1, color.2);
-        let _ = dev.set_mode(LED_I2C_STATUS_CH, mode);
-        state.status_visual = Some(visual);
     }
 }
 

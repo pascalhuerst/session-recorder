@@ -1629,7 +1629,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     while recorder.is_running() {
         tokio::time::sleep(Duration::from_secs(1)).await;
         secs += 1;
-        if !secs.is_multiple_of(STATUS_LOG_SECS) {
+        if secs % STATUS_LOG_SECS != 0 {
             continue;
         }
 

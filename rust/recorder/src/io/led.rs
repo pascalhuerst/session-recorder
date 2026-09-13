@@ -294,10 +294,10 @@ impl Led {
 
         for entry in std::fs::read_dir(base_path)? {
             let entry = entry?;
-            if entry.file_type()?.is_dir()
-                && let Some(name) = entry.file_name().to_str()
-            {
-                leds.push(name.to_string());
+            if entry.file_type()?.is_dir() {
+                if let Some(name) = entry.file_name().to_str() {
+                    leds.push(name.to_string());
+                }
             }
         }
 

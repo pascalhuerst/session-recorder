@@ -27,7 +27,10 @@ uuid = { version = "1", features = ["v4"] }
 clap = { version = "4.6.1", features = ["derive", "env"] }
 # D-Bus client for the Avahi discovery backend. zbus is pure Rust (no libdbus /
 # C dependency), so it cross-compiles to arm64 with the rest of the recorder.
-zbus = { version = "5", default-features = false, features = ["tokio"] }
+# Pinned to the last zbus/zvariant 5.x release built against rustc 1.85 —
+# zbus 5.14+ / zvariant 5.10+ bumped their MSRV to 1.87, which is newer than
+# the toolchain available on the target device (Raspberry Pi).
+zbus = { version = "=5.13.2", default-features = false, features = ["tokio"] }
 async-trait = "0.1"
 futures-util = "0.3"
 

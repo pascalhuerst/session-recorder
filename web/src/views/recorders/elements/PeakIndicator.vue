@@ -14,7 +14,7 @@ defineProps<{
         }"
       ></div>
     </div>
-    <div class="text">{{ Math.ceil(value) }}%</div>
+    <div class="text" :class="{ hot: value > 80 }">{{ Math.ceil(value) }}%</div>
   </div>
 </template>
 
@@ -31,6 +31,10 @@ defineProps<{
   font-size: var(--scale-00);
   color: var(--text-secondary);
   flex-shrink: 0;
+}
+
+.text.hot {
+  color: var(--color-red-500);
 }
 
 .indicator {

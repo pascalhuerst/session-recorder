@@ -101,7 +101,7 @@ pub struct AudioChunk {
 #[derive(Debug, Clone)]
 pub struct RecorderStatusInfo {
     pub signal_status: SignalStatus,
-    pub rms_percent: f64,
+    pub peak_percent: f64,
     pub clipping: bool,
 }
 
@@ -159,7 +159,7 @@ impl ChunkSinkClientService {
             recorder_id: self.config.recorder_id.clone(),
             recorder_name: self.config.recorder_name.clone(),
             signal_status: status.signal_status.into(),
-            rms_percent: status.rms_percent,
+            peak_percent: status.peak_percent,
             clipping: status.clipping,
         });
 
@@ -242,7 +242,7 @@ mod tests {
 
         let status = RecorderStatusInfo {
             signal_status: SignalStatus::Signal,
-            rms_percent: 0.5,
+            peak_percent: 0.5,
             clipping: false,
         };
 

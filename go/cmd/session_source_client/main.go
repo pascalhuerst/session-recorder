@@ -236,7 +236,7 @@ func formatRecorderInfo(rec *sspb.Recorder) string {
 	switch info := rec.GetInfo().(type) {
 	case *sspb.Recorder_Status:
 		s := info.Status
-		return fmt.Sprintf("  signal=%s rms=%.2f%% clip=%v", signalStatusName(s.SignalStatus), s.RmsPercent, s.Clipping)
+		return fmt.Sprintf("  signal=%s peak=%.2f%% clip=%v", signalStatusName(s.SignalStatus), s.PeakPercent, s.Clipping)
 	case *sspb.Recorder_Removed:
 		return "  REMOVED"
 	default:

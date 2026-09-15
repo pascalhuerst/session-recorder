@@ -31,7 +31,7 @@ func makeRecorder(id, name string, signalStatus cmpb.SignalStatus) *sspb.Recorde
 				RecorderID:   id,
 				RecorderName: name,
 				SignalStatus: signalStatus,
-				RmsPercent:   50.0,
+				PeakPercent:  50.0,
 				Clipping:     false,
 			},
 		},

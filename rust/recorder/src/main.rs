@@ -1467,11 +1467,14 @@ impl SessionRecorder {
                         let sample_rate = detector.sample_rate;
                         let channels = detector.num_channels;
                         tokio::task::spawn_blocking(move || {
+                            // Nested rather than a let-chain: those need rustc 1.88,
+                            // the recorder host (Debian trixie) ships 1.85.
                             if let Some(fp) =
                                 compute_fingerprint(&samples_snapshot, sample_rate, channels)
-                                && let Ok(mut g) = fingerprint_state.lock()
                             {
-                                *g = fp;
+                                if let Ok(mut g) = fingerprint_state.lock() {
+                                    *g = fp;
+                                }
                             }
                         });
                     }

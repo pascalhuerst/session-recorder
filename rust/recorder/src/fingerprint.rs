@@ -307,24 +307,6 @@ impl FingerprintWorker {
         tempo: Option<&crate::tempo::TempoEstimator>,
         job: Job,
     ) {
-        // With `spread`, computation k of n may not start before k/n of that
-        // time has passed since the window came in.
-        let started = std::time::Instant::now();
-        let steps = 1 + constellation as u32 + tempo.is_some() as u32 + speeds.len() as u32;
-        let mut step = 0u32;
-        let mut wait_for_turn = || {
-            if let Some(spread) = spread {
-                let due = started + spread * step / steps;
-                std::thread::sleep(due.saturating_duration_since(std::time::Instant::now()));
-            }
-            step += 1;
-        };
-
-        wait_for_turn();
-        let Some(fingerprint) = compute_fingerprint(&job.samples, job.sample_rate, job.channels)
-        else {
-            return;
-        };
         // Each result goes out the moment it exists. Whenever the session
         // has moved on in the meantime, the rest of the window is dropped.
         let publish = |update: &dyn Fn(&mut FingerprintOutput)| match shared.published.lock() {
@@ -336,21 +318,55 @@ impl FingerprintWorker {
             }
             _ => false,
         };
+        // A new window: nothing of the previous one belongs to it.
         if !publish(&|output| {
-            // A new window: what is left of the previous one does not belong
-            // to this fingerprint.
-            output.window = output.window.wrapping_add(1);
-            output.fingerprint = fingerprint.clone();
-            output.speed_fingerprints.clear();
-            output.peak_constellation.clear();
-            (output.tempo_bpm, output.tempo_probability) = (0.0, 0.0);
+            *output = FingerprintOutput {
+                window: output.window.wrapping_add(1),
+                ..Default::default()
+            };
         }) {
             return;
         }
+
+        // With `spread`, computation k of n may not start before k/n of that
+        // time has passed since the window came in. The tempo is not one of
+        // the n: it goes first and shares the plain fingerprint's turn.
+        let started = std::time::Instant::now();
+        let steps = 1 + constellation as u32 + speeds.len() as u32;
+        let mut step = 0u32;
+        let mut wait_for_turn = || {
+            if let Some(spread) = spread {
+                let due = started + spread * step / steps;
+                std::thread::sleep(due.saturating_duration_since(std::time::Instant::now()));
+            }
+            step += 1;
+        };
+
         // Constellation and tempo both work on the audio at 11025 Hz mono.
         let mono = (constellation || tempo.is_some()).then(|| {
             crate::constellation::mono_at_rate(&job.samples, job.sample_rate, job.channels)
         });
+        // The tempo first, before any fingerprint: a client can use it to
+        // narrow down what it compares the fingerprints with (a track's own
+        // tempo times the playback speed must give this one), and for that
+        // it has to be there when the fingerprints arrive.
+        if let Some(estimator) = tempo {
+            let found = estimator.estimate(mono.as_deref().unwrap_or_default());
+            let (bpm, probability) = found.map(|t| (t.bpm, t.probability)).unwrap_or((0.0, 0.0));
+            if !publish(&|output| (output.tempo_bpm, output.tempo_probability) = (bpm, probability))
+            {
+                return;
+            }
+        }
+
+        wait_for_turn();
+        let Some(fingerprint) = compute_fingerprint(&job.samples, job.sample_rate, job.channels)
+        else {
+            return;
+        };
+        if !publish(&|output| output.fingerprint = fingerprint.clone()) {
+            return;
+        }
         // Before the speeds: it is cheaper than a single one of them and
         // covers what all of them together are for.
         if constellation {
@@ -359,17 +375,6 @@ impl FingerprintWorker {
                 mono.as_deref().unwrap_or_default(),
             );
             if !publish(&|output| output.peak_constellation = peaks.clone()) {
-                return;
-            }
-        }
-        if let Some(estimator) = tempo {
-            wait_for_turn();
-            // No tempo (silence) is published as "none", not left out: the
-            // window's result must not keep the previous window's value.
-            let found = estimator.estimate(mono.as_deref().unwrap_or_default());
-            let (bpm, probability) = found.map(|t| (t.bpm, t.probability)).unwrap_or((0.0, 0.0));
-            if !publish(&|output| (output.tempo_bpm, output.tempo_probability) = (bpm, probability))
-            {
                 return;
             }
         }

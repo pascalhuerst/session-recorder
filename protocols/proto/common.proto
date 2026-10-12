@@ -29,7 +29,7 @@ message RecorderStatus {
     // together, and an empty field means "nothing new", not "no fingerprint".
 
     // Chromaprint fingerprint of the window, at the speed it was captured.
-    // The first result of a window.
+    // The first fingerprint of a window.
     string chromaprintFingerprint = 6;
 
     // The same window fingerprinted for a range of assumed playback speeds,
@@ -63,8 +63,10 @@ message RecorderStatus {
     // The tempo of the same window, estimated with TempoCNN: beats per minute
     // (whole numbers, 30 to 285) and the model's probability for that tempo
     // (0..1). Only if the recorder is configured for it. Sent once per
-    // window like the fingerprints; both 0 in every other status, and in the
-    // window's one status too when the window had no tempo (silence).
+    // window like the fingerprints, and as the window's FIRST result, before
+    // its fingerprints - so a client can use it to narrow down what it
+    // compares them with. Both 0 in every other status, and in the window's
+    // one status too when the window had no tempo (silence).
     float tempoBpm = 11;
     float tempoProbability = 12;
 }

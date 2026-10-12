@@ -567,6 +567,10 @@ func (f *Fs) renderSession(ctx context.Context, recorderID, sessionID uuid.UUID)
 	}
 	defer rawData.Close()
 
+	// Before the fan-out starts, not inside the FLAC worker: a consumer that
+	// is not reading yet stalls the pipe for all three.
+	flacEncode := flacEncoderForFile(rawPath, 0, -1)
+
 	// Three parallel consumers of data.raw: waveform.dat, data.flac, data.ogg.
 	// The reader count must equal the number of consumers or the MultiWriter
 	// blocks on an undrained pipe.
@@ -603,7 +607,7 @@ func (f *Fs) renderSession(ctx context.Context, recorderID, sessionID uuid.UUID)
 	eg.Go(func() error {
 		defer closeReader(flacReader)
 		return f.writeFileStream(f.sessionFilePath(recorderID, sessionID, FILENAME_FLAC), func(w io.Writer) error {
-			return render.Flac(w, flacReader)
+			return flacEncode(w, flacReader)
 		})
 	})
 
@@ -684,6 +688,35 @@ func (f *Fs) writeFile(path string, data []byte) error {
 		return fmt.Errorf("cannot rename %s: %w", path, err)
 	}
 	return nil
+}
+
+// flacEncoderForFile returns the FLAC encoder to use for length bytes of raw
+// audio at offset in the file at path (length < 0: to the end of the file).
+// It reads them once up front to learn their length and MD5, which belong in
+// the header of a stream written through a non-seekable writer (see
+// render.PCMSummary). If that extra read fails, encoding still goes ahead,
+// just with a header that carries neither.
+func flacEncoderForFile(path string, offset, length int64) func(dst io.Writer, src io.Reader) error {
+	summary, err := func() (render.PCMSummary, error) {
+		file, err := os.Open(path)
+		if err != nil {
+			return render.PCMSummary{}, err
+		}
+		defer file.Close()
+		if _, err := file.Seek(offset, io.SeekStart); err != nil {
+			return render.PCMSummary{}, err
+		}
+		var raw io.Reader = file
+		if length >= 0 {
+			raw = io.LimitReader(file, length)
+		}
+		return render.SummarizePCM(raw)
+	}()
+	if err != nil {
+		log.Warn().Err(err).Str("path", path).Msg("Cannot summarize raw audio; FLAC header will carry no length or MD5")
+		return render.Flac
+	}
+	return summary.Flac
 }
 
 // writeFileStream writes a file atomically (temp file + rename) by streaming:
@@ -1222,6 +1255,9 @@ func (f *Fs) RenderSegment(ctx context.Context, recorderID, sessionID, segmentID
 	}
 	segmentRaw := io.LimitReader(rawData, want)
 
+	// Same byte range, read once more up front for the FLAC header.
+	flacEncode := flacEncoderForFile(rawPath, startByte, want)
+
 	readers, writer, closer := makeReaders(2)
 	eg, _ := errgroup.WithContext(ctx)
 
@@ -1247,7 +1283,7 @@ func (f *Fs) RenderSegment(ctx context.Context, recorderID, sessionID, segmentID
 	eg.Go(func() error {
 		defer closeReader(flacReader)
 		return f.writeFileStream(f.segmentFilePath(recorderID, sessionID, segmentID, SEGMENT_FILENAME_FLAC), func(w io.Writer) error {
-			return render.Flac(w, flacReader)
+			return flacEncode(w, flacReader)
 		})
 	})
 

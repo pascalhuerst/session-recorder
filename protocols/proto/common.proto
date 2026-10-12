@@ -59,6 +59,14 @@ message RecorderStatus {
     // when it carries none: a number that goes up by one with every window.
     // Sent with every status.
     uint32 fingerprintWindow = 10;
+
+    // The tempo of the same window, estimated with TempoCNN: beats per minute
+    // (whole numbers, 30 to 285) and the model's probability for that tempo
+    // (0..1). Only if the recorder is configured for it. Sent once per
+    // window like the fingerprints; both 0 in every other status, and in the
+    // window's one status too when the window had no tempo (silence).
+    float tempoBpm = 11;
+    float tempoProbability = 12;
 }
 
 message SpeedFingerprint {

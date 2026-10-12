@@ -75,6 +75,30 @@ mDNS and connects automatically. No backend address is configured by hand.
 | `--fingerprint-speed-step <percent>` | distance between two assumed speeds | `1` |
 | `--peak-constellation <true\|false>` | also publish each window's spectral peaks, a speed-invariant fingerprint (a client matches a pitched record with it and learns the speed); about as cheap as one plain fingerprint | `false` |
 | `--fingerprint-spread <true\|false>` | pace a window's fingerprint computations evenly until the next window instead of one burst: level load, but the last speeds arrive up to ~11 s after the window instead of ~4 s | `false` |
+| `--tempo-model <file.onnx>` | estimate each window's tempo (BPM) with TempoCNN from this model file and publish it in the recorder status; see "Tempo model" below. About 0.3 s per window on a Pi 3 | — |
+
+### Tempo model
+
+`--tempo-model` wants TempoCNN (Schreiber & Müller 2018) as an ONNX file with a fixed input of
+`[1, 40, 256, 1]`. The model is not part of this repository. Essentia publishes it as a TensorFlow graph
+(`deeptemp-k16-3.pb`, under <https://essentia.upf.edu/models/tempo/tempocnn/>; mind its license); convert
+it once on any machine with `uv`:
+
+```bash
+uv run --no-project --python 3.10 --with "tensorflow-cpu==2.13.1" --with "tf2onnx==1.16.1" \
+    --with "numpy<2" --with "protobuf<4" --with "onnx<1.17" \
+    python -m tf2onnx.convert --graphdef deeptemp-k16-3.pb \
+    --inputs "input:0[1,40,256,1]" --outputs output:0 --opset 13 --output deeptemp-fixed.onnx
+uv run --no-project --python 3.10 --with "numpy<2" --with "onnx<1.17" --with onnxsim \
+    --with "onnxruntime<1.20" python -m onnxsim deeptemp-fixed.onnx deeptemp-k16-3.onnx
+```
+
+The fixed input size and the simplification matter: without them the graph keeps shape computations
+that `tract`, the pure-Rust engine the recorder runs the model with, cannot execute. The audio side
+(mel bands, patches, normalization) is in `src/tempo.rs` and follows Essentia's
+`TensorflowPredictTempoCNN`; on 250 excerpts of 25 s the recorder's path gave the same BPM as Essentia
+in every one. `cargo run --release --example tempo_dump -- <model> <rate> <channels> <raw s16le files>`
+runs it on files; `TEMPO_MODEL_TEST=<model> cargo test` includes the test that needs the model.
 
 ### Logging
 

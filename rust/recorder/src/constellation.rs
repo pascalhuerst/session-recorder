@@ -46,11 +46,28 @@ pub struct Peak {
 /// all frame numbers (uint32), then all bins (uint8), little endian, sorted
 /// by frame. Empty if the audio is too short to hold a peak.
 pub fn compute_constellation(samples: &[i16], sample_rate: u32, channels: u32) -> Vec<u8> {
-    let peaks = constellation(samples, sample_rate, channels);
+    compute_constellation_from_mono(&mono_at_rate(samples, sample_rate, channels))
+}
+
+/// Like [`compute_constellation`], for audio that already went through
+/// [`mono_at_rate`] - so a caller that needs that audio for something else as
+/// well (the tempo estimation runs at the same rate) resamples only once.
+pub fn compute_constellation_from_mono(audio: &[f32]) -> Vec<u8> {
+    let (spectrogram, frames) = log_spectrogram(audio);
+    let peaks = find_peaks(&spectrogram, frames);
     if peaks.is_empty() {
         return Vec::new();
     }
     pack(&peaks)
+}
+
+/// `samples` (interleaved PCM) as one channel at `RATE` Hz, still on the
+/// int16 scale.
+pub fn mono_at_rate(samples: &[i16], sample_rate: u32, channels: u32) -> Vec<f32> {
+    if channels == 0 || sample_rate == 0 {
+        return Vec::new();
+    }
+    resample(&downmix(samples, channels as usize), sample_rate, RATE)
 }
 
 pub fn pack(peaks: &[Peak]) -> Vec<u8> {
@@ -65,11 +82,7 @@ pub fn pack(peaks: &[Peak]) -> Vec<u8> {
 }
 
 pub fn constellation(samples: &[i16], sample_rate: u32, channels: u32) -> Vec<Peak> {
-    if channels == 0 || sample_rate == 0 {
-        return Vec::new();
-    }
-    let mono = downmix(samples, channels as usize);
-    let audio = resample(&mono, sample_rate, RATE);
+    let audio = mono_at_rate(samples, sample_rate, channels);
     let (spectrogram, frames) = log_spectrogram(&audio);
     find_peaks(&spectrogram, frames)
 }

@@ -298,6 +298,13 @@ struct Args {
     /// the last speeds arrive up to ~11 s after the window instead of ~4 s.
     #[arg(long, env = "FINGERPRINT_SPREAD", default_value_t = false, action = clap::ArgAction::Set)]
     fingerprint_spread: bool,
+
+    /// Estimate the tempo (BPM) of each window with TempoCNN and publish it
+    /// in the recorder status: the path of the model as an ONNX file (see the
+    /// README for how to get it). Not set: no tempo. About 0.3 s per window
+    /// on a Pi 3. Needs `--fingerprint true` (the default).
+    #[arg(long, env = "TEMPO_MODEL")]
+    tempo_model: Option<std::path::PathBuf>,
 }
 
 /// Bounded outbox of ready-to-send chunks. Drops the oldest entry when the
@@ -430,6 +437,8 @@ impl SessionRecorder {
             chromaprint_speed_count: 0,
             peak_constellation: Vec::new(),
             fingerprint_window: 0,
+            tempo_bpm: 0.0,
+            tempo_probability: 0.0,
         };
 
         let capacity_bytes = (audio_settings.sample_rate as f64
@@ -1463,6 +1472,8 @@ impl SessionRecorder {
                         .unwrap_or(0),
                     peak_constellation: fingerprints.peak_constellation,
                     fingerprint_window: fingerprints.window,
+                    tempo_bpm: fingerprints.tempo_bpm,
+                    tempo_probability: fingerprints.tempo_probability,
                 };
                 {
                     *status.lock().await = status_info.clone();
@@ -1763,10 +1774,19 @@ fn fingerprint_worker_from_args(
         info!("Live fingerprint: computations spread over the time until the next window");
         Duration::from_secs_f64(FINGERPRINT_RECOMPUTE_INTERVAL_SECONDS * 0.9)
     });
+    let tempo = match &args.tempo_model {
+        Some(path) => {
+            let estimator = recorder::tempo::TempoEstimator::load(path)?;
+            info!("Live tempo: TempoCNN from {}", path.display());
+            Some(estimator)
+        }
+        None => None,
+    };
     Ok(Some(Arc::new(FingerprintWorker::spawn(
         speeds,
         args.peak_constellation,
         spread,
+        tempo,
     )?)))
 }
 

@@ -32,6 +32,7 @@ async-trait = "0.1"
 futures-util = "0.3"
 rusty-chromaprint = "0.3.0"
 realfft = "3.5"
+tract-onnx = "0.21"
 
 [build-dependencies]
 tonic-build = "0.12"

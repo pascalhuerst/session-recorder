@@ -47,6 +47,26 @@ const CLASSES: usize = 256;
 /// Class 0 is this tempo, each further class one BPM more.
 const MIN_BPM: f32 = 30.0;
 
+/// The file name the model is looked for under when no path is given.
+pub const MODEL_FILE_NAME: &str = "deeptemp-k16-3.onnx";
+
+/// Where the model is looked for when no path is given, most specific
+/// first: the user's data directory, then the machine's.
+pub fn default_model_paths() -> Vec<std::path::PathBuf> {
+    let user_data = std::env::var_os("XDG_DATA_HOME")
+        .map(std::path::PathBuf::from)
+        .filter(|p| p.is_absolute())
+        .or_else(|| std::env::var_os("HOME").map(|home| Path::new(&home).join(".local/share")));
+    user_data
+        .into_iter()
+        .chain([
+            Path::new("/usr/local/share").to_path_buf(),
+            Path::new("/usr/share").to_path_buf(),
+        ])
+        .map(|dir| dir.join("session-recorder").join(MODEL_FILE_NAME))
+        .collect()
+}
+
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Tempo {
     pub bpm: f32,
@@ -261,6 +281,23 @@ mod tests {
         // [0, band, frame, 0] is frame `frame`'s band `band`.
         let expected_order = patch[5][2] < patch[6][2];
         assert_eq!(values[[0, 2, 5, 0]] < values[[0, 2, 6, 0]], expected_order);
+    }
+
+    #[test]
+    fn the_model_is_looked_for_in_the_users_data_directory_first() {
+        let paths = default_model_paths();
+        assert!(paths.len() >= 2);
+        assert!(paths
+            .iter()
+            .all(|p| p.ends_with("session-recorder/deeptemp-k16-3.onnx")));
+        assert_eq!(
+            paths[paths.len() - 1],
+            Path::new("/usr/share/session-recorder/deeptemp-k16-3.onnx")
+        );
+        assert!(
+            !paths[0].starts_with("/usr"),
+            "the user's own directory comes before the machine's"
+        );
     }
 
     #[test]

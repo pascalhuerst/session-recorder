@@ -75,23 +75,24 @@ mDNS and connects automatically. No backend address is configured by hand.
 | `--fingerprint-speed-step <percent>` | distance between two assumed speeds | `1` |
 | `--peak-constellation <true\|false>` | also publish each window's spectral peaks, a speed-invariant fingerprint (a client matches a pitched record with it and learns the speed); about as cheap as one plain fingerprint | `false` |
 | `--fingerprint-spread <true\|false>` | pace a window's fingerprint computations evenly until the next window instead of one burst: level load, but the last speeds arrive up to ~11 s after the window instead of ~4 s | `false` |
-| `--tempo-model <file.onnx>` | estimate each window's tempo (BPM) with TempoCNN from this model file and publish it in the recorder status; see "Tempo model" below. About 0.3 s per window on a Pi 3 | — |
+| `--tempo <true\|false>` | estimate each window's tempo (BPM) with TempoCNN and publish it in the recorder status, if the model file is found (see "Tempo model" below); without the file the recorder runs without tempo. About 0.3 s per window on a Pi 3 | `true` |
+| `--tempo-model <file.onnx>` | the model file, if it is not in one of the places looked in: `$XDG_DATA_HOME/session-recorder/deeptemp-k16-3.onnx` (`~/.local/share/...`), `/usr/local/share/session-recorder/...`, `/usr/share/session-recorder/...`. Given explicitly, it must load or the recorder does not start | — |
 
 ### Tempo model
 
-`--tempo-model` wants TempoCNN (Schreiber & Müller 2018) as an ONNX file with a fixed input of
-`[1, 40, 256, 1]`. The model is not part of this repository. Essentia publishes it as a TensorFlow graph
-(`deeptemp-k16-3.pb`, under <https://essentia.upf.edu/models/tempo/tempocnn/>; mind its license); convert
-it once on any machine with `uv`:
+The live tempo needs TempoCNN (Schreiber & Müller 2018) as an ONNX file with a fixed input of
+`[1, 40, 256, 1]`. The model is not part of this repository - it is published by the Music Technology
+Group (UPF) under <https://essentia.upf.edu/models/tempo/tempocnn/>; mind its license before passing the
+file on. One command gets and converts it:
 
 ```bash
-uv run --no-project --python 3.10 --with "tensorflow-cpu==2.13.1" --with "tf2onnx==1.16.1" \
-    --with "numpy<2" --with "protobuf<4" --with "onnx<1.17" \
-    python -m tf2onnx.convert --graphdef deeptemp-k16-3.pb \
-    --inputs "input:0[1,40,256,1]" --outputs output:0 --opset 13 --output deeptemp-fixed.onnx
-uv run --no-project --python 3.10 --with "numpy<2" --with "onnx<1.17" --with onnxsim \
-    --with "onnxruntime<1.20" python -m onnxsim deeptemp-fixed.onnx deeptemp-k16-3.onnx
+tools/fetch-tempo-model.sh            # -> ~/.local/share/session-recorder/deeptemp-k16-3.onnx
 ```
+
+It needs `curl` and [`uv`](https://docs.astral.sh/uv/) and downloads TensorFlow into uv's cache the first
+time (the conversion uses `tf2onnx` and `onnxsim`). Run it on any machine: the result is one 1.3 MB file,
+the same for every architecture. The recorder picks it up from the places listed under `--tempo-model`;
+`tools/deploy.sh` copies it to the device.
 
 The fixed input size and the simplification matter: without them the graph keeps shape computations
 that `tract`, the pure-Rust engine the recorder runs the model with, cannot execute. The audio side
@@ -99,6 +100,28 @@ that `tract`, the pure-Rust engine the recorder runs the model with, cannot exec
 `TensorflowPredictTempoCNN`; on 250 excerpts of 25 s the recorder's path gave the same BPM as Essentia
 in every one. `cargo run --release --example tempo_dump -- <model> <rate> <channels> <raw s16le files>`
 runs it on files; `TEMPO_MODEL_TEST=<model> cargo test` includes the test that needs the model.
+
+### Deploying to a Raspberry Pi
+
+`tools/deploy.sh` builds the recorder for aarch64 on this machine (in a Debian container of the device's
+release, with the cross toolchain - a release build on a Pi 3 takes the better part of an hour) and
+installs it on the device over ssh:
+
+```bash
+tools/fetch-tempo-model.sh        # once, if the live tempo is wanted
+tools/deploy.sh mypi.local        # build, copy binary and model, restart the unit, check it connected
+```
+
+The device, the binary's place there and the name of its systemd `--user` unit come from the
+environment or from `tools/deploy.env` (not in git): `DEPLOY_HOST`, `DEPLOY_BINARY`
+(default `.local/bin/session-recorder-alsa-reader`), `DEPLOY_SERVICE`
+(default `session-recorder-alsa-reader.service`); `DEBIAN_RELEASE` (default `trixie`) and `RUST_VERSION`
+(default `1.85.1`, what trixie ships - the code and `Cargo.lock` are kept buildable with it) pick the
+build container. `--build-only`, `--no-restart`, `--yes` and `--fetch-tempo-model` do what they say;
+`tools/deploy.sh --help` has the details. The previous binary is kept next to the new one as
+`<binary>.previous`. The script only replaces the binary and the model: the unit file and its options
+(recorder id and name, `--fingerprint-speed-range`, ...) are set up once by hand or by the `.deb`
+(`packaging/`). It needs Docker and ssh access to the device.
 
 ### Logging
 

@@ -300,9 +300,19 @@ struct Args {
     fingerprint_spread: bool,
 
     /// Estimate the tempo (BPM) of each window with TempoCNN and publish it
-    /// in the recorder status: the path of the model as an ONNX file (see the
-    /// README for how to get it). Not set: no tempo. About 0.3 s per window
-    /// on a Pi 3. Needs `--fingerprint true` (the default).
+    /// in the recorder status - if the model file is there: it is looked for
+    /// in the usual places (see `--tempo-model`), and without it the recorder
+    /// simply runs without tempo. `--tempo false` turns it off for good.
+    /// About 0.3 s per window on a Pi 3. Needs `--fingerprint true`.
+    #[arg(long, env = "TEMPO", default_value_t = true, action = clap::ArgAction::Set)]
+    tempo: bool,
+
+    /// The TempoCNN model as an ONNX file (`tools/fetch-tempo-model.sh` gets
+    /// it; see the README). Not set: the first of
+    /// `$XDG_DATA_HOME/session-recorder/deeptemp-k16-3.onnx` (that is
+    /// `~/.local/share/...`), `/usr/local/share/session-recorder/...` and
+    /// `/usr/share/session-recorder/...` that exists. Set, the file must
+    /// exist and load, or the recorder does not start.
     #[arg(long, env = "TEMPO_MODEL")]
     tempo_model: Option<std::path::PathBuf>,
 }
@@ -1774,13 +1784,39 @@ fn fingerprint_worker_from_args(
         info!("Live fingerprint: computations spread over the time until the next window");
         Duration::from_secs_f64(FINGERPRINT_RECOMPUTE_INTERVAL_SECONDS * 0.9)
     });
-    let tempo = match &args.tempo_model {
-        Some(path) => {
-            let estimator = recorder::tempo::TempoEstimator::load(path)?;
-            info!("Live tempo: TempoCNN from {}", path.display());
-            Some(estimator)
+    let tempo = if !args.tempo {
+        info!("Live tempo: off");
+        None
+    } else if let Some(path) = &args.tempo_model {
+        // Asked for by name: a problem with it is an error, not a shrug.
+        let estimator = recorder::tempo::TempoEstimator::load(path)?;
+        info!("Live tempo: TempoCNN from {}", path.display());
+        Some(estimator)
+    } else {
+        let candidates = recorder::tempo::default_model_paths();
+        match candidates.iter().find(|path| path.is_file()) {
+            Some(path) => match recorder::tempo::TempoEstimator::load(path) {
+                Ok(estimator) => {
+                    info!("Live tempo: TempoCNN from {}", path.display());
+                    Some(estimator)
+                }
+                Err(e) => {
+                    warn!("Live tempo: off - {e}");
+                    None
+                }
+            },
+            None => {
+                info!(
+                    "Live tempo: off - no model at {} (tools/fetch-tempo-model.sh gets it)",
+                    candidates
+                        .iter()
+                        .map(|p| p.display().to_string())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                );
+                None
+            }
         }
-        None => None,
     };
     Ok(Some(Arc::new(FingerprintWorker::spawn(
         speeds,

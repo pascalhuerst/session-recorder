@@ -9,31 +9,31 @@ use clap::Parser;
 use evdev::KeyCode;
 use log::{debug, error, info, warn};
 use recorder::audio::{
-    alsa::{AudioSettings, configure_input_device},
+    alsa::{configure_input_device, AudioSettings},
     callback_thread::start_callback_thread,
-    channels::{CaptureConsumer, new_capture_ring},
+    channels::{new_capture_ring, CaptureConsumer},
 };
 use recorder::discovery::{
     self, DiscoveryConfig, DiscoveryMethod, ServiceDiscovery, ServiceEvent, ServiceInfo,
 };
-use recorder::fingerprint::compute_fingerprint;
+use recorder::fingerprint::{speed_grid, FingerprintWorker};
 use recorder::grpc::chunk_sink_client::{
-    AudioChunk, ChunkSinkClientService, ChunkSinkConfig, RecorderStatusInfo,
-    chunksink::{GetCommandRequest, chunk_sink_client::ChunkSinkClient, command::Command},
+    chunksink::{chunk_sink_client::ChunkSinkClient, command::Command, GetCommandRequest},
     common::SignalStatus,
+    AudioChunk, ChunkSinkClientService, ChunkSinkConfig, RecorderStatusInfo,
 };
 use recorder::io::input_key::InputKey;
 use recorder::io::led::Led;
 use recorder::io::ws2812::{Mode, Ws2812};
 use ringbuf::traits::Consumer;
 use std::collections::{HashMap, HashSet, VecDeque};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, SystemTime};
 use tokio::time::interval;
-use tonic::Request;
 use tonic::transport::Channel;
+use tonic::Request;
 use uuid::Uuid;
 
 const SAMPLE_RATE: u32 = 48000;
@@ -57,6 +57,8 @@ const RECONCILE_INTERVAL: Duration = Duration::from_secs(5);
 // see discql_addon_chromaprintMatching/CHROMAPRINT_FINDINGS.md); recomputing
 // every 12 s keeps the exposed fingerprint reasonably fresh without running
 // the (cheap, but non-zero) computation on every detector window.
+// Both can be switched: --fingerprint, and --fingerprint-speed-range for the
+// additional per-speed fingerprints of the same window.
 const FINGERPRINT_WINDOW_SECONDS: f64 = 25.0;
 const FINGERPRINT_RECOMPUTE_INTERVAL_SECONDS: f64 = 12.0;
 
@@ -261,6 +263,25 @@ struct Args {
     /// D-Bus) or `mdns` (in-process mDNS).
     #[arg(long, value_enum, env = "DISCOVERY_METHOD", default_value_t = DiscoveryMethod::Avahi)]
     discovery: DiscoveryMethod,
+
+    /// Publish a live Chromaprint fingerprint of the last 25 s of the running
+    /// recording in the recorder status, refreshed every 12 s. Pass
+    /// `--fingerprint false` to turn all fingerprinting off.
+    #[arg(long, env = "FINGERPRINT", default_value_t = true, action = clap::ArgAction::Set)]
+    fingerprint: bool,
+
+    /// Additionally fingerprint each window for assumed playback speeds from
+    /// -N to +N percent (e.g. `8` for a turntable's +-8 % pitch fader), so a
+    /// pitched record can still be matched. 0 (the default) turns this off.
+    /// Computed one after another on a single thread; each speed costs about
+    /// as much as the plain fingerprint (~0.23 s per window on a Pi 3).
+    #[arg(long, env = "FINGERPRINT_SPEED_RANGE", default_value_t = 0.0)]
+    fingerprint_speed_range: f64,
+
+    /// Distance between two assumed speeds, in percent. A Chromaprint match
+    /// tolerates about half a percent of deviation, so 1 leaves no gaps.
+    #[arg(long, env = "FINGERPRINT_SPEED_STEP", default_value_t = 1.0)]
+    fingerprint_speed_step: f64,
 }
 
 /// Bounded outbox of ready-to-send chunks. Drops the oldest entry when the
@@ -342,7 +363,7 @@ struct SessionRecorder {
 
     /// Most recently computed live Chromaprint fingerprint, shared with the
     /// audio processing task and read whenever a RecorderStatus is sent.
-    latest_fingerprint: Arc<std::sync::Mutex<String>>,
+    fingerprint_worker: Option<Arc<FingerprintWorker>>,
 
     cut_tx: Option<tokio::sync::mpsc::Sender<CutTrigger>>,
     led_event_tx: Option<tokio::sync::mpsc::Sender<LedEvent>>,
@@ -375,7 +396,7 @@ impl ClientInfo {
 }
 
 impl SessionRecorder {
-    fn new(args: Args) -> Self {
+    fn new(args: Args, fingerprint_worker: Option<Arc<FingerprintWorker>>) -> Self {
         let audio_settings = AudioSettings {
             input_device: args.device.clone(),
             num_channels: NUM_CHANNELS,
@@ -389,6 +410,7 @@ impl SessionRecorder {
             peak_percent: 0.0,
             clipping: false,
             chromaprint_fingerprint: String::new(),
+            chromaprint_speed_fingerprints: Vec::new(),
         };
 
         let capacity_bytes = (audio_settings.sample_rate as f64
@@ -429,7 +451,7 @@ impl SessionRecorder {
             recorder_status: Arc::new(tokio::sync::Mutex::new(initial_status)),
             shutdown_signal: Arc::new(AtomicBool::new(false)),
             outbox,
-            latest_fingerprint: Arc::new(std::sync::Mutex::new(String::new())),
+            fingerprint_worker,
             cut_tx: None,
             led_event_tx: None,
             input_key: None,
@@ -815,7 +837,7 @@ impl SessionRecorder {
         let shutdown = self.shutdown_signal.clone();
         let status = Arc::clone(&self.recorder_status);
         let outbox = Arc::clone(&self.outbox);
-        let fingerprint_state = Arc::clone(&self.latest_fingerprint);
+        let fingerprint_worker = self.fingerprint_worker.clone();
         let detector = DetectorConfig {
             sample_rate: SAMPLE_RATE,
             num_channels: NUM_CHANNELS,
@@ -852,7 +874,7 @@ impl SessionRecorder {
                 led_event_tx,
                 outbox,
                 chunk_frames,
-                fingerprint_state,
+                fingerprint_worker,
             )
             .await;
         });
@@ -1180,7 +1202,7 @@ impl SessionRecorder {
         led_event_tx: Option<tokio::sync::mpsc::Sender<LedEvent>>,
         outbox: Arc<tokio::sync::Mutex<Outbox>>,
         chunk_frames: usize,
-        fingerprint_state: Arc<std::sync::Mutex<String>>,
+        fingerprint_worker: Option<Arc<FingerprintWorker>>,
     ) {
         info!(
             "Audio processing task started (threshold={} dB, window={}s, attack={}s, release={}s, chunk_frames={})",
@@ -1292,8 +1314,8 @@ impl SessionRecorder {
                         flush_pending(&outbox, &mut pending, session_id.as_deref(), chunk_counter).await;
                         fp_buffer.clear();
                         fp_samples_since_compute = 0;
-                        if let Ok(mut g) = fingerprint_state.lock() {
-                            g.clear();
+                        if let Some(worker) = &fingerprint_worker {
+                            worker.reset();
                         }
                         let new_id = Uuid::new_v4().to_string();
                         info!("Cut ({:?}): ending current session, starting {}", trigger, new_id);
@@ -1354,8 +1376,8 @@ impl SessionRecorder {
                         pending.clear();
                         fp_buffer.clear();
                         fp_samples_since_compute = 0;
-                        if let Ok(mut g) = fingerprint_state.lock() {
-                            g.clear();
+                        if let Some(worker) = &fingerprint_worker {
+                            worker.reset();
                         }
                         let new_id = Uuid::new_v4().to_string();
                         info!(
@@ -1387,8 +1409,8 @@ impl SessionRecorder {
                             .await;
                         fp_buffer.clear();
                         fp_samples_since_compute = 0;
-                        if let Ok(mut g) = fingerprint_state.lock() {
-                            g.clear();
+                        if let Some(worker) = &fingerprint_worker {
+                            worker.reset();
                         }
                         info!("Recording stopped (RMS {:.1} dB)", rms_db);
                         session_id = None;
@@ -1399,6 +1421,10 @@ impl SessionRecorder {
                 // (recording) state, not the raw per-window comparison — otherwise
                 // a quiet window mid-recording reports NoSignal to the server, which
                 // closes the session while we keep streaming chunks for it.
+                let fingerprints = fingerprint_worker
+                    .as_ref()
+                    .map(|worker| worker.output())
+                    .unwrap_or_default();
                 let status_info = RecorderStatusInfo {
                     signal_status: if recording {
                         SignalStatus::Signal
@@ -1407,10 +1433,8 @@ impl SessionRecorder {
                     },
                     peak_percent: (peak as f64) * 100.0,
                     clipping,
-                    chromaprint_fingerprint: fingerprint_state
-                        .lock()
-                        .map(|g| g.clone())
-                        .unwrap_or_default(),
+                    chromaprint_fingerprint: fingerprints.fingerprint,
+                    chromaprint_speed_fingerprints: fingerprints.speed_fingerprints,
                 };
                 {
                     *status.lock().await = status_info.clone();
@@ -1452,31 +1476,31 @@ impl SessionRecorder {
                     for &s in &window {
                         let i = (s.clamp(-1.0, 1.0) * 32767.0) as i16;
                         pending.extend_from_slice(&i.to_le_bytes());
-                        fp_buffer.push_back(i);
+                        if fingerprint_worker.is_some() {
+                            fp_buffer.push_back(i);
+                        }
                     }
-                    while fp_buffer.len() > fp_capacity_samples {
-                        fp_buffer.pop_front();
-                    }
-                    fp_samples_since_compute += window.len();
-                    if fp_buffer.len() >= fp_capacity_samples
-                        && fp_samples_since_compute >= fp_recompute_interval_samples
-                    {
-                        fp_samples_since_compute = 0;
-                        let samples_snapshot: Vec<i16> = fp_buffer.iter().copied().collect();
-                        let fingerprint_state = Arc::clone(&fingerprint_state);
-                        let sample_rate = detector.sample_rate;
-                        let channels = detector.num_channels;
-                        tokio::task::spawn_blocking(move || {
-                            // Nested rather than a let-chain: those need rustc 1.88,
-                            // the recorder host (Debian trixie) ships 1.85.
-                            if let Some(fp) =
-                                compute_fingerprint(&samples_snapshot, sample_rate, channels)
-                            {
-                                if let Ok(mut g) = fingerprint_state.lock() {
-                                    *g = fp;
-                                }
+                    if let Some(worker) = &fingerprint_worker {
+                        while fp_buffer.len() > fp_capacity_samples {
+                            fp_buffer.pop_front();
+                        }
+                        fp_samples_since_compute += window.len();
+                        if fp_buffer.len() >= fp_capacity_samples
+                            && fp_samples_since_compute >= fp_recompute_interval_samples
+                        {
+                            fp_samples_since_compute = 0;
+                            let samples_snapshot: Vec<i16> = fp_buffer.iter().copied().collect();
+                            // The worker takes one window at a time; while it is
+                            // still busy with the last one (many speeds on a slow
+                            // host) this window is left out and the next one tried.
+                            if !worker.submit(
+                                samples_snapshot,
+                                detector.sample_rate,
+                                detector.num_channels,
+                            ) {
+                                debug!("fingerprint worker still busy, window skipped");
                             }
-                        });
+                        }
                     }
 
                     // Send the first chunk of a session as soon as any audio is
@@ -1676,6 +1700,36 @@ async fn command_listener_task(
     info!("Command listener for {} stopped", service_name);
 }
 
+/// The fingerprint worker the options ask for: none with `--fingerprint
+/// false`, otherwise one that also covers the configured speed range.
+fn fingerprint_worker_from_args(
+    args: &Args,
+) -> Result<Option<Arc<FingerprintWorker>>, Box<dyn std::error::Error>> {
+    if !args.fingerprint {
+        info!("Live fingerprint: off");
+        return Ok(None);
+    }
+    let speeds = speed_grid(args.fingerprint_speed_range, args.fingerprint_speed_step)
+        .map_err(|e| format!("--fingerprint-speed-range/--fingerprint-speed-step: {e}"))?;
+    if speeds.is_empty() {
+        info!(
+            "Live fingerprint: last {}s every {}s, original speed only",
+            FINGERPRINT_WINDOW_SECONDS, FINGERPRINT_RECOMPUTE_INTERVAL_SECONDS
+        );
+    } else {
+        info!(
+            "Live fingerprint: last {}s every {}s, plus {} assumed speeds from {:+}% to {:+}% in steps of {}%",
+            FINGERPRINT_WINDOW_SECONDS,
+            FINGERPRINT_RECOMPUTE_INTERVAL_SECONDS,
+            speeds.len(),
+            speeds[0],
+            speeds[speeds.len() - 1],
+            args.fingerprint_speed_step
+        );
+    }
+    Ok(Some(Arc::new(FingerprintWorker::spawn(speeds)?)))
+}
+
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Default: info everywhere, but silence the chatty mdns_sd crate.
@@ -1687,7 +1741,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     info!("Starting Session Recorder");
 
-    let mut recorder = SessionRecorder::new(args);
+    let fingerprint_worker = fingerprint_worker_from_args(&args)?;
+    let mut recorder = SessionRecorder::new(args, fingerprint_worker);
     recorder.start().await?;
 
     let shutdown_signal = recorder.shutdown_signal.clone();

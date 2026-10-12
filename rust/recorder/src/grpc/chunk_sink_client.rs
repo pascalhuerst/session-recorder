@@ -18,9 +18,9 @@ pub mod common {
     tonic::include_proto!("common");
 }
 
-use chunksink::Chunks;
 use chunksink::chunk_sink_client::ChunkSinkClient;
-use common::{RecorderStatus, SignalStatus};
+use chunksink::Chunks;
+use common::{RecorderStatus, SignalStatus, SpeedFingerprint};
 
 /// Error types for ChunkSink client operations
 #[derive(Debug)]
@@ -106,6 +106,8 @@ pub struct RecorderStatusInfo {
     /// Most recently computed Chromaprint fingerprint for the current
     /// session, or empty if none has been computed yet.
     pub chromaprint_fingerprint: String,
+    /// The same window for other assumed playback speeds, if configured.
+    pub chromaprint_speed_fingerprints: Vec<crate::fingerprint::SpeedFingerprint>,
 }
 
 /// ChunkSink gRPC client service
@@ -165,6 +167,14 @@ impl ChunkSinkClientService {
             peak_percent: status.peak_percent,
             clipping: status.clipping,
             chromaprint_fingerprint: status.chromaprint_fingerprint,
+            chromaprint_speed_fingerprints: status
+                .chromaprint_speed_fingerprints
+                .into_iter()
+                .map(|v| SpeedFingerprint {
+                    speed_percent: v.speed_percent,
+                    fingerprint: v.fingerprint,
+                })
+                .collect(),
         });
 
         match client.set_recorder_status(request).await {
@@ -249,6 +259,7 @@ mod tests {
             peak_percent: 0.5,
             clipping: false,
             chromaprint_fingerprint: String::new(),
+            chromaprint_speed_fingerprints: Vec::new(),
         };
 
         let result = client.set_recorder_status(status).await;

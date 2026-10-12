@@ -15,6 +15,10 @@ import (
 // written incrementally to dst. Frames are emitted one block at a time, so
 // memory use is bounded regardless of stream length (safe for multi-hour
 // sessions).
+//
+// Each block is compressed: the stereo representation, predictor and Rice
+// parameters are chosen per block (see flac_predict.go), falling back to
+// storing the samples verbatim where prediction does not pay off.
 func Flac(dst io.Writer, src io.Reader) error {
 	const (
 		sr  uint32 = 48000
@@ -47,6 +51,9 @@ func Flac(dst io.Writer, src io.Reader) error {
 	for i := range subframes {
 		subframes[i] = &frame.Subframe{Samples: make([]int32, nsamplesPerChannel)}
 	}
+	predict := newPredictor(nsamplesPerChannel)
+	mid := make([]int32, nsamplesPerChannel)
+	side := make([]int32, nsamplesPerChannel)
 
 	br := bufio.NewReaderSize(src, 64*1024)
 	rbuf := make([]byte, nsamplesPerChannel*numChannels*2)
@@ -64,24 +71,19 @@ func Flac(dst io.Writer, src io.Reader) error {
 		nFrames := n / bytesPerFrame
 
 		for ch, subframe := range subframes {
-			subframe.SubHeader = frame.SubHeader{Pred: frame.PredVerbatim}
 			subframe.NSamples = nFrames
 			subframe.Samples = subframe.Samples[:nFrames]
 			for i := range nFrames {
 				s := int16(binary.LittleEndian.Uint16(rbuf[(i*numChannels+ch)*2:]))
 				subframe.Samples[i] = int32(s)
 			}
+		}
 
-			constant := true
-			for _, s := range subframe.Samples[1:] {
-				if s != subframe.Samples[0] {
-					constant = false
-					break
-				}
-			}
-			if constant {
-				subframe.SubHeader.Pred = frame.PredConstant
-			}
+		// The subframes keep the plain left/right samples: the encoder applies
+		// the chosen stereo representation itself while writing the frame.
+		plan := predict.planStereo(subframes[0].Samples, subframes[1].Samples, mid, side, uint(bps))
+		for ch, subframe := range subframes {
+			plan.subframes[ch].apply(subframe)
 		}
 
 		f := &frame.Frame{
@@ -89,7 +91,7 @@ func Flac(dst io.Writer, src io.Reader) error {
 				HasFixedBlockSize: false,
 				BlockSize:         uint16(nFrames),
 				SampleRate:        sr,
-				Channels:          frame.ChannelsLR,
+				Channels:          plan.channels,
 				BitsPerSample:     bps,
 			},
 			Subframes: subframes,

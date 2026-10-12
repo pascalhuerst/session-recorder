@@ -273,8 +273,9 @@ struct Args {
     /// Additionally fingerprint each window for assumed playback speeds from
     /// -N to +N percent (e.g. `8` for a turntable's +-8 % pitch fader), so a
     /// pitched record can still be matched. 0 (the default) turns this off.
-    /// Computed one after another on a single thread; each speed costs about
-    /// as much as the plain fingerprint (~0.23 s per window on a Pi 3).
+    /// Computed one after another on a single thread, the speeds closest to
+    /// the original first, each published as soon as it is done; a speed
+    /// costs about as much as the plain fingerprint (~0.23 s on a Pi 3).
     #[arg(long, env = "FINGERPRINT_SPEED_RANGE", default_value_t = 0.0)]
     fingerprint_speed_range: f64,
 
@@ -411,6 +412,7 @@ impl SessionRecorder {
             clipping: false,
             chromaprint_fingerprint: String::new(),
             chromaprint_speed_fingerprints: Vec::new(),
+            chromaprint_speed_count: 0,
         };
 
         let capacity_bytes = (audio_settings.sample_rate as f64
@@ -1435,6 +1437,10 @@ impl SessionRecorder {
                     clipping,
                     chromaprint_fingerprint: fingerprints.fingerprint,
                     chromaprint_speed_fingerprints: fingerprints.speed_fingerprints,
+                    chromaprint_speed_count: fingerprint_worker
+                        .as_ref()
+                        .map(|worker| worker.speed_count() as u32)
+                        .unwrap_or(0),
                 };
                 {
                     *status.lock().await = status_info.clone();
@@ -1718,12 +1724,11 @@ fn fingerprint_worker_from_args(
         );
     } else {
         info!(
-            "Live fingerprint: last {}s every {}s, plus {} assumed speeds from {:+}% to {:+}% in steps of {}%",
+            "Live fingerprint: last {}s every {}s, plus {} assumed speeds within +-{}% in steps of {}%",
             FINGERPRINT_WINDOW_SECONDS,
             FINGERPRINT_RECOMPUTE_INTERVAL_SECONDS,
             speeds.len(),
-            speeds[0],
-            speeds[speeds.len() - 1],
+            args.fingerprint_speed_range,
             args.fingerprint_speed_step
         );
     }

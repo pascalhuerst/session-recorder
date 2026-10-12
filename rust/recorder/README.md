@@ -71,7 +71,7 @@ mDNS and connects automatically. No backend address is configured by hand.
 | `--led-upload <sysfs>` | LED pulses on each successful chunk upload | — |
 | `--input-event <N>` `--input-keycode <K>` `--input-hold-ms <ms>` | local "cut session" button on `/dev/input/eventN` | — |
 | `--fingerprint <true\|false>` | publish a live Chromaprint fingerprint of the last 25 s in the recorder status, every 12 s while recording | `true` |
-| `--fingerprint-speed-range <percent>` | also fingerprint each window for assumed playback speeds from -N to +N % (e.g. `8` for a turntable's pitch fader); `0` = off. One after another on one thread, ~0.23 s per speed and window on a Pi 3 | `0` |
+| `--fingerprint-speed-range <percent>` | also fingerprint each window for assumed playback speeds from -N to +N % (e.g. `8` for a turntable's pitch fader); `0` = off. One after another on one thread (~0.23 s each on a Pi 3), closest speeds first, each published as soon as it is done | `0` |
 | `--fingerprint-speed-step <percent>` | distance between two assumed speeds | `1` |
 
 ### Logging

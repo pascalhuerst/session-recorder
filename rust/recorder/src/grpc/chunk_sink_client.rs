@@ -106,8 +106,11 @@ pub struct RecorderStatusInfo {
     /// Most recently computed Chromaprint fingerprint for the current
     /// session, or empty if none has been computed yet.
     pub chromaprint_fingerprint: String,
-    /// The same window for other assumed playback speeds, if configured.
+    /// The same window for other assumed playback speeds, as far as they
+    /// have been computed yet.
     pub chromaprint_speed_fingerprints: Vec<crate::fingerprint::SpeedFingerprint>,
+    /// How many speeds a window is fingerprinted for in total; 0 if none.
+    pub chromaprint_speed_count: u32,
 }
 
 /// ChunkSink gRPC client service
@@ -175,6 +178,7 @@ impl ChunkSinkClientService {
                     fingerprint: v.fingerprint,
                 })
                 .collect(),
+            chromaprint_speed_count: status.chromaprint_speed_count,
         });
 
         match client.set_recorder_status(request).await {
@@ -260,6 +264,7 @@ mod tests {
             clipping: false,
             chromaprint_fingerprint: String::new(),
             chromaprint_speed_fingerprints: Vec::new(),
+            chromaprint_speed_count: 0,
         };
 
         let result = client.set_recorder_status(status).await;

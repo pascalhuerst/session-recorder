@@ -28,9 +28,14 @@ message RecorderStatus {
     // for sources whose speed is not fixed (a turntable's pitch fader moves
     // tempo and pitch together, which a Chromaprint match only survives up to
     // about half a percent). Empty unless the recorder is configured for it.
-    // The unshifted fingerprint above is not repeated here. A set is computed
-    // after the fingerprint above and may lag one window behind it.
+    // The unshifted fingerprint above is not repeated here. They always
+    // belong to the same window as the fingerprint above and are added one by
+    // one as each is computed, the speeds closest to the original first; the
+    // list starts empty again with every new fingerprint above.
     repeated SpeedFingerprint chromaprintSpeedFingerprints = 7;
+    // How many entries the list above will hold once a window is done - the
+    // number of speeds the recorder is configured for, 0 if none.
+    uint32 chromaprintSpeedCount = 8;
 }
 
 message SpeedFingerprint {

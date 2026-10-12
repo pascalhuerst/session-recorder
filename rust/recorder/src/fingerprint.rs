@@ -76,7 +76,9 @@ fn raw_fingerprint(
 
 /// The playback speeds, in percent deviation, to fingerprint a window for in
 /// addition to the unshifted one: every multiple of `step_percent` from
-/// `-range_percent` to `+range_percent`, without 0. A range of 0 means none.
+/// `-range_percent` to `+range_percent`, without 0, ordered by distance from
+/// the original speed (+1, -1, +2, -2, ...) - the order they are computed in,
+/// small deviations being the likelier ones. A range of 0 means none.
 pub fn speed_grid(range_percent: f64, step_percent: f64) -> Result<Vec<f64>, String> {
     if !(0.0..=50.0).contains(&range_percent) {
         return Err(format!(
@@ -101,11 +103,9 @@ pub fn speed_grid(range_percent: f64, step_percent: f64) -> Result<Vec<f64>, Str
         ));
     }
     let mut speeds = Vec::with_capacity(steps * 2);
-    for i in (1..=steps).rev() {
-        speeds.push(-(i as f64) * step_percent);
-    }
     for i in 1..=steps {
         speeds.push(i as f64 * step_percent);
+        speeds.push(-(i as f64) * step_percent);
     }
     Ok(speeds)
 }
@@ -122,8 +122,8 @@ pub struct SpeedFingerprint {
 pub struct FingerprintOutput {
     /// The window as captured (speed 0), or empty if none was computed yet.
     pub fingerprint: String,
-    /// The speed variants, once a full set has been computed; they may
-    /// belong to the window before `fingerprint`'s for a few seconds.
+    /// The same window's speed variants, as far as they are computed yet:
+    /// empty when `fingerprint` is new, then growing one by one.
     pub speed_fingerprints: Vec<SpeedFingerprint>,
 }
 
@@ -149,14 +149,15 @@ struct Shared {
 }
 
 /// Fingerprints windows on one dedicated thread, strictly one computation
-/// after another: the unshifted fingerprint first (published as soon as it
-/// is done), then each speed variant in turn. A window submitted while the
+/// after another: the unshifted fingerprint first, then each speed variant
+/// in turn, every one published as soon as it is done. A window submitted while the
 /// previous one is still being worked on is skipped rather than queued, so
 /// fingerprinting never uses more than one core however many variants are
 /// configured.
 pub struct FingerprintWorker {
     shared: Arc<Shared>,
     jobs: SyncSender<Job>,
+    speed_count: usize,
 }
 
 impl FingerprintWorker {
@@ -165,6 +166,7 @@ impl FingerprintWorker {
             published: Mutex::new(Published::default()),
             busy: AtomicBool::new(false),
         });
+        let speed_count = speeds.len();
         let (jobs, queue) = sync_channel::<Job>(1);
         let worker_shared = Arc::clone(&shared);
         std::thread::Builder::new()
@@ -175,7 +177,11 @@ impl FingerprintWorker {
                     worker_shared.busy.store(false, Ordering::Release);
                 }
             })?;
-        Ok(Self { shared, jobs })
+        Ok(Self {
+            shared,
+            jobs,
+            speed_count,
+        })
     }
 
     /// Hand over a window. Returns false, without taking it, if the previous
@@ -213,6 +219,11 @@ impl FingerprintWorker {
         }
     }
 
+    /// How many speed variants a window gets in total.
+    pub fn speed_count(&self) -> usize {
+        self.speed_count
+    }
+
     pub fn output(&self) -> FingerprintOutput {
         self.shared
             .published
@@ -221,46 +232,43 @@ impl FingerprintWorker {
             .unwrap_or_default()
     }
 
-    fn is_current(shared: &Shared, generation: u64) -> bool {
-        shared
-            .published
-            .lock()
-            .map(|p| p.generation == generation)
-            .unwrap_or(false)
-    }
-
     fn run(shared: &Shared, speeds: &[f64], job: Job) {
         let Some(fingerprint) = compute_fingerprint(&job.samples, job.sample_rate, job.channels)
         else {
             return;
         };
-        match shared.published.lock() {
+        // Each result goes out the moment it exists. Whenever the session
+        // has moved on in the meantime, the rest of the window is dropped.
+        let publish = |update: &dyn Fn(&mut FingerprintOutput)| match shared.published.lock() {
             Ok(mut published) if published.generation == job.generation => {
-                published.output.fingerprint = fingerprint;
+                update(&mut published.output);
+                true
             }
-            _ => return,
+            _ => false,
+        };
+        if !publish(&|output| {
+            output.fingerprint = fingerprint.clone();
+            // The previous window's variants do not belong to this fingerprint.
+            output.speed_fingerprints.clear();
+        }) {
+            return;
         }
-
-        let mut variants = Vec::with_capacity(speeds.len());
         for &speed_percent in speeds {
-            if !Self::is_current(shared, job.generation) {
-                return;
-            }
-            if let Some(fingerprint) = compute_fingerprint_at_speed(
+            let Some(fingerprint) = compute_fingerprint_at_speed(
                 &job.samples,
                 job.sample_rate,
                 job.channels,
                 speed_percent,
-            ) {
-                variants.push(SpeedFingerprint {
+            ) else {
+                continue;
+            };
+            if !publish(&|output| {
+                output.speed_fingerprints.push(SpeedFingerprint {
                     speed_percent,
-                    fingerprint,
-                });
-            }
-        }
-        if let Ok(mut published) = shared.published.lock() {
-            if published.generation == job.generation {
-                published.output.speed_fingerprints = variants;
+                    fingerprint: fingerprint.clone(),
+                })
+            }) {
+                return;
             }
         }
     }
@@ -444,11 +452,11 @@ mod tests {
     #[test]
     fn speed_grid_lists_every_step_without_zero() {
         assert_eq!(speed_grid(0.0, 1.0).unwrap(), Vec::<f64>::new());
-        assert_eq!(speed_grid(2.0, 1.0).unwrap(), vec![-2.0, -1.0, 1.0, 2.0]);
-        assert_eq!(speed_grid(1.0, 0.5).unwrap(), vec![-1.0, -0.5, 0.5, 1.0]);
+        assert_eq!(speed_grid(2.0, 1.0).unwrap(), vec![1.0, -1.0, 2.0, -2.0]);
+        assert_eq!(speed_grid(1.0, 0.5).unwrap(), vec![0.5, -0.5, 1.0, -1.0]);
         assert_eq!(speed_grid(8.0, 1.0).unwrap().len(), 16);
         // A range that is not a multiple of the step stops at the last full step.
-        assert_eq!(speed_grid(2.5, 1.0).unwrap(), vec![-2.0, -1.0, 1.0, 2.0]);
+        assert_eq!(speed_grid(2.5, 1.0).unwrap(), vec![1.0, -1.0, 2.0, -2.0]);
     }
 
     #[test]
@@ -496,6 +504,33 @@ mod tests {
                 Some(variant.fingerprint.clone()),
                 compute_fingerprint_at_speed(&samples, 48000, 2, *speed)
             );
+        }
+    }
+
+    #[test]
+    fn worker_publishes_each_speed_as_soon_as_it_is_done_and_starts_over_per_window() {
+        let worker = FingerprintWorker::spawn(speed_grid(8.0, 1.0).unwrap()).unwrap();
+        assert_eq!(worker.speed_count(), 16);
+        assert!(worker.submit(melody_samples(48000, 25.0), 48000, 2));
+
+        // Seen growing: some, but not all, of the speeds are out already.
+        let partial = wait_for(&worker, |o| !o.speed_fingerprints.is_empty());
+        assert!(
+            partial.speed_fingerprints.len() < 16,
+            "the speeds came as one set"
+        );
+        assert_eq!(partial.speed_fingerprints[0].speed_percent, 1.0);
+        let first_window = wait_for(&worker, |o| o.speed_fingerprints.len() == 16);
+
+        // The next window's plain fingerprint takes the old variants away.
+        let other = played_faster(&melody_samples(48000, 26.0), 1.03);
+        while !worker.submit(other.clone(), 48000, 2) {
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        let second = wait_for(&worker, |o| o.fingerprint != first_window.fingerprint);
+        assert!(second.speed_fingerprints.len() < 16);
+        for variant in &second.speed_fingerprints {
+            assert!(!first_window.speed_fingerprints.contains(variant));
         }
     }
 

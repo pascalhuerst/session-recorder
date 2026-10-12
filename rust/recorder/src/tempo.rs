@@ -1,3 +1,25 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+//
+// This file is the one exception to the crate's MIT license. It rebuilds, in
+// Rust, the input chain of Essentia's TempoCNN algorithms
+// (TensorflowPredictTempoCNN, with FrameCutter, Windowing, Spectrum and
+// MelBands / TriangularBands) and is treated as a work derived from Essentia:
+//
+//   Essentia - https://essentia.upf.edu/ - https://github.com/MTG/essentia
+//   Copyright (C) 2006-2021  Music Technology Group - Universitat Pompeu Fabra
+//
+// Rust version for the session recorder, 2026, by the session-recorder
+// contributors; changed from the original in language and structure.
+//
+// This file is free software: you can redistribute it and/or modify it under
+// the terms of the GNU Affero General Public License as published by the Free
+// Software Foundation, either version 3 of the License, or (at your option)
+// any later version. It is distributed in the hope that it will be useful,
+// but WITHOUT ANY WARRANTY; without even the implied warranty of
+// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. The license text is in
+// LICENSE-AGPL-3.0 next to this crate's Cargo.toml; see also
+// https://www.gnu.org/licenses/.
+
 //! Live tempo (BPM) of recently captured audio, with TempoCNN.
 //!
 //! TempoCNN (Schreiber & Müller, ISMIR 2018; the `deeptemp` variant used here:
@@ -30,7 +52,7 @@
 //! them, probabilities equal to 5e-5. Every constant here is part of that
 //! agreement.
 //!
-//! The model file is not part of this crate and is not MIT: see "Source and
+//! The model file is not part of this crate and has its own license: see "Source and
 //! license of the model" in the README.
 
 use realfft::RealFftPlanner;

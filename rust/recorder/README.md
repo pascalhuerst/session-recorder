@@ -91,9 +91,8 @@ from before these features.
 ### Tempo model
 
 The live tempo needs the TempoCNN model `deeptemp-k16-3` as an ONNX file with a fixed input of
-`[1, 40, 256, 1]`. The model is not part of this repository, and it must not become part of it: this
-code is MIT, the model is not (see "Source and license of the model" below). One command gets and
-converts it:
+`[1, 40, 256, 1]`. The model is not part of this repository, and it must not become part of it: it
+has its own license (see "Source and license of the model" below). One command gets and converts it:
 
 ```bash
 tools/fetch-tempo-model.sh            # -> ~/.local/share/session-recorder/deeptemp-k16-3.onnx
@@ -190,6 +189,19 @@ RUST_LOG=recorder=debug,mdns_sd=warn ./target/release/recorder ...
 - Linux with ALSA.
 - avahi-daemon running (for mDNS discovery).
 - Membership in the `audio` group (or equivalent) to open the capture device.
+
+## Licenses
+
+The recorder is MIT, with one exception: `src/tempo.rs` is under the GNU Affero General Public License,
+version 3 or later (text in `LICENSE-AGPL-3.0`). That file rebuilds the input chain of
+[Essentia](https://essentia.upf.edu/)'s TempoCNN algorithms in Rust and is treated as derived from
+Essentia (Copyright (C) 2006-2021 Music Technology Group - Universitat Pompeu Fabra, AGPL-3.0); its
+header says so. Every other source file stays MIT and can be used under MIT on its own.
+
+A recorder binary contains `src/tempo.rs`, whether or not the live tempo is switched on, so whoever
+passes a binary on does so under the AGPL-3.0: with the license text and with the source, which is
+this repository. Running it yourself asks nothing of you. The tempo model has a license of its own, see
+"Source and license of the model" above.
 
 ## Acknowledgements
 

@@ -191,6 +191,17 @@ impl FingerprintWorker {
         std::thread::Builder::new()
             .name("fingerprint".into())
             .spawn(move || {
+                // Lowest priority: fingerprinting is steady CPU work with no
+                // deadline, on a host whose audio threads (the capture here,
+                // PipeWire, Bluetooth) may be running without realtime
+                // priority - at equal priority it made a Bluetooth stream
+                // crackle on the Raspberry Pi 3. Linux applies a nice value
+                // to the calling thread only.
+                // SAFETY: plain syscalls on this thread's own id.
+                unsafe {
+                    let tid = libc::syscall(libc::SYS_gettid) as libc::id_t;
+                    libc::setpriority(libc::PRIO_PROCESS, tid, 19);
+                }
                 while let Ok(job) = queue.recv() {
                     Self::run(&worker_shared, &speeds, constellation, spread, job);
                     worker_shared.busy.store(false, Ordering::Release);

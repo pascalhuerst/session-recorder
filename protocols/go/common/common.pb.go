@@ -71,14 +71,42 @@ func (SignalStatus) EnumDescriptor() ([]byte, []int) {
 }
 
 type RecorderStatus struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	RecorderID    string                 `protobuf:"bytes,1,opt,name=recorderID,proto3" json:"recorderID,omitempty"`
-	RecorderName  string                 `protobuf:"bytes,2,opt,name=recorderName,proto3" json:"recorderName,omitempty"`
-	SignalStatus  SignalStatus           `protobuf:"varint,3,opt,name=signalStatus,proto3,enum=common.SignalStatus" json:"signalStatus,omitempty"`
-	PeakPercent   float64                `protobuf:"fixed64,4,opt,name=peakPercent,proto3" json:"peakPercent,omitempty"`
-	Clipping      bool                   `protobuf:"varint,5,opt,name=clipping,proto3" json:"clipping,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	RecorderID   string                 `protobuf:"bytes,1,opt,name=recorderID,proto3" json:"recorderID,omitempty"`
+	RecorderName string                 `protobuf:"bytes,2,opt,name=recorderName,proto3" json:"recorderName,omitempty"`
+	SignalStatus SignalStatus           `protobuf:"varint,3,opt,name=signalStatus,proto3,enum=common.SignalStatus" json:"signalStatus,omitempty"`
+	PeakPercent  float64                `protobuf:"fixed64,4,opt,name=peakPercent,proto3" json:"peakPercent,omitempty"`
+	Clipping     bool                   `protobuf:"varint,5,opt,name=clipping,proto3" json:"clipping,omitempty"`
+	// Most recently computed Chromaprint audio fingerprint for this
+	// recorder's current session, recomputed every few seconds over a
+	// rolling window while recording. Empty until the first window has
+	// been fingerprinted.
+	ChromaprintFingerprint string `protobuf:"bytes,6,opt,name=chromaprintFingerprint,proto3" json:"chromaprintFingerprint,omitempty"`
+	// The same window fingerprinted for a range of assumed playback speeds,
+	// for sources whose speed is not fixed (a turntable's pitch fader moves
+	// tempo and pitch together, which a Chromaprint match only survives up to
+	// about half a percent). Empty unless the recorder is configured for it.
+	// The unshifted fingerprint above is not repeated here. They always
+	// belong to the same window as the fingerprint above and are added one by
+	// one as each is computed, the speeds closest to the original first; the
+	// list starts empty again with every new fingerprint above.
+	ChromaprintSpeedFingerprints []*SpeedFingerprint `protobuf:"bytes,7,rep,name=chromaprintSpeedFingerprints,proto3" json:"chromaprintSpeedFingerprints,omitempty"`
+	// How many entries the list above will hold once a window is done - the
+	// number of speeds the recorder is configured for, 0 if none.
+	ChromaprintSpeedCount uint32 `protobuf:"varint,8,opt,name=chromaprintSpeedCount,proto3" json:"chromaprintSpeedCount,omitempty"`
+	// A second, speed-invariant fingerprint of the same window: the spectral
+	// peaks ("constellation") of the last seconds of audio, from which a
+	// client derives hashes that do not change with playback speed (a pitched
+	// turntable), and gets the speed itself out of a match. Empty until the
+	// first window is done, and when the recorder is not configured for it.
+	//
+	// Format "SIC1": the 4 bytes "SIC1", a uint32 count N, then N frame
+	// numbers (uint32) followed by N log-frequency bins (uint8), all little
+	// endian; peaks sorted by frame. A frame is 256 samples of the audio
+	// resampled to 11025 Hz mono (23.2 ms); bin b is 300 Hz * 2^(b/48).
+	PeakConstellation []byte `protobuf:"bytes,9,opt,name=peakConstellation,proto3" json:"peakConstellation,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *RecorderStatus) Reset() {
@@ -146,6 +174,91 @@ func (x *RecorderStatus) GetClipping() bool {
 	return false
 }
 
+func (x *RecorderStatus) GetChromaprintFingerprint() string {
+	if x != nil {
+		return x.ChromaprintFingerprint
+	}
+	return ""
+}
+
+func (x *RecorderStatus) GetChromaprintSpeedFingerprints() []*SpeedFingerprint {
+	if x != nil {
+		return x.ChromaprintSpeedFingerprints
+	}
+	return nil
+}
+
+func (x *RecorderStatus) GetChromaprintSpeedCount() uint32 {
+	if x != nil {
+		return x.ChromaprintSpeedCount
+	}
+	return 0
+}
+
+func (x *RecorderStatus) GetPeakConstellation() []byte {
+	if x != nil {
+		return x.PeakConstellation
+	}
+	return nil
+}
+
+type SpeedFingerprint struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Assumed deviation from the original speed, in percent (+4 = playing
+	// 4 % too fast).
+	SpeedPercent float64 `protobuf:"fixed64,1,opt,name=speedPercent,proto3" json:"speedPercent,omitempty"`
+	// Chromaprint fingerprint of the window brought back to original speed
+	// under that assumption - comparable to a fingerprint of the unshifted
+	// recording.
+	Fingerprint   string `protobuf:"bytes,2,opt,name=fingerprint,proto3" json:"fingerprint,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SpeedFingerprint) Reset() {
+	*x = SpeedFingerprint{}
+	mi := &file_common_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SpeedFingerprint) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SpeedFingerprint) ProtoMessage() {}
+
+func (x *SpeedFingerprint) ProtoReflect() protoreflect.Message {
+	mi := &file_common_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SpeedFingerprint.ProtoReflect.Descriptor instead.
+func (*SpeedFingerprint) Descriptor() ([]byte, []int) {
+	return file_common_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *SpeedFingerprint) GetSpeedPercent() float64 {
+	if x != nil {
+		return x.SpeedPercent
+	}
+	return 0
+}
+
+func (x *SpeedFingerprint) GetFingerprint() string {
+	if x != nil {
+		return x.Fingerprint
+	}
+	return ""
+}
+
 type Respone struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
@@ -156,7 +269,7 @@ type Respone struct {
 
 func (x *Respone) Reset() {
 	*x = Respone{}
-	mi := &file_common_proto_msgTypes[1]
+	mi := &file_common_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -168,7 +281,7 @@ func (x *Respone) String() string {
 func (*Respone) ProtoMessage() {}
 
 func (x *Respone) ProtoReflect() protoreflect.Message {
-	mi := &file_common_proto_msgTypes[1]
+	mi := &file_common_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -181,7 +294,7 @@ func (x *Respone) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Respone.ProtoReflect.Descriptor instead.
 func (*Respone) Descriptor() ([]byte, []int) {
-	return file_common_proto_rawDescGZIP(), []int{1}
+	return file_common_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *Respone) GetSuccess() bool {
@@ -202,7 +315,7 @@ var File_common_proto protoreflect.FileDescriptor
 
 const file_common_proto_rawDesc = "" +
 	"\n" +
-	"\fcommon.proto\x12\x06common\"\xcc\x01\n" +
+	"\fcommon.proto\x12\x06common\"\xc6\x03\n" +
 	"\x0eRecorderStatus\x12\x1e\n" +
 	"\n" +
 	"recorderID\x18\x01 \x01(\tR\n" +
@@ -210,7 +323,14 @@ const file_common_proto_rawDesc = "" +
 	"\frecorderName\x18\x02 \x01(\tR\frecorderName\x128\n" +
 	"\fsignalStatus\x18\x03 \x01(\x0e2\x14.common.SignalStatusR\fsignalStatus\x12 \n" +
 	"\vpeakPercent\x18\x04 \x01(\x01R\vpeakPercent\x12\x1a\n" +
-	"\bclipping\x18\x05 \x01(\bR\bclipping\"G\n" +
+	"\bclipping\x18\x05 \x01(\bR\bclipping\x126\n" +
+	"\x16chromaprintFingerprint\x18\x06 \x01(\tR\x16chromaprintFingerprint\x12\\\n" +
+	"\x1cchromaprintSpeedFingerprints\x18\a \x03(\v2\x18.common.SpeedFingerprintR\x1cchromaprintSpeedFingerprints\x124\n" +
+	"\x15chromaprintSpeedCount\x18\b \x01(\rR\x15chromaprintSpeedCount\x12,\n" +
+	"\x11peakConstellation\x18\t \x01(\fR\x11peakConstellation\"X\n" +
+	"\x10SpeedFingerprint\x12\"\n" +
+	"\fspeedPercent\x18\x01 \x01(\x01R\fspeedPercent\x12 \n" +
+	"\vfingerprint\x18\x02 \x01(\tR\vfingerprint\"G\n" +
 	"\aRespone\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\"\n" +
 	"\ferrorMessage\x18\x02 \x01(\tR\ferrorMessage*6\n" +
@@ -233,19 +353,21 @@ func file_common_proto_rawDescGZIP() []byte {
 }
 
 var file_common_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_common_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_common_proto_msgTypes = make([]protoimpl.MessageInfo, 3)
 var file_common_proto_goTypes = []any{
-	(SignalStatus)(0),      // 0: common.SignalStatus
-	(*RecorderStatus)(nil), // 1: common.RecorderStatus
-	(*Respone)(nil),        // 2: common.Respone
+	(SignalStatus)(0),        // 0: common.SignalStatus
+	(*RecorderStatus)(nil),   // 1: common.RecorderStatus
+	(*SpeedFingerprint)(nil), // 2: common.SpeedFingerprint
+	(*Respone)(nil),          // 3: common.Respone
 }
 var file_common_proto_depIdxs = []int32{
 	0, // 0: common.RecorderStatus.signalStatus:type_name -> common.SignalStatus
-	1, // [1:1] is the sub-list for method output_type
-	1, // [1:1] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	2, // 1: common.RecorderStatus.chromaprintSpeedFingerprints:type_name -> common.SpeedFingerprint
+	2, // [2:2] is the sub-list for method output_type
+	2, // [2:2] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_common_proto_init() }
@@ -259,7 +381,7 @@ func file_common_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_common_proto_rawDesc), len(file_common_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   2,
+			NumMessages:   3,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

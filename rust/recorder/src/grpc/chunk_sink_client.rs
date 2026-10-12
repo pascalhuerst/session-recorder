@@ -103,6 +103,9 @@ pub struct RecorderStatusInfo {
     pub signal_status: SignalStatus,
     pub peak_percent: f64,
     pub clipping: bool,
+    /// Most recently computed Chromaprint fingerprint for the current
+    /// session, or empty if none has been computed yet.
+    pub chromaprint_fingerprint: String,
 }
 
 /// ChunkSink gRPC client service
@@ -161,6 +164,7 @@ impl ChunkSinkClientService {
             signal_status: status.signal_status.into(),
             peak_percent: status.peak_percent,
             clipping: status.clipping,
+            chromaprint_fingerprint: status.chromaprint_fingerprint,
         });
 
         match client.set_recorder_status(request).await {
@@ -244,6 +248,7 @@ mod tests {
             signal_status: SignalStatus::Signal,
             peak_percent: 0.5,
             clipping: false,
+            chromaprint_fingerprint: String::new(),
         };
 
         let result = client.set_recorder_status(status).await;

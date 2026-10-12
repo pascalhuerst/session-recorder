@@ -16,6 +16,7 @@ use recorder::audio::{
 use recorder::discovery::{
     self, DiscoveryConfig, DiscoveryMethod, ServiceDiscovery, ServiceEvent, ServiceInfo,
 };
+use recorder::fingerprint::compute_fingerprint;
 use recorder::grpc::chunk_sink_client::{
     AudioChunk, ChunkSinkClientService, ChunkSinkConfig, RecorderStatusInfo,
     chunksink::{GetCommandRequest, chunk_sink_client::ChunkSinkClient, command::Command},
@@ -49,6 +50,15 @@ const CLIPPING_THRESHOLD: f32 = 32767.0 / 32768.0;
 // has a live gRPC client. Catches reconnects after backend restarts when no
 // fresh mDNS event would otherwise wake us up.
 const RECONCILE_INTERVAL: Duration = Duration::from_secs(5);
+// Live Chromaprint fingerprinting: fingerprint the most recent
+// FINGERPRINT_WINDOW_SECONDS of audio every FINGERPRINT_RECOMPUTE_INTERVAL_SECONDS
+// while recording. A 25 s window is comfortably above Chromaprint's own
+// effective minimum (useful matches have been observed on much shorter clips,
+// see discql_addon_chromaprintMatching/CHROMAPRINT_FINDINGS.md); recomputing
+// every 12 s keeps the exposed fingerprint reasonably fresh without running
+// the (cheap, but non-zero) computation on every detector window.
+const FINGERPRINT_WINDOW_SECONDS: f64 = 25.0;
+const FINGERPRINT_RECOMPUTE_INTERVAL_SECONDS: f64 = 12.0;
 
 // One captured "frame" is one inter-channel sample (NUM_CHANNELS samples). On
 // the wire samples are packed little-endian s16 (AudioChunk.data is `bytes`),
@@ -330,6 +340,10 @@ struct SessionRecorder {
 
     outbox: Arc<tokio::sync::Mutex<Outbox>>,
 
+    /// Most recently computed live Chromaprint fingerprint, shared with the
+    /// audio processing task and read whenever a RecorderStatus is sent.
+    latest_fingerprint: Arc<std::sync::Mutex<String>>,
+
     cut_tx: Option<tokio::sync::mpsc::Sender<CutTrigger>>,
     led_event_tx: Option<tokio::sync::mpsc::Sender<LedEvent>>,
 
@@ -374,6 +388,7 @@ impl SessionRecorder {
             signal_status: SignalStatus::NoSignal,
             peak_percent: 0.0,
             clipping: false,
+            chromaprint_fingerprint: String::new(),
         };
 
         let capacity_bytes = (audio_settings.sample_rate as f64
@@ -414,6 +429,7 @@ impl SessionRecorder {
             recorder_status: Arc::new(tokio::sync::Mutex::new(initial_status)),
             shutdown_signal: Arc::new(AtomicBool::new(false)),
             outbox,
+            latest_fingerprint: Arc::new(std::sync::Mutex::new(String::new())),
             cut_tx: None,
             led_event_tx: None,
             input_key: None,
@@ -799,6 +815,7 @@ impl SessionRecorder {
         let shutdown = self.shutdown_signal.clone();
         let status = Arc::clone(&self.recorder_status);
         let outbox = Arc::clone(&self.outbox);
+        let fingerprint_state = Arc::clone(&self.latest_fingerprint);
         let detector = DetectorConfig {
             sample_rate: SAMPLE_RATE,
             num_channels: NUM_CHANNELS,
@@ -835,6 +852,7 @@ impl SessionRecorder {
                 led_event_tx,
                 outbox,
                 chunk_frames,
+                fingerprint_state,
             )
             .await;
         });
@@ -1162,6 +1180,7 @@ impl SessionRecorder {
         led_event_tx: Option<tokio::sync::mpsc::Sender<LedEvent>>,
         outbox: Arc<tokio::sync::Mutex<Outbox>>,
         chunk_frames: usize,
+        fingerprint_state: Arc<std::sync::Mutex<String>>,
     ) {
         info!(
             "Audio processing task started (threshold={} dB, window={}s, attack={}s, release={}s, chunk_frames={})",
@@ -1206,6 +1225,20 @@ impl SessionRecorder {
         let mut meter_ssq_l = 0f32;
         let mut meter_ssq_r = 0f32;
         let mut meter_frames = 0usize;
+
+        // Rolling buffer of the most recent FINGERPRINT_WINDOW_SECONDS of
+        // interleaved i16 samples (while recording), re-fingerprinted every
+        // FINGERPRINT_RECOMPUTE_INTERVAL_SECONDS. Reset whenever recording
+        // stops so a new session doesn't start by exposing the previous
+        // session's stale fingerprint.
+        let fp_capacity_samples = (FINGERPRINT_WINDOW_SECONDS
+            * detector.sample_rate as f64
+            * detector.num_channels as f64) as usize;
+        let fp_recompute_interval_samples = (FINGERPRINT_RECOMPUTE_INTERVAL_SECONDS
+            * detector.sample_rate as f64
+            * detector.num_channels as f64) as usize;
+        let mut fp_buffer: VecDeque<i16> = VecDeque::with_capacity(fp_capacity_samples);
+        let mut fp_samples_since_compute: usize = 0;
 
         while !shutdown.load(Ordering::Relaxed) {
             tokio::select! {
@@ -1257,6 +1290,11 @@ impl SessionRecorder {
                         }
                         window_buf.clear();
                         flush_pending(&outbox, &mut pending, session_id.as_deref(), chunk_counter).await;
+                        fp_buffer.clear();
+                        fp_samples_since_compute = 0;
+                        if let Ok(mut g) = fingerprint_state.lock() {
+                            g.clear();
+                        }
                         let new_id = Uuid::new_v4().to_string();
                         info!("Cut ({:?}): ending current session, starting {}", trigger, new_id);
                         session_id = Some(new_id);
@@ -1314,6 +1352,11 @@ impl SessionRecorder {
                     if !recording && above_count >= attack_windows {
                         recording = true;
                         pending.clear();
+                        fp_buffer.clear();
+                        fp_samples_since_compute = 0;
+                        if let Ok(mut g) = fingerprint_state.lock() {
+                            g.clear();
+                        }
                         let new_id = Uuid::new_v4().to_string();
                         info!(
                             "Recording started (RMS {:.1} dB), session: {}",
@@ -1342,6 +1385,11 @@ impl SessionRecorder {
                         // final (partial) chunk so the tail isn't dropped.
                         flush_pending(&outbox, &mut pending, session_id.as_deref(), chunk_counter)
                             .await;
+                        fp_buffer.clear();
+                        fp_samples_since_compute = 0;
+                        if let Ok(mut g) = fingerprint_state.lock() {
+                            g.clear();
+                        }
                         info!("Recording stopped (RMS {:.1} dB)", rms_db);
                         session_id = None;
                     }
@@ -1359,6 +1407,10 @@ impl SessionRecorder {
                     },
                     peak_percent: (peak as f64) * 100.0,
                     clipping,
+                    chromaprint_fingerprint: fingerprint_state
+                        .lock()
+                        .map(|g| g.clone())
+                        .unwrap_or_default(),
                 };
                 {
                     *status.lock().await = status_info.clone();
@@ -1400,6 +1452,28 @@ impl SessionRecorder {
                     for &s in &window {
                         let i = (s.clamp(-1.0, 1.0) * 32767.0) as i16;
                         pending.extend_from_slice(&i.to_le_bytes());
+                        fp_buffer.push_back(i);
+                    }
+                    while fp_buffer.len() > fp_capacity_samples {
+                        fp_buffer.pop_front();
+                    }
+                    fp_samples_since_compute += window.len();
+                    if fp_buffer.len() >= fp_capacity_samples
+                        && fp_samples_since_compute >= fp_recompute_interval_samples
+                    {
+                        fp_samples_since_compute = 0;
+                        let samples_snapshot: Vec<i16> = fp_buffer.iter().copied().collect();
+                        let fingerprint_state = Arc::clone(&fingerprint_state);
+                        let sample_rate = detector.sample_rate;
+                        let channels = detector.num_channels;
+                        tokio::task::spawn_blocking(move || {
+                            if let Some(fp) =
+                                compute_fingerprint(&samples_snapshot, sample_rate, channels)
+                                && let Ok(mut g) = fingerprint_state.lock()
+                            {
+                                *g = fp;
+                            }
+                        });
                     }
 
                     // Send the first chunk of a session as soon as any audio is

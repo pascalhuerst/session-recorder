@@ -132,6 +132,7 @@ fn generate_test_data(recorder_statuses: RecorderStatusMap) {
                 signal_status,
                 peak_percent,
                 clipping,
+                chromaprint_fingerprint: String::new(),
             };
 
             // Update the shared state

@@ -17,6 +17,12 @@ message RecorderStatus {
     SignalStatus signalStatus = 3;
     double peakPercent = 4;
     bool clipping = 5;
+
+    // Most recently computed Chromaprint audio fingerprint for this
+    // recorder's current session, recomputed every few seconds over a
+    // rolling window while recording. Empty until the first window has
+    // been fingerprinted.
+    string chromaprintFingerprint = 6;
 }
 
 message Respone {

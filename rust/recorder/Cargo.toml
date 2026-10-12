@@ -30,6 +30,7 @@ clap = { version = "4.6.1", features = ["derive", "env"] }
 zbus = { version = "5", default-features = false, features = ["tokio"] }
 async-trait = "0.1"
 futures-util = "0.3"
+rusty-chromaprint = "0.3.0"
 
 [build-dependencies]
 tonic-build = "0.12"

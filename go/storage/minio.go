@@ -1100,23 +1100,39 @@ func (m *Minio) composeChunksIntoRaw(ctx context.Context, recorderID, sessionID 
 // (e.g. a Raspberry Pi rendering a 12h session).
 const uploadPartSize = 16 * 1024 * 1024
 
-// flacEncoderFor returns the FLAC encoder to use for the raw audio stored in
-// object - or for the byte range of it that opts selects. It reads that audio
-// once up front to learn its length and MD5, which belong in the header of a
-// stream that is then uploaded without ever being seekable (see
-// render.PCMSummary). If that extra read fails, encoding still goes ahead,
-// just with a header that carries neither.
-func (m *Minio) flacEncoderFor(ctx context.Context, object string, opts minio.GetObjectOptions) func(dst io.Writer, src io.Reader) error {
+// summarizeRaw reads the raw audio stored in object - or the byte range of it
+// that opts selects - once, for the length and MD5 that belong in the header
+// of a FLAC stream which is then uploaded without ever being seekable (see
+// render.PCMSummary). It also returns the ETag of the object version it read,
+// so a caller that opens the object again can tell whether it got the same
+// bytes.
+func (m *Minio) summarizeRaw(ctx context.Context, object string, opts minio.GetObjectOptions) (render.PCMSummary, string, error) {
 	raw, err := m.client.GetObject(ctx, bucketName, object, opts)
-	if err == nil {
-		defer raw.Close()
-		var summary render.PCMSummary
-		if summary, err = render.SummarizePCM(raw); err == nil {
-			return summary.Flac
-		}
+	if err != nil {
+		return render.PCMSummary{}, "", err
 	}
-	log.Warn().Err(err).Str("object", object).Msg("Cannot summarize raw audio; FLAC header will carry no length or MD5")
-	return render.Flac
+	defer raw.Close()
+	info, err := raw.Stat()
+	if err != nil {
+		return render.PCMSummary{}, "", err
+	}
+	summary, err := render.SummarizePCM(raw)
+	if err != nil {
+		return render.PCMSummary{}, "", err
+	}
+	return summary, info.ETag, nil
+}
+
+// flacEncoderFor returns the FLAC encoder to use for the raw audio stored in
+// object (see summarizeRaw). If the audio cannot be summarized, encoding
+// still goes ahead, just with a header that carries neither length nor MD5.
+func (m *Minio) flacEncoderFor(ctx context.Context, object string, opts minio.GetObjectOptions) func(dst io.Writer, src io.Reader) error {
+	summary, _, err := m.summarizeRaw(ctx, object, opts)
+	if err != nil {
+		log.Warn().Err(err).Str("object", object).Msg("Cannot summarize raw audio; FLAC header will carry no length or MD5")
+		return render.Flac
+	}
+	return summary.Flac
 }
 
 // streamEncode runs encode(dst, src) and uploads its output to object via a
@@ -1148,6 +1164,14 @@ func (m *Minio) renderDerivedFiles(ctx context.Context, recorderID, sessionID uu
 	chunksPrefix := fmt.Sprintf("%s/sessions/%s/chunks", recorderID, sessionID)
 	rawDataObjectName := fmt.Sprintf("%s/sessions/%s/data.raw", recorderID, sessionID)
 
+	// Summarize for the FLAC header *before* opening data.raw for rendering,
+	// never in between: Stat() below pins the object version, and the first
+	// read after it fails with a precondition error if data.raw was replaced
+	// in the meantime - which a second close of the same session (a chunk
+	// arriving just after the recorder went silent) does. Anything slow
+	// between Stat() and that first read turns this rare race into the rule.
+	summary, summaryETag, summaryErr := m.summarizeRaw(ctx, rawDataObjectName, minio.GetObjectOptions{})
+
 	rawData, err := m.client.GetObject(ctx, bucketName, rawDataObjectName, minio.GetObjectOptions{})
 	if err != nil {
 		log.Err(err).Str("object", rawDataObjectName).Msg("Cannot get object")
@@ -1158,6 +1182,19 @@ func (m *Minio) renderDerivedFiles(ctx context.Context, recorderID, sessionID uu
 	if err != nil {
 		rawData.Close()
 		return fmt.Errorf("cannot stat data.raw: %w", err)
+	}
+
+	// The summary only describes the bytes about to be encoded if both reads
+	// saw the same version of data.raw; otherwise encode without it rather
+	// than fail the render or write a header that contradicts the stream.
+	flacEncode := render.Flac
+	switch {
+	case summaryErr != nil:
+		log.Warn().Err(summaryErr).Str("object", rawDataObjectName).Msg("Cannot summarize raw audio; FLAC header will carry no length or MD5")
+	case summaryETag != rawInfo.ETag:
+		log.Warn().Str("object", rawDataObjectName).Msg("data.raw changed while it was being summarized; FLAC header will carry no length or MD5")
+	default:
+		flacEncode = summary.Flac
 	}
 
 	// raw samples: 48000 Hz, 2 channels, int16 LE
@@ -1174,10 +1211,6 @@ func (m *Minio) renderDerivedFiles(ctx context.Context, recorderID, sessionID uu
 	sm.Duration = time.Duration(durationSeconds) * time.Second
 	sm.EndTime = sm.StartTime.Add(sm.Duration)
 	// Don't set to FINISHED yet - wait for rendering to complete
-
-	// Before the fan-out starts, not inside the FLAC worker: a consumer that
-	// is not reading yet stalls the pipe for all three.
-	flacEncode := m.flacEncoderFor(ctx, rawDataObjectName, minio.GetObjectOptions{})
 
 	// Three parallel consumers of data.raw: waveform.dat, data.flac, data.ogg.
 	// The reader count must equal the number of consumers or the MultiWriter

@@ -34,11 +34,19 @@ export interface RecorderStatus {
      * @generated from protobuf field: bool clipping = 5
      */
     clipping: boolean;
+    // --- Live fingerprints of the audio being recorded -----------------------
+    // 
+    // While recording, the recorder fingerprints the last seconds of audio
+    // (a "window") again and again. Each result is carried by exactly ONE
+    // status message - the first one sent after it was computed - and the
+    // fields below are empty in all the others; a status goes out several
+    // times a second and the results only change every few seconds. A client
+    // collects them: everything with the same fingerprintWindow belongs
+    // together, and an empty field means "nothing new", not "no fingerprint".
+
     /**
-     * Most recently computed Chromaprint audio fingerprint for this
-     * recorder's current session, recomputed every few seconds over a
-     * rolling window while recording. Empty until the first window has
-     * been fingerprinted.
+     * Chromaprint fingerprint of the window, at the speed it was captured.
+     * The first fingerprint of a window.
      *
      * @generated from protobuf field: string chromaprintFingerprint = 6
      */
@@ -47,18 +55,16 @@ export interface RecorderStatus {
      * The same window fingerprinted for a range of assumed playback speeds,
      * for sources whose speed is not fixed (a turntable's pitch fader moves
      * tempo and pitch together, which a Chromaprint match only survives up to
-     * about half a percent). Empty unless the recorder is configured for it.
-     * The unshifted fingerprint above is not repeated here. They always
-     * belong to the same window as the fingerprint above and are added one by
-     * one as each is computed, the speeds closest to the original first; the
-     * list starts empty again with every new fingerprint above.
+     * about half a percent). Only if the recorder is configured for it. Each
+     * speed is sent once, as it is computed, the speeds closest to the
+     * original first; the unshifted fingerprint above is not among them.
      *
      * @generated from protobuf field: repeated common.SpeedFingerprint chromaprintSpeedFingerprints = 7
      */
     chromaprintSpeedFingerprints: SpeedFingerprint[];
     /**
-     * How many entries the list above will hold once a window is done - the
-     * number of speeds the recorder is configured for, 0 if none.
+     * How many speeds a window is fingerprinted for in total - the number the
+     * recorder is configured for, 0 if none. Sent with every status.
      *
      * @generated from protobuf field: uint32 chromaprintSpeedCount = 8
      */
@@ -67,8 +73,8 @@ export interface RecorderStatus {
      * A second, speed-invariant fingerprint of the same window: the spectral
      * peaks ("constellation") of the last seconds of audio, from which a
      * client derives hashes that do not change with playback speed (a pitched
-     * turntable), and gets the speed itself out of a match. Empty until the
-     * first window is done, and when the recorder is not configured for it.
+     * turntable), and gets the speed itself out of a match. Only if the
+     * recorder is configured for it.
      *
      * Format "SIC1": the 4 bytes "SIC1", a uint32 count N, then N frame
      * numbers (uint32) followed by N log-frequency bins (uint8), all little
@@ -78,6 +84,30 @@ export interface RecorderStatus {
      * @generated from protobuf field: bytes peakConstellation = 9
      */
     peakConstellation: Uint8Array;
+    /**
+     * Which window the results in this status belong to, and the current one
+     * when it carries none: a number that goes up by one with every window.
+     * Sent with every status.
+     *
+     * @generated from protobuf field: uint32 fingerprintWindow = 10
+     */
+    fingerprintWindow: number;
+    /**
+     * The tempo of the same window, estimated with TempoCNN: beats per minute
+     * (whole numbers, 30 to 285) and the model's probability for that tempo
+     * (0..1). Only if the recorder is configured for it. Sent once per
+     * window like the fingerprints, and as the window's FIRST result, before
+     * its fingerprints - so a client can use it to narrow down what it
+     * compares them with. Both 0 in every other status, and in the window's
+     * one status too when the window had no tempo (silence).
+     *
+     * @generated from protobuf field: float tempoBpm = 11
+     */
+    tempoBpm: number;
+    /**
+     * @generated from protobuf field: float tempoProbability = 12
+     */
+    tempoProbability: number;
 }
 /**
  * @generated from protobuf message common.SpeedFingerprint
@@ -141,7 +171,10 @@ class RecorderStatus$Type extends MessageType<RecorderStatus> {
             { no: 6, name: "chromaprintFingerprint", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
             { no: 7, name: "chromaprintSpeedFingerprints", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => SpeedFingerprint },
             { no: 8, name: "chromaprintSpeedCount", kind: "scalar", T: 13 /*ScalarType.UINT32*/ },
-            { no: 9, name: "peakConstellation", kind: "scalar", T: 12 /*ScalarType.BYTES*/ }
+            { no: 9, name: "peakConstellation", kind: "scalar", T: 12 /*ScalarType.BYTES*/ },
+            { no: 10, name: "fingerprintWindow", kind: "scalar", T: 13 /*ScalarType.UINT32*/ },
+            { no: 11, name: "tempoBpm", kind: "scalar", T: 2 /*ScalarType.FLOAT*/ },
+            { no: 12, name: "tempoProbability", kind: "scalar", T: 2 /*ScalarType.FLOAT*/ }
         ]);
     }
     create(value?: PartialMessage<RecorderStatus>): RecorderStatus {
@@ -155,6 +188,9 @@ class RecorderStatus$Type extends MessageType<RecorderStatus> {
         message.chromaprintSpeedFingerprints = [];
         message.chromaprintSpeedCount = 0;
         message.peakConstellation = new Uint8Array(0);
+        message.fingerprintWindow = 0;
+        message.tempoBpm = 0;
+        message.tempoProbability = 0;
         if (value !== undefined)
             reflectionMergePartial<RecorderStatus>(this, message, value);
         return message;
@@ -190,6 +226,15 @@ class RecorderStatus$Type extends MessageType<RecorderStatus> {
                     break;
                 case /* bytes peakConstellation */ 9:
                     message.peakConstellation = reader.bytes();
+                    break;
+                case /* uint32 fingerprintWindow */ 10:
+                    message.fingerprintWindow = reader.uint32();
+                    break;
+                case /* float tempoBpm */ 11:
+                    message.tempoBpm = reader.float();
+                    break;
+                case /* float tempoProbability */ 12:
+                    message.tempoProbability = reader.float();
                     break;
                 default:
                     let u = options.readUnknownField;
@@ -230,6 +275,15 @@ class RecorderStatus$Type extends MessageType<RecorderStatus> {
         /* bytes peakConstellation = 9; */
         if (message.peakConstellation.length)
             writer.tag(9, WireType.LengthDelimited).bytes(message.peakConstellation);
+        /* uint32 fingerprintWindow = 10; */
+        if (message.fingerprintWindow !== 0)
+            writer.tag(10, WireType.Varint).uint32(message.fingerprintWindow);
+        /* float tempoBpm = 11; */
+        if (message.tempoBpm !== 0)
+            writer.tag(11, WireType.Bit32).float(message.tempoBpm);
+        /* float tempoProbability = 12; */
+        if (message.tempoProbability !== 0)
+            writer.tag(12, WireType.Bit32).float(message.tempoProbability);
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);

@@ -77,36 +77,45 @@ type RecorderStatus struct {
 	SignalStatus SignalStatus           `protobuf:"varint,3,opt,name=signalStatus,proto3,enum=common.SignalStatus" json:"signalStatus,omitempty"`
 	PeakPercent  float64                `protobuf:"fixed64,4,opt,name=peakPercent,proto3" json:"peakPercent,omitempty"`
 	Clipping     bool                   `protobuf:"varint,5,opt,name=clipping,proto3" json:"clipping,omitempty"`
-	// Most recently computed Chromaprint audio fingerprint for this
-	// recorder's current session, recomputed every few seconds over a
-	// rolling window while recording. Empty until the first window has
-	// been fingerprinted.
+	// Chromaprint fingerprint of the window, at the speed it was captured.
+	// The first fingerprint of a window.
 	ChromaprintFingerprint string `protobuf:"bytes,6,opt,name=chromaprintFingerprint,proto3" json:"chromaprintFingerprint,omitempty"`
 	// The same window fingerprinted for a range of assumed playback speeds,
 	// for sources whose speed is not fixed (a turntable's pitch fader moves
 	// tempo and pitch together, which a Chromaprint match only survives up to
-	// about half a percent). Empty unless the recorder is configured for it.
-	// The unshifted fingerprint above is not repeated here. They always
-	// belong to the same window as the fingerprint above and are added one by
-	// one as each is computed, the speeds closest to the original first; the
-	// list starts empty again with every new fingerprint above.
+	// about half a percent). Only if the recorder is configured for it. Each
+	// speed is sent once, as it is computed, the speeds closest to the
+	// original first; the unshifted fingerprint above is not among them.
 	ChromaprintSpeedFingerprints []*SpeedFingerprint `protobuf:"bytes,7,rep,name=chromaprintSpeedFingerprints,proto3" json:"chromaprintSpeedFingerprints,omitempty"`
-	// How many entries the list above will hold once a window is done - the
-	// number of speeds the recorder is configured for, 0 if none.
+	// How many speeds a window is fingerprinted for in total - the number the
+	// recorder is configured for, 0 if none. Sent with every status.
 	ChromaprintSpeedCount uint32 `protobuf:"varint,8,opt,name=chromaprintSpeedCount,proto3" json:"chromaprintSpeedCount,omitempty"`
 	// A second, speed-invariant fingerprint of the same window: the spectral
 	// peaks ("constellation") of the last seconds of audio, from which a
 	// client derives hashes that do not change with playback speed (a pitched
-	// turntable), and gets the speed itself out of a match. Empty until the
-	// first window is done, and when the recorder is not configured for it.
+	// turntable), and gets the speed itself out of a match. Only if the
+	// recorder is configured for it.
 	//
 	// Format "SIC1": the 4 bytes "SIC1", a uint32 count N, then N frame
 	// numbers (uint32) followed by N log-frequency bins (uint8), all little
 	// endian; peaks sorted by frame. A frame is 256 samples of the audio
 	// resampled to 11025 Hz mono (23.2 ms); bin b is 300 Hz * 2^(b/48).
 	PeakConstellation []byte `protobuf:"bytes,9,opt,name=peakConstellation,proto3" json:"peakConstellation,omitempty"`
-	unknownFields     protoimpl.UnknownFields
-	sizeCache         protoimpl.SizeCache
+	// Which window the results in this status belong to, and the current one
+	// when it carries none: a number that goes up by one with every window.
+	// Sent with every status.
+	FingerprintWindow uint32 `protobuf:"varint,10,opt,name=fingerprintWindow,proto3" json:"fingerprintWindow,omitempty"`
+	// The tempo of the same window, estimated with TempoCNN: beats per minute
+	// (whole numbers, 30 to 285) and the model's probability for that tempo
+	// (0..1). Only if the recorder is configured for it. Sent once per
+	// window like the fingerprints, and as the window's FIRST result, before
+	// its fingerprints - so a client can use it to narrow down what it
+	// compares them with. Both 0 in every other status, and in the window's
+	// one status too when the window had no tempo (silence).
+	TempoBpm         float32 `protobuf:"fixed32,11,opt,name=tempoBpm,proto3" json:"tempoBpm,omitempty"`
+	TempoProbability float32 `protobuf:"fixed32,12,opt,name=tempoProbability,proto3" json:"tempoProbability,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *RecorderStatus) Reset() {
@@ -200,6 +209,27 @@ func (x *RecorderStatus) GetPeakConstellation() []byte {
 		return x.PeakConstellation
 	}
 	return nil
+}
+
+func (x *RecorderStatus) GetFingerprintWindow() uint32 {
+	if x != nil {
+		return x.FingerprintWindow
+	}
+	return 0
+}
+
+func (x *RecorderStatus) GetTempoBpm() float32 {
+	if x != nil {
+		return x.TempoBpm
+	}
+	return 0
+}
+
+func (x *RecorderStatus) GetTempoProbability() float32 {
+	if x != nil {
+		return x.TempoProbability
+	}
+	return 0
 }
 
 type SpeedFingerprint struct {
@@ -315,7 +345,7 @@ var File_common_proto protoreflect.FileDescriptor
 
 const file_common_proto_rawDesc = "" +
 	"\n" +
-	"\fcommon.proto\x12\x06common\"\xc6\x03\n" +
+	"\fcommon.proto\x12\x06common\"\xbc\x04\n" +
 	"\x0eRecorderStatus\x12\x1e\n" +
 	"\n" +
 	"recorderID\x18\x01 \x01(\tR\n" +
@@ -327,7 +357,11 @@ const file_common_proto_rawDesc = "" +
 	"\x16chromaprintFingerprint\x18\x06 \x01(\tR\x16chromaprintFingerprint\x12\\\n" +
 	"\x1cchromaprintSpeedFingerprints\x18\a \x03(\v2\x18.common.SpeedFingerprintR\x1cchromaprintSpeedFingerprints\x124\n" +
 	"\x15chromaprintSpeedCount\x18\b \x01(\rR\x15chromaprintSpeedCount\x12,\n" +
-	"\x11peakConstellation\x18\t \x01(\fR\x11peakConstellation\"X\n" +
+	"\x11peakConstellation\x18\t \x01(\fR\x11peakConstellation\x12,\n" +
+	"\x11fingerprintWindow\x18\n" +
+	" \x01(\rR\x11fingerprintWindow\x12\x1a\n" +
+	"\btempoBpm\x18\v \x01(\x02R\btempoBpm\x12*\n" +
+	"\x10tempoProbability\x18\f \x01(\x02R\x10tempoProbability\"X\n" +
 	"\x10SpeedFingerprint\x12\"\n" +
 	"\fspeedPercent\x18\x01 \x01(\x01R\fspeedPercent\x12 \n" +
 	"\vfingerprint\x18\x02 \x01(\tR\vfingerprint\"G\n" +

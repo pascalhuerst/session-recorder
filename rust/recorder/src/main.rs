@@ -291,6 +291,13 @@ struct Args {
     /// `--fingerprint true` (the default).
     #[arg(long, env = "PEAK_CONSTELLATION", default_value_t = false, action = clap::ArgAction::Set)]
     peak_constellation: bool,
+
+    /// Pace a window's fingerprint computations evenly until the next window
+    /// instead of running them in one burst: a level load (about a third of a
+    /// core with 16 speeds on a Pi 3, instead of 4 s flat out every 12 s), but
+    /// the last speeds arrive up to ~11 s after the window instead of ~4 s.
+    #[arg(long, env = "FINGERPRINT_SPREAD", default_value_t = false, action = clap::ArgAction::Set)]
+    fingerprint_spread: bool,
 }
 
 /// Bounded outbox of ready-to-send chunks. Drops the oldest entry when the
@@ -422,6 +429,7 @@ impl SessionRecorder {
             chromaprint_speed_fingerprints: Vec::new(),
             chromaprint_speed_count: 0,
             peak_constellation: Vec::new(),
+            fingerprint_window: 0,
         };
 
         let capacity_bytes = (audio_settings.sample_rate as f64
@@ -1432,9 +1440,12 @@ impl SessionRecorder {
                 // (recording) state, not the raw per-window comparison — otherwise
                 // a quiet window mid-recording reports NoSignal to the server, which
                 // closes the session while we keep streaming chunks for it.
+                // Only what was computed since the last status: every
+                // fingerprint travels in one status message, not in all four
+                // a second until the next window.
                 let fingerprints = fingerprint_worker
                     .as_ref()
-                    .map(|worker| worker.output())
+                    .map(|worker| worker.take_new())
                     .unwrap_or_default();
                 let status_info = RecorderStatusInfo {
                     signal_status: if recording {
@@ -1451,6 +1462,7 @@ impl SessionRecorder {
                         .map(|worker| worker.speed_count() as u32)
                         .unwrap_or(0),
                     peak_constellation: fingerprints.peak_constellation,
+                    fingerprint_window: fingerprints.window,
                 };
                 {
                     *status.lock().await = status_info.clone();
@@ -1745,9 +1757,16 @@ fn fingerprint_worker_from_args(
     if args.peak_constellation {
         info!("Live fingerprint: plus the peak constellation of each window");
     }
+    // Not the whole interval: a window that is still being worked on when
+    // the next one is due makes that one be skipped.
+    let spread = args.fingerprint_spread.then(|| {
+        info!("Live fingerprint: computations spread over the time until the next window");
+        Duration::from_secs_f64(FINGERPRINT_RECOMPUTE_INTERVAL_SECONDS * 0.9)
+    });
     Ok(Some(Arc::new(FingerprintWorker::spawn(
         speeds,
         args.peak_constellation,
+        spread,
     )?)))
 }
 

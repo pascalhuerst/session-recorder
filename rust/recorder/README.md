@@ -74,6 +74,7 @@ mDNS and connects automatically. No backend address is configured by hand.
 | `--fingerprint-speed-range <percent>` | also fingerprint each window for assumed playback speeds from -N to +N % (e.g. `8` for a turntable's pitch fader); `0` = off. One after another on one thread (~0.23 s each on a Pi 3), closest speeds first, each published as soon as it is done | `0` |
 | `--fingerprint-speed-step <percent>` | distance between two assumed speeds | `1` |
 | `--peak-constellation <true\|false>` | also publish each window's spectral peaks, a speed-invariant fingerprint (a client matches a pitched record with it and learns the speed); about as cheap as one plain fingerprint | `false` |
+| `--fingerprint-spread <true\|false>` | pace a window's fingerprint computations evenly until the next window instead of one burst: level load, but the last speeds arrive up to ~11 s after the window instead of ~4 s | `false` |
 
 ### Logging
 

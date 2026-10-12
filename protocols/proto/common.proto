@@ -18,36 +18,47 @@ message RecorderStatus {
     double peakPercent = 4;
     bool clipping = 5;
 
-    // Most recently computed Chromaprint audio fingerprint for this
-    // recorder's current session, recomputed every few seconds over a
-    // rolling window while recording. Empty until the first window has
-    // been fingerprinted.
+    // --- Live fingerprints of the audio being recorded -----------------------
+    //
+    // While recording, the recorder fingerprints the last seconds of audio
+    // (a "window") again and again. Each result is carried by exactly ONE
+    // status message - the first one sent after it was computed - and the
+    // fields below are empty in all the others; a status goes out several
+    // times a second and the results only change every few seconds. A client
+    // collects them: everything with the same fingerprintWindow belongs
+    // together, and an empty field means "nothing new", not "no fingerprint".
+
+    // Chromaprint fingerprint of the window, at the speed it was captured.
+    // The first result of a window.
     string chromaprintFingerprint = 6;
 
     // The same window fingerprinted for a range of assumed playback speeds,
     // for sources whose speed is not fixed (a turntable's pitch fader moves
     // tempo and pitch together, which a Chromaprint match only survives up to
-    // about half a percent). Empty unless the recorder is configured for it.
-    // The unshifted fingerprint above is not repeated here. They always
-    // belong to the same window as the fingerprint above and are added one by
-    // one as each is computed, the speeds closest to the original first; the
-    // list starts empty again with every new fingerprint above.
+    // about half a percent). Only if the recorder is configured for it. Each
+    // speed is sent once, as it is computed, the speeds closest to the
+    // original first; the unshifted fingerprint above is not among them.
     repeated SpeedFingerprint chromaprintSpeedFingerprints = 7;
-    // How many entries the list above will hold once a window is done - the
-    // number of speeds the recorder is configured for, 0 if none.
+    // How many speeds a window is fingerprinted for in total - the number the
+    // recorder is configured for, 0 if none. Sent with every status.
     uint32 chromaprintSpeedCount = 8;
 
     // A second, speed-invariant fingerprint of the same window: the spectral
     // peaks ("constellation") of the last seconds of audio, from which a
     // client derives hashes that do not change with playback speed (a pitched
-    // turntable), and gets the speed itself out of a match. Empty until the
-    // first window is done, and when the recorder is not configured for it.
+    // turntable), and gets the speed itself out of a match. Only if the
+    // recorder is configured for it.
     //
     // Format "SIC1": the 4 bytes "SIC1", a uint32 count N, then N frame
     // numbers (uint32) followed by N log-frequency bins (uint8), all little
     // endian; peaks sorted by frame. A frame is 256 samples of the audio
     // resampled to 11025 Hz mono (23.2 ms); bin b is 300 Hz * 2^(b/48).
     bytes peakConstellation = 9;
+
+    // Which window the results in this status belong to, and the current one
+    // when it carries none: a number that goes up by one with every window.
+    // Sent with every status.
+    uint32 fingerprintWindow = 10;
 }
 
 message SpeedFingerprint {

@@ -113,6 +113,9 @@ pub struct RecorderStatusInfo {
     pub chromaprint_speed_count: u32,
     /// The window's speed-invariant peak constellation ("SIC1"), or empty.
     pub peak_constellation: Vec<u8>,
+    /// The window the fingerprints above belong to. Each of them is put
+    /// into one status only - see `RecorderStatus` in common.proto.
+    pub fingerprint_window: u32,
 }
 
 /// ChunkSink gRPC client service
@@ -182,6 +185,7 @@ impl ChunkSinkClientService {
                 .collect(),
             chromaprint_speed_count: status.chromaprint_speed_count,
             peak_constellation: status.peak_constellation,
+            fingerprint_window: status.fingerprint_window,
         });
 
         match client.set_recorder_status(request).await {
@@ -269,6 +273,7 @@ mod tests {
             chromaprint_speed_fingerprints: Vec::new(),
             chromaprint_speed_count: 0,
             peak_constellation: Vec::new(),
+            fingerprint_window: 0,
         };
 
         let result = client.set_recorder_status(status).await;

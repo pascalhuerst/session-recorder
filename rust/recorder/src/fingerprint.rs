@@ -129,6 +129,8 @@ pub struct FingerprintOutput {
     /// `crate::constellation`), if the worker computes one; replaced a
     /// moment after `fingerprint`.
     pub peak_constellation: Vec<u8>,
+    /// Counts the windows: goes up by one with every new `fingerprint`.
+    pub window: u32,
 }
 
 struct Job {
@@ -145,6 +147,9 @@ struct Published {
     /// dropped instead of showing up in the next session.
     generation: u64,
     output: FingerprintOutput,
+    /// What `take_new` has not handed out yet: the same as `output`, minus
+    /// everything already taken.
+    unsent: FingerprintOutput,
 }
 
 struct Shared {
@@ -167,8 +172,15 @@ pub struct FingerprintWorker {
 impl FingerprintWorker {
     /// `speeds`: the assumed playback speeds to fingerprint each window for
     /// besides the original one. `constellation`: also compute the window's
-    /// speed-invariant peak constellation.
-    pub fn spawn(speeds: Vec<f64>, constellation: bool) -> std::io::Result<Self> {
+    /// speed-invariant peak constellation. `spread`: instead of computing
+    /// everything in one go, pace the computations evenly over this long, so
+    /// the load is level rather than a burst after every window - at the
+    /// price of the last results arriving that much later.
+    pub fn spawn(
+        speeds: Vec<f64>,
+        constellation: bool,
+        spread: Option<std::time::Duration>,
+    ) -> std::io::Result<Self> {
         let shared = Arc::new(Shared {
             published: Mutex::new(Published::default()),
             busy: AtomicBool::new(false),
@@ -180,7 +192,7 @@ impl FingerprintWorker {
             .name("fingerprint".into())
             .spawn(move || {
                 while let Ok(job) = queue.recv() {
-                    Self::run(&worker_shared, &speeds, constellation, job);
+                    Self::run(&worker_shared, &speeds, constellation, spread, job);
                     worker_shared.busy.store(false, Ordering::Release);
                 }
             })?;
@@ -222,13 +234,37 @@ impl FingerprintWorker {
     pub fn reset(&self) {
         if let Ok(mut published) = self.shared.published.lock() {
             published.generation = published.generation.wrapping_add(1);
-            published.output = FingerprintOutput::default();
+            // The window number survives: the next window must not look like
+            // more of this one.
+            let window = published.output.window;
+            published.output = FingerprintOutput {
+                window,
+                ..Default::default()
+            };
+            published.unsent = published.output.clone();
         }
     }
 
     /// How many speed variants a window gets in total.
     pub fn speed_count(&self) -> usize {
         self.speed_count
+    }
+
+    /// Everything published since the last call, and nothing twice: the
+    /// plain fingerprint, constellation and speed variants not handed out
+    /// yet, with the window they belong to. For whoever sends them on.
+    pub fn take_new(&self) -> FingerprintOutput {
+        let Ok(mut published) = self.shared.published.lock() else {
+            return FingerprintOutput::default();
+        };
+        let window = published.unsent.window;
+        std::mem::replace(
+            &mut published.unsent,
+            FingerprintOutput {
+                window,
+                ..Default::default()
+            },
+        )
     }
 
     pub fn output(&self) -> FingerprintOutput {
@@ -239,7 +275,27 @@ impl FingerprintWorker {
             .unwrap_or_default()
     }
 
-    fn run(shared: &Shared, speeds: &[f64], constellation: bool, job: Job) {
+    fn run(
+        shared: &Shared,
+        speeds: &[f64],
+        constellation: bool,
+        spread: Option<std::time::Duration>,
+        job: Job,
+    ) {
+        // With `spread`, computation k of n may not start before k/n of that
+        // time has passed since the window came in.
+        let started = std::time::Instant::now();
+        let steps = 1 + constellation as u32 + speeds.len() as u32;
+        let mut step = 0u32;
+        let mut wait_for_turn = || {
+            if let Some(spread) = spread {
+                let due = started + spread * step / steps;
+                std::thread::sleep(due.saturating_duration_since(std::time::Instant::now()));
+            }
+            step += 1;
+        };
+
+        wait_for_turn();
         let Some(fingerprint) = compute_fingerprint(&job.samples, job.sample_rate, job.channels)
         else {
             return;
@@ -248,21 +304,27 @@ impl FingerprintWorker {
         // has moved on in the meantime, the rest of the window is dropped.
         let publish = |update: &dyn Fn(&mut FingerprintOutput)| match shared.published.lock() {
             Ok(mut published) if published.generation == job.generation => {
+                let published = &mut *published;
                 update(&mut published.output);
+                update(&mut published.unsent);
                 true
             }
             _ => false,
         };
         if !publish(&|output| {
+            // A new window: what is left of the previous one does not belong
+            // to this fingerprint.
+            output.window = output.window.wrapping_add(1);
             output.fingerprint = fingerprint.clone();
-            // The previous window's variants do not belong to this fingerprint.
             output.speed_fingerprints.clear();
+            output.peak_constellation.clear();
         }) {
             return;
         }
         // Before the speeds: it is cheaper than a single one of them and
         // covers what all of them together are for.
         if constellation {
+            wait_for_turn();
             let peaks = crate::constellation::compute_constellation(
                 &job.samples,
                 job.sample_rate,
@@ -273,6 +335,7 @@ impl FingerprintWorker {
             }
         }
         for &speed_percent in speeds {
+            wait_for_turn();
             let Some(fingerprint) = compute_fingerprint_at_speed(
                 &job.samples,
                 job.sample_rate,
@@ -509,7 +572,7 @@ mod tests {
     fn worker_publishes_the_plain_fingerprint_and_every_speed() {
         let samples = melody_samples(48000, 10.0);
         let speeds = speed_grid(2.0, 1.0).unwrap();
-        let worker = FingerprintWorker::spawn(speeds.clone(), false).unwrap();
+        let worker = FingerprintWorker::spawn(speeds.clone(), false, None).unwrap();
         assert!(worker.submit(samples.clone(), 48000, 2));
 
         let output = wait_for(&worker, |o| o.speed_fingerprints.len() == speeds.len());
@@ -528,7 +591,7 @@ mod tests {
 
     #[test]
     fn worker_publishes_each_speed_as_soon_as_it_is_done_and_starts_over_per_window() {
-        let worker = FingerprintWorker::spawn(speed_grid(8.0, 1.0).unwrap(), false).unwrap();
+        let worker = FingerprintWorker::spawn(speed_grid(8.0, 1.0).unwrap(), false, None).unwrap();
         assert_eq!(worker.speed_count(), 16);
         assert!(worker.submit(melody_samples(48000, 25.0), 48000, 2));
 
@@ -556,7 +619,7 @@ mod tests {
     #[test]
     fn worker_publishes_the_peak_constellation_only_when_asked() {
         let samples = melody_samples(48000, 10.0);
-        let worker = FingerprintWorker::spawn(Vec::new(), true).unwrap();
+        let worker = FingerprintWorker::spawn(Vec::new(), true, None).unwrap();
         assert!(worker.submit(samples.clone(), 48000, 2));
         let output = wait_for(&worker, |o| !o.peak_constellation.is_empty());
         assert_eq!(
@@ -567,7 +630,7 @@ mod tests {
         worker.reset();
         assert!(worker.output().peak_constellation.is_empty());
 
-        let plain = FingerprintWorker::spawn(Vec::new(), false).unwrap();
+        let plain = FingerprintWorker::spawn(Vec::new(), false, None).unwrap();
         assert!(plain.submit(samples, 48000, 2));
         wait_for(&plain, |o| !o.fingerprint.is_empty());
         std::thread::sleep(std::time::Duration::from_millis(200));
@@ -575,8 +638,75 @@ mod tests {
     }
 
     #[test]
+    fn take_new_hands_out_every_result_exactly_once_with_its_window() {
+        let speeds = speed_grid(2.0, 1.0).unwrap();
+        let worker = FingerprintWorker::spawn(speeds.clone(), true, None).unwrap();
+        let collect_until_done = |worker: &FingerprintWorker| {
+            let (mut plain, mut constellations, mut variants, mut window) = (0, 0, Vec::new(), 0);
+            for _ in 0..600 {
+                let new = worker.take_new();
+                plain += !new.fingerprint.is_empty() as usize;
+                constellations += !new.peak_constellation.is_empty() as usize;
+                variants.extend(new.speed_fingerprints.iter().map(|v| v.speed_percent));
+                window = new.window;
+                if variants.len() == speeds.len() {
+                    break;
+                }
+                std::thread::sleep(std::time::Duration::from_millis(20));
+            }
+            (plain, constellations, variants, window)
+        };
+
+        assert!(worker.submit(melody_samples(48000, 10.0), 48000, 2));
+        let (plain, constellations, variants, first_window) = collect_until_done(&worker);
+        assert_eq!((plain, constellations), (1, 1));
+        assert_eq!(variants, speeds);
+        // Nothing is handed out a second time ...
+        assert_eq!(
+            worker.take_new(),
+            FingerprintOutput {
+                window: first_window,
+                ..Default::default()
+            }
+        );
+        // ... while the full picture is still there for whoever wants it.
+        assert_eq!(worker.output().speed_fingerprints.len(), speeds.len());
+
+        while !worker.submit(melody_samples(48000, 11.0), 48000, 2) {
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        let (plain, _, variants, second_window) = collect_until_done(&worker);
+        assert_eq!((plain, variants.len()), (1, speeds.len()));
+        assert_eq!(second_window, first_window + 1);
+
+        // A reset keeps the count going, so the next window cannot be
+        // mistaken for more of this one.
+        worker.reset();
+        assert_eq!(worker.take_new().window, first_window + 1);
+    }
+
+    #[test]
+    fn spread_paces_the_computations_over_the_given_time() {
+        let speeds = speed_grid(2.0, 1.0).unwrap(); // 4 speeds + the plain one = 5 steps
+        let worker =
+            FingerprintWorker::spawn(speeds, false, Some(std::time::Duration::from_millis(1500)))
+                .unwrap();
+        let started = std::time::Instant::now();
+        assert!(worker.submit(melody_samples(48000, 10.0), 48000, 2));
+        wait_for(&worker, |o| !o.fingerprint.is_empty());
+        assert!(
+            started.elapsed().as_millis() < 600,
+            "the plain fingerprint must not wait"
+        );
+        wait_for(&worker, |o| o.speed_fingerprints.len() == 4);
+        let took = started.elapsed().as_millis();
+        // The last of 5 steps starts at 4/5 of 1.5 s.
+        assert!((1200..2500).contains(&took), "all speeds after {took} ms");
+    }
+
+    #[test]
     fn worker_without_speeds_publishes_only_the_plain_fingerprint() {
-        let worker = FingerprintWorker::spawn(Vec::new(), false).unwrap();
+        let worker = FingerprintWorker::spawn(Vec::new(), false, None).unwrap();
         assert!(worker.submit(melody_samples(48000, 10.0), 48000, 2));
         let output = wait_for(&worker, |o| !o.fingerprint.is_empty());
         assert!(output.speed_fingerprints.is_empty());
@@ -584,7 +714,7 @@ mod tests {
 
     #[test]
     fn worker_skips_a_window_while_busy_and_drops_results_after_a_reset() {
-        let worker = FingerprintWorker::spawn(speed_grid(8.0, 1.0).unwrap(), false).unwrap();
+        let worker = FingerprintWorker::spawn(speed_grid(8.0, 1.0).unwrap(), false, None).unwrap();
         assert!(worker.submit(melody_samples(48000, 25.0), 48000, 2));
         assert!(
             !worker.submit(melody_samples(48000, 25.0), 48000, 2),
@@ -595,7 +725,8 @@ mod tests {
         worker.reset();
         // The worker gets free again without ever publishing the stale result.
         for _ in 0..600 {
-            assert_eq!(worker.output(), FingerprintOutput::default());
+            let output = worker.output();
+            assert!(output.fingerprint.is_empty() && output.speed_fingerprints.is_empty());
             if worker.submit(melody_samples(48000, 10.0), 48000, 2) {
                 let output = wait_for(&worker, |o| o.speed_fingerprints.len() == 16);
                 assert!(!output.fingerprint.is_empty());

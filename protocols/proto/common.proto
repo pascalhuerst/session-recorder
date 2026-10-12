@@ -36,6 +36,18 @@ message RecorderStatus {
     // How many entries the list above will hold once a window is done - the
     // number of speeds the recorder is configured for, 0 if none.
     uint32 chromaprintSpeedCount = 8;
+
+    // A second, speed-invariant fingerprint of the same window: the spectral
+    // peaks ("constellation") of the last seconds of audio, from which a
+    // client derives hashes that do not change with playback speed (a pitched
+    // turntable), and gets the speed itself out of a match. Empty until the
+    // first window is done, and when the recorder is not configured for it.
+    //
+    // Format "SIC1": the 4 bytes "SIC1", a uint32 count N, then N frame
+    // numbers (uint32) followed by N log-frequency bins (uint8), all little
+    // endian; peaks sorted by frame. A frame is 256 samples of the audio
+    // resampled to 11025 Hz mono (23.2 ms); bin b is 300 Hz * 2^(b/48).
+    bytes peakConstellation = 9;
 }
 
 message SpeedFingerprint {

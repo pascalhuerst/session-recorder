@@ -34,7 +34,7 @@ const createMockRecorder = (id: string, name: string, isRecording = false) => ({
     oneofKind: 'status' as const,
     status: {
       signalStatus: isRecording ? 1 : 0,
-      rmsPercent: isRecording ? 45 : 0,
+      peakPercent: isRecording ? 45 : 0,
     },
   },
 });

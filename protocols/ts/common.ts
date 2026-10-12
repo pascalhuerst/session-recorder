@@ -27,9 +27,9 @@ export interface RecorderStatus {
      */
     signalStatus: SignalStatus;
     /**
-     * @generated from protobuf field: double rmsPercent = 4
+     * @generated from protobuf field: double peakPercent = 4
      */
-    rmsPercent: number;
+    peakPercent: number;
     /**
      * @generated from protobuf field: bool clipping = 5
      */
@@ -72,7 +72,7 @@ class RecorderStatus$Type extends MessageType<RecorderStatus> {
             { no: 1, name: "recorderID", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
             { no: 2, name: "recorderName", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
             { no: 3, name: "signalStatus", kind: "enum", T: () => ["common.SignalStatus", SignalStatus] },
-            { no: 4, name: "rmsPercent", kind: "scalar", T: 1 /*ScalarType.DOUBLE*/ },
+            { no: 4, name: "peakPercent", kind: "scalar", T: 1 /*ScalarType.DOUBLE*/ },
             { no: 5, name: "clipping", kind: "scalar", T: 8 /*ScalarType.BOOL*/ }
         ]);
     }
@@ -81,7 +81,7 @@ class RecorderStatus$Type extends MessageType<RecorderStatus> {
         message.recorderID = "";
         message.recorderName = "";
         message.signalStatus = 0;
-        message.rmsPercent = 0;
+        message.peakPercent = 0;
         message.clipping = false;
         if (value !== undefined)
             reflectionMergePartial<RecorderStatus>(this, message, value);
@@ -101,8 +101,8 @@ class RecorderStatus$Type extends MessageType<RecorderStatus> {
                 case /* common.SignalStatus signalStatus */ 3:
                     message.signalStatus = reader.int32();
                     break;
-                case /* double rmsPercent */ 4:
-                    message.rmsPercent = reader.double();
+                case /* double peakPercent */ 4:
+                    message.peakPercent = reader.double();
                     break;
                 case /* bool clipping */ 5:
                     message.clipping = reader.bool();
@@ -128,9 +128,9 @@ class RecorderStatus$Type extends MessageType<RecorderStatus> {
         /* common.SignalStatus signalStatus = 3; */
         if (message.signalStatus !== 0)
             writer.tag(3, WireType.Varint).int32(message.signalStatus);
-        /* double rmsPercent = 4; */
-        if (message.rmsPercent !== 0)
-            writer.tag(4, WireType.Bit64).double(message.rmsPercent);
+        /* double peakPercent = 4; */
+        if (message.peakPercent !== 0)
+            writer.tag(4, WireType.Bit64).double(message.peakPercent);
         /* bool clipping = 5; */
         if (message.clipping !== false)
             writer.tag(5, WireType.Varint).bool(message.clipping);

@@ -112,10 +112,10 @@ fn generate_test_data(recorder_statuses: RecorderStatusMap) {
             };
 
             // Add some randomness
-            let rms_percent = (base_rms + (t * 13.7).sin() * 5.0).max(0.0).min(100.0);
+            let peak_percent = (base_rms + (t * 13.7).sin() * 5.0).max(0.0).min(100.0);
 
-            // Clipping occurs when RMS is very high
-            let clipping = rms_percent > 85.0 && (t * 3.0).sin() > 0.7;
+            // Clipping occurs when the peak is very high
+            let clipping = peak_percent > 85.0 && (t * 3.0).sin() > 0.7;
 
             // Occasional signal dropouts
             let signal_status = if signal_present && (t * 0.1).sin() > -0.9 {
@@ -130,7 +130,7 @@ fn generate_test_data(recorder_statuses: RecorderStatusMap) {
                 recorder_id: id.to_string(),
                 recorder_name: name.to_string(),
                 signal_status,
-                rms_percent,
+                peak_percent,
                 clipping,
             };
 

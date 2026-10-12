@@ -15,7 +15,7 @@ message RecorderStatus {
     string recorderName = 2;
 
     SignalStatus signalStatus = 3;
-    double rmsPercent = 4;
+    double peakPercent = 4;
     bool clipping = 5;
 }
 

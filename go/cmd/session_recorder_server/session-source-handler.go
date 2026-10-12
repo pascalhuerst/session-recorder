@@ -341,7 +341,7 @@ func (h *SessionSourceHandler) streamRecorders(ctx context.Context, request *ssp
 						RecorderID:   recorder.ID.String(),
 						RecorderName: recorder.Name,
 						SignalStatus: cmpb.SignalStatus_UNKNOWN,
-						RmsPercent:   0.0,
+						PeakPercent:  0.0,
 						Clipping:     false,
 					},
 				},

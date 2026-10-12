@@ -190,7 +190,7 @@ func (b *RecorderBroadcaster) checkStaleRecorders() {
 						RecorderID:   cachedRecorder.RecorderID,
 						RecorderName: cachedRecorder.RecorderName,
 						SignalStatus: cmpb.SignalStatus_NO_SIGNAL,
-						RmsPercent:   0.0,
+						PeakPercent:  0.0,
 						Clipping:     false,
 					},
 				},

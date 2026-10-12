@@ -8,6 +8,7 @@ import (
 
 	cmpb "github.com/pascalhuerst/session-recorder/protocols/go/common"
 	sspb "github.com/pascalhuerst/session-recorder/protocols/go/sessionsource"
+	"google.golang.org/protobuf/proto"
 )
 
 /**
@@ -20,6 +21,9 @@ import (
  * - Concurrent access: Thread-safe operations
  * - Timeout: Stale recorders transition to NO_SIGNAL after timeout
  * - Timeout Reset: Fresh updates reset the timeout timer
+ * - Fingerprints: The status's audio fingerprint fields reach subscribers and
+ *   the cache unchanged, and are gone from the NO_SIGNAL status of a stale
+ *   recorder
  */
 
 func makeRecorder(id, name string, signalStatus cmpb.SignalStatus) *sspb.Recorder {
@@ -403,5 +407,67 @@ func TestRecorderBroadcaster_Timeout_FreshUpdateResetsTimer(t *testing.T) {
 	status := cached.Info.(*sspb.Recorder_Status)
 	if status.Status.SignalStatus != cmpb.SignalStatus_SIGNAL {
 		t.Errorf("SignalStatus = %v, want SIGNAL", status.Status.SignalStatus)
+	}
+}
+
+// makeFingerprintedRecorder is makeRecorder with the audio fingerprint fields
+// of the status (6 to 9) filled in.
+func makeFingerprintedRecorder(id, name string) *sspb.Recorder {
+	recorder := makeRecorder(id, name, cmpb.SignalStatus_SIGNAL)
+	status := recorder.GetStatus()
+	status.ChromaprintFingerprint = "AQAAE0mUaEkSRZEGAA"
+	status.ChromaprintSpeedFingerprints = []*cmpb.SpeedFingerprint{
+		{SpeedPercent: 0.5, Fingerprint: "AQAAE0mUaEkSRZEGBB"},
+		{SpeedPercent: -0.5, Fingerprint: "AQAAE0mUaEkSRZEGCC"},
+	}
+	status.ChromaprintSpeedCount = 16
+	status.PeakConstellation = []byte("SIC1\x01\x00\x00\x00\x07\x00\x00\x00\x2a")
+	return recorder
+}
+
+func TestRecorderBroadcaster_Broadcast_KeepsFingerprints(t *testing.T) {
+	b := NewRecorderBroadcaster(5)
+
+	ch, unsub := b.Subscribe()
+	defer unsub()
+
+	want := makeFingerprintedRecorder("rec-1", "Recorder 1")
+	b.Broadcast(proto.Clone(want).(*sspb.Recorder))
+	// Another recorder's update must not disturb what is cached for rec-1.
+	b.Broadcast(makeRecorder("rec-2", "Recorder 2", cmpb.SignalStatus_SIGNAL))
+
+	select {
+	case msg := <-ch:
+		if !proto.Equal(msg, want) {
+			t.Errorf("subscriber received %v, want %v", msg, want)
+		}
+	case <-time.After(100 * time.Millisecond):
+		t.Fatal("timeout waiting for broadcast")
+	}
+
+	if cached := b.GetCachedStatus("rec-1"); !proto.Equal(cached, want) {
+		t.Errorf("cached status = %v, want %v", cached, want)
+	}
+}
+
+func TestRecorderBroadcaster_Timeout_StaleRecorderLosesFingerprints(t *testing.T) {
+	b := NewRecorderBroadcaster(5)
+	b.SetStatusTimeout(50 * time.Millisecond)
+
+	b.Broadcast(makeFingerprintedRecorder("rec-1", "Recorder 1"))
+
+	time.Sleep(60 * time.Millisecond)
+	b.checkStaleRecorders()
+
+	// The fingerprints describe audio from before the recorder went quiet;
+	// the NO_SIGNAL status that replaces the last one must not carry them.
+	status := b.GetCachedStatus("rec-1").GetStatus()
+	if status.GetSignalStatus() != cmpb.SignalStatus_NO_SIGNAL {
+		t.Fatalf("SignalStatus = %v, want NO_SIGNAL", status.GetSignalStatus())
+	}
+	if status.GetChromaprintFingerprint() != "" ||
+		len(status.GetChromaprintSpeedFingerprints()) != 0 ||
+		len(status.GetPeakConstellation()) != 0 {
+		t.Errorf("stale status still carries fingerprints: %v", status)
 	}
 }

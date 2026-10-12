@@ -88,7 +88,12 @@ func (h *ChunkSinkHandler) setRecorderStatus(ctx context.Context, status *cmpb.R
 
 	h.sessionStorage.EnsureRecorderExists(ctx, recorderID, status.RecorderName)
 
-	// Broadcast to all connected clients (non-blocking, with per-subscriber buffer)
+	// Broadcast to all connected clients (non-blocking, with per-subscriber buffer).
+	// The status is relayed as a whole, as the recorder sent it: clients read
+	// more of it than the backend does (the audio fingerprints), so nothing
+	// here picks fields out of it or builds a new one. The message is not
+	// modified after this point - the broadcaster caches it and every
+	// subscriber stream serializes this same instance.
 	h.recorderBroadcaster.Broadcast(&sspb.Recorder{
 		RecorderID:   recorderID.String(),
 		RecorderName: status.RecorderName,

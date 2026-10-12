@@ -11,19 +11,16 @@ import (
 	"google.golang.org/grpc"
 )
 
-// StartGrpcWebServer exposes an existing *grpc.Server as gRPC-Web on the given
-// HTTP port. The HTTP listener runs in its own goroutine. The returned
-// *http.Server can be Shutdown by the caller for a graceful exit.
-func StartGrpcWebServer(grpcServer *grpc.Server, port uint16) (*http.Server, error) {
+// NewGrpcWebHandler wraps an existing *grpc.Server as a gRPC-Web HTTP handler.
+// It is what StartGrpcWebServer serves; separate so tests can serve it too.
+func NewGrpcWebHandler(grpcServer *grpc.Server) http.Handler {
 	wrapped := grpcweb.WrapServer(
 		grpcServer,
 		grpcweb.WithOriginFunc(func(string) bool { return true }),
 		grpcweb.WithCorsForRegisteredEndpointsOnly(false),
 	)
 
-	addr := fmt.Sprintf(":%d", port)
-
-	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if wrapped.IsGrpcWebRequest(r) ||
 			wrapped.IsGrpcWebSocketRequest(r) ||
 			wrapped.IsAcceptableGrpcCorsRequest(r) {
@@ -32,8 +29,15 @@ func StartGrpcWebServer(grpcServer *grpc.Server, port uint16) (*http.Server, err
 		}
 		http.NotFound(w, r)
 	})
+}
 
-	httpServer := &http.Server{Addr: addr, Handler: handler}
+// StartGrpcWebServer exposes an existing *grpc.Server as gRPC-Web on the given
+// HTTP port. The HTTP listener runs in its own goroutine. The returned
+// *http.Server can be Shutdown by the caller for a graceful exit.
+func StartGrpcWebServer(grpcServer *grpc.Server, port uint16) (*http.Server, error) {
+	addr := fmt.Sprintf(":%d", port)
+
+	httpServer := &http.Server{Addr: addr, Handler: NewGrpcWebHandler(grpcServer)}
 
 	// Bind IPv4 only. http.Server.ListenAndServe would listen on "tcp" which
 	// resolves ":port" to the IPv6 wildcard (":::port", dual-stack); the rest of

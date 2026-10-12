@@ -181,7 +181,10 @@ func (b *RecorderBroadcaster) checkStaleRecorders() {
 				Dur("since-last-update", now.Sub(lastTime)).
 				Msg("Recorder status timed out, setting to NO_SIGNAL")
 
-			// Create updated status with NO_SIGNAL
+			// Create updated status with NO_SIGNAL. Deliberately a new, bare
+			// status rather than a copy of the last one: the fingerprints in
+			// it describe audio the recorder sent more than statusTimeout
+			// ago, and must not be handed out as what is playing now.
 			staleRecorder := &sspb.Recorder{
 				RecorderID:   cachedRecorder.RecorderID,
 				RecorderName: cachedRecorder.RecorderName,

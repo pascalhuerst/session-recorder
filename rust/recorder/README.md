@@ -90,10 +90,10 @@ from before these features.
 
 ### Tempo model
 
-The live tempo needs TempoCNN (Schreiber & Müller 2018) as an ONNX file with a fixed input of
-`[1, 40, 256, 1]`. The model is not part of this repository - it is published by the Music Technology
-Group (UPF) under <https://essentia.upf.edu/models/tempo/tempocnn/>; mind its license before passing the
-file on. One command gets and converts it:
+The live tempo needs the TempoCNN model `deeptemp-k16-3` as an ONNX file with a fixed input of
+`[1, 40, 256, 1]`. The model is not part of this repository, and it must not become part of it: this
+code is MIT, the model is not (see "Source and license of the model" below). One command gets and
+converts it:
 
 ```bash
 tools/fetch-tempo-model.sh            # -> ~/.local/share/session-recorder/deeptemp-k16-3.onnx
@@ -110,6 +110,27 @@ that `tract`, the pure-Rust engine the recorder runs the model with, cannot exec
 `TensorflowPredictTempoCNN`; on 250 excerpts of 25 s the recorder's path gave the same BPM as Essentia
 in every one. `cargo run --release --example tempo_dump -- <model> <rate> <channels> <raw s16le files>`
 runs it on files; `TEMPO_MODEL_TEST=<model> cargo test` includes the test that needs the model.
+
+#### Source and license of the model
+
+- TempoCNN is the work of Hendrik Schreiber and Meinard Müller: "A Single-Step Approach to Musical Tempo
+  Estimation Using a Convolutional Neural Network", ISMIR 2018, and, for the `deeptemp` architecture
+  used here, "Musical Tempo and Key Estimation using Convolutional Neural Networks with Directional
+  Filters", SMC 2019. Their code and models: <https://github.com/hendriks73/tempo-cnn>, licensed under
+  the GNU Affero General Public License v3.
+- The file the script downloads, `deeptemp-k16-3.pb`, is that model as a TensorFlow graph for Essentia,
+  prepared by Pablo Alonso at the Music Technology Group, Universitat Pompeu Fabra, and published at
+  <https://essentia.upf.edu/models/tempo/tempocnn/> (metadata: `deeptemp-k16-3.json` there). The
+  `LICENSE` in that directory is the AGPL-3.0; the license file for all Essentia models
+  (<https://essentia.upf.edu/models/LICENSE>) puts the MTG's model files under CC BY-NC-SA 4.0, offers
+  a proprietary license on request for commercial use, and names the TempoCNN models as derived from
+  Hendrik Schreiber's AGPL-3.0 work.
+- What that means here (checked 2026-10-12, not legal advice): downloading the model and running it on
+  your own recorder is fine. Passing the downloaded or converted file on - in a package, an image, a
+  repository - is distribution of a work under those licenses, with their conditions (AGPL-3.0:
+  license text, attribution and source, i.e. the original graph and the conversion steps in
+  `tools/fetch-tempo-model.sh`; CC BY-NC-SA: attribution, non-commercial, same license). That is why
+  the recorder only loads the model at run time from a file you fetch yourself.
 
 ### Deploying to a Raspberry Pi
 
@@ -169,3 +190,19 @@ RUST_LOG=recorder=debug,mdns_sd=warn ./target/release/recorder ...
 - Linux with ALSA.
 - avahi-daemon running (for mDNS discovery).
 - Membership in the `audio` group (or equivalent) to open the capture device.
+
+## Acknowledgements
+
+The live analysis stands on other people's work. Thank you to:
+
+- **Hendrik Schreiber and Meinard Müller** for TempoCNN and for publishing its models
+  (<https://github.com/hendriks73/tempo-cnn>, AGPL-3.0). It gets broken beats right, where the
+  tempogram-based estimator we tried first did not.
+- **The Music Technology Group, Universitat Pompeu Fabra**, for [Essentia](https://essentia.upf.edu/)
+  and its model collection, and Pablo Alonso for the TempoCNN graph the recorder uses
+  (<https://essentia.upf.edu/models/tempo/tempocnn/>). Essentia's `TensorflowPredictTempoCNN` and
+  `Chromaprinter` were the reference the recorder's results were checked against.
+- **Lukáš Lalinský** for [Chromaprint](https://acoustid.org/chromaprint) and the authors of
+  [rusty-chromaprint](https://github.com/darksv/rusty-chromaprint) (MIT), its Rust implementation.
+- **Mathieu Poumeyrol and the tract contributors** for [tract](https://github.com/sonos/tract)
+  (MIT OR Apache-2.0), which runs the model in pure Rust on a Raspberry Pi.

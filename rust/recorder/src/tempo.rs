@@ -1,6 +1,7 @@
 //! Live tempo (BPM) of recently captured audio, with TempoCNN.
 //!
-//! TempoCNN (Schreiber & Müller, ISMIR 2018) is a small convolutional network
+//! TempoCNN (Schreiber & Müller, ISMIR 2018; the `deeptemp` variant used here:
+//! SMC 2019; https://github.com/hendriks73/tempo-cnn) is a small convolutional network
 //! that classifies about twelve seconds of audio into one of 256 tempo
 //! classes, 30 to 285 BPM. It is what DiscQL uses for its library (through
 //! Essentia) because it also gets broken beats right, where onset- and
@@ -28,6 +29,9 @@
 //! Checked against Essentia on 250 excerpts of 25 s: the same BPM in all of
 //! them, probabilities equal to 5e-5. Every constant here is part of that
 //! agreement.
+//!
+//! The model file is not part of this crate and is not MIT: see "Source and
+//! license of the model" in the README.
 
 use realfft::RealFftPlanner;
 use std::path::Path;

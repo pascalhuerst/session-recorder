@@ -3,9 +3,16 @@
 # form it needs: downloads Essentia's TensorFlow graph and converts it to an
 # ONNX file with a fixed input size (see "Tempo model" in the README for why).
 #
-# The model is not part of this repository. It is published by the Music
-# Technology Group (UPF) at https://essentia.upf.edu/models/ after Schreiber &
-# Müller's TempoCNN; check its license before passing the file on.
+# The model is not part of this repository and has its own license:
+#   - TempoCNN: Hendrik Schreiber and Meinard Müller (ISMIR 2018, SMC 2019),
+#     https://github.com/hendriks73/tempo-cnn, AGPL-3.0
+#   - this graph: prepared for Essentia by Pablo Alonso, Music Technology
+#     Group (UPF), https://essentia.upf.edu/models/tempo/tempocnn/ (AGPL-3.0
+#     LICENSE there; https://essentia.upf.edu/models/LICENSE: CC BY-NC-SA 4.0
+#     for the MTG's model files, derived from Schreiber's AGPL-3.0 work)
+# Fetching and running it yourself is fine. Passing the file on, converted or
+# not, is distribution under those licenses - see "Source and license of the
+# model" in the README. Thanks to the authors for publishing it.
 #
 # Needs curl and uv (https://docs.astral.sh/uv/); the conversion downloads
 # TensorFlow into uv's cache the first time (several hundred MB). Run it on

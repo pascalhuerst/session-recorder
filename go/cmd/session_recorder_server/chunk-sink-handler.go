@@ -3,8 +3,10 @@ package main
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/pascalhuerst/session-recorder/broadcast"
@@ -15,17 +17,35 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// defaultCloseDelay is how long a session stays open after its recorder
+// reported silence, and after each chunk that still arrives for it.
+//
+// The recorder sends its "no signal" status directly, but only queues its
+// final chunk for a sender task - so the status regularly overtakes the last
+// audio, and after a reconnect it can overtake a whole send buffer of it.
+// Closing on the status itself cut that audio off (and, before the storage
+// refused chunks for closed sessions, let it start the session over).
+const defaultCloseDelay = 2 * time.Second
+
 type ChunkSinkHandler struct {
 	recorderBroadcaster *broadcast.RecorderBroadcaster
 	sessionStorage      storage.Storage
 	lock                sync.Mutex
 	recorderStates      map[uuid.UUID]*recorderState
 	connectedRecorders  map[uuid.UUID]struct{}
+	// See defaultCloseDelay; a field so tests can shorten it.
+	closeDelay time.Duration
 }
 
 type recorderState struct {
 	lastSession uuid.UUID
-	recording   bool
+	// Driven by the recorder's status alone - a chunk says nothing about
+	// whether the recorder is still recording.
+	recording bool
+	// The session waiting to be closed once closeDelay has passed without
+	// another chunk for it, and the timer that will do it.
+	pendingSession uuid.UUID
+	pendingClose   *time.Timer
 }
 
 type sessionCloser interface {
@@ -38,6 +58,7 @@ func NewChunkSinkHandler(sessionStorage storage.Storage, recorderBroadcaster *br
 		recorderBroadcaster: recorderBroadcaster,
 		recorderStates:      make(map[uuid.UUID]*recorderState),
 		connectedRecorders:  make(map[uuid.UUID]struct{}),
+		closeDelay:          defaultCloseDelay,
 	}
 }
 
@@ -49,8 +70,6 @@ func (h *ChunkSinkHandler) setRecorderStatus(ctx context.Context, status *cmpb.R
 		return err
 	}
 
-	var sessionToClose uuid.UUID
-
 	h.lock.Lock()
 	state := h.recorderStates[recorderID]
 	if state == nil {
@@ -60,25 +79,12 @@ func (h *ChunkSinkHandler) setRecorderStatus(ctx context.Context, status *cmpb.R
 	wasRecording := state.recording
 	nowRecording := status.SignalStatus == cmpb.SignalStatus_SIGNAL
 	if wasRecording && !nowRecording && state.lastSession != uuid.Nil {
-		sessionToClose = state.lastSession
-		state.lastSession = uuid.Nil
+		// Not closed here: the session's last chunk is usually still on its
+		// way (see defaultCloseDelay).
+		h.scheduleCloseLocked(recorderID, state, state.lastSession)
 	}
 	state.recording = nowRecording
 	h.lock.Unlock()
-
-	if sessionToClose != uuid.Nil {
-		if closed, closeErr := h.closeRecorderSession(ctx, recorderID, sessionToClose); closeErr != nil {
-			log.Err(closeErr).
-				Str("recorder-id", recorderID.String()).
-				Str("session-id", sessionToClose.String()).
-				Msg("Cannot close session after recorder became silent")
-		} else if closed {
-			log.Info().
-				Str("recorder-id", recorderID.String()).
-				Str("session-id", sessionToClose.String()).
-				Msg("Closed session after recorder became silent")
-		}
-	}
 
 	h.sessionStorage.EnsureRecorderExists(ctx, recorderID, status.RecorderName)
 
@@ -92,6 +98,56 @@ func (h *ChunkSinkHandler) setRecorderStatus(ctx context.Context, status *cmpb.R
 	})
 
 	return nil
+}
+
+// scheduleCloseLocked arranges for sessionID to be closed once closeDelay has
+// passed. Caller holds h.lock.
+func (h *ChunkSinkHandler) scheduleCloseLocked(recorderID uuid.UUID, state *recorderState, sessionID uuid.UUID) {
+	if state.pendingClose != nil {
+		if state.pendingSession == sessionID {
+			return
+		}
+		// A different session is still waiting: do not let it wait any longer.
+		state.pendingClose.Stop()
+		go h.closeAfterSilence(recorderID, state.pendingSession)
+	}
+	state.pendingSession = sessionID
+	state.pendingClose = time.AfterFunc(h.closeDelay, func() {
+		h.closeSilentSession(recorderID, sessionID)
+	})
+}
+
+// closeSilentSession is the pending close firing. It does nothing if that
+// close was cancelled, or already carried out, in the meantime.
+func (h *ChunkSinkHandler) closeSilentSession(recorderID, sessionID uuid.UUID) {
+	h.lock.Lock()
+	state := h.recorderStates[recorderID]
+	if state == nil || state.pendingSession != sessionID {
+		h.lock.Unlock()
+		return
+	}
+	state.pendingSession = uuid.Nil
+	state.pendingClose = nil
+	if state.lastSession == sessionID {
+		state.lastSession = uuid.Nil
+	}
+	h.lock.Unlock()
+
+	h.closeAfterSilence(recorderID, sessionID)
+}
+
+func (h *ChunkSinkHandler) closeAfterSilence(recorderID, sessionID uuid.UUID) {
+	if closed, closeErr := h.closeRecorderSession(context.Background(), recorderID, sessionID); closeErr != nil {
+		log.Err(closeErr).
+			Str("recorder-id", recorderID.String()).
+			Str("session-id", sessionID.String()).
+			Msg("Cannot close session after recorder became silent")
+	} else if closed {
+		log.Info().
+			Str("recorder-id", recorderID.String()).
+			Str("session-id", sessionID.String()).
+			Msg("Closed session after recorder became silent")
+	}
 }
 
 func (h *ChunkSinkHandler) closeRecorderSession(ctx context.Context, recorderID, sessionID uuid.UUID) (bool, error) {
@@ -128,21 +184,6 @@ func (h *ChunkSinkHandler) setChunks(ctx context.Context, chunks *cspb.Chunks) e
 		return err
 	}
 
-	var previousSession uuid.UUID
-
-	h.lock.Lock()
-	state := h.recorderStates[recorderID]
-	if state == nil {
-		state = &recorderState{}
-		h.recorderStates[recorderID] = state
-	}
-	if state.lastSession != uuid.Nil && state.lastSession != sessionID {
-		previousSession = state.lastSession
-	}
-	state.lastSession = sessionID
-	state.recording = true
-	h.lock.Unlock()
-
 	// data is packed little-endian s16 PCM (2 bytes per sample).
 	raw := chunks.Data
 	if len(raw)%2 != 0 {
@@ -160,8 +201,46 @@ func (h *ChunkSinkHandler) setChunks(ctx context.Context, chunks *cspb.Chunks) e
 	timeCreated := chunks.TimeCreated.AsTime()
 
 	if err = h.sessionStorage.SafeChunks(ctx, recorderID, sessionID, chunkID, timeCreated, samples); err != nil {
+		if errors.Is(err, storage.ErrSessionClosed) {
+			// Audio for a session that is already closed (it arrived later
+			// than closeDelay after the recorder went silent). The storage
+			// logged it and dropped it; nothing here changes for it - in
+			// particular the session must not become "current" again.
+			return nil
+		}
 		log.Err(err).Msg("Cannot save chunks")
-	} else if previousSession != uuid.Nil && previousSession != sessionID {
+		return nil
+	}
+
+	// Only a chunk the storage took makes its session the recorder's current
+	// one, and it never says the recorder is recording: the status does.
+	var previousSession uuid.UUID
+	h.lock.Lock()
+	state := h.recorderStates[recorderID]
+	if state == nil {
+		state = &recorderState{}
+		h.recorderStates[recorderID] = state
+	}
+	if state.lastSession != uuid.Nil && state.lastSession != sessionID {
+		previousSession = state.lastSession
+	}
+	state.lastSession = sessionID
+	if state.pendingClose != nil {
+		if state.pendingSession == sessionID {
+			// Still audio coming in for the session about to be closed
+			// (a recorder emptying its send buffer): wait for it to end.
+			state.pendingClose.Reset(h.closeDelay)
+		} else if state.pendingSession == previousSession {
+			// The recorder has moved on to a new session; the storage
+			// closes the old one itself when it switches.
+			state.pendingClose.Stop()
+			state.pendingSession = uuid.Nil
+			state.pendingClose = nil
+		}
+	}
+	h.lock.Unlock()
+
+	if previousSession != uuid.Nil && previousSession != sessionID {
 		if closed, closeErr := h.closeRecorderSession(ctx, recorderID, previousSession); closeErr != nil {
 			log.Err(closeErr).
 				Str("recorder-id", recorderID.String()).
@@ -194,8 +273,8 @@ func (h *ChunkSinkHandler) OnRecorderDisconnected(recorderID uuid.UUID) {
 
 	delete(h.connectedRecorders, recorderID)
 	if state, ok := h.recorderStates[recorderID]; ok {
+		// A pending close stays scheduled and fires as planned.
 		state.recording = false
 		state.lastSession = uuid.Nil
 	}
 }
-

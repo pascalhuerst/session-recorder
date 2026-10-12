@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/url"
@@ -57,7 +58,13 @@ type Minio struct {
 	// Key is recorder ID
 	chunks        map[uuid.UUID]*minioChunk
 	lastChunkTime map[uuid.UUID]time.Time // Track when each recorder last received chunks
-	dataLock      sync.Mutex
+	// Sessions with a close (flush + compose + render) in flight. A session is
+	// closed from several places - the recorder going silent, a session
+	// switch, the stale-session timeout, the orphan sweep - and two of them
+	// running at once compose and render the same data.raw underneath each
+	// other. Guarded by dataLock.
+	closing  map[uuid.UUID]struct{}
+	dataLock sync.Mutex
 
 	sessionTimeout time.Duration
 	stopTimeout    chan struct{}
@@ -472,6 +479,34 @@ func (m *Minio) notifyStateChange(session *Session, previousState SessionState) 
 	}
 }
 
+// isObjectNotFound reports whether err is MinIO telling us the object does
+// not exist, as opposed to any other failure to read it.
+func isObjectNotFound(err error) bool {
+	var response minio.ErrorResponse
+	return errors.As(err, &response) && response.Code == "NoSuchKey"
+}
+
+// beginClose claims sessionID for closing. It returns false when a close of
+// that session is already in flight; the caller must then leave it alone.
+func (m *Minio) beginClose(sessionID uuid.UUID) bool {
+	m.dataLock.Lock()
+	defer m.dataLock.Unlock()
+	if _, inFlight := m.closing[sessionID]; inFlight {
+		return false
+	}
+	if m.closing == nil {
+		m.closing = make(map[uuid.UUID]struct{})
+	}
+	m.closing[sessionID] = struct{}{}
+	return true
+}
+
+func (m *Minio) endClose(sessionID uuid.UUID) {
+	m.dataLock.Lock()
+	defer m.dataLock.Unlock()
+	delete(m.closing, sessionID)
+}
+
 func (m *Minio) initSession(ctx context.Context, recorderID, sessionID uuid.UUID, timeCreated time.Time) {
 	log.Info().
 		Stringer("recorder-id", recorderID).
@@ -734,18 +769,26 @@ func (m *Minio) SafeChunks(ctx context.Context, recorderID, sessionID uuid.UUID,
 	}
 
 	if _, ok := m.chunks[recorderID]; !ok {
-		// First chunk after process start: see if there is a resumable
-		// session on disk for this (recorder, session) pair.
-		if sm, err := m.getSessionMetadata(ctx, recorderID, sessionID); err == nil &&
-			sm.State == SessionStateRecording {
+		// No in-memory state for this recorder (first chunk after process
+		// start, or its last session was closed): start, resume or refuse,
+		// depending on what is stored for this (recorder, session) pair.
+		sm, err := m.getSessionMetadata(ctx, recorderID, sessionID)
+		start, resume, reject := admitChunkForSession(sm, err, isObjectNotFound(err))
+		switch {
+		case reject != nil:
+			log.Warn().Err(reject).
+				Stringer("recorder-id", recorderID).
+				Stringer("session-id", sessionID).
+				Int("bytes", len(samples)*2).
+				Msg("Dropping chunk for a session that cannot take it")
+			return reject
+		case resume:
+			// Not "starting fresh" on failure: the session has audio on disk
+			// that a fresh start would overwrite. The next chunk tries again.
 			if err := m.resumeSession(ctx, recorderID, sessionID, sm); err != nil {
-				log.Err(err).
-					Stringer("recorder-id", recorderID).
-					Stringer("session-id", sessionID).
-					Msg("Cannot resume session, starting fresh")
-				m.initSession(ctx, recorderID, sessionID, timeCreated)
+				return fmt.Errorf("cannot resume session: %w", err)
 			}
-		} else {
+		case start:
 			m.initSession(ctx, recorderID, sessionID, timeCreated)
 		}
 		// The recorder has committed to this session id. Any other session
@@ -760,11 +803,32 @@ func (m *Minio) SafeChunks(ctx context.Context, recorderID, sessionID uuid.UUID,
 	// If we have a new sessionID, we need to close the old one
 	// This creates a copy of the last chunk, initSession below resets the chunks
 	if chunk.sessionID != sessionID {
+		// Only a session that does not exist yet may take over. A chunk for
+		// an already stored session (a late arrival) must neither be
+		// initialised over that session nor end the one being recorded - not
+		// even if it is still RECORDING: that is an orphan the sweep below
+		// has not closed yet, not something to resume while another session
+		// is live.
+		sm, err := m.getSessionMetadata(ctx, recorderID, sessionID)
+		start, _, reject := admitChunkForSession(sm, err, isObjectNotFound(err))
+		if reject == nil && !start {
+			reject = ErrSessionClosed
+		}
+		if reject != nil {
+			log.Warn().Err(reject).
+				Stringer("recorder-id", recorderID).
+				Stringer("session-id", sessionID).
+				Stringer("current-session-id", chunk.sessionID).
+				Int("bytes", len(samples)*2).
+				Msg("Dropping chunk for a session that cannot take it")
+			return reject
+		}
+
 		oldSessionID := chunk.sessionID
 
 		// Synchronously transition old session to PROCESSING before starting new session
 		// This ensures only one session per recorder can be in RECORDING state at a time
-		sm, err := m.getSessionMetadata(ctx, recorderID, oldSessionID)
+		sm, err = m.getSessionMetadata(ctx, recorderID, oldSessionID)
 		if err == nil && sm.State == SessionStateRecording {
 			previousState := sm.State
 			sm.State = SessionStateProcessing
@@ -1741,7 +1805,21 @@ func (m *Minio) closeSession(ctx context.Context, recorderID, sessionID uuid.UUI
 
 // closeSessionAsync handles session closing when state was already transitioned to PROCESSING.
 // Used when a new session starts and we need to finish processing the previous session.
+//
+// At most one close per session runs at a time: a second request while the
+// first is still flushing, composing or rendering returns right away. (One
+// arriving after the first has finished finds no chunks left and a terminal
+// state, and returns below.)
 func (m *Minio) closeSessionAsync(ctx context.Context, recorderID, sessionID uuid.UUID, chunk *minioChunk) error {
+	if !m.beginClose(sessionID) {
+		log.Info().
+			Stringer("recorder-id", recorderID).
+			Stringer("session-id", sessionID).
+			Msg("Session is already being closed, not closing it a second time")
+		return nil
+	}
+	defer m.endClose(sessionID)
+
 	hasOnDisk := !m.isSessionClosed(ctx, recorderID, sessionID)
 	hasInMemory := chunk != nil && chunk.buffer != nil && chunk.buffer.Len() > 0
 
@@ -1793,6 +1871,20 @@ func (m *Minio) dispatchRender(
 	chunk *minioChunk,
 	hasOnDisk, hasInMemory bool,
 ) error {
+	// A buffer numbered 0 that was never uploaded, for a session that already
+	// has chunks stored: flushing it would write it over chunks/0, the start
+	// of the recording. No legitimate path produces this (resumeSession
+	// numbers the buffer after what is stored), so refuse rather than trust
+	// it, and render what is stored.
+	if hasOnDisk && hasInMemory && chunk.number == 0 && !chunk.pushedToMinio {
+		log.Error().
+			Stringer("recorder-id", recorderID).
+			Stringer("session-id", sessionID).
+			Int("bytes", chunk.buffer.Len()).
+			Msg("Refusing to flush a restarted chunk buffer over the session's first chunk; rendering the stored chunks only")
+		return m.renderSession(ctx, recorderID, sessionID)
+	}
+
 	switch {
 	case hasOnDisk && hasInMemory:
 		if err := m.flushChunks(ctx, recorderID, sessionID, chunk); err != nil {
@@ -1821,10 +1913,13 @@ func (m *Minio) CloseRecordingSession(ctx context.Context, recorderID, sessionID
 		delete(m.chunks, recorderID)
 		delete(m.lastChunkTime, recorderID)
 	}
-	m.dataLock.Unlock()
 
+	// Still under the lock: the read-modify-write of the metadata must not
+	// interleave with another close or with SafeChunks deciding, from this
+	// very state, whether a chunk may still go into the session.
 	sm, err := m.getSessionMetadata(ctx, recorderID, sessionID)
 	if err != nil {
+		m.dataLock.Unlock()
 		return fmt.Errorf("cannot get session metadata: %w", err)
 	}
 
@@ -1832,11 +1927,13 @@ func (m *Minio) CloseRecordingSession(ctx context.Context, recorderID, sessionID
 		previousState := sm.State
 		sm.State = SessionStateProcessing
 		if err := m.putSessionMetadata(ctx, recorderID, sessionID, sm); err != nil {
+			m.dataLock.Unlock()
 			return fmt.Errorf("cannot update session state to PROCESSING: %w", err)
 		}
 		sessionCopy := *sm
 		go m.notifyStateChange(&sessionCopy, previousState)
 	}
+	m.dataLock.Unlock()
 
 	go func(recorderID, sessionID uuid.UUID, chunk *minioChunk) {
 		var chunkArg *minioChunk

@@ -2,12 +2,47 @@ package storage
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"time"
 
 	"github.com/google/uuid"
 )
+
+// ErrSessionClosed is returned by SafeChunks for a chunk whose session is
+// already stored and no longer recording. The audio in it is dropped: the
+// session's files are final (or being rendered), and starting the session
+// again would overwrite them.
+var ErrSessionClosed = errors.New("session is closed")
+
+// admitChunkForSession decides what a chunk for a session without in-memory
+// state may do, from the result of reading that session's stored metadata
+// (notFound: the read failed because there is none): start the session
+// (nothing stored yet), resume it (stored and still RECORDING), or nothing.
+//
+// The last case is the important one. A chunk can arrive for a session that
+// has already been closed - the recorder's final chunk regularly lands just
+// after the status that closed the session, and a recorder draining its send
+// buffer after a reconnect can be much later than that. Such a session must
+// never be initialised again: that restarts it from nothing, so the late
+// chunk replaces the start of the recording (MinIO: its first chunk object)
+// or all of it (filesystem: data.raw is truncated), and the session's
+// metadata - start time, name, keep flag, segments - is replaced by a blank
+// one.
+func admitChunkForSession(sm *Session, err error, notFound bool) (start, resume bool, reject error) {
+	switch {
+	case err == nil && sm.State == SessionStateRecording:
+		return false, true, nil
+	case err == nil:
+		return false, false, ErrSessionClosed
+	case notFound:
+		return true, false, nil
+	default:
+		// Unknown whether the session exists - do not guess.
+		return false, false, fmt.Errorf("cannot read session metadata: %w", err)
+	}
+}
 
 // SessionState represents the lifecycle state of a session
 type SessionState int32

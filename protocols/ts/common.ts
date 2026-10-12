@@ -108,6 +108,25 @@ export interface RecorderStatus {
      * @generated from protobuf field: float tempoProbability = 12
      */
     tempoProbability: number;
+    /**
+     * What this recorder is set up to compute and send, in every status - so
+     * a client can tell "not switched on at the recorder" from "nothing yet".
+     * Each of them is optional and independent of recording itself: a
+     * recorder with all of them off (or one that predates them) records
+     * exactly the same. (Whether speed fingerprints are on is
+     * chromaprintSpeedCount > 0.)
+     *
+     * @generated from protobuf field: bool chromaprintEnabled = 13
+     */
+    chromaprintEnabled: boolean;
+    /**
+     * @generated from protobuf field: bool peakConstellationEnabled = 14
+     */
+    peakConstellationEnabled: boolean;
+    /**
+     * @generated from protobuf field: bool tempoEnabled = 15
+     */
+    tempoEnabled: boolean;
 }
 /**
  * @generated from protobuf message common.SpeedFingerprint
@@ -174,7 +193,10 @@ class RecorderStatus$Type extends MessageType<RecorderStatus> {
             { no: 9, name: "peakConstellation", kind: "scalar", T: 12 /*ScalarType.BYTES*/ },
             { no: 10, name: "fingerprintWindow", kind: "scalar", T: 13 /*ScalarType.UINT32*/ },
             { no: 11, name: "tempoBpm", kind: "scalar", T: 2 /*ScalarType.FLOAT*/ },
-            { no: 12, name: "tempoProbability", kind: "scalar", T: 2 /*ScalarType.FLOAT*/ }
+            { no: 12, name: "tempoProbability", kind: "scalar", T: 2 /*ScalarType.FLOAT*/ },
+            { no: 13, name: "chromaprintEnabled", kind: "scalar", T: 8 /*ScalarType.BOOL*/ },
+            { no: 14, name: "peakConstellationEnabled", kind: "scalar", T: 8 /*ScalarType.BOOL*/ },
+            { no: 15, name: "tempoEnabled", kind: "scalar", T: 8 /*ScalarType.BOOL*/ }
         ]);
     }
     create(value?: PartialMessage<RecorderStatus>): RecorderStatus {
@@ -191,6 +213,9 @@ class RecorderStatus$Type extends MessageType<RecorderStatus> {
         message.fingerprintWindow = 0;
         message.tempoBpm = 0;
         message.tempoProbability = 0;
+        message.chromaprintEnabled = false;
+        message.peakConstellationEnabled = false;
+        message.tempoEnabled = false;
         if (value !== undefined)
             reflectionMergePartial<RecorderStatus>(this, message, value);
         return message;
@@ -235,6 +260,15 @@ class RecorderStatus$Type extends MessageType<RecorderStatus> {
                     break;
                 case /* float tempoProbability */ 12:
                     message.tempoProbability = reader.float();
+                    break;
+                case /* bool chromaprintEnabled */ 13:
+                    message.chromaprintEnabled = reader.bool();
+                    break;
+                case /* bool peakConstellationEnabled */ 14:
+                    message.peakConstellationEnabled = reader.bool();
+                    break;
+                case /* bool tempoEnabled */ 15:
+                    message.tempoEnabled = reader.bool();
                     break;
                 default:
                     let u = options.readUnknownField;
@@ -284,6 +318,15 @@ class RecorderStatus$Type extends MessageType<RecorderStatus> {
         /* float tempoProbability = 12; */
         if (message.tempoProbability !== 0)
             writer.tag(12, WireType.Bit32).float(message.tempoProbability);
+        /* bool chromaprintEnabled = 13; */
+        if (message.chromaprintEnabled !== false)
+            writer.tag(13, WireType.Varint).bool(message.chromaprintEnabled);
+        /* bool peakConstellationEnabled = 14; */
+        if (message.peakConstellationEnabled !== false)
+            writer.tag(14, WireType.Varint).bool(message.peakConstellationEnabled);
+        /* bool tempoEnabled = 15; */
+        if (message.tempoEnabled !== false)
+            writer.tag(15, WireType.Varint).bool(message.tempoEnabled);
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);

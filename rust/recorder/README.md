@@ -70,13 +70,23 @@ mDNS and connects automatically. No backend address is configured by hand.
 | `--led-rec-state <sysfs>` | LED on while recording, blinks on new session | — |
 | `--led-upload <sysfs>` | LED pulses on each successful chunk upload | — |
 | `--input-event <N>` `--input-keycode <K>` `--input-hold-ms <ms>` | local "cut session" button on `/dev/input/eventN` | — |
-| `--fingerprint <true\|false>` | publish a live Chromaprint fingerprint of the last 25 s in the recorder status, every 12 s while recording | `true` |
+| `--fingerprint <true\|false>` | master switch for the live analysis: every 12 s the last 25 s of the running recording are analysed and the results published in the recorder status. `false` turns all of it off; recording is the same either way. Each part below has its own switch | `true` |
+| `--chromaprint <true\|false>` | the Chromaprint fingerprint of each window (at the speed it was captured). `false` leaves it out, and the speed variants with it | `true` |
 | `--fingerprint-speed-range <percent>` | also fingerprint each window for assumed playback speeds from -N to +N % (e.g. `8` for a turntable's pitch fader); `0` = off. One after another on one thread (~0.23 s each on a Pi 3), closest speeds first, each published as soon as it is done | `0` |
 | `--fingerprint-speed-step <percent>` | distance between two assumed speeds | `1` |
 | `--peak-constellation <true\|false>` | also publish each window's spectral peaks, a speed-invariant fingerprint (a client matches a pitched record with it and learns the speed); about as cheap as one plain fingerprint | `false` |
 | `--fingerprint-spread <true\|false>` | pace a window's fingerprint computations evenly until the next window instead of one burst: level load, but the last speeds arrive up to ~11 s after the window instead of ~4 s | `false` |
 | `--tempo <true\|false>` | estimate each window's tempo (BPM) with TempoCNN and publish it in the recorder status, if the model file is found (see "Tempo model" below); without the file the recorder runs without tempo. About 0.3 s per window on a Pi 3 | `true` |
 | `--tempo-model <file.onnx>` | the model file, if it is not in one of the places looked in: `$XDG_DATA_HOME/session-recorder/deeptemp-k16-3.onnx` (`~/.local/share/...`), `/usr/local/share/session-recorder/...`, `/usr/share/session-recorder/...`. Given explicitly, it must load or the recorder does not start | — |
+
+### Live analysis is optional
+
+Chromaprint, its speed variants, the peak constellation and the tempo are four independent extras on top
+of recording, each with its own switch (above). Whatever is off is simply not computed and not sent; the
+status tells clients which parts are on (`chromaprintEnabled`, `chromaprintSpeedCount`,
+`peakConstellationEnabled`, `tempoEnabled`). Neither the backend nor recording depends on any of them:
+the backend relays the status as it comes, and a recorder with everything off behaves exactly like one
+from before these features.
 
 ### Tempo model
 

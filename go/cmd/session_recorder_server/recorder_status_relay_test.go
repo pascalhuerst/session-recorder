@@ -387,6 +387,61 @@ func TestRecorderStatusFieldsUnknownToTheBackendAreRelayed(t *testing.T) {
 // HTTP/1.1 POST to the gRPC-Web handler - and returns a function that reads
 // the next message from the response. "application/grpc-web-text" is the
 // base64 framing the web UI's GrpcWebFetchTransport uses by default.
+// A recorder with all live analysis switched off (or one from before it
+// existed) sends none of the fingerprint fields. That is the plain case, not a
+// degraded one: its status is relayed as it is, live and from the cache, and
+// nothing is filled in for it.
+func TestRecorderWithoutLiveAnalysisIsRelayedAsIs(t *testing.T) {
+	x := newRelayFixture(t)
+	recorderID := uuid.New()
+	live := x.subscribe()
+
+	plain := &cmpb.RecorderStatus{
+		RecorderID:   recorderID.String(),
+		RecorderName: "No analysis",
+		SignalStatus: cmpb.SignalStatus_SIGNAL,
+		PeakPercent:  42.5,
+	}
+	x.setStatus(plain)
+	expectStatus(t, live.Recv, plain)
+
+	late := x.subscribe()
+	got, err := late.Recv()
+	if err != nil {
+		t.Fatalf("late subscriber: %v", err)
+	}
+	status := got.GetStatus()
+	assertSameStatus(t, status, plain)
+	if status.GetChromaprintFingerprint() != "" || len(status.GetChromaprintSpeedFingerprints()) != 0 ||
+		len(status.GetPeakConstellation()) != 0 || status.GetTempoBpm() != 0 ||
+		status.GetChromaprintEnabled() || status.GetPeakConstellationEnabled() || status.GetTempoEnabled() {
+		t.Errorf("the backend invented analysis data for a recorder that sends none: %v", status)
+	}
+}
+
+// What the recorder says it is set up for, the window number and the tempo
+// travel like the fingerprints: unchanged.
+func TestRecorderStatusAnalysisFlagsWindowAndTempoAreRelayed(t *testing.T) {
+	x := newRelayFixture(t)
+	recorderID := uuid.New()
+	live := x.subscribe()
+
+	// Only the constellation and the tempo switched on; the window's first status.
+	status := &cmpb.RecorderStatus{
+		RecorderID:               recorderID.String(),
+		RecorderName:             "Constellation and tempo",
+		SignalStatus:             cmpb.SignalStatus_SIGNAL,
+		PeakConstellationEnabled: true,
+		TempoEnabled:             true,
+		FingerprintWindow:        17,
+		TempoBpm:                 141,
+		TempoProbability:         0.58,
+	}
+	x.setStatus(status)
+	expectStatus(t, live.Recv, status)
+	expectStatus(t, x.subscribe().Recv, status)
+}
+
 func (x *relayFixture) subscribeGrpcWeb(contentType string) func() (*sspb.Recorder, error) {
 	x.t.Helper()
 	text := strings.HasPrefix(contentType, "application/grpc-web-text")

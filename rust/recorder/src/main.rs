@@ -264,11 +264,21 @@ struct Args {
     #[arg(long, value_enum, env = "DISCOVERY_METHOD", default_value_t = DiscoveryMethod::Avahi)]
     discovery: DiscoveryMethod,
 
-    /// Publish a live Chromaprint fingerprint of the last 25 s of the running
-    /// recording in the recorder status, refreshed every 12 s. Pass
-    /// `--fingerprint false` to turn all fingerprinting off.
+    /// Master switch for the live analysis of the running recording: every
+    /// 12 s the last 25 s are analysed and the results published in the
+    /// recorder status. `--fingerprint false` turns all of it off -
+    /// Chromaprint, its speed variants, the peak constellation and the
+    /// tempo; recording itself is the same either way. The parts have their
+    /// own switches: `--chromaprint`, `--fingerprint-speed-range`,
+    /// `--peak-constellation`, `--tempo`.
     #[arg(long, env = "FINGERPRINT", default_value_t = true, action = clap::ArgAction::Set)]
     fingerprint: bool,
+
+    /// Publish the Chromaprint fingerprint of each window (at the speed it
+    /// was captured). `--chromaprint false` leaves it out - and with it the
+    /// speed variants, which are Chromaprints too.
+    #[arg(long, env = "CHROMAPRINT", default_value_t = true, action = clap::ArgAction::Set)]
+    chromaprint: bool,
 
     /// Additionally fingerprint each window for assumed playback speeds from
     /// -N to +N percent (e.g. `8` for a turntable's +-8 % pitch fader), so a
@@ -449,6 +459,9 @@ impl SessionRecorder {
             fingerprint_window: 0,
             tempo_bpm: 0.0,
             tempo_probability: 0.0,
+            chromaprint_enabled: false,
+            peak_constellation_enabled: false,
+            tempo_enabled: false,
         };
 
         let capacity_bytes = (audio_settings.sample_rate as f64
@@ -1466,6 +1479,10 @@ impl SessionRecorder {
                     .as_ref()
                     .map(|worker| worker.take_new())
                     .unwrap_or_default();
+                let features = fingerprint_worker
+                    .as_ref()
+                    .map(|worker| worker.features())
+                    .unwrap_or_default();
                 let status_info = RecorderStatusInfo {
                     signal_status: if recording {
                         SignalStatus::Signal
@@ -1484,6 +1501,9 @@ impl SessionRecorder {
                     fingerprint_window: fingerprints.window,
                     tempo_bpm: fingerprints.tempo_bpm,
                     tempo_probability: fingerprints.tempo_probability,
+                    chromaprint_enabled: features.chromaprint,
+                    peak_constellation_enabled: features.constellation,
+                    tempo_enabled: features.tempo,
                 };
                 {
                     *status.lock().await = status_info.clone();
@@ -1755,19 +1775,27 @@ fn fingerprint_worker_from_args(
     args: &Args,
 ) -> Result<Option<Arc<FingerprintWorker>>, Box<dyn std::error::Error>> {
     if !args.fingerprint {
-        info!("Live fingerprint: off");
+        info!("Live analysis: off (--fingerprint false)");
         return Ok(None);
     }
     let speeds = speed_grid(args.fingerprint_speed_range, args.fingerprint_speed_step)
         .map_err(|e| format!("--fingerprint-speed-range/--fingerprint-speed-step: {e}"))?;
-    if speeds.is_empty() {
+    if !args.chromaprint {
+        info!("Live fingerprint: Chromaprint off");
+        if !speeds.is_empty() {
+            warn!(
+                "--fingerprint-speed-range {} has no effect with --chromaprint false",
+                args.fingerprint_speed_range
+            );
+        }
+    } else if speeds.is_empty() {
         info!(
-            "Live fingerprint: last {}s every {}s, original speed only",
+            "Live fingerprint: Chromaprint of the last {}s every {}s, original speed only",
             FINGERPRINT_WINDOW_SECONDS, FINGERPRINT_RECOMPUTE_INTERVAL_SECONDS
         );
     } else {
         info!(
-            "Live fingerprint: last {}s every {}s, plus {} assumed speeds within +-{}% in steps of {}%",
+            "Live fingerprint: Chromaprint of the last {}s every {}s, plus {} assumed speeds within +-{}% in steps of {}%",
             FINGERPRINT_WINDOW_SECONDS,
             FINGERPRINT_RECOMPUTE_INTERVAL_SECONDS,
             speeds.len(),
@@ -1776,7 +1804,7 @@ fn fingerprint_worker_from_args(
         );
     }
     if args.peak_constellation {
-        info!("Live fingerprint: plus the peak constellation of each window");
+        info!("Live fingerprint: peak constellation of each window");
     }
     // Not the whole interval: a window that is still being worked on when
     // the next one is due makes that one be skipped.
@@ -1818,11 +1846,18 @@ fn fingerprint_worker_from_args(
             }
         }
     };
-    Ok(Some(Arc::new(FingerprintWorker::spawn(
-        speeds,
-        args.peak_constellation,
-        spread,
-        tempo,
+    if !args.chromaprint && !args.peak_constellation && tempo.is_none() {
+        info!("Live analysis: nothing switched on");
+        return Ok(None);
+    }
+    Ok(Some(Arc::new(FingerprintWorker::spawn_with(
+        recorder::fingerprint::WorkerConfig {
+            chromaprint: args.chromaprint,
+            speeds,
+            constellation: args.peak_constellation,
+            tempo,
+            spread,
+        },
     )?)))
 }
 

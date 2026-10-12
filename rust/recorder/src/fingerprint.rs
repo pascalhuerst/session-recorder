@@ -170,10 +170,49 @@ struct Shared {
 pub struct FingerprintWorker {
     shared: Arc<Shared>,
     jobs: SyncSender<Job>,
-    speed_count: usize,
+    features: WorkerFeatures,
+}
+
+/// What a [`FingerprintWorker`] computes for each window. Every part can be
+/// switched on its own.
+pub struct WorkerConfig {
+    /// The Chromaprint fingerprint at the speed the audio was captured at.
+    pub chromaprint: bool,
+    /// Chromaprints for these assumed playback speeds as well (needs
+    /// `chromaprint`).
+    pub speeds: Vec<f64>,
+    /// The speed-invariant peak constellation.
+    pub constellation: bool,
+    /// The tempo, with this model.
+    pub tempo: Option<crate::tempo::TempoEstimator>,
+    /// Pace the computations evenly over this long instead of one burst.
+    pub spread: Option<std::time::Duration>,
+}
+
+impl Default for WorkerConfig {
+    fn default() -> Self {
+        Self {
+            chromaprint: true,
+            speeds: Vec::new(),
+            constellation: false,
+            tempo: None,
+            spread: None,
+        }
+    }
+}
+
+/// Which results a worker produces - what the recorder tells its clients.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct WorkerFeatures {
+    pub chromaprint: bool,
+    pub speed_count: usize,
+    pub constellation: bool,
+    pub tempo: bool,
 }
 
 impl FingerprintWorker {
+    /// The Chromaprint fingerprint plus what is given here; see
+    /// [`WorkerConfig`] for the general form.
     /// `speeds`: the assumed playback speeds to fingerprint each window for
     /// besides the original one. `constellation`: also compute the window's
     /// speed-invariant peak constellation. `spread`: instead of computing
@@ -187,11 +226,31 @@ impl FingerprintWorker {
         spread: Option<std::time::Duration>,
         tempo: Option<crate::tempo::TempoEstimator>,
     ) -> std::io::Result<Self> {
+        Self::spawn_with(WorkerConfig {
+            chromaprint: true,
+            speeds,
+            constellation,
+            tempo,
+            spread,
+        })
+    }
+
+    pub fn spawn_with(config: WorkerConfig) -> std::io::Result<Self> {
         let shared = Arc::new(Shared {
             published: Mutex::new(Published::default()),
             busy: AtomicBool::new(false),
         });
-        let speed_count = speeds.len();
+        let features = WorkerFeatures {
+            chromaprint: config.chromaprint,
+            // Without the plain fingerprint there are no speed variants either.
+            speed_count: if config.chromaprint {
+                config.speeds.len()
+            } else {
+                0
+            },
+            constellation: config.constellation,
+            tempo: config.tempo.is_some(),
+        };
         let (jobs, queue) = sync_channel::<Job>(1);
         let worker_shared = Arc::clone(&shared);
         std::thread::Builder::new()
@@ -209,21 +268,14 @@ impl FingerprintWorker {
                     libc::setpriority(libc::PRIO_PROCESS, tid, 19);
                 }
                 while let Ok(job) = queue.recv() {
-                    Self::run(
-                        &worker_shared,
-                        &speeds,
-                        constellation,
-                        spread,
-                        tempo.as_ref(),
-                        job,
-                    );
+                    Self::run(&worker_shared, &config, job);
                     worker_shared.busy.store(false, Ordering::Release);
                 }
             })?;
         Ok(Self {
             shared,
             jobs,
-            speed_count,
+            features,
         })
     }
 
@@ -271,7 +323,12 @@ impl FingerprintWorker {
 
     /// How many speed variants a window gets in total.
     pub fn speed_count(&self) -> usize {
-        self.speed_count
+        self.features.speed_count
+    }
+
+    /// What this worker produces.
+    pub fn features(&self) -> WorkerFeatures {
+        self.features
     }
 
     /// Everything published since the last call, and nothing twice: the
@@ -299,14 +356,32 @@ impl FingerprintWorker {
             .unwrap_or_default()
     }
 
-    fn run(
-        shared: &Shared,
-        speeds: &[f64],
+    /// The peak constellation, if wanted: before the speeds, as it is
+    /// cheaper than a single one of them and covers what they are for.
+    fn rest_without_speeds(
         constellation: bool,
-        spread: Option<std::time::Duration>,
-        tempo: Option<&crate::tempo::TempoEstimator>,
-        job: Job,
+        mono: &Option<Vec<f32>>,
+        publish: &dyn Fn(&dyn Fn(&mut FingerprintOutput)) -> bool,
+        wait_for_turn: &mut dyn FnMut(),
     ) {
+        if constellation {
+            wait_for_turn();
+            let peaks = crate::constellation::compute_constellation_from_mono(
+                mono.as_deref().unwrap_or_default(),
+            );
+            publish(&|output| output.peak_constellation = peaks.clone());
+        }
+    }
+
+    fn run(shared: &Shared, config: &WorkerConfig, job: Job) {
+        let constellation = config.constellation;
+        let tempo = config.tempo.as_ref();
+        let spread = config.spread;
+        let speeds: &[f64] = if config.chromaprint {
+            &config.speeds
+        } else {
+            &[]
+        };
         // Each result goes out the moment it exists. Whenever the session
         // has moved on in the meantime, the rest of the window is dropped.
         let publish = |update: &dyn Fn(&mut FingerprintOutput)| match shared.published.lock() {
@@ -332,7 +407,7 @@ impl FingerprintWorker {
         // time has passed since the window came in. The tempo is not one of
         // the n: it goes first and shares the plain fingerprint's turn.
         let started = std::time::Instant::now();
-        let steps = 1 + constellation as u32 + speeds.len() as u32;
+        let steps = (config.chromaprint as u32 + constellation as u32 + speeds.len() as u32).max(1);
         let mut step = 0u32;
         let mut wait_for_turn = || {
             if let Some(spread) = spread {
@@ -359,25 +434,27 @@ impl FingerprintWorker {
             }
         }
 
-        wait_for_turn();
-        let Some(fingerprint) = compute_fingerprint(&job.samples, job.sample_rate, job.channels)
-        else {
-            return;
-        };
-        if !publish(&|output| output.fingerprint = fingerprint.clone()) {
-            return;
-        }
-        // Before the speeds: it is cheaper than a single one of them and
-        // covers what all of them together are for.
-        if constellation {
+        if config.chromaprint {
             wait_for_turn();
-            let peaks = crate::constellation::compute_constellation_from_mono(
-                mono.as_deref().unwrap_or_default(),
-            );
-            if !publish(&|output| output.peak_constellation = peaks.clone()) {
-                return;
+            // None (audio too quiet or short for Chromaprint) leaves the
+            // field empty; the window's other results still go out.
+            if let Some(fingerprint) =
+                compute_fingerprint(&job.samples, job.sample_rate, job.channels)
+            {
+                if !publish(&|output| output.fingerprint = fingerprint.clone()) {
+                    return;
+                }
+            } else {
+                // No plain fingerprint, no variants of it.
+                return Self::rest_without_speeds(
+                    constellation,
+                    &mono,
+                    &publish,
+                    &mut wait_for_turn,
+                );
             }
         }
+        Self::rest_without_speeds(constellation, &mono, &publish, &mut wait_for_turn);
         for &speed_percent in speeds {
             wait_for_turn();
             let Some(fingerprint) = compute_fingerprint_at_speed(
@@ -751,6 +828,51 @@ mod tests {
         let took = started.elapsed().as_millis();
         // The last of 5 steps starts at 4/5 of 1.5 s.
         assert!((1200..2500).contains(&took), "all speeds after {took} ms");
+    }
+
+    #[test]
+    fn without_chromaprint_the_other_results_still_come_and_no_fingerprint_does() {
+        let samples = melody_samples(48000, 10.0);
+        let worker = FingerprintWorker::spawn_with(WorkerConfig {
+            chromaprint: false,
+            speeds: speed_grid(2.0, 1.0).unwrap(), // asked for, but they are Chromaprints
+            constellation: true,
+            ..Default::default()
+        })
+        .unwrap();
+        assert_eq!(
+            worker.features(),
+            WorkerFeatures {
+                chromaprint: false,
+                speed_count: 0,
+                constellation: true,
+                tempo: false
+            }
+        );
+        assert!(worker.submit(samples.clone(), 48000, 2));
+        let output = wait_for(&worker, |o| !o.peak_constellation.is_empty());
+        assert_eq!(output.window, 1, "it is still a window of its own");
+        std::thread::sleep(std::time::Duration::from_millis(300));
+        let output = worker.output();
+        assert!(output.fingerprint.is_empty() && output.speed_fingerprints.is_empty());
+    }
+
+    #[test]
+    fn features_say_what_a_worker_produces() {
+        let plain = FingerprintWorker::spawn(Vec::new(), false, None, None).unwrap();
+        assert_eq!(
+            plain.features(),
+            WorkerFeatures {
+                chromaprint: true,
+                speed_count: 0,
+                constellation: false,
+                tempo: false
+            }
+        );
+        let full =
+            FingerprintWorker::spawn(speed_grid(8.0, 1.0).unwrap(), true, None, None).unwrap();
+        assert_eq!(full.features().speed_count, 16);
+        assert!(full.features().constellation);
     }
 
     #[test]

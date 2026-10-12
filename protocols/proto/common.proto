@@ -69,6 +69,16 @@ message RecorderStatus {
     // one status too when the window had no tempo (silence).
     float tempoBpm = 11;
     float tempoProbability = 12;
+
+    // What this recorder is set up to compute and send, in every status - so
+    // a client can tell "not switched on at the recorder" from "nothing yet".
+    // Each of them is optional and independent of recording itself: a
+    // recorder with all of them off (or one that predates them) records
+    // exactly the same. (Whether speed fingerprints are on is
+    // chromaprintSpeedCount > 0.)
+    bool chromaprintEnabled = 13;
+    bool peakConstellationEnabled = 14;
+    bool tempoEnabled = 15;
 }
 
 message SpeedFingerprint {

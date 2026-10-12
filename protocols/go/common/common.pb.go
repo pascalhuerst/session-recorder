@@ -114,8 +114,17 @@ type RecorderStatus struct {
 	// one status too when the window had no tempo (silence).
 	TempoBpm         float32 `protobuf:"fixed32,11,opt,name=tempoBpm,proto3" json:"tempoBpm,omitempty"`
 	TempoProbability float32 `protobuf:"fixed32,12,opt,name=tempoProbability,proto3" json:"tempoProbability,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// What this recorder is set up to compute and send, in every status - so
+	// a client can tell "not switched on at the recorder" from "nothing yet".
+	// Each of them is optional and independent of recording itself: a
+	// recorder with all of them off (or one that predates them) records
+	// exactly the same. (Whether speed fingerprints are on is
+	// chromaprintSpeedCount > 0.)
+	ChromaprintEnabled       bool `protobuf:"varint,13,opt,name=chromaprintEnabled,proto3" json:"chromaprintEnabled,omitempty"`
+	PeakConstellationEnabled bool `protobuf:"varint,14,opt,name=peakConstellationEnabled,proto3" json:"peakConstellationEnabled,omitempty"`
+	TempoEnabled             bool `protobuf:"varint,15,opt,name=tempoEnabled,proto3" json:"tempoEnabled,omitempty"`
+	unknownFields            protoimpl.UnknownFields
+	sizeCache                protoimpl.SizeCache
 }
 
 func (x *RecorderStatus) Reset() {
@@ -232,6 +241,27 @@ func (x *RecorderStatus) GetTempoProbability() float32 {
 	return 0
 }
 
+func (x *RecorderStatus) GetChromaprintEnabled() bool {
+	if x != nil {
+		return x.ChromaprintEnabled
+	}
+	return false
+}
+
+func (x *RecorderStatus) GetPeakConstellationEnabled() bool {
+	if x != nil {
+		return x.PeakConstellationEnabled
+	}
+	return false
+}
+
+func (x *RecorderStatus) GetTempoEnabled() bool {
+	if x != nil {
+		return x.TempoEnabled
+	}
+	return false
+}
+
 type SpeedFingerprint struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Assumed deviation from the original speed, in percent (+4 = playing
@@ -345,7 +375,7 @@ var File_common_proto protoreflect.FileDescriptor
 
 const file_common_proto_rawDesc = "" +
 	"\n" +
-	"\fcommon.proto\x12\x06common\"\xbc\x04\n" +
+	"\fcommon.proto\x12\x06common\"\xcc\x05\n" +
 	"\x0eRecorderStatus\x12\x1e\n" +
 	"\n" +
 	"recorderID\x18\x01 \x01(\tR\n" +
@@ -361,7 +391,10 @@ const file_common_proto_rawDesc = "" +
 	"\x11fingerprintWindow\x18\n" +
 	" \x01(\rR\x11fingerprintWindow\x12\x1a\n" +
 	"\btempoBpm\x18\v \x01(\x02R\btempoBpm\x12*\n" +
-	"\x10tempoProbability\x18\f \x01(\x02R\x10tempoProbability\"X\n" +
+	"\x10tempoProbability\x18\f \x01(\x02R\x10tempoProbability\x12.\n" +
+	"\x12chromaprintEnabled\x18\r \x01(\bR\x12chromaprintEnabled\x12:\n" +
+	"\x18peakConstellationEnabled\x18\x0e \x01(\bR\x18peakConstellationEnabled\x12\"\n" +
+	"\ftempoEnabled\x18\x0f \x01(\bR\ftempoEnabled\"X\n" +
 	"\x10SpeedFingerprint\x12\"\n" +
 	"\fspeedPercent\x18\x01 \x01(\x01R\fspeedPercent\x12 \n" +
 	"\vfingerprint\x18\x02 \x01(\tR\vfingerprint\"G\n" +

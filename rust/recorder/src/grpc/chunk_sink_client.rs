@@ -119,6 +119,11 @@ pub struct RecorderStatusInfo {
     /// The window's tempo and the model's probability for it; 0 if none.
     pub tempo_bpm: f32,
     pub tempo_probability: f32,
+    /// What this recorder is set up to compute and send (see
+    /// `RecorderStatus` in common.proto).
+    pub chromaprint_enabled: bool,
+    pub peak_constellation_enabled: bool,
+    pub tempo_enabled: bool,
 }
 
 /// ChunkSink gRPC client service
@@ -191,6 +196,9 @@ impl ChunkSinkClientService {
             fingerprint_window: status.fingerprint_window,
             tempo_bpm: status.tempo_bpm,
             tempo_probability: status.tempo_probability,
+            chromaprint_enabled: status.chromaprint_enabled,
+            peak_constellation_enabled: status.peak_constellation_enabled,
+            tempo_enabled: status.tempo_enabled,
         });
 
         match client.set_recorder_status(request).await {
@@ -281,6 +289,9 @@ mod tests {
             fingerprint_window: 0,
             tempo_bpm: 0.0,
             tempo_probability: 0.0,
+            chromaprint_enabled: false,
+            peak_constellation_enabled: false,
+            tempo_enabled: false,
         };
 
         let result = client.set_recorder_status(status).await;

@@ -19,8 +19,10 @@ func Flac(dst io.Writer, src io.Reader) error {
 	const (
 		sr  uint32 = 48000
 		bps uint8  = 16
-		// Number of inter-channel samples per block.
-		nsamplesPerChannel = 16
+		// Number of inter-channel samples per block. 4096 is the usual FLAC
+		// block size; every block carries its own frame header and CRCs, so
+		// very small blocks inflate the file and make it slow to decode.
+		nsamplesPerChannel = 4096
 	)
 
 	// The encoder only back-patches BlockSizeMin/Max in Close() when the writer

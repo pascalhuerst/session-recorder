@@ -71,11 +71,11 @@ func TestFlacRoundTripIsLossless(t *testing.T) {
 	}
 }
 
-// Production data.raw is not aligned to the 16-frame FLAC block size, so the
-// encoder must emit a smaller final block and still round-trip losslessly.
+// Production data.raw is not aligned to the FLAC block size, so the encoder
+// must emit a smaller final block and still round-trip losslessly.
 func TestFlacRoundTripNonAligned(t *testing.T) {
 	in := genSineRaw(1000, 1)
-	tail := make([]byte, 7*bytesPerFrame) // 7 frames: not a multiple of 16
+	tail := make([]byte, 7*bytesPerFrame) // 7 extra frames: total is not a multiple of the block size
 	for i := range tail {
 		tail[i] = byte(i)
 	}
@@ -91,7 +91,7 @@ func TestFlacRoundTripNonAligned(t *testing.T) {
 		t.Fatalf("decoded length %d != input length %d", len(out), len(in))
 	}
 	if !bytes.Equal(out, in) {
-		t.Fatal("FLAC round-trip not lossless for non-16-frame-aligned input")
+		t.Fatal("FLAC round-trip not lossless for non-block-aligned input")
 	}
 }
 

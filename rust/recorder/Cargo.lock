@@ -1417,6 +1417,7 @@ dependencies = [
  "num-traits",
  "prost",
  "prost-types",
+ "realfft",
  "ringbuf",
  "rusty-chromaprint",
  "tokio",

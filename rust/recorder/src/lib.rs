@@ -17,6 +17,7 @@ pub mod grpc {
 }
 
 pub mod discovery;
+pub mod constellation;
 pub mod fingerprint;
 
 pub use audio::*;

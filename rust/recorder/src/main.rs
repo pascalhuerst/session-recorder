@@ -283,6 +283,14 @@ struct Args {
     /// tolerates about half a percent of deviation, so 1 leaves no gaps.
     #[arg(long, env = "FINGERPRINT_SPEED_STEP", default_value_t = 1.0)]
     fingerprint_speed_step: f64,
+
+    /// Additionally publish each window's peak constellation: a second,
+    /// speed-invariant fingerprint from which a client can match a record at
+    /// any playback speed and tell that speed, without the per-speed
+    /// fingerprints above. About as cheap as one plain fingerprint. Needs
+    /// `--fingerprint true` (the default).
+    #[arg(long, env = "PEAK_CONSTELLATION", default_value_t = false, action = clap::ArgAction::Set)]
+    peak_constellation: bool,
 }
 
 /// Bounded outbox of ready-to-send chunks. Drops the oldest entry when the
@@ -413,6 +421,7 @@ impl SessionRecorder {
             chromaprint_fingerprint: String::new(),
             chromaprint_speed_fingerprints: Vec::new(),
             chromaprint_speed_count: 0,
+            peak_constellation: Vec::new(),
         };
 
         let capacity_bytes = (audio_settings.sample_rate as f64
@@ -1441,6 +1450,7 @@ impl SessionRecorder {
                         .as_ref()
                         .map(|worker| worker.speed_count() as u32)
                         .unwrap_or(0),
+                    peak_constellation: fingerprints.peak_constellation,
                 };
                 {
                     *status.lock().await = status_info.clone();
@@ -1732,7 +1742,13 @@ fn fingerprint_worker_from_args(
             args.fingerprint_speed_step
         );
     }
-    Ok(Some(Arc::new(FingerprintWorker::spawn(speeds)?)))
+    if args.peak_constellation {
+        info!("Live fingerprint: plus the peak constellation of each window");
+    }
+    Ok(Some(Arc::new(FingerprintWorker::spawn(
+        speeds,
+        args.peak_constellation,
+    )?)))
 }
 
 #[tokio::main]

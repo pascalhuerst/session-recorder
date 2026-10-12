@@ -1011,7 +1011,11 @@ func (m *Minio) renderInMemorySession(ctx context.Context, recorderID, sessionID
 	})
 
 	eg.Go(func() error {
-		if err := m.streamEncode(egCtx, flacObject, "audio/flac", bytes.NewReader(rawBytes), render.Flac); err != nil {
+		summary, err := render.SummarizePCM(bytes.NewReader(rawBytes))
+		if err != nil {
+			return fmt.Errorf("cannot summarize raw audio: %w", err)
+		}
+		if err := m.streamEncode(egCtx, flacObject, "audio/flac", bytes.NewReader(rawBytes), summary.Flac); err != nil {
 			return fmt.Errorf("cannot create flac: %w", err)
 		}
 		return nil
@@ -1096,6 +1100,25 @@ func (m *Minio) composeChunksIntoRaw(ctx context.Context, recorderID, sessionID 
 // (e.g. a Raspberry Pi rendering a 12h session).
 const uploadPartSize = 16 * 1024 * 1024
 
+// flacEncoderFor returns the FLAC encoder to use for the raw audio stored in
+// object - or for the byte range of it that opts selects. It reads that audio
+// once up front to learn its length and MD5, which belong in the header of a
+// stream that is then uploaded without ever being seekable (see
+// render.PCMSummary). If that extra read fails, encoding still goes ahead,
+// just with a header that carries neither.
+func (m *Minio) flacEncoderFor(ctx context.Context, object string, opts minio.GetObjectOptions) func(dst io.Writer, src io.Reader) error {
+	raw, err := m.client.GetObject(ctx, bucketName, object, opts)
+	if err == nil {
+		defer raw.Close()
+		var summary render.PCMSummary
+		if summary, err = render.SummarizePCM(raw); err == nil {
+			return summary.Flac
+		}
+	}
+	log.Warn().Err(err).Str("object", object).Msg("Cannot summarize raw audio; FLAC header will carry no length or MD5")
+	return render.Flac
+}
+
 // streamEncode runs encode(dst, src) and uploads its output to object via a
 // streaming multipart PutObject. The encoder writes into a pipe that PutObject
 // drains, so neither the raw input nor the encoded output is ever fully
@@ -1152,6 +1175,10 @@ func (m *Minio) renderDerivedFiles(ctx context.Context, recorderID, sessionID uu
 	sm.EndTime = sm.StartTime.Add(sm.Duration)
 	// Don't set to FINISHED yet - wait for rendering to complete
 
+	// Before the fan-out starts, not inside the FLAC worker: a consumer that
+	// is not reading yet stalls the pipe for all three.
+	flacEncode := m.flacEncoderFor(ctx, rawDataObjectName, minio.GetObjectOptions{})
+
 	// Three parallel consumers of data.raw: waveform.dat, data.flac, data.ogg.
 	// The reader count must equal the number of consumers or the MultiWriter
 	// blocks on an undrained pipe.
@@ -1200,7 +1227,7 @@ func (m *Minio) renderDerivedFiles(ctx context.Context, recorderID, sessionID uu
 	eg.Go(func() error {
 		defer closeReader(flacReader)
 		flacObject := fmt.Sprintf("%s/sessions/%s/data.flac", recorderID, sessionID)
-		if err := m.streamEncode(ctx, flacObject, "audio/flac", flacReader, render.Flac); err != nil {
+		if err := m.streamEncode(ctx, flacObject, "audio/flac", flacReader, flacEncode); err != nil {
 			log.Err(err).Str("object", flacObject).Msg("Cannot convert to flac")
 			return err
 		}
@@ -2144,6 +2171,9 @@ func (m *Minio) RenderSegment(ctx context.Context, recorderID, sessionID, segmen
 	}
 	defer rawData.Close()
 
+	// Same byte range, read once more up front for the FLAC header.
+	flacEncode := m.flacEncoderFor(ctx, rawDataObjectName, getOpts)
+
 	// The ranged reader already yields exactly the segment, so the encoders can
 	// consume it directly. Fan it out to the OGG and FLAC encoders, each of which
 	// streams its output straight to MinIO (never fully buffered in memory).
@@ -2177,7 +2207,7 @@ func (m *Minio) RenderSegment(ctx context.Context, recorderID, sessionID, segmen
 	eg.Go(func() error {
 		defer closeReader(flacReader)
 		flacObject := fmt.Sprintf("%s/sessions/%s/segments/%s/%s", recorderID, sessionID, segmentID, SEGMENT_FILENAME_FLAC)
-		if err := m.streamEncode(egCtx, flacObject, "audio/flac", flacReader, render.Flac); err != nil {
+		if err := m.streamEncode(egCtx, flacObject, "audio/flac", flacReader, flacEncode); err != nil {
 			log.Error().Stringer("segment-id", segmentID).Err(err).Msg("FLAC encoding failed")
 			return fmt.Errorf("cannot encode segment to FLAC: %w", err)
 		}

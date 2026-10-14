@@ -3,7 +3,9 @@ name = "recorder"
 version = "0.1.0"
 edition = "2024"
 description = "Session Recorder ALSA reader — captures audio and streams it to the backend (ChunkSink protocol client)."
-license = "MIT"
+# MIT, except src/tempo.rs (AGPL-3.0-or-later, derived from Essentia): see
+# "Licenses" in the README.
+license = "MIT AND AGPL-3.0-or-later"
 homepage = "https://github.com/pascalhuerst/session-recorder"
 
 [dependencies]
@@ -30,6 +32,9 @@ clap = { version = "4.6.1", features = ["derive", "env"] }
 zbus = { version = "5", default-features = false, features = ["tokio"] }
 async-trait = "0.1"
 futures-util = "0.3"
+rusty-chromaprint = "0.3.0"
+realfft = "3.5"
+tract-onnx = "0.21"
 
 [build-dependencies]
 tonic-build = "0.12"

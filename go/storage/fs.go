@@ -41,7 +41,9 @@ type Fs struct {
 	// Key is recorder ID.
 	recordings    map[uuid.UUID]*fsRecording
 	lastChunkTime map[uuid.UUID]time.Time
-	dataLock      sync.Mutex
+	// Sessions with a close (render) in flight; guarded by dataLock.
+	closing  map[uuid.UUID]struct{}
+	dataLock sync.Mutex
 
 	sessionTimeout time.Duration
 	stopTimeout    chan struct{}
@@ -448,20 +450,26 @@ func (f *Fs) SafeChunks(ctx context.Context, recorderID, sessionID uuid.UUID, _ 
 
 	rec, ok := f.recordings[recorderID]
 	if !ok {
-		// First chunk after process start: see if there is a resumable
-		// session on disk for this (recorder, session) pair.
-		if sm, err := f.getSessionMetadata(recorderID, sessionID); err == nil &&
-			sm.State == SessionStateRecording {
+		// No open recording for this recorder (first chunk after process
+		// start, or its last session was closed): start, resume or refuse,
+		// depending on what is stored for this (recorder, session) pair -
+		// see admitChunkForSession.
+		sm, err := f.getSessionMetadata(recorderID, sessionID)
+		start, resume, reject := admitChunkForSession(sm, err, errors.Is(err, os.ErrNotExist))
+		switch {
+		case reject != nil:
+			log.Warn().Err(reject).
+				Stringer("recorder-id", recorderID).
+				Stringer("session-id", sessionID).
+				Int("bytes", len(samples)*2).
+				Msg("Dropping chunk for a session that cannot take it")
+			return reject
+		case resume:
+			// Not "starting fresh" on failure: initSession truncates data.raw.
 			if err := f.resumeSession(recorderID, sessionID); err != nil {
-				log.Err(err).
-					Stringer("recorder-id", recorderID).
-					Stringer("session-id", sessionID).
-					Msg("Cannot resume session, starting fresh")
-				if err := f.initSession(ctx, recorderID, sessionID, timeCreated); err != nil {
-					return err
-				}
+				return fmt.Errorf("cannot resume session: %w", err)
 			}
-		} else {
+		case start:
 			if err := f.initSession(ctx, recorderID, sessionID, timeCreated); err != nil {
 				return err
 			}
@@ -476,9 +484,26 @@ func (f *Fs) SafeChunks(ctx context.Context, recorderID, sessionID uuid.UUID, _ 
 
 	// New session arrived while a previous one is still open: rotate.
 	if rec.sessionID != sessionID {
+		// Only a session that does not exist yet may take over - see the
+		// same check in Minio.SafeChunks.
+		sm, err := f.getSessionMetadata(recorderID, sessionID)
+		start, _, reject := admitChunkForSession(sm, err, errors.Is(err, os.ErrNotExist))
+		if reject == nil && !start {
+			reject = ErrSessionClosed
+		}
+		if reject != nil {
+			log.Warn().Err(reject).
+				Stringer("recorder-id", recorderID).
+				Stringer("session-id", sessionID).
+				Stringer("current-session-id", rec.sessionID).
+				Int("bytes", len(samples)*2).
+				Msg("Dropping chunk for a session that cannot take it")
+			return reject
+		}
+
 		oldSessionID := rec.sessionID
 
-		sm, err := f.getSessionMetadata(recorderID, oldSessionID)
+		sm, err = f.getSessionMetadata(recorderID, oldSessionID)
 		if err == nil && sm.State == SessionStateRecording {
 			previousState := sm.State
 			sm.State = SessionStateProcessing
@@ -873,7 +898,28 @@ func (f *Fs) closeSession(ctx context.Context, recorderID, sessionID uuid.UUID) 
 	return nil
 }
 
+// At most one close per session runs at a time (see Minio.closeSessionAsync).
 func (f *Fs) closeSessionAsync(ctx context.Context, recorderID, sessionID uuid.UUID) error {
+	f.dataLock.Lock()
+	if _, inFlight := f.closing[sessionID]; inFlight {
+		f.dataLock.Unlock()
+		log.Info().
+			Stringer("recorder-id", recorderID).
+			Stringer("session-id", sessionID).
+			Msg("Session is already being closed, not closing it a second time")
+		return nil
+	}
+	if f.closing == nil {
+		f.closing = make(map[uuid.UUID]struct{})
+	}
+	f.closing[sessionID] = struct{}{}
+	f.dataLock.Unlock()
+	defer func() {
+		f.dataLock.Lock()
+		delete(f.closing, sessionID)
+		f.dataLock.Unlock()
+	}()
+
 	if f.isSessionClosed(ctx, recorderID, sessionID) {
 		return nil
 	}
@@ -891,21 +937,26 @@ func (f *Fs) CloseRecordingSession(ctx context.Context, recorderID, sessionID uu
 		delete(f.recordings, recorderID)
 		delete(f.lastChunkTime, recorderID)
 	}
-	f.dataLock.Unlock()
 
+	// Still under the lock: the read-modify-write of the metadata must not
+	// interleave with another close or with SafeChunks deciding, from this
+	// very state, whether a chunk may still go into the session.
 	sm, err := f.getSessionMetadata(recorderID, sessionID)
 	if err != nil {
+		f.dataLock.Unlock()
 		return fmt.Errorf("cannot get session metadata: %w", err)
 	}
 	if sm.State == SessionStateRecording {
 		previousState := sm.State
 		sm.State = SessionStateProcessing
 		if err := f.putSessionMetadata(recorderID, sessionID, sm); err != nil {
+			f.dataLock.Unlock()
 			return fmt.Errorf("cannot update session state to PROCESSING: %w", err)
 		}
 		sessionCopy := *sm
 		go f.notifyStateChange(&sessionCopy, previousState)
 	}
+	f.dataLock.Unlock()
 
 	go func(recorderID, sessionID uuid.UUID) {
 		if err := f.closeSessionAsync(context.Background(), recorderID, sessionID); err != nil {

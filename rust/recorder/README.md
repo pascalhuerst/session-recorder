@@ -70,6 +70,88 @@ mDNS and connects automatically. No backend address is configured by hand.
 | `--led-rec-state <sysfs>` | LED on while recording, blinks on new session | — |
 | `--led-upload <sysfs>` | LED pulses on each successful chunk upload | — |
 | `--input-event <N>` `--input-keycode <K>` `--input-hold-ms <ms>` | local "cut session" button on `/dev/input/eventN` | — |
+| `--fingerprint <true\|false>` | master switch for the live analysis: every 12 s the last 25 s of the running recording are analysed and the results published in the recorder status. `false` turns all of it off; recording is the same either way. Each part below has its own switch | `true` |
+| `--chromaprint <true\|false>` | the Chromaprint fingerprint of each window (at the speed it was captured). `false` leaves it out, and the speed variants with it | `true` |
+| `--fingerprint-speed-range <percent>` | also fingerprint each window for assumed playback speeds from -N to +N % (e.g. `8` for a turntable's pitch fader); `0` = off. One after another on one thread (~0.23 s each on a Pi 3), closest speeds first, each published as soon as it is done | `0` |
+| `--fingerprint-speed-step <percent>` | distance between two assumed speeds | `1` |
+| `--peak-constellation <true\|false>` | also publish each window's spectral peaks, a speed-invariant fingerprint (a client matches a pitched record with it and learns the speed); about as cheap as one plain fingerprint | `false` |
+| `--fingerprint-spread <true\|false>` | pace a window's fingerprint computations evenly until the next window instead of one burst: level load, but the last speeds arrive up to ~11 s after the window instead of ~4 s | `false` |
+| `--tempo <true\|false>` | estimate each window's tempo (BPM) with TempoCNN and publish it in the recorder status, if the model file is found (see "Tempo model" below); without the file the recorder runs without tempo. About 0.3 s per window on a Pi 3 | `true` |
+| `--tempo-model <file.onnx>` | the model file, if it is not in one of the places looked in: `$XDG_DATA_HOME/session-recorder/deeptemp-k16-3.onnx` (`~/.local/share/...`), `/usr/local/share/session-recorder/...`, `/usr/share/session-recorder/...`. Given explicitly, it must load or the recorder does not start | — |
+
+### Live analysis is optional
+
+Chromaprint, its speed variants, the peak constellation and the tempo are four independent extras on top
+of recording, each with its own switch (above). Whatever is off is simply not computed and not sent; the
+status tells clients which parts are on (`chromaprintEnabled`, `chromaprintSpeedCount`,
+`peakConstellationEnabled`, `tempoEnabled`). Neither the backend nor recording depends on any of them:
+the backend relays the status as it comes, and a recorder with everything off behaves exactly like one
+from before these features.
+
+### Tempo model
+
+The live tempo needs the TempoCNN model `deeptemp-k16-3` as an ONNX file with a fixed input of
+`[1, 40, 256, 1]`. The model is not part of this repository, and it must not become part of it: it
+has its own license (see "Source and license of the model" below). One command gets and converts it:
+
+```bash
+tools/fetch-tempo-model.sh            # -> ~/.local/share/session-recorder/deeptemp-k16-3.onnx
+```
+
+It needs `curl` and [`uv`](https://docs.astral.sh/uv/) and downloads TensorFlow into uv's cache the first
+time (the conversion uses `tf2onnx` and `onnxsim`). Run it on any machine: the result is one 1.3 MB file,
+the same for every architecture. The recorder picks it up from the places listed under `--tempo-model`;
+`tools/deploy.sh` copies it to the device.
+
+The fixed input size and the simplification matter: without them the graph keeps shape computations
+that `tract`, the pure-Rust engine the recorder runs the model with, cannot execute. The audio side
+(mel bands, patches, normalization) is in `src/tempo.rs` and follows Essentia's
+`TensorflowPredictTempoCNN`; on 250 excerpts of 25 s the recorder's path gave the same BPM as Essentia
+in every one. `cargo run --release --example tempo_dump -- <model> <rate> <channels> <raw s16le files>`
+runs it on files; `TEMPO_MODEL_TEST=<model> cargo test` includes the test that needs the model.
+
+#### Source and license of the model
+
+- TempoCNN is the work of Hendrik Schreiber and Meinard Müller: "A Single-Step Approach to Musical Tempo
+  Estimation Using a Convolutional Neural Network", ISMIR 2018, and, for the `deeptemp` architecture
+  used here, "Musical Tempo and Key Estimation using Convolutional Neural Networks with Directional
+  Filters", SMC 2019. Their code and models: <https://github.com/hendriks73/tempo-cnn>, licensed under
+  the GNU Affero General Public License v3.
+- The file the script downloads, `deeptemp-k16-3.pb`, is that model as a TensorFlow graph for Essentia,
+  prepared by Pablo Alonso at the Music Technology Group, Universitat Pompeu Fabra, and published at
+  <https://essentia.upf.edu/models/tempo/tempocnn/> (metadata: `deeptemp-k16-3.json` there). The
+  `LICENSE` in that directory is the AGPL-3.0; the license file for all Essentia models
+  (<https://essentia.upf.edu/models/LICENSE>) puts the MTG's model files under CC BY-NC-SA 4.0, offers
+  a proprietary license on request for commercial use, and names the TempoCNN models as derived from
+  Hendrik Schreiber's AGPL-3.0 work.
+- What that means here (checked 2026-10-12, not legal advice): downloading the model and running it on
+  your own recorder is fine. Passing the downloaded or converted file on - in a package, an image, a
+  repository - is distribution of a work under those licenses, with their conditions (AGPL-3.0:
+  license text, attribution and source, i.e. the original graph and the conversion steps in
+  `tools/fetch-tempo-model.sh`; CC BY-NC-SA: attribution, non-commercial, same license). That is why
+  the recorder only loads the model at run time from a file you fetch yourself.
+
+### Deploying to a Raspberry Pi
+
+`tools/deploy.sh` builds the recorder for aarch64 on this machine (in a Debian container of the device's
+release, with the cross toolchain - a release build on a Pi 3 takes the better part of an hour) and
+installs it on the device over ssh:
+
+```bash
+tools/fetch-tempo-model.sh        # once, if the live tempo is wanted
+tools/deploy.sh mypi.local        # build, copy binary and model, restart the unit, check it connected
+```
+
+The device, the binary's place there and the name of its systemd `--user` unit come from the
+environment or from `tools/deploy.env` (not in git): `DEPLOY_HOST`, `DEPLOY_BINARY`
+(default `.local/bin/session-recorder-alsa-reader`), `DEPLOY_SERVICE`
+(default `session-recorder-alsa-reader.service`); `DEBIAN_RELEASE` (default `trixie`) and `RUST_VERSION`
+(default `1.85.1`, what trixie ships - the code and `Cargo.lock` are kept buildable with it) pick the
+build container. `--build-only`, `--no-restart`, `--yes` and `--fetch-tempo-model` do what they say;
+`tools/deploy.sh --help` has the details. The previous binary is kept next to the new one as
+`<binary>.previous`. The script only replaces the binary and the model: the unit file and its options
+(recorder id and name, `--fingerprint-speed-range`, ...) are set up once by hand or by the `.deb`
+(`packaging/`). It needs Docker and ssh access to the device.
 
 ### Logging
 
@@ -107,3 +189,32 @@ RUST_LOG=recorder=debug,mdns_sd=warn ./target/release/recorder ...
 - Linux with ALSA.
 - avahi-daemon running (for mDNS discovery).
 - Membership in the `audio` group (or equivalent) to open the capture device.
+
+## Licenses
+
+The recorder is MIT, with one exception: `src/tempo.rs` is under the GNU Affero General Public License,
+version 3 or later (text in `LICENSE-AGPL-3.0`). That file rebuilds the input chain of
+[Essentia](https://essentia.upf.edu/)'s TempoCNN algorithms in Rust and is treated as derived from
+Essentia (Copyright (C) 2006-2021 Music Technology Group - Universitat Pompeu Fabra, AGPL-3.0); its
+header says so. Every other source file stays MIT and can be used under MIT on its own.
+
+A recorder binary contains `src/tempo.rs`, whether or not the live tempo is switched on, so whoever
+passes a binary on does so under the AGPL-3.0: with the license text and with the source, which is
+this repository. Running it yourself asks nothing of you. The tempo model has a license of its own, see
+"Source and license of the model" above.
+
+## Acknowledgements
+
+The live analysis stands on other people's work. Thank you to:
+
+- **Hendrik Schreiber and Meinard Müller** for TempoCNN and for publishing its models
+  (<https://github.com/hendriks73/tempo-cnn>, AGPL-3.0). It gets broken beats right, where the
+  tempogram-based estimator we tried first did not.
+- **The Music Technology Group, Universitat Pompeu Fabra**, for [Essentia](https://essentia.upf.edu/)
+  and its model collection, and Pablo Alonso for the TempoCNN graph the recorder uses
+  (<https://essentia.upf.edu/models/tempo/tempocnn/>). Essentia's `TensorflowPredictTempoCNN` and
+  `Chromaprinter` were the reference the recorder's results were checked against.
+- **Lukáš Lalinský** for [Chromaprint](https://acoustid.org/chromaprint) and the authors of
+  [rusty-chromaprint](https://github.com/darksv/rusty-chromaprint) (MIT), its Rust implementation.
+- **Mathieu Poumeyrol and the tract contributors** for [tract](https://github.com/sonos/tract)
+  (MIT OR Apache-2.0), which runs the model in pure Rust on a Raspberry Pi.

@@ -18,9 +18,9 @@ pub mod common {
     tonic::include_proto!("common");
 }
 
-use chunksink::Chunks;
 use chunksink::chunk_sink_client::ChunkSinkClient;
-use common::{RecorderStatus, SignalStatus};
+use chunksink::Chunks;
+use common::{RecorderStatus, SignalStatus, SpeedFingerprint};
 
 /// Error types for ChunkSink client operations
 #[derive(Debug)]
@@ -101,8 +101,29 @@ pub struct AudioChunk {
 #[derive(Debug, Clone)]
 pub struct RecorderStatusInfo {
     pub signal_status: SignalStatus,
-    pub rms_percent: f64,
+    pub peak_percent: f64,
     pub clipping: bool,
+    /// Most recently computed Chromaprint fingerprint for the current
+    /// session, or empty if none has been computed yet.
+    pub chromaprint_fingerprint: String,
+    /// The same window for other assumed playback speeds, as far as they
+    /// have been computed yet.
+    pub chromaprint_speed_fingerprints: Vec<crate::fingerprint::SpeedFingerprint>,
+    /// How many speeds a window is fingerprinted for in total; 0 if none.
+    pub chromaprint_speed_count: u32,
+    /// The window's speed-invariant peak constellation ("SIC1"), or empty.
+    pub peak_constellation: Vec<u8>,
+    /// The window the fingerprints above belong to. Each of them is put
+    /// into one status only - see `RecorderStatus` in common.proto.
+    pub fingerprint_window: u32,
+    /// The window's tempo and the model's probability for it; 0 if none.
+    pub tempo_bpm: f32,
+    pub tempo_probability: f32,
+    /// What this recorder is set up to compute and send (see
+    /// `RecorderStatus` in common.proto).
+    pub chromaprint_enabled: bool,
+    pub peak_constellation_enabled: bool,
+    pub tempo_enabled: bool,
 }
 
 /// ChunkSink gRPC client service
@@ -159,8 +180,25 @@ impl ChunkSinkClientService {
             recorder_id: self.config.recorder_id.clone(),
             recorder_name: self.config.recorder_name.clone(),
             signal_status: status.signal_status.into(),
-            rms_percent: status.rms_percent,
+            peak_percent: status.peak_percent,
             clipping: status.clipping,
+            chromaprint_fingerprint: status.chromaprint_fingerprint,
+            chromaprint_speed_fingerprints: status
+                .chromaprint_speed_fingerprints
+                .into_iter()
+                .map(|v| SpeedFingerprint {
+                    speed_percent: v.speed_percent,
+                    fingerprint: v.fingerprint,
+                })
+                .collect(),
+            chromaprint_speed_count: status.chromaprint_speed_count,
+            peak_constellation: status.peak_constellation,
+            fingerprint_window: status.fingerprint_window,
+            tempo_bpm: status.tempo_bpm,
+            tempo_probability: status.tempo_probability,
+            chromaprint_enabled: status.chromaprint_enabled,
+            peak_constellation_enabled: status.peak_constellation_enabled,
+            tempo_enabled: status.tempo_enabled,
         });
 
         match client.set_recorder_status(request).await {
@@ -242,8 +280,18 @@ mod tests {
 
         let status = RecorderStatusInfo {
             signal_status: SignalStatus::Signal,
-            rms_percent: 0.5,
+            peak_percent: 0.5,
             clipping: false,
+            chromaprint_fingerprint: String::new(),
+            chromaprint_speed_fingerprints: Vec::new(),
+            chromaprint_speed_count: 0,
+            peak_constellation: Vec::new(),
+            fingerprint_window: 0,
+            tempo_bpm: 0.0,
+            tempo_probability: 0.0,
+            chromaprint_enabled: false,
+            peak_constellation_enabled: false,
+            tempo_enabled: false,
         };
 
         let result = client.set_recorder_status(status).await;

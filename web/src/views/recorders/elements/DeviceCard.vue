@@ -4,7 +4,7 @@ import { SignalStatus } from '@session-recorder/protocols/ts/common';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import StatusIndicator from './StatusIndicator.vue';
 import { computed } from 'vue';
-import RmsIndicator from './RmsIndicator.vue';
+import PeakIndicator from './PeakIndicator.vue';
 
 const props = defineProps<{
   recorder: Recorder;
@@ -27,9 +27,9 @@ const isRecording = computed(() => {
     </div>
     <div class="indicators">
       <StatusIndicator :isRecording="isRecording" />
-      <RmsIndicator
+      <PeakIndicator
         v-if="isRecording && recorder.info.oneofKind === 'status'"
-        :value="recorder.info.status.rmsPercent"
+        :value="recorder.info.status.peakPercent"
       />
     </div>
   </div>

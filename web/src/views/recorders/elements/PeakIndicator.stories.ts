@@ -1,8 +1,8 @@
 /**
- * Test Plan: RmsIndicator
+ * Test Plan: PeakIndicator
  *
  * Scenario: Render with different values
- *   Given the RmsIndicator is rendered with a value
+ *   Given the PeakIndicator is rendered with a value
  *   When the component mounts
  *   Then it should display the percentage and visual indicator
  *
@@ -20,11 +20,11 @@
 
 import type { Meta, StoryObj } from '@storybook/vue3';
 import { within, expect } from '@storybook/test';
-import RmsIndicator from './RmsIndicator.vue';
+import PeakIndicator from './PeakIndicator.vue';
 
-const meta: Meta<typeof RmsIndicator> = {
-  title: 'App/Elements/RmsIndicator',
-  component: RmsIndicator,
+const meta: Meta<typeof PeakIndicator> = {
+  title: 'App/Elements/PeakIndicator',
+  component: PeakIndicator,
   tags: ['autodocs'],
   parameters: {
     layout: 'centered',
@@ -32,7 +32,7 @@ const meta: Meta<typeof RmsIndicator> = {
   argTypes: {
     value: {
       control: { type: 'range', min: 0, max: 100, step: 1 },
-      description: 'RMS value percentage (0-100)',
+      description: 'Peak level percentage (0-100)',
     },
   },
 };
@@ -119,28 +119,28 @@ export const AllLevels: Story = {
     await expect(canvas.getByText('100%')).toBeInTheDocument();
   },
   render: () => ({
-    components: { RmsIndicator },
+    components: { PeakIndicator },
     template: `
       <div style="display: flex; flex-direction: column; gap: 1rem; width: 200px;">
         <div>
           <p style="font-size: 0.75rem; color: #666; margin-bottom: 0.25rem;">Silent</p>
-          <RmsIndicator :value="0" />
+          <PeakIndicator :value="0" />
         </div>
         <div>
           <p style="font-size: 0.75rem; color: #666; margin-bottom: 0.25rem;">Quiet</p>
-          <RmsIndicator :value="25" />
+          <PeakIndicator :value="25" />
         </div>
         <div>
           <p style="font-size: 0.75rem; color: #666; margin-bottom: 0.25rem;">Normal</p>
-          <RmsIndicator :value="50" />
+          <PeakIndicator :value="50" />
         </div>
         <div>
           <p style="font-size: 0.75rem; color: #666; margin-bottom: 0.25rem;">Loud</p>
-          <RmsIndicator :value="75" />
+          <PeakIndicator :value="75" />
         </div>
         <div>
-          <p style="font-size: 0.75rem; color: #666; margin-bottom: 0.25rem;">Peak</p>
-          <RmsIndicator :value="100" />
+          <p style="font-size: 0.75rem; color: #666; margin-bottom: 0.25rem;">Max</p>
+          <PeakIndicator :value="100" />
         </div>
       </div>
     `,
@@ -157,7 +157,7 @@ export const InCardContext: Story = {
     await expect(canvas.getByText('65%')).toBeInTheDocument();
   },
   render: (args) => ({
-    components: { RmsIndicator },
+    components: { PeakIndicator },
     setup() {
       return { args };
     },
@@ -165,7 +165,7 @@ export const InCardContext: Story = {
       <div style="display: flex; align-items: center; gap: 1rem; padding: 1rem; background: white; border: 1px solid #eee; border-radius: 8px; width: 200px;">
         <span style="font-size: 0.875rem;">Level:</span>
         <div style="flex: 1;">
-          <RmsIndicator v-bind="args" />
+          <PeakIndicator v-bind="args" />
         </div>
       </div>
     `,
@@ -179,13 +179,13 @@ export const ColorGradient: Story = {
     await expect(indicator).toBeInTheDocument();
   },
   render: () => ({
-    components: { RmsIndicator },
+    components: { PeakIndicator },
     template: `
       <div style="width: 300px;">
         <p style="font-size: 0.75rem; color: #666; margin-bottom: 0.5rem;">
           Green (safe) → Yellow (warning) → Red (clipping)
         </p>
-        <RmsIndicator :value="100" />
+        <PeakIndicator :value="100" />
       </div>
     `,
   }),

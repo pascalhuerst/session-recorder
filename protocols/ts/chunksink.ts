@@ -6,10 +6,10 @@ import { RecorderStatus } from "./common";
 import { ServiceType } from "@protobuf-ts/runtime-rpc";
 import type { BinaryWriteOptions } from "@protobuf-ts/runtime";
 import type { IBinaryWriter } from "@protobuf-ts/runtime";
+import { WireType } from "@protobuf-ts/runtime";
 import type { BinaryReadOptions } from "@protobuf-ts/runtime";
 import type { IBinaryReader } from "@protobuf-ts/runtime";
 import { UnknownFieldHandler } from "@protobuf-ts/runtime";
-import { WireType } from "@protobuf-ts/runtime";
 import type { PartialMessage } from "@protobuf-ts/runtime";
 import { reflectionMergePartial } from "@protobuf-ts/runtime";
 import { MessageType } from "@protobuf-ts/runtime";
@@ -35,9 +35,12 @@ export interface Chunks {
      */
     timeCreated?: Timestamp;
     /**
-     * @generated from protobuf field: repeated uint32 data = 5
+     * Packed little-endian signed 16-bit PCM (interleaved channels) — the same
+     * layout stored as data.raw. Fixed 2 bytes per sample, unlike a varint type.
+     *
+     * @generated from protobuf field: bytes data = 5
      */
-    data: number[];
+    data: Uint8Array;
 }
 /**
  * @generated from protobuf message chunksink.GetCommandRequest
@@ -89,7 +92,7 @@ class Chunks$Type extends MessageType<Chunks> {
             { no: 2, name: "sessionID", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
             { no: 3, name: "chunkCount", kind: "scalar", T: 13 /*ScalarType.UINT32*/ },
             { no: 4, name: "timeCreated", kind: "message", T: () => Timestamp },
-            { no: 5, name: "data", kind: "scalar", repeat: 1 /*RepeatType.PACKED*/, T: 13 /*ScalarType.UINT32*/ }
+            { no: 5, name: "data", kind: "scalar", T: 12 /*ScalarType.BYTES*/ }
         ]);
     }
     create(value?: PartialMessage<Chunks>): Chunks {
@@ -97,7 +100,7 @@ class Chunks$Type extends MessageType<Chunks> {
         message.recorderID = "";
         message.sessionID = "";
         message.chunkCount = 0;
-        message.data = [];
+        message.data = new Uint8Array(0);
         if (value !== undefined)
             reflectionMergePartial<Chunks>(this, message, value);
         return message;
@@ -119,12 +122,8 @@ class Chunks$Type extends MessageType<Chunks> {
                 case /* google.protobuf.Timestamp timeCreated */ 4:
                     message.timeCreated = Timestamp.internalBinaryRead(reader, reader.uint32(), options, message.timeCreated);
                     break;
-                case /* repeated uint32 data */ 5:
-                    if (wireType === WireType.LengthDelimited)
-                        for (let e = reader.int32() + reader.pos; reader.pos < e;)
-                            message.data.push(reader.uint32());
-                    else
-                        message.data.push(reader.uint32());
+                case /* bytes data */ 5:
+                    message.data = reader.bytes();
                     break;
                 default:
                     let u = options.readUnknownField;
@@ -150,13 +149,9 @@ class Chunks$Type extends MessageType<Chunks> {
         /* google.protobuf.Timestamp timeCreated = 4; */
         if (message.timeCreated)
             Timestamp.internalBinaryWrite(message.timeCreated, writer.tag(4, WireType.LengthDelimited).fork(), options).join();
-        /* repeated uint32 data = 5; */
-        if (message.data.length) {
-            writer.tag(5, WireType.LengthDelimited).fork();
-            for (let i = 0; i < message.data.length; i++)
-                writer.uint32(message.data[i]);
-            writer.join();
-        }
+        /* bytes data = 5; */
+        if (message.data.length)
+            writer.tag(5, WireType.LengthDelimited).bytes(message.data);
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);

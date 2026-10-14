@@ -27,13 +27,126 @@ export interface RecorderStatus {
      */
     signalStatus: SignalStatus;
     /**
-     * @generated from protobuf field: double rmsPercent = 4
+     * @generated from protobuf field: double peakPercent = 4
      */
-    rmsPercent: number;
+    peakPercent: number;
     /**
      * @generated from protobuf field: bool clipping = 5
      */
     clipping: boolean;
+    // --- Live fingerprints of the audio being recorded -----------------------
+    // 
+    // While recording, the recorder fingerprints the last seconds of audio
+    // (a "window") again and again. Each result is carried by exactly ONE
+    // status message - the first one sent after it was computed - and the
+    // fields below are empty in all the others; a status goes out several
+    // times a second and the results only change every few seconds. A client
+    // collects them: everything with the same fingerprintWindow belongs
+    // together, and an empty field means "nothing new", not "no fingerprint".
+
+    /**
+     * Chromaprint fingerprint of the window, at the speed it was captured.
+     * The first fingerprint of a window.
+     *
+     * @generated from protobuf field: string chromaprintFingerprint = 6
+     */
+    chromaprintFingerprint: string;
+    /**
+     * The same window fingerprinted for a range of assumed playback speeds,
+     * for sources whose speed is not fixed (a turntable's pitch fader moves
+     * tempo and pitch together, which a Chromaprint match only survives up to
+     * about half a percent). Only if the recorder is configured for it. Each
+     * speed is sent once, as it is computed, the speeds closest to the
+     * original first; the unshifted fingerprint above is not among them.
+     *
+     * @generated from protobuf field: repeated common.SpeedFingerprint chromaprintSpeedFingerprints = 7
+     */
+    chromaprintSpeedFingerprints: SpeedFingerprint[];
+    /**
+     * How many speeds a window is fingerprinted for in total - the number the
+     * recorder is configured for, 0 if none. Sent with every status.
+     *
+     * @generated from protobuf field: uint32 chromaprintSpeedCount = 8
+     */
+    chromaprintSpeedCount: number;
+    /**
+     * A second, speed-invariant fingerprint of the same window: the spectral
+     * peaks ("constellation") of the last seconds of audio, from which a
+     * client derives hashes that do not change with playback speed (a pitched
+     * turntable), and gets the speed itself out of a match. Only if the
+     * recorder is configured for it.
+     *
+     * Format "SIC1": the 4 bytes "SIC1", a uint32 count N, then N frame
+     * numbers (uint32) followed by N log-frequency bins (uint8), all little
+     * endian; peaks sorted by frame. A frame is 256 samples of the audio
+     * resampled to 11025 Hz mono (23.2 ms); bin b is 300 Hz * 2^(b/48).
+     *
+     * @generated from protobuf field: bytes peakConstellation = 9
+     */
+    peakConstellation: Uint8Array;
+    /**
+     * Which window the results in this status belong to, and the current one
+     * when it carries none: a number that goes up by one with every window.
+     * Sent with every status.
+     *
+     * @generated from protobuf field: uint32 fingerprintWindow = 10
+     */
+    fingerprintWindow: number;
+    /**
+     * The tempo of the same window, estimated with TempoCNN: beats per minute
+     * (whole numbers, 30 to 285) and the model's probability for that tempo
+     * (0..1). Only if the recorder is configured for it. Sent once per
+     * window like the fingerprints, and as the window's FIRST result, before
+     * its fingerprints - so a client can use it to narrow down what it
+     * compares them with. Both 0 in every other status, and in the window's
+     * one status too when the window had no tempo (silence).
+     *
+     * @generated from protobuf field: float tempoBpm = 11
+     */
+    tempoBpm: number;
+    /**
+     * @generated from protobuf field: float tempoProbability = 12
+     */
+    tempoProbability: number;
+    /**
+     * What this recorder is set up to compute and send, in every status - so
+     * a client can tell "not switched on at the recorder" from "nothing yet".
+     * Each of them is optional and independent of recording itself: a
+     * recorder with all of them off (or one that predates them) records
+     * exactly the same. (Whether speed fingerprints are on is
+     * chromaprintSpeedCount > 0.)
+     *
+     * @generated from protobuf field: bool chromaprintEnabled = 13
+     */
+    chromaprintEnabled: boolean;
+    /**
+     * @generated from protobuf field: bool peakConstellationEnabled = 14
+     */
+    peakConstellationEnabled: boolean;
+    /**
+     * @generated from protobuf field: bool tempoEnabled = 15
+     */
+    tempoEnabled: boolean;
+}
+/**
+ * @generated from protobuf message common.SpeedFingerprint
+ */
+export interface SpeedFingerprint {
+    /**
+     * Assumed deviation from the original speed, in percent (+4 = playing
+     * 4 % too fast).
+     *
+     * @generated from protobuf field: double speedPercent = 1
+     */
+    speedPercent: number;
+    /**
+     * Chromaprint fingerprint of the window brought back to original speed
+     * under that assumption - comparable to a fingerprint of the unshifted
+     * recording.
+     *
+     * @generated from protobuf field: string fingerprint = 2
+     */
+    fingerprint: string;
 }
 /**
  * @generated from protobuf message common.Respone
@@ -72,8 +185,18 @@ class RecorderStatus$Type extends MessageType<RecorderStatus> {
             { no: 1, name: "recorderID", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
             { no: 2, name: "recorderName", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
             { no: 3, name: "signalStatus", kind: "enum", T: () => ["common.SignalStatus", SignalStatus] },
-            { no: 4, name: "rmsPercent", kind: "scalar", T: 1 /*ScalarType.DOUBLE*/ },
-            { no: 5, name: "clipping", kind: "scalar", T: 8 /*ScalarType.BOOL*/ }
+            { no: 4, name: "peakPercent", kind: "scalar", T: 1 /*ScalarType.DOUBLE*/ },
+            { no: 5, name: "clipping", kind: "scalar", T: 8 /*ScalarType.BOOL*/ },
+            { no: 6, name: "chromaprintFingerprint", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
+            { no: 7, name: "chromaprintSpeedFingerprints", kind: "message", repeat: 2 /*RepeatType.UNPACKED*/, T: () => SpeedFingerprint },
+            { no: 8, name: "chromaprintSpeedCount", kind: "scalar", T: 13 /*ScalarType.UINT32*/ },
+            { no: 9, name: "peakConstellation", kind: "scalar", T: 12 /*ScalarType.BYTES*/ },
+            { no: 10, name: "fingerprintWindow", kind: "scalar", T: 13 /*ScalarType.UINT32*/ },
+            { no: 11, name: "tempoBpm", kind: "scalar", T: 2 /*ScalarType.FLOAT*/ },
+            { no: 12, name: "tempoProbability", kind: "scalar", T: 2 /*ScalarType.FLOAT*/ },
+            { no: 13, name: "chromaprintEnabled", kind: "scalar", T: 8 /*ScalarType.BOOL*/ },
+            { no: 14, name: "peakConstellationEnabled", kind: "scalar", T: 8 /*ScalarType.BOOL*/ },
+            { no: 15, name: "tempoEnabled", kind: "scalar", T: 8 /*ScalarType.BOOL*/ }
         ]);
     }
     create(value?: PartialMessage<RecorderStatus>): RecorderStatus {
@@ -81,8 +204,18 @@ class RecorderStatus$Type extends MessageType<RecorderStatus> {
         message.recorderID = "";
         message.recorderName = "";
         message.signalStatus = 0;
-        message.rmsPercent = 0;
+        message.peakPercent = 0;
         message.clipping = false;
+        message.chromaprintFingerprint = "";
+        message.chromaprintSpeedFingerprints = [];
+        message.chromaprintSpeedCount = 0;
+        message.peakConstellation = new Uint8Array(0);
+        message.fingerprintWindow = 0;
+        message.tempoBpm = 0;
+        message.tempoProbability = 0;
+        message.chromaprintEnabled = false;
+        message.peakConstellationEnabled = false;
+        message.tempoEnabled = false;
         if (value !== undefined)
             reflectionMergePartial<RecorderStatus>(this, message, value);
         return message;
@@ -101,11 +234,41 @@ class RecorderStatus$Type extends MessageType<RecorderStatus> {
                 case /* common.SignalStatus signalStatus */ 3:
                     message.signalStatus = reader.int32();
                     break;
-                case /* double rmsPercent */ 4:
-                    message.rmsPercent = reader.double();
+                case /* double peakPercent */ 4:
+                    message.peakPercent = reader.double();
                     break;
                 case /* bool clipping */ 5:
                     message.clipping = reader.bool();
+                    break;
+                case /* string chromaprintFingerprint */ 6:
+                    message.chromaprintFingerprint = reader.string();
+                    break;
+                case /* repeated common.SpeedFingerprint chromaprintSpeedFingerprints */ 7:
+                    message.chromaprintSpeedFingerprints.push(SpeedFingerprint.internalBinaryRead(reader, reader.uint32(), options));
+                    break;
+                case /* uint32 chromaprintSpeedCount */ 8:
+                    message.chromaprintSpeedCount = reader.uint32();
+                    break;
+                case /* bytes peakConstellation */ 9:
+                    message.peakConstellation = reader.bytes();
+                    break;
+                case /* uint32 fingerprintWindow */ 10:
+                    message.fingerprintWindow = reader.uint32();
+                    break;
+                case /* float tempoBpm */ 11:
+                    message.tempoBpm = reader.float();
+                    break;
+                case /* float tempoProbability */ 12:
+                    message.tempoProbability = reader.float();
+                    break;
+                case /* bool chromaprintEnabled */ 13:
+                    message.chromaprintEnabled = reader.bool();
+                    break;
+                case /* bool peakConstellationEnabled */ 14:
+                    message.peakConstellationEnabled = reader.bool();
+                    break;
+                case /* bool tempoEnabled */ 15:
+                    message.tempoEnabled = reader.bool();
                     break;
                 default:
                     let u = options.readUnknownField;
@@ -128,12 +291,42 @@ class RecorderStatus$Type extends MessageType<RecorderStatus> {
         /* common.SignalStatus signalStatus = 3; */
         if (message.signalStatus !== 0)
             writer.tag(3, WireType.Varint).int32(message.signalStatus);
-        /* double rmsPercent = 4; */
-        if (message.rmsPercent !== 0)
-            writer.tag(4, WireType.Bit64).double(message.rmsPercent);
+        /* double peakPercent = 4; */
+        if (message.peakPercent !== 0)
+            writer.tag(4, WireType.Bit64).double(message.peakPercent);
         /* bool clipping = 5; */
         if (message.clipping !== false)
             writer.tag(5, WireType.Varint).bool(message.clipping);
+        /* string chromaprintFingerprint = 6; */
+        if (message.chromaprintFingerprint !== "")
+            writer.tag(6, WireType.LengthDelimited).string(message.chromaprintFingerprint);
+        /* repeated common.SpeedFingerprint chromaprintSpeedFingerprints = 7; */
+        for (let i = 0; i < message.chromaprintSpeedFingerprints.length; i++)
+            SpeedFingerprint.internalBinaryWrite(message.chromaprintSpeedFingerprints[i], writer.tag(7, WireType.LengthDelimited).fork(), options).join();
+        /* uint32 chromaprintSpeedCount = 8; */
+        if (message.chromaprintSpeedCount !== 0)
+            writer.tag(8, WireType.Varint).uint32(message.chromaprintSpeedCount);
+        /* bytes peakConstellation = 9; */
+        if (message.peakConstellation.length)
+            writer.tag(9, WireType.LengthDelimited).bytes(message.peakConstellation);
+        /* uint32 fingerprintWindow = 10; */
+        if (message.fingerprintWindow !== 0)
+            writer.tag(10, WireType.Varint).uint32(message.fingerprintWindow);
+        /* float tempoBpm = 11; */
+        if (message.tempoBpm !== 0)
+            writer.tag(11, WireType.Bit32).float(message.tempoBpm);
+        /* float tempoProbability = 12; */
+        if (message.tempoProbability !== 0)
+            writer.tag(12, WireType.Bit32).float(message.tempoProbability);
+        /* bool chromaprintEnabled = 13; */
+        if (message.chromaprintEnabled !== false)
+            writer.tag(13, WireType.Varint).bool(message.chromaprintEnabled);
+        /* bool peakConstellationEnabled = 14; */
+        if (message.peakConstellationEnabled !== false)
+            writer.tag(14, WireType.Varint).bool(message.peakConstellationEnabled);
+        /* bool tempoEnabled = 15; */
+        if (message.tempoEnabled !== false)
+            writer.tag(15, WireType.Varint).bool(message.tempoEnabled);
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
@@ -144,6 +337,61 @@ class RecorderStatus$Type extends MessageType<RecorderStatus> {
  * @generated MessageType for protobuf message common.RecorderStatus
  */
 export const RecorderStatus = new RecorderStatus$Type();
+// @generated message type with reflection information, may provide speed optimized methods
+class SpeedFingerprint$Type extends MessageType<SpeedFingerprint> {
+    constructor() {
+        super("common.SpeedFingerprint", [
+            { no: 1, name: "speedPercent", kind: "scalar", T: 1 /*ScalarType.DOUBLE*/ },
+            { no: 2, name: "fingerprint", kind: "scalar", T: 9 /*ScalarType.STRING*/ }
+        ]);
+    }
+    create(value?: PartialMessage<SpeedFingerprint>): SpeedFingerprint {
+        const message = globalThis.Object.create((this.messagePrototype!));
+        message.speedPercent = 0;
+        message.fingerprint = "";
+        if (value !== undefined)
+            reflectionMergePartial<SpeedFingerprint>(this, message, value);
+        return message;
+    }
+    internalBinaryRead(reader: IBinaryReader, length: number, options: BinaryReadOptions, target?: SpeedFingerprint): SpeedFingerprint {
+        let message = target ?? this.create(), end = reader.pos + length;
+        while (reader.pos < end) {
+            let [fieldNo, wireType] = reader.tag();
+            switch (fieldNo) {
+                case /* double speedPercent */ 1:
+                    message.speedPercent = reader.double();
+                    break;
+                case /* string fingerprint */ 2:
+                    message.fingerprint = reader.string();
+                    break;
+                default:
+                    let u = options.readUnknownField;
+                    if (u === "throw")
+                        throw new globalThis.Error(`Unknown field ${fieldNo} (wire type ${wireType}) for ${this.typeName}`);
+                    let d = reader.skip(wireType);
+                    if (u !== false)
+                        (u === true ? UnknownFieldHandler.onRead : u)(this.typeName, message, fieldNo, wireType, d);
+            }
+        }
+        return message;
+    }
+    internalBinaryWrite(message: SpeedFingerprint, writer: IBinaryWriter, options: BinaryWriteOptions): IBinaryWriter {
+        /* double speedPercent = 1; */
+        if (message.speedPercent !== 0)
+            writer.tag(1, WireType.Bit64).double(message.speedPercent);
+        /* string fingerprint = 2; */
+        if (message.fingerprint !== "")
+            writer.tag(2, WireType.LengthDelimited).string(message.fingerprint);
+        let u = options.writeUnknownFields;
+        if (u !== false)
+            (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);
+        return writer;
+    }
+}
+/**
+ * @generated MessageType for protobuf message common.SpeedFingerprint
+ */
+export const SpeedFingerprint = new SpeedFingerprint$Type();
 // @generated message type with reflection information, may provide speed optimized methods
 class Respone$Type extends MessageType<Respone> {
     constructor() {

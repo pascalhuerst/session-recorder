@@ -372,7 +372,7 @@ impl SessionRecorder {
 
         let initial_status = RecorderStatusInfo {
             signal_status: SignalStatus::NoSignal,
-            rms_percent: 0.0,
+            peak_percent: 0.0,
             clipping: false,
         };
 
@@ -1279,6 +1279,10 @@ impl SessionRecorder {
                 // detector smoothing and the wire RecorderStatus only. The
                 // I2C meter is driven by a separate, shorter analysis window
                 // in the samples_rx arm.
+                // rms/rms_db drive only the attack/release gate below; the wire
+                // status (and the web/on-device meters fed by it) report peak
+                // amplitude instead, so it reflects transients the gate's
+                // sustained-level average would smooth away.
                 let mean_square: f32 =
                     window.iter().map(|&x| x * x).sum::<f32>() / window.len() as f32;
                 let rms = mean_square.sqrt();
@@ -1287,6 +1291,7 @@ impl SessionRecorder {
                 } else {
                     20.0 * (rms as f64).log10()
                 };
+                let peak: f32 = window.iter().map(|&x| x.abs()).fold(0.0, f32::max);
                 let clipping = window.iter().any(|&x| x.abs() >= CLIPPING_THRESHOLD);
 
                 let signal_above = rms_db >= detector.threshold_db;
@@ -1352,7 +1357,7 @@ impl SessionRecorder {
                     } else {
                         SignalStatus::NoSignal
                     },
-                    rms_percent: (rms as f64) * 100.0,
+                    peak_percent: (peak as f64) * 100.0,
                     clipping,
                 };
                 {
@@ -1377,10 +1382,10 @@ impl SessionRecorder {
                         }
                     }
                     debug!(
-                        "status sent to {} client(s): signal={:?} rms={:.2}% clip={}",
+                        "status sent to {} client(s): signal={:?} peak={:.2}% clip={}",
                         n_clients,
                         status_info.signal_status,
-                        status_info.rms_percent,
+                        status_info.peak_percent,
                         status_info.clipping
                     );
                 }
@@ -1632,21 +1637,21 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let servers = recorder.get_client_count().await;
         let (queued, buffered_s, capacity_s) = recorder.outbox_stats().await;
 
-        // Linear RMS percent → dBFS (more meaningful for level judgement).
-        let rms = status.rms_percent / 100.0;
-        let rms_db = if rms < 1e-9 {
+        // Linear peak percent → dBFS (more meaningful for level judgement).
+        let peak = status.peak_percent / 100.0;
+        let peak_db = if peak < 1e-9 {
             f64::NEG_INFINITY
         } else {
-            20.0 * rms.log10()
+            20.0 * peak.log10()
         };
         let recording = matches!(status.signal_status, SignalStatus::Signal);
 
         info!(
-            "status: servers={} recording={} rms={:.1}dBFS ({:.1}%) clipping={} outbox={} chunks ({:.1}s / {:.0}s)",
+            "status: servers={} recording={} peak={:.1}dBFS ({:.1}%) clipping={} outbox={} chunks ({:.1}s / {:.0}s)",
             servers,
             if recording { "yes" } else { "no" },
-            rms_db,
-            status.rms_percent,
+            peak_db,
+            status.peak_percent,
             if status.clipping { "YES" } else { "no" },
             queued,
             buffered_s,

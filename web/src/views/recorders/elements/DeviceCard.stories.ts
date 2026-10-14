@@ -34,7 +34,7 @@ const mockIdleRecorder = {
     oneofKind: 'status' as const,
     status: {
       signalStatus: 0, // NO_SIGNAL
-      rmsPercent: 0,
+      peakPercent: 0,
     },
   },
 };
@@ -46,7 +46,7 @@ const mockRecordingRecorder = {
     oneofKind: 'status' as const,
     status: {
       signalStatus: 1, // SIGNAL (recording)
-      rmsPercent: 65,
+      peakPercent: 65,
     },
   },
 };
@@ -58,7 +58,7 @@ const mockLongNameRecorder = {
     oneofKind: 'status' as const,
     status: {
       signalStatus: 0,
-      rmsPercent: 0,
+      peakPercent: 0,
     },
   },
 };

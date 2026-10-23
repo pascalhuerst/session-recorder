@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { Recorder } from '@session-recorder/protocols/ts/sessionsource';
+import {
+  LevelMeter,
+  Recorder,
+} from '@session-recorder/protocols/ts/sessionsource';
 import { SignalStatus } from '@session-recorder/protocols/ts/common';
 import { FontAwesomeIcon } from '@fortawesome/vue-fontawesome';
 import StatusIndicator from './StatusIndicator.vue';
 import { computed } from 'vue';
-import RmsIndicator from './RmsIndicator.vue';
+import LevelIndicator from './LevelIndicator.vue';
 
 const props = defineProps<{
   recorder: Recorder;
@@ -17,6 +20,16 @@ const isRecording = computed(() => {
     props.recorder.info.status.signalStatus === SignalStatus.SIGNAL
   );
 });
+
+const status = computed(() =>
+  props.recorder.info.oneofKind === 'status'
+    ? props.recorder.info.status
+    : undefined,
+);
+
+// The backend's --level-meter option decides which meters are shown.
+const showRms = computed(() => props.recorder.levelMeter !== LevelMeter.PEAK);
+const showPeak = computed(() => props.recorder.levelMeter !== LevelMeter.RMS);
 </script>
 
 <template>
@@ -27,10 +40,19 @@ const isRecording = computed(() => {
     </div>
     <div class="indicators">
       <StatusIndicator :isRecording="isRecording" />
-      <RmsIndicator
-        v-if="isRecording && recorder.info.oneofKind === 'status'"
-        :value="recorder.info.status.rmsPercent"
-      />
+      <div v-if="isRecording && status" class="meters">
+        <LevelIndicator
+          v-if="showRms"
+          label="RMS"
+          :value="status.rmsPercent"
+        />
+        <LevelIndicator
+          v-if="showPeak"
+          label="Peak"
+          :value="status.peakPercent"
+          :warn-above="80"
+        />
+      </div>
     </div>
   </div>
 </template>
@@ -95,6 +117,14 @@ const isRecording = computed(() => {
   align-items: center;
   gap: var(--size-2);
   padding-left: calc(var(--size-4) + var(--size-2));
+  min-width: 0;
+}
+
+.meters {
+  display: flex;
+  flex-direction: column;
+  gap: var(--size-1);
+  flex: 1;
   min-width: 0;
 }
 </style>

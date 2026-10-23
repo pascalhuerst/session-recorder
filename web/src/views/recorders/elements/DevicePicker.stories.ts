@@ -35,6 +35,7 @@ const createMockRecorder = (id: string, name: string, isRecording = false) => ({
     status: {
       signalStatus: isRecording ? 1 : 0,
       rmsPercent: isRecording ? 45 : 0,
+      peakPercent: isRecording ? 70 : 0,
     },
   },
 });

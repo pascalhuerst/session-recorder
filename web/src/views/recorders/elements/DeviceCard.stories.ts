@@ -35,6 +35,7 @@ const mockIdleRecorder = {
     status: {
       signalStatus: 0, // NO_SIGNAL
       rmsPercent: 0,
+      peakPercent: 0,
     },
   },
 };
@@ -47,6 +48,7 @@ const mockRecordingRecorder = {
     status: {
       signalStatus: 1, // SIGNAL (recording)
       rmsPercent: 65,
+      peakPercent: 88,
     },
   },
 };
@@ -59,6 +61,7 @@ const mockLongNameRecorder = {
     status: {
       signalStatus: 0,
       rmsPercent: 0,
+      peakPercent: 0,
     },
   },
 };

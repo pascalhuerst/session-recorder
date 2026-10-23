@@ -132,6 +132,7 @@ fn generate_test_data(recorder_statuses: RecorderStatusMap) {
                 signal_status,
                 rms_percent,
                 clipping,
+                peak_percent: (rms_percent * 1.4).min(100.0),
             };
 
             // Update the shared state

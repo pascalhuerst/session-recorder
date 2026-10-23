@@ -2,6 +2,9 @@
 name = "recorder"
 version = "0.1.0"
 edition = "2024"
+# The toolchain on the Raspberry Pi (Debian trixie). Also makes clippy keep
+# its suggestions to what this version supports.
+rust-version = "1.85"
 description = "Session Recorder ALSA reader — captures audio and streams it to the backend (ChunkSink protocol client)."
 license = "MIT"
 homepage = "https://github.com/pascalhuerst/session-recorder"

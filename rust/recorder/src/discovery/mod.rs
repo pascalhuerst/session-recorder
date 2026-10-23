@@ -91,6 +91,9 @@ pub enum DiscoveryMethod {
 
 /// A pluggable service-discovery backend. Both backends report the same
 /// [`ServiceEvent`] stream so callers don't care which one is active.
+// async-trait marks its boxed futures #[must_use] although the type already is
+// (clippy::double_must_use, new in clippy 1.99).
+#[allow(clippy::double_must_use)]
 #[async_trait::async_trait]
 pub trait ServiceDiscovery: Send {
     /// Start discovering services, returning a receiver of discovery events.

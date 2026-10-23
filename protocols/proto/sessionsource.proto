@@ -12,6 +12,14 @@ message StreamRecordersRequest {}
 
 message RecordereRemoved {}
 
+// Which level meter(s) a client shows for a recorder. Chosen with the
+// backend's --level-meter option.
+enum LevelMeter {
+	LEVEL_METER_BOTH = 0;
+	LEVEL_METER_RMS = 1;
+	LEVEL_METER_PEAK = 2;
+}
+
 message Recorder {
 	string recorderID = 1;
 	string recorderName = 2;
@@ -20,6 +28,8 @@ message Recorder {
 		common.RecorderStatus status = 3;
 		RecordereRemoved removed = 4;
 	}
+
+	LevelMeter levelMeter = 5;
 }
 
 message StreamSessionRequest {

@@ -17,6 +17,9 @@ message RecorderStatus {
     SignalStatus signalStatus = 3;
     double rmsPercent = 4;
     bool clipping = 5;
+    // Highest absolute sample of the same window as rmsPercent, in percent of
+    // full scale. Recorders older than this field leave it at 0.
+    double peakPercent = 6;
 }
 
 message Respone {

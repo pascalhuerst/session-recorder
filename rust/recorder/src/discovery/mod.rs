@@ -92,6 +92,7 @@ pub enum DiscoveryMethod {
 /// A pluggable service-discovery backend. Both backends report the same
 /// [`ServiceEvent`] stream so callers don't care which one is active.
 #[async_trait::async_trait]
+#[allow(clippy::double_must_use)]
 pub trait ServiceDiscovery: Send {
     /// Start discovering services, returning a receiver of discovery events.
     async fn start(&mut self) -> anyhow::Result<mpsc::UnboundedReceiver<ServiceEvent>>;

@@ -1214,8 +1214,7 @@ impl SessionRecorder {
                     // Update the meter accumulator frame by frame and emit a
                     // LevelUpdate every meter_window_frames; a single chunk may
                     // close zero, one, or several meter windows.
-                    for frame in chunk.chunks_exact(2) {
-                        let (l, r) = (frame[0], frame[1]);
+                    for &[l, r] in chunk.as_chunks::<2>().0 {
                         let (al, ar) = (l.abs(), r.abs());
                         if al > meter_peak_l { meter_peak_l = al; }
                         if ar > meter_peak_r { meter_peak_r = ar; }

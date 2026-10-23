@@ -1,3 +1,6 @@
+// tonic::Status (and the generated tonic client code) is large by design.
+#![allow(clippy::result_large_err)]
+
 pub mod audio {
     pub mod alsa;
     pub mod callback_thread;

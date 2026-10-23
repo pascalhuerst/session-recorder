@@ -17,6 +17,7 @@ import (
 	sspb "github.com/pascalhuerst/session-recorder/protocols/go/sessionsource"
 	"github.com/pascalhuerst/session-recorder/storage"
 	"github.com/rs/zerolog/log"
+	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/durationpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -38,6 +39,7 @@ type SessionSourceHandler struct {
 	emailSender         *email.Sender
 	fileSharer          fileshare.FileSharer
 	renderSemaphore     chan struct{} // Limits concurrent segment renders
+	levelMeter          sspb.LevelMeter
 }
 
 func NewSessionSourceHandler(
@@ -48,6 +50,7 @@ func NewSessionSourceHandler(
 	audioBroadcaster *broadcast.AudioBroadcaster,
 	emailSender *email.Sender,
 	fileSharer fileshare.FileSharer,
+	levelMeter sspb.LevelMeter,
 ) *SessionSourceHandler {
 	h := &SessionSourceHandler{
 		sessionStorage:      sessionStorage,
@@ -58,6 +61,7 @@ func NewSessionSourceHandler(
 		emailSender:         emailSender,
 		fileSharer:          fileSharer,
 		renderSemaphore:     make(chan struct{}, maxConcurrentRenders),
+		levelMeter:          levelMeter,
 	}
 
 	// Register callback for session state changes (RECORDING, PROCESSING, FINISHED)
@@ -348,7 +352,7 @@ func (h *SessionSourceHandler) streamRecorders(ctx context.Context, request *ssp
 			}
 		}
 
-		if err := server.SendMsg(recorderMsg); err != nil {
+		if err := server.SendMsg(h.withLevelMeter(recorderMsg)); err != nil {
 			log.Err(err).Msg("Cannot send recorder data")
 		}
 	}
@@ -360,7 +364,7 @@ func (h *SessionSourceHandler) streamRecorders(ctx context.Context, request *ssp
 				// Channel closed, subscriber was removed
 				return nil
 			}
-			if err := server.SendMsg(recorder); err != nil {
+			if err := server.SendMsg(h.withLevelMeter(recorder)); err != nil {
 				log.Err(err).Msg("Cannot send recorder data")
 			}
 		case <-ctx.Done():
@@ -368,6 +372,28 @@ func (h *SessionSourceHandler) streamRecorders(ctx context.Context, request *ssp
 			return nil
 		}
 	}
+}
+
+// withLevelMeter returns a copy of a recorder message carrying the configured
+// level meter. The message itself is shared with the broadcaster's cache and
+// other subscribers, so it is not modified.
+func (h *SessionSourceHandler) withLevelMeter(recorder *sspb.Recorder) *sspb.Recorder {
+	out := proto.Clone(recorder).(*sspb.Recorder)
+	out.LevelMeter = h.levelMeter
+	return out
+}
+
+// parseLevelMeter maps the --level-meter option to its protocol value.
+func parseLevelMeter(name string) (sspb.LevelMeter, error) {
+	switch strings.ToLower(strings.TrimSpace(name)) {
+	case "both":
+		return sspb.LevelMeter_LEVEL_METER_BOTH, nil
+	case "rms":
+		return sspb.LevelMeter_LEVEL_METER_RMS, nil
+	case "peak":
+		return sspb.LevelMeter_LEVEL_METER_PEAK, nil
+	}
+	return sspb.LevelMeter_LEVEL_METER_BOTH, fmt.Errorf("unknown level meter %q (want both, rms or peak)", name)
 }
 
 func (h *SessionSourceHandler) streamSessions(ctx context.Context, request *sspb.StreamSessionRequest, server sspb.SessionSource_StreamSessionsServer) error {

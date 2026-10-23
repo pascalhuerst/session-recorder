@@ -179,6 +179,7 @@ impl StatusReaderService {
                     signal_status: 0, // Unknown
                     rms_percent: 0.0,
                     clipping: false,
+                    peak_percent: 0.0,
                 };
 
                 statuses.insert(
@@ -261,6 +262,7 @@ mod tests {
             signal_status: SignalStatus::Signal.into(),
             rms_percent: 50.0,
             clipping: false,
+            peak_percent: 70.0,
         };
 
         let request = Request::new(status.clone());

@@ -1,11 +1,19 @@
 <script setup lang="ts">
-defineProps<{
-  value: number;
-}>();
+withDefaults(
+  defineProps<{
+    value: number;
+    // Short name shown in front of the meter, e.g. "RMS" or "Peak".
+    label?: string;
+    // The percentage turns red above this value.
+    warnAbove?: number;
+  }>(),
+  { label: undefined, warnAbove: 100 },
+);
 </script>
 
 <template>
   <div class="status">
+    <div v-if="label" class="label">{{ label }}</div>
     <div class="track">
       <div
         class="indicator"
@@ -14,7 +22,9 @@ defineProps<{
         }"
       ></div>
     </div>
-    <div class="text">{{ Math.ceil(value) }}%</div>
+    <div class="text" :class="{ hot: value > warnAbove }">
+      {{ Math.ceil(value) }}%
+    </div>
   </div>
 </template>
 
@@ -27,10 +37,19 @@ defineProps<{
   min-width: 0;
 }
 
+.label,
 .text {
   font-size: var(--scale-00);
   color: var(--text-secondary);
   flex-shrink: 0;
+}
+
+.label {
+  width: 2.5em;
+}
+
+.text.hot {
+  color: var(--color-red-500);
 }
 
 .indicator {

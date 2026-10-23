@@ -55,6 +55,10 @@ export interface Recorder {
     } | {
         oneofKind: undefined;
     };
+    /**
+     * @generated from protobuf field: sessionsource.LevelMeter levelMeter = 5
+     */
+    levelMeter: LevelMeter;
 }
 /**
  * @generated from protobuf message sessionsource.StreamSessionRequest
@@ -438,6 +442,26 @@ export interface AudioChunk {
     timestamp?: Timestamp;
 }
 /**
+ * Which level meter(s) a client shows for a recorder. Chosen with the
+ * backend's --level-meter option.
+ *
+ * @generated from protobuf enum sessionsource.LevelMeter
+ */
+export enum LevelMeter {
+    /**
+     * @generated from protobuf enum value: LEVEL_METER_BOTH = 0;
+     */
+    BOTH = 0,
+    /**
+     * @generated from protobuf enum value: LEVEL_METER_RMS = 1;
+     */
+    RMS = 1,
+    /**
+     * @generated from protobuf enum value: LEVEL_METER_PEAK = 2;
+     */
+    PEAK = 2
+}
+/**
  * @generated from protobuf enum sessionsource.SegmentState
  */
 export enum SegmentState {
@@ -570,7 +594,8 @@ class Recorder$Type extends MessageType<Recorder> {
             { no: 1, name: "recorderID", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
             { no: 2, name: "recorderName", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
             { no: 3, name: "status", kind: "message", oneof: "info", T: () => RecorderStatus },
-            { no: 4, name: "removed", kind: "message", oneof: "info", T: () => RecordereRemoved }
+            { no: 4, name: "removed", kind: "message", oneof: "info", T: () => RecordereRemoved },
+            { no: 5, name: "levelMeter", kind: "enum", T: () => ["sessionsource.LevelMeter", LevelMeter, "LEVEL_METER_"] }
         ]);
     }
     create(value?: PartialMessage<Recorder>): Recorder {
@@ -578,6 +603,7 @@ class Recorder$Type extends MessageType<Recorder> {
         message.recorderID = "";
         message.recorderName = "";
         message.info = { oneofKind: undefined };
+        message.levelMeter = 0;
         if (value !== undefined)
             reflectionMergePartial<Recorder>(this, message, value);
         return message;
@@ -605,6 +631,9 @@ class Recorder$Type extends MessageType<Recorder> {
                         removed: RecordereRemoved.internalBinaryRead(reader, reader.uint32(), options, (message.info as any).removed)
                     };
                     break;
+                case /* sessionsource.LevelMeter levelMeter */ 5:
+                    message.levelMeter = reader.int32();
+                    break;
                 default:
                     let u = options.readUnknownField;
                     if (u === "throw")
@@ -629,6 +658,9 @@ class Recorder$Type extends MessageType<Recorder> {
         /* sessionsource.RecordereRemoved removed = 4; */
         if (message.info.oneofKind === "removed")
             RecordereRemoved.internalBinaryWrite(message.info.removed, writer.tag(4, WireType.LengthDelimited).fork(), options).join();
+        /* sessionsource.LevelMeter levelMeter = 5; */
+        if (message.levelMeter !== 0)
+            writer.tag(5, WireType.Varint).int32(message.levelMeter);
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);

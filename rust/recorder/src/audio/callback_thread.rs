@@ -120,10 +120,10 @@ pub fn start_callback_thread(
                                 // a dead capture thread silently freezes the
                                 // whole recorder.
                                 warn!("Capture read error: {} (errno {})", e, e.errno());
-                                if capture_pcm.try_recover(e, true).is_err()
-                                    && let Err(re) = reinit_capture(&capture_pcm)
-                                {
-                                    error!("Capture reinit failed: {}", re);
+                                if capture_pcm.try_recover(e, true).is_err() {
+                                    if let Err(re) = reinit_capture(&capture_pcm) {
+                                        error!("Capture reinit failed: {}", re);
+                                    }
                                 }
                             }
                         }

@@ -141,10 +141,10 @@ impl InputKey {
         info!("Stopping input key monitoring...");
         self.terminate_request.store(true, Ordering::Relaxed);
 
-        if let Some(handle) = self.worker_handle.take()
-            && let Err(e) = handle.join()
-        {
-            error!("Error joining worker thread: {:?}", e);
+        if let Some(handle) = self.worker_handle.take() {
+            if let Err(e) = handle.join() {
+                error!("Error joining worker thread: {:?}", e);
+            }
         }
 
         self.is_running.store(false, Ordering::Relaxed);
@@ -239,8 +239,10 @@ impl InputKey {
                     // Key release: hold = release timestamp − press timestamp, both
                     // from the kernel, so the 100 ms poll cadence can't skew it.
                     if let Some(press_time) = key_event.press_timestamp.take() {
-                        let hold_duration =
-                            event.timestamp().duration_since(press_time).unwrap_or_default();
+                        let hold_duration = event
+                            .timestamp()
+                            .duration_since(press_time)
+                            .unwrap_or_default();
                         (key_event.release_callback)(hold_duration);
                     } else {
                         // Release without corresponding press - still call the callback

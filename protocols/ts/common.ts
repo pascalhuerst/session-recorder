@@ -34,6 +34,13 @@ export interface RecorderStatus {
      * @generated from protobuf field: bool clipping = 5
      */
     clipping: boolean;
+    /**
+     * Highest absolute sample of the same window as rmsPercent, in percent of
+     * full scale. Recorders older than this field leave it at 0.
+     *
+     * @generated from protobuf field: double peakPercent = 6
+     */
+    peakPercent: number;
 }
 /**
  * @generated from protobuf message common.Respone
@@ -73,7 +80,8 @@ class RecorderStatus$Type extends MessageType<RecorderStatus> {
             { no: 2, name: "recorderName", kind: "scalar", T: 9 /*ScalarType.STRING*/ },
             { no: 3, name: "signalStatus", kind: "enum", T: () => ["common.SignalStatus", SignalStatus] },
             { no: 4, name: "rmsPercent", kind: "scalar", T: 1 /*ScalarType.DOUBLE*/ },
-            { no: 5, name: "clipping", kind: "scalar", T: 8 /*ScalarType.BOOL*/ }
+            { no: 5, name: "clipping", kind: "scalar", T: 8 /*ScalarType.BOOL*/ },
+            { no: 6, name: "peakPercent", kind: "scalar", T: 1 /*ScalarType.DOUBLE*/ }
         ]);
     }
     create(value?: PartialMessage<RecorderStatus>): RecorderStatus {
@@ -83,6 +91,7 @@ class RecorderStatus$Type extends MessageType<RecorderStatus> {
         message.signalStatus = 0;
         message.rmsPercent = 0;
         message.clipping = false;
+        message.peakPercent = 0;
         if (value !== undefined)
             reflectionMergePartial<RecorderStatus>(this, message, value);
         return message;
@@ -106,6 +115,9 @@ class RecorderStatus$Type extends MessageType<RecorderStatus> {
                     break;
                 case /* bool clipping */ 5:
                     message.clipping = reader.bool();
+                    break;
+                case /* double peakPercent */ 6:
+                    message.peakPercent = reader.double();
                     break;
                 default:
                     let u = options.readUnknownField;
@@ -134,6 +146,9 @@ class RecorderStatus$Type extends MessageType<RecorderStatus> {
         /* bool clipping = 5; */
         if (message.clipping !== false)
             writer.tag(5, WireType.Varint).bool(message.clipping);
+        /* double peakPercent = 6; */
+        if (message.peakPercent !== 0)
+            writer.tag(6, WireType.Bit64).double(message.peakPercent);
         let u = options.writeUnknownFields;
         if (u !== false)
             (u == true ? UnknownFieldHandler.onWrite : u)(this.typeName, message, writer);

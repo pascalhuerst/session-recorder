@@ -78,6 +78,8 @@ func main() {
 	retentionPeriod := flag.Duration("retention-period", utils.GetDurationWithDefault("RETENTION_PERIOD", defaultLifetime), "How long finished, non-kept sessions are retained before deletion (env: RETENTION_PERIOD)")
 	retentionInterval := flag.Duration("retention-interval", utils.GetDurationWithDefault("RETENTION_INTERVAL", defaultRetentionInterval), "How often the retention sweeper runs (env: RETENTION_INTERVAL)")
 
+	levelMeterName := flag.String("level-meter", utils.GetWithDefault("LEVEL_METER", "both"), "Level meter(s) the web interface shows per recorder: both, rms or peak (env: LEVEL_METER)")
+
 	// Storage backend selection.
 	storageFsRoot := flag.String("storage-fs-root", utils.GetWithDefault("STORAGE_FS_ROOT", ""),
 		"Path to use as the root of a local filesystem storage backend (env: STORAGE_FS_ROOT).\n"+
@@ -112,6 +114,11 @@ func main() {
 	s3PublicPort := flag.Int("s3-public-port", utils.GetIntWithDefault("S3_PUBLIC_PORT", 0), "S3 port for email sharing URLs (env: S3_PUBLIC_PORT, default: s3-local-port)")
 
 	flag.Parse()
+
+	levelMeter, err := parseLevelMeter(*levelMeterName)
+	if err != nil {
+		log.Fatal().Err(err).Msg("Invalid --level-meter")
+	}
 
 	// Keep the UI-reported lifetime in lockstep with actual deletion timing.
 	sessionLifetime = *retentionPeriod
@@ -219,7 +226,7 @@ func main() {
 		return
 	}
 
-	sessionSourceHandler := NewSessionSourceHandler(sessionStorage, chunkSinkServer, recorderBroadcaster, sessionBroadcaster, audioBroadcaster, emailSender, fileSharer)
+	sessionSourceHandler := NewSessionSourceHandler(sessionStorage, chunkSinkServer, recorderBroadcaster, sessionBroadcaster, audioBroadcaster, emailSender, fileSharer, levelMeter)
 
 	// Periodic background maintenance: delete finished, non-kept sessions older
 	// than the retention period, and backfill missing preview thumbnails (runs

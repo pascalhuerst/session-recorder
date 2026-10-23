@@ -47,6 +47,7 @@ services:
       - S3_ACCESS_KEY=admin
       - S3_SECRET_KEY=password123
       - S3_USE_SSL=false
+      - LEVEL_METER=${LEVEL_METER:-both}
     depends_on:
       - protocols
       - minio

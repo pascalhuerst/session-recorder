@@ -29,7 +29,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
-use std::time::{Duration, SystemTime};
+use std::time::{Duration, Instant, SystemTime};
 use tokio::time::interval;
 use tonic::Request;
 use tonic::transport::Channel;
@@ -49,6 +49,10 @@ const CLIPPING_THRESHOLD: f32 = 32767.0 / 32768.0;
 // has a live gRPC client. Catches reconnects after backend restarts when no
 // fresh mDNS event would otherwise wake us up.
 const RECONCILE_INTERVAL: Duration = Duration::from_secs(5);
+// A known service that has had no live client for this long (every re-attach
+// attempt failing) is forgotten, so we stop retrying a sink that vanished
+// without an mDNS goodbye. A fresh announcement brings it back.
+const SERVICE_STALE_TIMEOUT: Duration = Duration::from_secs(180);
 
 // One captured "frame" is one inter-channel sample (NUM_CHANNELS samples). On
 // the wire samples are packed little-endian s16 (AudioChunk.data is `bytes`),
@@ -964,6 +968,8 @@ impl SessionRecorder {
         // client got dropped (e.g. the backend restarted under us) without a
         // fresh mDNS event firing.
         let mut known_services: HashMap<String, ServiceInfo> = HashMap::new();
+        // When each known service was first seen without a live client.
+        let mut unreachable_since: HashMap<String, Instant> = HashMap::new();
         let mut reconcile_tick = tokio::time::interval(RECONCILE_INTERVAL);
         // First tick fires immediately; skip it so we don't reconcile-before-we-discover.
         reconcile_tick.tick().await;
@@ -979,6 +985,7 @@ impl SessionRecorder {
                     match event {
                         ServiceEvent::ServiceDiscovered(service_info) => {
                             info!("Discovered service: {}", service_info.instance_name);
+                            unreachable_since.remove(&service_info.instance_name);
                             known_services.insert(service_info.instance_name.clone(), service_info.clone());
                             Self::try_attach_service(
                                 &service_info,
@@ -991,6 +998,8 @@ impl SessionRecorder {
                             .await;
                         }
                         ServiceEvent::ServiceUpdated(service_info) => {
+                            // A fresh announcement proves the sink is alive.
+                            unreachable_since.remove(&service_info.instance_name);
                             known_services.insert(service_info.instance_name.clone(), service_info.clone());
 
                             let already_connected = clients
@@ -1021,6 +1030,7 @@ impl SessionRecorder {
                         ServiceEvent::ServiceRemoved(instance_name) => {
                             info!("Service removed: {}", instance_name);
                             known_services.remove(&instance_name);
+                            unreachable_since.remove(&instance_name);
 
                             if let Some(mut client_info) = clients.lock().await.remove(&instance_name) {
                                 client_info.client.disconnect().await;
@@ -1042,6 +1052,27 @@ impl SessionRecorder {
                         .keys()
                         .cloned()
                         .collect();
+
+                    unreachable_since.retain(|name, _| !connected.contains(name));
+
+                    let now = Instant::now();
+                    let stale: Vec<String> = known_services
+                        .keys()
+                        .filter(|name| !connected.contains(*name))
+                        .filter(|name| {
+                            now.duration_since(*unreachable_since.entry((*name).clone()).or_insert(now))
+                                >= SERVICE_STALE_TIMEOUT
+                        })
+                        .cloned()
+                        .collect();
+                    for name in stale {
+                        warn!(
+                            "Service {} unreachable for {:?}, forgetting it until it is announced again",
+                            name, SERVICE_STALE_TIMEOUT
+                        );
+                        known_services.remove(&name);
+                        unreachable_since.remove(&name);
+                    }
 
                     for (name, info) in &known_services {
                         if connected.contains(name) {
